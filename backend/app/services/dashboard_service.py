@@ -315,6 +315,11 @@ class DashboardService:
         reports = self.repo.get_all_in_range(f)
         return MetricsService.calculate_hazard_frequency(reports)
 
+    def get_ssp_risk_trends(self, **overrides) -> Dict[str, Any]:
+        f = self._base_filter(**overrides)
+        reports = self.repo.get_all_in_range(f)
+        return MetricsService.calculate_ssp_risk_trends(reports)
+
     def get_actions_summary(self, **overrides) -> Dict[str, Any]:
         f = self._base_filter(**overrides)
         reports = self.repo.get_all_in_range(f)

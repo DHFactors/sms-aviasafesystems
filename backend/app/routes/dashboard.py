@@ -129,6 +129,21 @@ async def get_monthly_trends(
     return _envelope(data)
 
 
+@router.get("/risk-trends")
+async def get_ssp_risk_trends(
+    days: int = Query(730, ge=30, le=1825),
+    user: Dict[str, Any] = Depends(get_tenant_user),
+):
+    """Tenant-scoped quarterly SSP risk trend (avg risk-index per SSP category).
+
+    Operators see only their own aggregated, anonymized risk evolution —
+    never another tenant's data and never individual report content.
+    """
+    svc = DashboardService(user)
+    data = _safe_airline("get_ssp_risk_trends", svc, days=days)
+    return _envelope(data)
+
+
 @router.get("/hazards")
 async def get_hazard_frequency(
     days: int = Query(90, ge=1, le=365),

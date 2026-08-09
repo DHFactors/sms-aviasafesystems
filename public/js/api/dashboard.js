@@ -10,6 +10,9 @@ const DashboardAPI = {
     getMonthlyTrends: (days = 180) =>
         ApiClient.get(`/api/dashboard/trends?days=${days}`),
 
+    getSSPRiskTrends: (days = 730) =>
+        ApiClient.get(`/api/dashboard/risk-trends?days=${days}`),
+
     getHazardFrequency: (days = 90) =>
         ApiClient.get(`/api/dashboard/hazards?days=${days}`),
 

@@ -248,3 +248,119 @@ class MetricsService:
             "safety_actions_overdue": 0,
             "investigation_backlog": investigations,
         }
+
+    # ICAO ADREP occurrence categories → SMS taxonomy (mirrors CAAN dashboard
+    # mapping and the seed ICAO_TO_TAXONOMY table).
+    ICAO_TO_TAXONOMY = {
+        "LOCI": "Organizational-Facilities",
+        "CFIT": "Organizational-Facilities",
+        "RE": "Organizational-Facilities",
+        "RI": "Organizational-Facilities",
+        "GCOL": "Organizational-Facilities",
+        "MAC": "Technical",
+        "ENG": "Technical",
+        "SYS": "Technical",
+        "FIRE": "Technical",
+        "BIRD": "Wildlife",
+        "CABIN": "Human Factors",
+        "ARC": "Organizational-Documentation, Processes and Procedures",
+        "PRO": "Organizational-Documentation, Processes and Procedures",
+        "WX": "Environmental",
+        "OTHER": "Other",
+    }
+
+    @staticmethod
+    def _ssp_category(report: dict) -> str:
+        """Map a report to one of the five SSP risk categories used by the
+        CAAN and operator risk-trend charts.
+        """
+        taxonomy = (
+            report.get("taxonomy")
+            or MetricsService.ICAO_TO_TAXONOMY.get(
+                (report.get("occurrence_category") or "").upper(), "Other"
+            )
+            or "Other"
+        )
+        if taxonomy == "Technical":
+            return "Technical"
+        if taxonomy in ("Wildlife", "Environmental"):
+            return "External"
+        if taxonomy == "Human Factors":
+            return "Human Factors"
+        if taxonomy.startswith("Organizational"):
+            return "Organizational"
+        return "Operational"
+
+    @staticmethod
+    def _report_quarter(report: dict) -> Optional[str]:
+        raw = (
+            report.get("created_at")
+            or report.get("occurrence_date")
+        )
+        if not raw:
+            return None
+        try:
+            if isinstance(raw, str):
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            else:
+                dt = raw
+            return f"{dt.year}-Q{(dt.month - 1) // 3 + 1}"
+        except Exception:
+            return None
+
+    @staticmethod
+    def calculate_ssp_risk_trends(reports: List[dict]) -> Dict[str, Any]:
+        """Quarterly average risk-index trend per SSP category (0-100 scale).
+
+        Aggregates only aggregate-level data (category, quarter, average risk
+        index) — never individual report content. Mirrors the CAAN dashboard's
+        line chart so operators see the same SSM-aligned trend for their own
+        tenant.
+        """
+        categories = ["Operational", "Technical", "Human Factors", "Organizational", "External"]
+        quarters = set()
+        cells: Dict[str, Dict[str, Any]] = {}
+
+        for r in reports:
+            quarter = MetricsService._report_quarter(r)
+            if not quarter:
+                continue
+            quarters.add(quarter)
+            cat = MetricsService._ssp_category(r)
+            ri = r.get("risk_index")
+            if ri is None:
+                continue
+            try:
+                score = float(ri) * 4  # normalize 1-25 → 0-100
+            except (TypeError, ValueError):
+                continue
+            key = f"{quarter}|{cat}"
+            cell = cells.setdefault(key, {"sum": 0.0, "count": 0})
+            cell["sum"] += score
+            cell["count"] += 1
+
+        sorted_quarters = sorted(quarters)
+        series = []
+        for cat in categories:
+            series.append({
+                "category": cat,
+                "points": [
+                    {
+                        "quarter": q,
+                        "label": q.replace("-Q", " Q"),
+                        "avg_risk_index": (
+                            round(cells[f"{q}|{cat}"]["sum"] / cells[f"{q}|{cat}"]["count"], 1)
+                            if cells.get(f"{q}|{cat}") and cells[f"{q}|{cat}"]["count"]
+                            else None
+                        ),
+                    }
+                    for q in sorted_quarters
+                ],
+            })
+
+        return {
+            "categories": categories,
+            "quarters": sorted_quarters,
+            "labels": [q.replace("-Q", " Q") for q in sorted_quarters],
+            "series": series,
+        }

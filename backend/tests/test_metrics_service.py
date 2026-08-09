@@ -50,3 +50,64 @@ def test_calculate_org_kpis(sample_reports):
     assert result["active_reporters"] == 2
     assert result["corrective_actions_open"] == 1
     assert result["investigation_backlog"] == 1
+
+
+def test_calculate_ssp_risk_trends_empty():
+    result = MetricsService.calculate_ssp_risk_trends([])
+    assert result["quarters"] == []
+    assert len(result["series"]) == 5
+    assert all(s["points"] == [] for s in result["series"])
+
+
+def test_calculate_ssp_risk_trends_categories_and_scoring():
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    reports = [
+        {
+            "occurrence_category": "MAC",
+            "risk_index": 8,
+            "created_at": now,
+        },
+        {
+            "occurrence_category": "MAC",
+            "risk_index": 12,
+            "created_at": now,
+        },
+        {
+            "occurrence_category": "BIRD",
+            "risk_index": 4,
+            "created_at": now,
+        },
+    ]
+    result = MetricsService.calculate_ssp_risk_trends(reports)
+    assert result["quarters"] == [f"{now.year}-Q{(now.month - 1) // 3 + 1}"]
+    by_cat = {s["category"]: s for s in result["series"]}
+
+    tech = by_cat["Technical"]["points"][0]
+    assert tech["avg_risk_index"] == round(((8 + 12) / 2) * 4, 1)
+
+    ext = by_cat["External"]["points"][0]
+    assert ext["avg_risk_index"] == round(4 * 4, 1)
+
+    assert by_cat["Operational"]["points"][0]["avg_risk_index"] is None
+
+
+def test_calculate_ssp_risk_trends_ignores_no_risk_index():
+    from datetime import datetime, timezone
+
+    now = datetime.now(timezone.utc)
+    reports = [{"occurrence_category": "MAC", "created_at": now}]
+    result = MetricsService.calculate_ssp_risk_trends(reports)
+    assert result["quarters"] == [f"{now.year}-Q{(now.month - 1) // 3 + 1}"]
+    for s in result["series"]:
+        assert s["points"][0]["avg_risk_index"] is None
+
+
+def test_calculate_ssp_risk_trends_skips_bad_dates():
+    reports = [
+        {"occurrence_category": "MAC", "risk_index": 8, "created_at": "not-a-date"},
+        {"occurrence_category": "MAC", "risk_index": 8},
+    ]
+    result = MetricsService.calculate_ssp_risk_trends(reports)
+    assert result["quarters"] == []

@@ -100,6 +100,7 @@ async function loadAll() {
     await Promise.all([
         loadKpis(),
         loadRiskDistribution(),
+        loadSSMRiskTrends(),
         loadMonthlyTrends(),
         loadHazardFrequency(),
         loadRecentReports(),
@@ -140,6 +141,24 @@ async function loadRiskDistribution() {
         }
         setReady(el);
         renderRiskChart(data);
+    } catch (err) {
+        setError(el, err.message);
+    }
+}
+
+async function loadSSMRiskTrends() {
+    const el = document.getElementById('ssmRiskChart');
+    setLoading(el);
+
+    try {
+        const data = (await DashboardAPI.getSSPRiskTrends(730)) || {};
+        const labels = Array.isArray(data.labels) ? data.labels : [];
+        if (labels.length === 0) {
+            setEmpty(el, 'No SSM risk trend data available yet');
+            return;
+        }
+        setReady(el);
+        renderSSMRiskChart(data);
     } catch (err) {
         setError(el, err.message);
     }
@@ -237,6 +256,67 @@ function renderRiskChart(data) {
             },
             scales: {
                 y: { beginAtZero: true, ticks: { precision: 0 } },
+            },
+        },
+    });
+}
+
+function renderSSMRiskChart(data) {
+    destroyChart('ssmRiskChartCanvas');
+    const ctx = document.getElementById('ssmRiskChartCanvas');
+    if (!ctx) return;
+
+    const colors = {
+        Operational: '#1a73e8',
+        Technical: '#e8710a',
+        'Human Factors': '#9334e6',
+        Organizational: '#188038',
+        External: '#c5221f',
+    };
+
+    const labels = Array.isArray(data.labels) ? data.labels : [];
+    const series = Array.isArray(data.series) ? data.series : [];
+
+    chartInstances.ssmTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: series.map(s => ({
+                label: s.category,
+                data: (s.points || []).map(p => p.avg_risk_index),
+                borderColor: colors[s.category] || '#5f6368',
+                backgroundColor: (colors[s.category] || '#5f6368') + '1a',
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                tension: 0.3,
+                spanGaps: true,
+            })),
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: { display: true, text: 'Avg Risk Index (0–100)' },
+                    ticks: { precision: 0 },
+                },
+            },
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: (item) => {
+                            const v = item.raw;
+                            return v == null
+                                ? `${item.dataset.label}: no data`
+                                : `${item.dataset.label}: ${v}`;
+                        },
+                    },
+                },
             },
         },
     });
