@@ -766,3 +766,29 @@ class TestCrossTenantAndAuthorization:
         data = resp.json()
         assert data["tenant_id"] is None, resp.text
         assert data["report_type"] == "quarterly"
+
+    def test_caan_national_report_pdf_export(self, client):
+        """CAAN national report exports a valid PDF (reportlab)."""
+        from app.services.pdf_generator import HAS_REPORTLAB
+        gen = client.post(
+            "/api/v1/reporting/quarterly?year=2026&quarter=2",
+            json={},
+            headers=_auth_header("CAAN_SMD_TOKEN"),
+        )
+        assert gen.status_code == 201, gen.text
+        report_id = gen.json()["id"]
+
+        exp = client.get(
+            f"/api/v1/reporting/quarterly/{report_id}/export",
+            headers=_auth_header("CAAN_SMD_TOKEN"),
+        )
+        assert exp.status_code == 200, exp.text
+        content_type = exp.headers.get("content-type", "")
+        assert "application/pdf" in content_type, content_type
+        body = exp.content
+        assert body[:5] == b"%PDF-", "Export is not a valid PDF"
+        if HAS_REPORTLAB:
+            assert len(body) > 500, "PDF too small to contain report content"
+        else:
+            # Placeholder path still returns bytes with a PDF header
+            assert len(body) > 0

@@ -287,7 +287,12 @@ AUTHOR: AviaSAFE Systems
     <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-chart-bar"></i> National Reports</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
-            <h3><i class="fas fa-chart-bar"></i> Latest Industry Reports <a href="/reports/index.html" style="float:right;font-size:0.8rem;font-weight:400;"><i class="fas fa-external-link-alt"></i> View All</a></h3>
+            <h3><i class="fas fa-chart-bar"></i> Latest Industry Reports
+                <span style="float:right;font-size:0.8rem;font-weight:400;">
+                    <a href="/reports/generate.html" style="margin-right:0.75rem;color:#1a6b8a;"><i class="fas fa-file-pdf"></i> Generate SSP Report</a>
+                    <a href="/reports/index.html"><i class="fas fa-external-link-alt"></i> View All</a>
+                </span>
+            </h3>
             <div id="nationalReportsWidget" style="min-height:80px;">
                 <div id="nationalReportsContent"></div>
             </div>
@@ -335,6 +340,7 @@ AUTHOR: AviaSAFE Systems
 <script src="/js/verification.js"></script>
 <script src="/js/reports.js"></script>
 <script src="/js/flight_diversions.js"></script>
+<script src="/js/feedback.js"></script>
 <script>
 // ============================================================================
 // CAAN SMD DASHBOARD
@@ -888,6 +894,8 @@ async function logout() {
         console.error('Logout error:', error);
     }
 }
+
+initFeedbackWidget();
 </script>
 
 </body>

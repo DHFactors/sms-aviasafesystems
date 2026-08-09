@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     API_PREFIX_TENANTS: str = "/api/v1/tenants"
     API_PREFIX_REGULATORS: str = "/api/v1/regulators"
     API_PREFIX_CONTACT: str = "/api/v1/contact"
+    API_PREFIX_FEEDBACK: str = "/api/v1/feedback"
     API_PREFIX_AUTH_LEGACY: str = "/api/auth"
     API_PREFIX_REPORTS_LEGACY: str = "/api/reports"
     API_PREFIX_DASHBOARD_LEGACY: str = "/api/dashboard"
