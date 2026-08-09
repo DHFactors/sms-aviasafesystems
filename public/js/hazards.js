@@ -63,7 +63,7 @@ function calculateRiskIndex(severity, probability) {
     return severity * probability;
 }
 
-const ICAO_THRESHOLDS = { lowMax: 5, mediumMax: 9, highMax: 15 };
+window.ICAO_THRESHOLDS = window.ICAO_THRESHOLDS || { lowMax: 5, mediumMax: 9, highMax: 15 };
 
 function classifyHazardRisk(riskIndex) {
     if (riskIndex == null) return 'Unknown';

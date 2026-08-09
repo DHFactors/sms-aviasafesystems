@@ -1,4 +1,4 @@
-const ICAO_THRESHOLDS = { lowMax: 5, mediumMax: 9, highMax: 15 };
+window.ICAO_THRESHOLDS = window.ICAO_THRESHOLDS || { lowMax: 5, mediumMax: 9, highMax: 15 };
 
 const ICAO_COLORS = {
     Low: '#34a853',
