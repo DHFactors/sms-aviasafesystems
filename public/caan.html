@@ -208,6 +208,11 @@ AUTHOR: AviaSAFE Systems
             <div class="number" id="highRiskCount">0</div>
             <div class="label">High Risk Items</div>
         </div>
+        <div class="stat-card" onclick="window.location.href='/caan-state-risk.html'" style="cursor:pointer;" title="View national SMS health">
+            <div class="number" id="nationalSMSHealth">--</div>
+            <div class="label">National SMS Health</div>
+            <div class="label" id="nationalSMSHealthTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
+        </div>
     </div>
 
     <!-- Charts -->
@@ -468,6 +473,8 @@ async function loadIndustryData() {
         document.getElementById('highRiskCount').textContent = highRiskCount;
         document.getElementById('tenantsTableBody').innerHTML = html;
 
+        await loadNationalSmsHealth();
+
         renderCaanRiskChart(riskLevelCounts);
         renderCaanHeatMap(heatMapData);
         renderCaanTopRisks(topRisks);
@@ -486,6 +493,31 @@ async function loadIndustryData() {
                 </td>
             </tr>
         `;
+    }
+}
+
+async function loadNationalSmsHealth() {
+    const scoreEl = document.getElementById('nationalSMSHealth');
+    const tierEl = document.getElementById('nationalSMSHealthTier');
+    try {
+        const data = await ApiClient.get('/api/v1/dashboard/caan/survey-health');
+        const nat = (data && data.national) || {};
+        const v = nat.overall_sms_health;
+        scoreEl.textContent = v != null ? v.toFixed(1) : '--';
+        if (tierEl) {
+            if (v == null) {
+                tierEl.textContent = '';
+            } else {
+                const pct = ((v - 1) / 4) * 100;
+                tierEl.textContent = pct >= 85 ? 'Strong'
+                    : pct >= 70 ? 'Watch'
+                    : pct >= 50 ? 'Action' : 'Critical';
+            }
+        }
+    } catch (err) {
+        console.error('Error loading national SMS health:', err);
+        scoreEl.textContent = '--';
+        if (tierEl) tierEl.textContent = '';
     }
 }
 
