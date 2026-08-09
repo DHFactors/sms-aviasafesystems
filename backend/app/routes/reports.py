@@ -16,7 +16,8 @@ from loguru import logger
 
 from app.models.report import ReportCreate, MorCreate, ReportResponse, ReportListItem
 from app.models.hazard import HazardCreate, HazardSource, HazardTaxonomy, HazardPriority
-from app.middleware.auth import get_tenant_user, get_safety_manager
+from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
+from app.core.config import settings
 from app.services.report_service import ReportService
 from app.services.hazard_service import HazardService
 from app.services.risk_matrix import compute_risk_index, get_risk_level
@@ -163,15 +164,16 @@ async def submit_vsr(
 
 @router.get("/", response_model=List[ReportListItem])
 async def get_reports(
-    user: Dict[str, Any] = Depends(get_tenant_user),
+    user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Retrieve safety reports for the authenticated user's tenant.
+    """Retrieve safety reports.
 
     AIRLINE_ADMIN: reports scoped to their tenant.
     CAAN_SMD / SUPER_ADMIN: cross-tenant view.
     """
-    tenant_id = user["tenant_id"]
-    service = ReportService(tenant_id)
+    if not user.get("tenant_id") and user.get("role") not in settings.CROSS_TENANT_ROLES:
+        raise HTTPException(status_code=403, detail="User does not have tenant access")
+    service = ReportService(user.get("tenant_id", "default"))
 
     docs = service.get_reports(user)
     return [_to_list_item(d) for d in docs]
@@ -180,11 +182,12 @@ async def get_reports(
 @router.get("/{report_id}", response_model=ReportResponse)
 async def get_report(
     report_id: str,
-    user: Dict[str, Any] = Depends(get_tenant_user),
+    user: Dict[str, Any] = Depends(get_current_user),
 ):
     """Retrieve a single safety report by ID."""
-    tenant_id = user["tenant_id"]
-    service = ReportService(tenant_id)
+    if not user.get("tenant_id") and user.get("role") not in settings.CROSS_TENANT_ROLES:
+        raise HTTPException(status_code=403, detail="User does not have tenant access")
+    service = ReportService(user.get("tenant_id", "default"))
 
     doc = service.get_report_by_id(report_id, user)
     if not doc:
@@ -219,6 +222,12 @@ async def confirm_risk_assessment(
     return _to_report_response(updated)
 
 
+def _normalize_severity(value):
+    if value is None or isinstance(value, str):
+        return value
+    return str(value)
+
+
 def _to_report_response(data: dict) -> dict:
     """Transform stored Firestore document into ReportResponse shape."""
     keys = [
@@ -248,7 +257,9 @@ def _to_report_response(data: dict) -> dict:
         "call_sign", "organisation_comments",
         "manufacturer_advised", "fdr_data_retained",
     ]
-    return {k: data.get(k) for k in keys}
+    result = {k: data.get(k) for k in keys}
+    result["severity"] = _normalize_severity(result.get("severity"))
+    return result
 
 
 def _to_list_item(data: dict) -> dict:
@@ -265,7 +276,7 @@ def _to_list_item(data: dict) -> dict:
         "created_at": data.get("created_at"),
         "is_anonymous": data.get("is_anonymous", False),
         "occurrence_type": data.get("occurrence_type"),
-        "severity": data.get("severity"),
+        "severity": _normalize_severity(data.get("severity")),
         "risk_score": data.get("risk_score"),
         "risk_level": data.get("risk_level"),
         "severity_level": data.get("severity_level"),

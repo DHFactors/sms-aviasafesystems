@@ -152,6 +152,27 @@ def survey_doc(tid: str, answers: dict, submitted_at: datetime, idx: int) -> dic
     }
 
 
+# Mirrors app/routes/reports.py:_determine_hazard_taxonomy so seeded hazards
+# carry a taxonomy value accepted by the HazardTaxonomy enum (API contract).
+ICAO_TO_TAXONOMY = {
+    "LOCI": "Organizational-Facilities",
+    "CFIT": "Organizational-Facilities",
+    "RE": "Organizational-Facilities",
+    "RI": "Organizational-Facilities",
+    "GCOL": "Organizational-Facilities",
+    "MAC": "Technical",
+    "ENG": "Technical",
+    "SYS": "Technical",
+    "FIRE": "Technical",
+    "BIRD": "Wildlife",
+    "CABIN": "Human Factors",
+    "ARC": "Organizational-Documentation, Processes and Procedures",
+    "PRO": "Organizational-Documentation, Processes and Procedures",
+    "WX": "Environmental",
+    "OTHER": "Other",
+}
+
+
 def hazard_doc(tid: str, cat: str, created_at: datetime, idx: int) -> dict:
     severity = random.randint(2, 4)
     probability = random.randint(2, 4)
@@ -161,13 +182,14 @@ def hazard_doc(tid: str, cat: str, created_at: datetime, idx: int) -> dict:
         "hazard_id": f"{tid}-HZ-{created_at.year}-{idx:03d}",
         "title": f"Demo hazard {cat} at {tid}",
         "description": f"Seeded demonstration hazard classified as {cat}.",
-        "source": random.choice(["VSR", "MOR", "Manual"]),
+        "source": random.choice(["VSR", "MOR", "Safety Inspection"]),
         "occurrence_category": cat,
-        "taxonomy": cat,
+        "taxonomy": ICAO_TO_TAXONOMY.get(cat, "Other"),
         "severity": severity,
         "probability": probability,
         "risk_index": risk_index,
         "risk_level": get_risk_level(risk_index),
+        "priority": "H" if risk_index >= 12 else "M" if risk_index >= 6 else "L",
         "status": random.choice(["Open", "Open", "Under Review", "Closed"]),
         "created_by": "seed-caan-demo",
         "created_at": created_at,
@@ -190,7 +212,7 @@ def report_doc(tid: str, cat: str, created_at: datetime, idx: int) -> dict:
         "location": random.choice(["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]),
         "occurrence_type": "Report",
         "occurrence_category": cat,
-        "severity": severity,
+        "severity": str(severity),
         "severity_level": severity,
         "probability": probability,
         "probability_level": probability,

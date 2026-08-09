@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import Dict, Any, Optional, List
 from loguru import logger
 
-from app.models.hazard import HazardCreate, HazardUpdate, HazardResponse, HazardListItem, HazardStatus
+from app.models.hazard import HazardCreate, HazardUpdate, HazardResponse, HazardListItem, HazardStatus, HazardSource, HazardTaxonomy
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.services.hazard_service import HazardService
 from app.services.audit_service import log_audit, request_context
@@ -138,18 +138,57 @@ async def assign_hazard(
     return _to_hazard_response(updated)
 
 
+_VALID_SOURCES = {s.value for s in HazardSource}
+_VALID_TAXONOMIES = {t.value for t in HazardTaxonomy}
+
+
+def _normalize_source(value):
+    if value in _VALID_SOURCES:
+        return value
+    return "Internal Audit"
+
+
+def _normalize_taxonomy(value, occurrence_category=None):
+    if value in _VALID_TAXONOMIES:
+        return value
+    taxonomy_map = {
+        "BIRD": "Wildlife",
+        "FIRE": "Technical",
+        "ENG": "Technical",
+        "SYS": "Technical",
+        "MAC": "Technical",
+        "CFIT": "Organizational-Facilities",
+        "GCOL": "Organizational-Facilities",
+        "RI": "Organizational-Facilities",
+        "RE": "Organizational-Facilities",
+        "LOCI": "Organizational-Facilities",
+        "CABIN": "Human Factors",
+        "PRO": "Organizational-Documentation, Processes and Procedures",
+        "ARC": "Organizational-Documentation, Processes and Procedures",
+        "WX": "Environmental",
+    }
+    mapped = taxonomy_map.get((occurrence_category or value or "").upper())
+    return mapped or "Other"
+
+
+def _normalize_priority(value):
+    if value in ("H", "M", "L"):
+        return value
+    return "M"
+
+
 def _to_hazard_response(data: dict) -> dict:
     return {
         "id": data.get("id", ""),
         "hazard_id": data.get("hazard_id", ""),
         "title": data.get("title", ""),
         "description": data.get("description", ""),
-        "source": data.get("source", ""),
+        "source": _normalize_source(data.get("source", "")),
         "source_id": data.get("source_id"),
         "source_url": data.get("source_url"),
         "adrep_category": data.get("adrep_category"),
         "occurrence_type": data.get("occurrence_type"),
-        "taxonomy": data.get("taxonomy", ""),
+        "taxonomy": _normalize_taxonomy(data.get("taxonomy", ""), data.get("occurrence_category")),
         "taxonomy_specific": data.get("taxonomy_specific"),
         "consequence": data.get("consequence"),
         "severity": data.get("severity"),
@@ -157,7 +196,7 @@ def _to_hazard_response(data: dict) -> dict:
         "risk_index": data.get("risk_index"),
         "risk_level": data.get("risk_level"),
         "risk_outcome": data.get("risk_outcome"),
-        "priority": data.get("priority", ""),
+        "priority": _normalize_priority(data.get("priority", "")),
         "recommended_action": data.get("recommended_action"),
         "corrective_action": data.get("corrective_action"),
         "assigned_to": data.get("assigned_to"),
@@ -183,9 +222,9 @@ def _to_list_item(data: dict) -> dict:
         "id": data.get("id", ""),
         "hazard_id": data.get("hazard_id", ""),
         "title": data.get("title", ""),
-        "source": data.get("source", ""),
-        "taxonomy": data.get("taxonomy", ""),
-        "priority": data.get("priority", ""),
+        "source": _normalize_source(data.get("source", "")),
+        "taxonomy": _normalize_taxonomy(data.get("taxonomy", ""), data.get("occurrence_category")),
+        "priority": _normalize_priority(data.get("priority", "")),
         "risk_level": data.get("risk_level"),
         "status": data.get("status", "Open"),
         "assigned_to": data.get("assigned_to"),

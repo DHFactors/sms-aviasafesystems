@@ -671,6 +671,13 @@ class TestCrossTenantAndAuthorization:
         assert confirmed["risk_assessment"]["severity"] == 4, resp3.text
         assert confirmed["risk_level"] == "Medium"
 
+    def test_caan_lists_reports_across_tenants(self, client):
+        """CAAN (no tenant claim) can list reports across tenants (regression for
+        the 403 thrown when GET /api/v1/reports used get_tenant_user)."""
+        resp = client.get("/api/v1/reports/",
+                          headers=_auth_header("CAAN_SMD_TOKEN"))
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
     def test_caan_reads_can_caps_across_tenants(self, client):
         """CAAN can list CAPs and latest-CAP across tenants (UAT-002)."""
         can_body = {
