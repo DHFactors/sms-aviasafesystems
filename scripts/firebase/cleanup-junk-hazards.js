@@ -1,7 +1,9 @@
 'use strict';
 // Backup + delete junk hazards from the beta DB.
-// Junk = hazards with no seed_version OR created_by starting with "user_"
-// Seeded hazards (seed_version=caan-demo-1, created_by=seed-caan-demo) are kept.
+// Junk = hazards that are (a) not seeded AND (b) created by a demo/test user
+// AND (c) NOT derived from a report (no source_id). Auto-created hazards from
+// report submissions carry source_id=<report.id> and must be kept even though
+// they have created_by="user_*" and no seed_version.
 // Usage: node scripts/firebase/cleanup-junk-hazards.js [databaseId] [--only-tara]
 const fs = require('fs');
 const path = require('path');
@@ -45,7 +47,9 @@ const app = admin.initializeApp({
         const kept = [];
         for (const doc of snap.docs) {
             const d = doc.data() || {};
-            const isJunk = !d.seed_version || String(d.created_by || '').startsWith('user_');
+            const isJunk = !d.seed_version
+                && String(d.created_by || '').startsWith('user_')
+                && !d.source_id;
             const rec = {
                 docId: doc.id,
                 hazard_id: d.hazard_id || null,
