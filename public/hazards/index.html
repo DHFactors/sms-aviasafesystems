@@ -51,6 +51,11 @@
         .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
         .loading-state i { font-size: 1.5rem; margin-right: 0.5rem; }
         .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+        .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; }
+        .page-btn { background: #fff; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
+        .page-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #1a6b8a; color: #1a6b8a; }
+        .page-btn:disabled { opacity: 0.4; cursor: default; }
+        .page-info { font-size: 0.85rem; color: #64748b; }
         @media (max-width: 768px) {
             .filter-bar { flex-direction: column; align-items: stretch; }
             .header-bar { flex-direction: column; align-items: stretch; }
@@ -134,6 +139,7 @@
             <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.5rem;"></i>
             <p>No hazards found.</p>
         </div>
+        <div id="pagination" class="pagination" style="display:none;"></div>
     </div>
 </div>
 
@@ -148,6 +154,8 @@ let currentUser = null;
 let allHazards = [];
 let sortKey = 'created_at';
 let sortDir = -1;
+const PAGE_SIZE = 10;
+let currentPage = 1;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -224,6 +232,7 @@ async function loadHazards() {
         const data = await HazardsAPI.list(getFilters());
         loading.style.display = 'none';
         allHazards = Array.isArray(data) ? data : [];
+        currentPage = 1;
         renderTable();
     } catch (err) {
         loading.style.display = 'none';
@@ -272,10 +281,16 @@ function renderTable() {
     tbody.innerHTML = '';
     if (rows.length === 0) {
         empty.style.display = 'block';
+        renderPagination(0);
         return;
     }
     empty.style.display = 'none';
-    rows.forEach(function(h) {
+    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageRows = rows.slice(start, start + PAGE_SIZE);
+    pageRows.forEach(function(h) {
         const tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
         tr.addEventListener('click', function() {
@@ -296,6 +311,33 @@ function renderTable() {
             <td>${formatDate(h.created_at)}</td>
         `;
         tbody.appendChild(tr);
+    });
+    renderPagination(rows.length);
+}
+
+function renderPagination(total) {
+    const container = document.getElementById('pagination');
+    if (!container) return;
+    if (total <= PAGE_SIZE) {
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'flex';
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, total);
+    container.innerHTML = `
+        <button class="page-btn" id="pagePrev" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i> Previous</button>
+        <span class="page-info">Showing ${start}–${end} of ${total} · Page ${currentPage} of ${totalPages}</span>
+        <button class="page-btn" id="pageNext" ${currentPage === totalPages ? 'disabled' : ''}>Next <i class="fas fa-chevron-right"></i></button>
+    `;
+    document.getElementById('pagePrev').addEventListener('click', function() {
+        currentPage--;
+        renderTable();
+    });
+    document.getElementById('pageNext').addEventListener('click', function() {
+        currentPage++;
+        renderTable();
     });
 }
 
