@@ -2,7 +2,7 @@
 // Mint a Firebase ID token for load testing.
 //
 // Usage:
-//   node load-tests/get-token.mjs safety.tara-air@taraair.com <password>
+//   node load-tests/get-token.mjs safety@tara-air.com 'TARA-Safety-2026'
 //   LOADTEST_TOKEN=$(node load-tests/get-token.mjs <email> <password>)
 //
 // The token is valid for 1 hour. Re-mint it before each load test run.

@@ -1,6 +1,14 @@
 from loguru import logger
 
-from seed.config import DEMO_USERS, OPERATOR_PROFILES, NEPALI_NAMES, DEMO_USER_PASSWORD
+from seed.config import (
+    DEMO_USERS,
+    OPERATOR_PROFILES,
+    NEPALI_NAMES,
+    DEMO_USER_PASSWORD,
+    SIMPLIFIED_ROLE_ACCOUNTS,
+    simplified_email,
+    simplified_password,
+)
 from seed.generator import SeededRandom
 
 
@@ -45,6 +53,7 @@ def create_all_users(auth) -> list:
     for profile in OPERATOR_PROFILES:
         op_id = profile["id"]
         domain = profile["email_domain"]
+        op_name = profile["name"]
 
         sm_name = f"{rng.choice(NEPALI_NAMES)}"
         sm_uid = f"sm-{op_id}-001"
@@ -84,6 +93,20 @@ def create_all_users(auth) -> list:
             "tenant_id": op_id,
         }
         created_users.append(create_user(auth, mgr_user))
+
+        # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
+        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+            token = role["token"]
+            role_user = {
+                "uid": f"{token}-{op_id}-001",
+                "email": simplified_email(token, op_id),
+                "password": simplified_password(token, op_id),
+                "full_name": f"{role['full_name']} ({op_name})",
+                "organization": op_name,
+                "role": role["app_role"],
+                "tenant_id": op_id,
+            }
+            created_users.append(create_user(auth, role_user))
 
     logger.info(f"Seeded {len(created_users)} users total")
     return created_users

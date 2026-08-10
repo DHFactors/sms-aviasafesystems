@@ -2,7 +2,7 @@
 # Dashboard GET endpoints are NOT rate-limited, so this is a clean latency test.
 #
 # Run:
-#   LOADTEST_TOKEN=$(node load-tests/get-token.mjs safety.tara-air@taraair.com <password>)
+#   LOADTEST_TOKEN=$(node load-tests/get-token.mjs safety@tara-air.com 'TARA-Safety-2026')
 #   artillery run load-tests/artillery/dashboard-view.yml
 
 config:

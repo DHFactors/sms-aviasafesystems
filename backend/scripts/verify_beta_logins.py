@@ -44,10 +44,12 @@ def load_credentials(date_str):
 
 
 def pick_verification_set(accounts):
-    # Prefer the Admin (Safety Manager) for each airline; include all CAAN.
+    # Prefer the Safety role account for each airline; include all CAAN.
     selected = {}
-    preferred_order = ["Admin (Safety Manager)", "Reporter (Accountable Executive)",
-                       "User (Department Manager)", "Super Admin", "CAAN SMD"]
+    preferred_order = ["Safety Manager", "CAMO Manager", "Part-145 Maintenance",
+                       "Operations Manager", "Admin (Safety Manager)",
+                       "Reporter (Accountable Executive)", "User (Department Manager)",
+                       "Super Admin", "CAAN SMD"]
     for acc in accounts:
         key = acc["tenant"]
         if key == "CAAN":

@@ -24,7 +24,7 @@ profile. Both **k6** and **Artillery** configs are provided.
 
 ```bash
 # Airline scenario (dashboard-view, report-submission):
-LOADTEST_TOKEN=$(node load-tests/get-token.mjs safety.tara-air@taraair.com '<password>')
+LOADTEST_TOKEN=$(node load-tests/get-token.mjs safety@tara-air.com 'TARA-Safety-2026')
 
 # CAAN scenario — use a CAAN_SMD / SUPER_ADMIN account instead:
 LOADTEST_TOKEN=$(node load-tests/get-token.mjs '<caan-email>' '<caan-password>')

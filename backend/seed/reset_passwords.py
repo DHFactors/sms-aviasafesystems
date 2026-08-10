@@ -2,22 +2,15 @@
 """
 Reset per-user passwords for beta testing and write a credentials document.
 
-Generates a unique, strong random password for every seeded Auth user (24 demo
-accounts), updates Firebase Auth, and writes:
+Applies the simplified 2026-08 credential scheme to the four functional role
+accounts per operator (password `{TENANT_CODE}-{ROLE}-2026`), and generates a
+unique, strong random password for the remaining seeded Auth accounts, then
+updates Firebase Auth and writes:
 
     <project_root>/BETA_CREDENTIALS_YYYY-MM-DD.md   (Markdown table)
     <project_root>/beta-testing-credentials.csv     (flat CSV backup)
 
 Columns (markdown): Tenant | Role | Email | New Password
-
-Requirements met by the generated passwords:
-  * 14+ characters
-  * upper and lower case letters
-  * at least one digit
-  * at least one special character
-
-WARNING: this OVERWRITES the shared DEFAULT_SEED_PASSWORD for every user.
-Any user not in the generated list is left untouched.
 
 The credentials document contains real passwords and is intended to be stored
 locally or shared securely. It is covered by .gitignore and must NOT be
@@ -65,7 +58,14 @@ def random_password(length: int = PASSWORD_LENGTH) -> str:
 
 
 def build_user_specs():
-    from seed.config import DEMO_USERS, OPERATOR_PROFILES
+    from seed.config import (
+        DEMO_USERS,
+        OPERATOR_PROFILES,
+        SIMPLIFIED_ROLE_ACCOUNTS,
+        simplified_email,
+        simplified_password,
+        CREDENTIAL_TENANT_CODES,
+    )
 
     specs = []
 
@@ -116,6 +116,19 @@ def build_user_specs():
                 },
             ]
         )
+        # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
+        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+            token = role["token"]
+            specs.append(
+                {
+                    "uid": f"{token}-{op_id}-001",
+                    "email": simplified_email(token, op_id),
+                    "password": simplified_password(token, op_id),
+                    "role": role["app_role"],
+                    "role_label": f"{role['full_name']}",
+                    "tenant": tenant_name,
+                }
+            )
 
     return specs
 
@@ -154,7 +167,7 @@ def main():
             errors += 1
             continue
 
-        pwd = random_password()
+        pwd = spec.get("password") or random_password()
         try:
             auth.update_user(spec["uid"], password=pwd)
             rows.append(

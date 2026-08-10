@@ -665,15 +665,6 @@ INVESTIGATION_STATUSES = ["NOT_INVESTIGATED", "INVESTIGATING", "INVESTIGATED", "
 
 DEMO_USERS = [
     {
-        "uid": "super-admin-001",
-        "email": "safety.director@caan.gov.np",
-        "password": DEMO_USER_PASSWORD,
-        "full_name": "Dr. Rajendra Prasad Acharya",
-        "organization": "CAAN",
-        "role": "SUPER_ADMIN",
-        "tenant_id": None,
-    },
-    {
         "uid": "caan-smd-001",
         "email": "sms.inspector@caan.gov.np",
         "password": DEMO_USER_PASSWORD,
@@ -713,3 +704,60 @@ OPERATOR_USER_TEMPLATES = {
         "role": "USER",
     },
 }
+
+# ============================================================================
+# Simplified credential scheme (2026-08)
+#
+# Email:   {role}@{tenant}.com          e.g. safety@buddha-air.com
+# Password: {TENANT_CODE}-{ROLE}-2026   e.g. BHA-Safety-2026
+#
+# Applied to the four functional role accounts added per operator (in addition
+# to the legacy Safety Manager / Accountable Executive / Department Manager
+# accounts above).
+# ============================================================================
+
+CREDENTIAL_TENANT_CODES = {
+    "buddha-air": "BHA",
+    "tara-air": "TARA",
+    "sita-air": "SITA",
+    "yeti-airlines": "YETI",
+    "summit-air": "SUMMIT",
+    "simrik-air": "SIMRIK",
+    "air-dynasty": "DYNASTY",
+}
+
+CREDENTIAL_EMAIL_DOMAINS = {
+    "buddha-air": "buddha-air.com",
+    "tara-air": "tara-air.com",
+    "sita-air": "sita-air.com",
+    "yeti-airlines": "yeti-airlines.com",
+    "summit-air": "summit-air.com",
+    "simrik-air": "simrik-air.com",
+    "air-dynasty": "air-dynasty.com",
+}
+
+SIMPLIFIED_ROLE_ACCOUNTS = [
+    {"token": "safety", "password_token": "Safety", "app_role": "AIRLINE_ADMIN",
+     "full_name": "Safety Manager"},
+    {"token": "camo", "password_token": "CAMO", "app_role": "AIRLINE_ADMIN",
+     "full_name": "CAMO Manager"},
+    {"token": "145", "password_token": "145", "app_role": "AIRLINE_ADMIN",
+     "full_name": "Part-145 Maintenance"},
+    {"token": "ops", "password_token": "Ops", "app_role": "AIRLINE_ADMIN",
+     "full_name": "Operations Manager"},
+]
+
+
+def simplified_email(role_token: str, op_id: str) -> str:
+    """Return the simplified-format email for a role token + operator id."""
+    return f"{role_token}@{CREDENTIAL_EMAIL_DOMAINS[op_id]}"
+
+
+def simplified_password(role_token: str, op_id: str) -> str:
+    """Return the simplified-format password for a role token + operator id."""
+    code = CREDENTIAL_TENANT_CODES[op_id]
+    pwd_token = next(
+        (r["password_token"] for r in SIMPLIFIED_ROLE_ACCOUNTS if r["token"] == role_token),
+        role_token,
+    )
+    return f"{code}-{pwd_token}-2026"
