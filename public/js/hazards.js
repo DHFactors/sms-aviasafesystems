@@ -31,6 +31,9 @@ const HAZARD_SOURCES = [
     'VSR', 'MOR', 'Quality Audit', 'Safety Inspection', 'Flight Diversion',
     'CAAN Audit', 'Internal Audit', 'Safety Survey', 'IOR', 'MOC', 'SRM Request', 'Incident'
 ];
+const HAZARD_CREATION_SOURCES = [
+    'VSR', 'MOR', 'Internal Audit', 'Quality Audit', 'CAAN Audit', 'Flight Diversion'
+];
 const HAZARD_TAXONOMIES = [
     'Organizational-Facilities',
     'Organizational-Documentation, Processes and Procedures',

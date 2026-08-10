@@ -9,8 +9,75 @@ from app.models.flight_diversion import (
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager, get_admin_user
 from app.services.flight_diversion_service import FlightDiversionService
 from app.services.audit_service import log_audit, request_context
+from app.models.hazard import HazardCreate, HazardSource, HazardTaxonomy, HazardPriority
+from app.services.hazard_service import HazardService
 
 router = APIRouter()
+
+
+_DIVERSION_REASON_TAXONOMY = {
+    "Weather": HazardTaxonomy.ENVIRONMENTAL,
+    "Technical": HazardTaxonomy.TECHNICAL,
+    "Medical": HazardTaxonomy.HUMAN_FACTORS,
+    "Fuel": HazardTaxonomy.TECHNICAL,
+    "Security": HazardTaxonomy.OTHER,
+    "Operational": HazardTaxonomy.OTHER,
+    "Airport Closure": HazardTaxonomy.OTHER,
+    "Air Traffic Control": HazardTaxonomy.OTHER,
+    "Other": HazardTaxonomy.OTHER,
+}
+
+
+def _auto_create_hazard_from_diversion(stored: dict, user: dict):
+    try:
+        tenant_id = stored.get("tenant_id")
+        doc_id = stored.get("id")
+        diversion_id = stored.get("diversion_id")
+        if not tenant_id or not doc_id:
+            return None
+        reason = stored.get("reason", "")
+        taxonomy = _DIVERSION_REASON_TAXONOMY.get(reason, HazardTaxonomy.OTHER)
+        parts = [p for p in [
+            stored.get("description"),
+            stored.get("reason_details"),
+        ] if p and p.strip()]
+        description = " ".join(parts).strip() or f"Flight diversion {diversion_id} due to {reason}."
+        title = f"Flight Diversion {diversion_id} - {stored.get('flight_number', '')} {stored.get('sector_from', '')}-{stored.get('sector_to', '')} diverted to {stored.get('diverted_to', '')}"
+
+        hazard_payload = HazardCreate(
+            title=title[:200],
+            description=description,
+            source=HazardSource.FLIGHT_DIVERSION,
+            source_id=diversion_id,
+            source_url=f"/flight_diversions/detail.html?id={doc_id}",
+            occurrence_type=f"Flight Diversion - {reason}",
+            taxonomy=taxonomy,
+            priority=HazardPriority.MEDIUM,
+            tenant_id=tenant_id,
+        )
+        service = HazardService(tenant_id)
+        created = service.create_hazard(hazard_payload.model_dump(), user)
+        logger.info(f"Auto-created hazard {created.get('hazard_id')} from diversion {diversion_id}")
+        if created:
+            diversion_service = FlightDiversionService(tenant_id)
+            diversion_service.set_hazard_link(
+                doc_id,
+                created.get("hazard_id"),
+                f"/hazards/detail.html?id={created.get('id')}",
+                user,
+            )
+            log_audit(
+                action="HAZARD_CREATED",
+                user=user.get("email"),
+                tenant_id=tenant_id,
+                target_type="hazard",
+                target_id=created.get("id"),
+                metadata={"source": "auto", "source_diversion_id": diversion_id},
+            )
+        return created
+    except Exception as e:
+        logger.warning(f"Failed to auto-create hazard from diversion: {e}")
+        return None
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -21,6 +88,7 @@ async def create_diversion(
     tenant_id = user["tenant_id"]
     service = FlightDiversionService(tenant_id)
     stored = service.create_diversion(diversion.model_dump(), user)
+    _auto_create_hazard_from_diversion(stored, user)
     return _to_diversion_response(stored)
 
 

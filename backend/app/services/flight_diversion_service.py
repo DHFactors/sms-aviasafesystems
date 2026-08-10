@@ -179,6 +179,35 @@ class FlightDiversionService:
             logger.error(f"Failed to delete diversion {diversion_id}: {e}")
             raise
 
+    def set_hazard_link(self, diversion_id: str, hazard_id: str, hazard_link_url: str, user: dict) -> Optional[dict]:
+        try:
+            docs = self._collection().get()
+            target_id = None
+            for doc in docs:
+                data = doc.to_dict()
+                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
+                    target_id = doc.id
+                    break
+            if not target_id:
+                return None
+
+            ref = self._collection().document(target_id)
+            now = datetime.now(timezone.utc)
+            ref.update({
+                "hazard_id": hazard_id,
+                "hazard_link_url": hazard_link_url,
+                "updated_at": now,
+                "updated_by": user.get("uid"),
+            })
+
+            updated = ref.get().to_dict()
+            updated["id"] = target_id
+            self._serialize_timestamps(updated)
+            return updated
+        except Exception as e:
+            logger.error(f"Failed to set hazard link for diversion {diversion_id}: {e}")
+            raise
+
     def link_to_hazard(self, diversion_id: str, hazard_id: str, user: dict) -> Optional[dict]:
         try:
             docs = self._collection().get()

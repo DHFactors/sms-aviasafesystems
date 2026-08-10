@@ -44,11 +44,21 @@ class HazardSource(str, Enum):
     INCIDENT = "Incident"
 
 
+HAZARD_CREATION_SOURCES = {
+    "VSR",
+    "MOR",
+    "Internal Audit",
+    "Quality Audit",
+    "CAAN Audit",
+    "Flight Diversion",
+}
+
+
 class HazardCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     description: str = Field(..., min_length=10)
     source: HazardSource = Field(...)
-    source_id: Optional[str] = None
+    source_id: str = Field(...)
     source_url: Optional[str] = None
 
     adrep_category: Optional[str] = None

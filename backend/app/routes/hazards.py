@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import Dict, Any, Optional, List
 from loguru import logger
 
-from app.models.hazard import HazardCreate, HazardUpdate, HazardResponse, HazardListItem, HazardStatus, HazardSource, HazardTaxonomy
+from app.models.hazard import HazardCreate, HazardUpdate, HazardResponse, HazardListItem, HazardStatus, HazardSource, HazardTaxonomy, HAZARD_CREATION_SOURCES
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.services.hazard_service import HazardService
 from app.services.audit_service import log_audit, request_context
@@ -17,6 +17,13 @@ async def create_hazard(
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     tenant_id = user["tenant_id"]
+    source_value = hazard.source.value if hasattr(hazard.source, "value") else str(hazard.source)
+    if source_value not in HAZARD_CREATION_SOURCES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Source '{source_value}' is not allowed. Allowed sources: {', '.join(sorted(HAZARD_CREATION_SOURCES))}. "
+                   f"Note: safety reports (VSR/MOR) and flight diversions are auto-registered from their registers.",
+        )
     service = HazardService(tenant_id)
     payload = hazard.model_dump()
     payload["tenant_id"] = tenant_id
@@ -30,7 +37,7 @@ async def create_hazard(
         target_id=stored.get("id"),
         ip=ip,
         request_id=request_id,
-        metadata={"source": hazard.source.value if hasattr(hazard.source, "value") else str(hazard.source)},
+        metadata={"source": source_value},
     )
     return _to_hazard_response(stored)
 
@@ -103,6 +110,13 @@ async def update_hazard(
     tenant_id = user["tenant_id"]
     service = HazardService(tenant_id)
     payload = {k: v for k, v in data.model_dump().items() if v is not None}
+    if payload.get("source"):
+        source_value = payload["source"].value if hasattr(payload["source"], "value") else str(payload["source"])
+        if source_value not in HAZARD_CREATION_SOURCES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Source '{source_value}' is not allowed. Allowed sources: {', '.join(sorted(HAZARD_CREATION_SOURCES))}.",
+            )
     updated = service.update_hazard(hazard_id, payload, user)
     if not updated:
         raise HTTPException(status_code=404, detail="Hazard not found")

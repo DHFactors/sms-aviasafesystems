@@ -81,8 +81,8 @@
                     <select class="form-control" id="fieldPriority" required></select>
                 </div>
                 <div class="form-group">
-                    <label>Source ID (Reference)</label>
-                    <input class="form-control" id="fieldSourceId" placeholder="e.g., VSR report ID">
+                    <label>Source ID (Reference) <span class="required">*</span></label>
+                    <input class="form-control" id="fieldSourceId" placeholder="e.g., VSR report ID, MOR reference" required>
                 </div>
             </div>
 
@@ -205,7 +205,7 @@ firebase.auth().onAuthStateChanged(function(user) {
 function populateDropdowns() {
     const sourceSel = document.getElementById('fieldSource');
     sourceSel.innerHTML = '<option value="">— Select —</option>' +
-        HAZARD_SOURCES.map(s => `<option value="${s}">${s}</option>`).join('');
+        HAZARD_CREATION_SOURCES.map(s => `<option value="${s}">${s}</option>`).join('');
 
     const taxSel = document.getElementById('fieldTaxonomy');
     taxSel.innerHTML = '<option value="">— Select —</option>' +
@@ -235,6 +235,8 @@ async function submitHazard() {
     if (!title || title.length < 3) { showMessage('Title is required (min 3 characters)', 'error'); return; }
     if (!description || description.length < 10) { showMessage('Description is required (min 10 characters)', 'error'); return; }
     if (!source) { showMessage('Source is required', 'error'); return; }
+    const sourceId = document.getElementById('fieldSourceId').value.trim();
+    if (!sourceId) { showMessage('Source ID (reference) is required', 'error'); return; }
     if (!taxonomy) { showMessage('Taxonomy is required', 'error'); return; }
     if (!priority) { showMessage('Priority is required', 'error'); return; }
 
@@ -247,7 +249,7 @@ async function submitHazard() {
         source,
         taxonomy,
         priority,
-        source_id: document.getElementById('fieldSourceId').value.trim() || null,
+        source_id: sourceId,
         source_url: document.getElementById('fieldSourceUrl').value.trim() || null,
         adrep_category: document.getElementById('fieldAdrep').value.trim() || null,
         occurrence_type: document.getElementById('fieldOccurrenceType').value.trim() || null,
