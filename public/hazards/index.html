@@ -28,6 +28,9 @@
         .table-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
         .table-card table { width: 100%; border-collapse: collapse; }
         .table-card th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.85rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; }
+        .table-card th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+        .table-card th.sortable:hover { color: #0b2a42; }
+        .table-card th .fa-sort, .table-card th .fa-sort-up, .table-card th .fa-sort-down { margin-left: 0.3rem; opacity: 0.6; font-size: 0.7rem; }
         .table-card td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
         .table-card tbody tr { cursor: pointer; }
         .table-card tbody tr:hover { background: #f8fafc; }
@@ -95,6 +98,13 @@
         <select id="filterSource"><option value="">All</option></select>
         <label>Taxonomy:</label>
         <select id="filterTaxonomy"><option value="">All</option></select>
+        <label>Date:</label>
+        <select id="filterDateField">
+            <option value="created_at">Created</option>
+            <option value="updated_at">Updated</option>
+        </select>
+        <input type="date" id="filterDateFrom" title="From date">
+        <input type="date" id="filterDateTo" title="To date">
         <input type="text" id="filterSearch" placeholder="Search hazard ID, title..." style="flex:1;min-width:150px;">
         <button class="btn-search" onclick="loadHazards()"><i class="fas fa-search"></i> Search</button>
         <button class="btn-clear" onclick="clearFilters()"><i class="fas fa-times"></i> Clear</button>
@@ -104,15 +114,15 @@
         <table>
             <thead>
                 <tr>
-                    <th>Hazard ID</th>
-                    <th>Title</th>
-                    <th>Source</th>
-                    <th>Taxonomy</th>
-                    <th>Priority</th>
-                    <th>Risk Level</th>
-                    <th>Status</th>
-                    <th>Assigned To</th>
-                    <th>Created</th>
+                    <th class="sortable" data-sort="hazard_id">Hazard ID <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="title">Title <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="taxonomy">Taxonomy <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="priority">Priority <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="risk_level">Risk Level <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="status">Status <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="assigned_to">Assigned To <i class="fas fa-sort"></i></th>
+                    <th class="sortable" data-sort="created_at">Created <i class="fas fa-sort"></i></th>
                 </tr>
             </thead>
             <tbody id="hazardsBody"></tbody>
@@ -135,12 +145,16 @@
 <script src="/js/can_cap.js"></script>
 <script>
 let currentUser = null;
+let allHazards = [];
+let sortKey = 'created_at';
+let sortDir = -1;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
     populateFilters();
+    initSortableHeaders();
     loadHazards();
     loadStats();
     loadCapStats();
@@ -180,6 +194,9 @@ function getFilters() {
         source: document.getElementById('filterSource').value,
         taxonomy: document.getElementById('filterTaxonomy').value,
         search: document.getElementById('filterSearch').value,
+        dateField: document.getElementById('filterDateField').value,
+        dateFrom: document.getElementById('filterDateFrom').value,
+        dateTo: document.getElementById('filterDateTo').value,
     };
 }
 
@@ -189,6 +206,9 @@ function clearFilters() {
     document.getElementById('filterSource').value = '';
     document.getElementById('filterTaxonomy').value = '';
     document.getElementById('filterSearch').value = '';
+    document.getElementById('filterDateField').value = 'created_at';
+    document.getElementById('filterDateFrom').value = '';
+    document.getElementById('filterDateTo').value = '';
     loadHazards();
 }
 
@@ -203,36 +223,108 @@ async function loadHazards() {
     try {
         const data = await HazardsAPI.list(getFilters());
         loading.style.display = 'none';
-        if (!data || data.length === 0) {
-            empty.style.display = 'block';
-            return;
-        }
-        data.forEach(h => {
-            const tr = document.createElement('tr');
-            tr.style.cursor = 'pointer';
-            tr.addEventListener('click', () => {
-                window.location.href = `/hazards/detail.html?id=${h.id}`;
-            });
-            const riskClass = hazardRiskBadgeClass(h.risk_level);
-            const statusClass = hazardStatusBadgeClass(h.status);
-            const priorityClass = hazardPriorityBadgeClass(h.priority);
-            tr.innerHTML = `
-                <td><strong>${h.hazard_id || h.id}</strong></td>
-                <td>${h.title}</td>
-                <td>${h.source || '-'}</td>
-                <td>${h.taxonomy || '-'}</td>
-                <td><span class="badge ${priorityClass}">${h.priority}</span></td>
-                <td><span class="badge ${riskClass}">${h.risk_level || 'N/A'}</span></td>
-                <td><span class="badge ${statusClass}">${h.status}</span></td>
-                <td>${h.assigned_to || '-'}</td>
-                <td>${formatDate(h.created_at)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
+        allHazards = Array.isArray(data) ? data : [];
+        renderTable();
     } catch (err) {
         loading.style.display = 'none';
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;
     }
+}
+
+function applyDateFilter(rows) {
+    const f = getFilters();
+    const field = f.dateField || 'created_at';
+    const from = f.dateFrom ? new Date(f.dateFrom + 'T00:00:00') : null;
+    const to = f.dateTo ? new Date(f.dateTo + 'T23:59:59.999') : null;
+    if (!from && !to) return rows;
+    return rows.filter(function(r) {
+        const d = r[field] ? new Date(r[field]) : null;
+        if (!d) return true;
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+        return true;
+    });
+}
+
+function sortRows(rows) {
+    const dir = sortDir;
+    const key = sortKey;
+    return rows.slice().sort(function(a, b) {
+        let va = a[key];
+        let vb = b[key];
+        if (key === 'created_at' || key === 'updated_at') {
+            va = va ? new Date(va).getTime() : 0;
+            vb = vb ? new Date(vb).getTime() : 0;
+        } else {
+            va = (va == null ? '' : String(va)).toLowerCase();
+            vb = (vb == null ? '' : String(vb)).toLowerCase();
+        }
+        if (va < vb) return -1 * dir;
+        if (va > vb) return 1 * dir;
+        return 0;
+    });
+}
+
+function renderTable() {
+    const tbody = document.getElementById('hazardsBody');
+    const empty = document.getElementById('emptyIndicator');
+    const rows = sortRows(applyDateFilter(allHazards));
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+    rows.forEach(function(h) {
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', function() {
+            window.location.href = `/hazards/detail.html?id=${h.id}`;
+        });
+        const riskClass = hazardRiskBadgeClass(h.risk_level);
+        const statusClass = hazardStatusBadgeClass(h.status);
+        const priorityClass = hazardPriorityBadgeClass(h.priority);
+        tr.innerHTML = `
+            <td><strong>${h.hazard_id || h.id}</strong></td>
+            <td>${h.title}</td>
+            <td>${h.source || '-'}</td>
+            <td>${h.taxonomy || '-'}</td>
+            <td><span class="badge ${priorityClass}">${h.priority}</span></td>
+            <td><span class="badge ${riskClass}">${h.risk_level || 'N/A'}</span></td>
+            <td><span class="badge ${statusClass}">${h.status}</span></td>
+            <td>${h.assigned_to || '-'}</td>
+            <td>${formatDate(h.created_at)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function initSortableHeaders() {
+    document.querySelectorAll('th.sortable').forEach(function(th) {
+        th.addEventListener('click', function() {
+            const key = th.dataset.sort;
+            if (sortKey === key) {
+                sortDir = -sortDir;
+            } else {
+                sortKey = key;
+                sortDir = (key === 'created_at' || key === 'updated_at') ? -1 : 1;
+            }
+            updateSortIndicators();
+            renderTable();
+        });
+    });
+}
+
+function updateSortIndicators() {
+    document.querySelectorAll('th.sortable').forEach(function(th) {
+        const icon = th.querySelector('i');
+        if (!icon) return;
+        if (th.dataset.sort === sortKey) {
+            icon.className = sortDir === 1 ? 'fas fa-sort-up' : 'fas fa-sort-down';
+        } else {
+            icon.className = 'fas fa-sort';
+        }
+    });
 }
 
 async function loadStats() {
