@@ -304,8 +304,25 @@ function onAuthStateChanged(user) {
         if (isOnLoginPage) {
             redirectBasedOnRole({ uid: user.uid, email: user.email, role: role, tenantId: tenantId, claims: claims });
         }
-    }).catch(function() {
+    }).catch(function(error) {
         authRedirectInProgress = false;
+        // A saved session whose token can no longer be refreshed (stale or
+        // invalidated refresh token, disabled user, etc.) must be cleared
+        // locally — otherwise the auto-redirect keeps bouncing between the
+        // login page and the dashboard forever. Network failures are NOT
+        // cleared, so a transient outage cannot log anyone out.
+        var code = (error && error.code) || '';
+        var stale = [
+            'auth/invalid-login-credentials',
+            'auth/invalid-refresh-token',
+            'auth/user-token-expired',
+            'auth/user-disabled',
+            'auth/user-not-found'
+        ].indexOf(code) !== -1;
+        if (stale && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().signOut) {
+            console.log('Clearing stale session (' + code + ') to break redirect loop');
+            firebase.auth().signOut().catch(function() {});
+        }
     });
 }
 
