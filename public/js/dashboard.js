@@ -54,12 +54,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.updateShellTenant(tenantName, tenantId ? 'Safety Dashboard · ICAO operator' : 'State-level aggregated view');
     }
 
-    if (role === 'AIRLINE_ADMIN' || role === 'CAAN_SMD') {
-        document.getElementById('riskMatrixSection').style.display = 'block';
-        await loadRiskMatrixConfig();
-        setupRiskMatrixForm();
-    }
-
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
@@ -78,16 +72,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const recentRangeEl = document.getElementById('recentRange');
-    if (recentRangeEl) {
-        recentDays = parseInt(recentRangeEl.value, 10) || 30;
-        recentRangeEl.addEventListener('change', () => {
-            recentDays = parseInt(recentRangeEl.value, 10) || 30;
-            currentPage = 1;
-            loadRecentReports();
-        });
-    }
-
     document.getElementById('refreshBtn').addEventListener('click', () => {
         currentPage = 1;
         loadAll();
@@ -97,13 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadAll() {
-    await Promise.all([
-        loadKpis(),
-        loadRiskDistribution(),
-        loadMonthlyTrends(),
-        loadHazardFrequency(),
-        loadRecentReports(),
-    ]);
+    await loadKpis();
 }
 
 async function loadKpis() {

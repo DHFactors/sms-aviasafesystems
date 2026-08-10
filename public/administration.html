@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration — AviaSAFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0b2a42; min-height: 100vh; }
+        #pageContent { display: none; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .page-header h2 { margin: 0; color: #0b2a42; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #0b2a42; margin: 1.5rem 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .section-title:first-of-type { margin-top: 0; }
+        .config-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem; max-width: 900px; }
+        .config-card p.note { font-size: 0.85rem; color: #64748b; margin-bottom: 1rem; }
+        .btn-refresh { background: #1a6b8a; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.15s; }
+        .btn-refresh:hover { background: #0b2a42; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div id="pageContent">
+
+        <div class="page-header">
+            <h2><i class="fas fa-user-gear"></i> Administration</h2>
+            <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        </div>
+
+        <div class="section-title"><i class="fas fa-sliders-h"></i> ICAO Risk Matrix Configuration</div>
+        <div class="config-card">
+            <p class="note">
+                Configure the thresholds that define Low, Medium, High, and Very High risk levels.
+                Changes apply to your organization only.
+            </p>
+            <form id="riskMatrixForm" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;align-items:end;max-width:500px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Low Max</label>
+                    <input type="number" id="rmLowMax" min="1" max="25" value="5" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Medium Max</label>
+                    <input type="number" id="rmMediumMax" min="1" max="25" value="9" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">High Max</label>
+                    <input type="number" id="rmHighMax" min="1" max="25" value="15" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                </div>
+                <div style="grid-column:1/-1;">
+                    <button type="submit" class="btn-refresh" id="rmSaveBtn"><i class="fas fa-save"></i> Save Thresholds</button>
+                    <span id="rmStatus" style="margin-left:0.75rem;font-size:0.85rem;display:none;"></span>
+                </div>
+            </form>
+            <div style="margin-top:1.25rem;border-top:1px solid #e2e8f0;padding-top:1rem;">
+                <p style="font-size:0.8rem;color:#475569;font-weight:600;margin-bottom:0.5rem;">Preview — Severity × Probability (cell = risk index)</p>
+                <div id="riskMatrixPreview" style="overflow-x:auto;"></div>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin-top:0.75rem;font-size:0.72rem;color:#475569;">
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#34a853;border-radius:3px;display:inline-block;"></span> Low</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#f9ab00;border-radius:3px;display:inline-block;"></span> Medium</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#f57c00;border-radius:3px;display:inline-block;"></span> High</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#ea4335;border-radius:3px;display:inline-block;"></span> Very High</span>
+                </div>
+                <p style="font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;text-align:center;">
+                    Thresholds are inclusive maximums (1–25). Risk index = Severity × Probability. Changes apply to your organization only.
+                </p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/shell.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    nav: [
+        { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+        { href: '/dashboard/index.html', label: 'SMS Health', icon: 'fa-heart-pulse' },
+        { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+        { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN'] },
+    ],
+};
+</script>
+<script src="/js/dashboard-utils.js"></script>
+<script src="/js/report.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    await waitForFirebase();
+    const session = await getCurrentUser();
+    if (!session) { window.location.href = '/login.html'; return; }
+    if (session.role !== 'AIRLINE_ADMIN') {
+        document.getElementById('pageContent').innerHTML = `
+            <div style="text-align:center;padding:3rem;">
+                <i class="fas fa-lock" style="font-size:2.5rem;color:#dc3545;"></i>
+                <h2 style="color:#dc3545;margin-top:1rem;">Access Denied</h2>
+                <p style="color:#64748b;">The Administration section is available to Safety Managers only.</p>
+                <a href="/safety.html" class="btn btn-outline btn-sm" style="margin-top:1rem;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+            </div>`;
+        document.getElementById('pageContent').style.display = 'block';
+        return;
+    }
+    if (typeof window.updateShellTenant === 'function') {
+        const tenantName = session.tenantId ? session.tenantId.toUpperCase() : 'Safety Overview';
+        window.updateShellTenant(tenantName, 'Administration · Safety Manager');
+    }
+    document.getElementById('pageContent').style.display = 'block';
+    await loadRiskMatrixConfig();
+    setupRiskMatrixForm();
+});
+
+async function loadRiskMatrixConfig() {
+    try {
+        const config = await getRiskMatrix();
+        if (config && config.thresholds) {
+            document.getElementById('rmLowMax').value = config.thresholds.low_max || 5;
+            document.getElementById('rmMediumMax').value = config.thresholds.medium_max || 9;
+            document.getElementById('rmHighMax').value = config.thresholds.high_max || 15;
+        }
+    } catch {
+        // Use defaults
+    }
+    syncRiskMatrixThresholds();
+    renderRiskMatrixPreview();
+}
+
+function riskMatrixThresholdsFromInputs() {
+    return {
+        lowMax: parseInt(document.getElementById('rmLowMax').value, 10) || 5,
+        mediumMax: parseInt(document.getElementById('rmMediumMax').value, 10) || 9,
+        highMax: parseInt(document.getElementById('rmHighMax').value, 10) || 15,
+    };
+}
+
+function syncRiskMatrixThresholds() {
+    const t = riskMatrixThresholdsFromInputs();
+    if (t.lowMax >= t.mediumMax || t.mediumMax >= t.highMax) return;
+    if (typeof ICAO_THRESHOLDS !== 'undefined') {
+        ICAO_THRESHOLDS.lowMax = t.lowMax;
+        ICAO_THRESHOLDS.mediumMax = t.mediumMax;
+        ICAO_THRESHOLDS.highMax = t.highMax;
+    }
+}
+
+function renderRiskMatrixPreview() {
+    const container = document.getElementById('riskMatrixPreview');
+    if (!container) return;
+    const t = riskMatrixThresholdsFromInputs();
+    const valid = t.lowMax >= 1 && t.lowMax < t.mediumMax && t.mediumMax < t.highMax && t.highMax <= 25;
+
+    const levelFor = (index) => {
+        if (!valid) return 'Very High';
+        if (index <= t.lowMax) return 'Low';
+        if (index <= t.mediumMax) return 'Medium';
+        if (index <= t.highMax) return 'High';
+        return 'Very High';
+    };
+
+    const colorFor = (index) => {
+        if (!valid) return '#e2e8f0';
+        return ICAO_COLORS[levelFor(index)] || '#e2e8f0';
+    };
+
+    let html = '<table style="border-collapse:collapse;margin:0 auto;font-size:0.78rem;">';
+    html += '<tr><td style="padding:0.4rem;font-weight:700;color:#475569;text-align:right;">P\\S</td>';
+    for (let s = 1; s <= 5; s++) {
+        html += `<td style="padding:0.4rem 0.55rem;font-weight:700;color:#1a6b8a;text-align:center;">${s}</td>`;
+    }
+    html += '</tr>';
+    for (let p = 5; p >= 1; p--) {
+        html += `<tr><td style="padding:0.4rem;font-weight:700;color:#475569;text-align:right;">${p}</td>`;
+        for (let s = 1; s <= 5; s++) {
+            const index = s * p;
+            const color = colorFor(index);
+            const textColor = (index > 15 && valid) ? '#fff' : '#0b2a42';
+            html += `<td style="padding:0.4rem;text-align:center;background:${color};border:1px solid #fff;border-radius:4px;min-width:42px;color:${textColor};font-weight:700;">${index}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</table>';
+
+    let note;
+    if (!valid) {
+        note = '<p style="text-align:center;font-size:0.72rem;color:#d97706;margin-top:0.5rem;">Thresholds must be strictly increasing: 1 ≤ Low &lt; Medium &lt; High ≤ 25.</p>';
+    } else {
+        note = `<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;">Low ≤ ${t.lowMax} · Medium ≤ ${t.mediumMax} · High ≤ ${t.highMax} · Very High &gt; ${t.highMax}</p>`;
+    }
+    container.innerHTML = html + note;
+}
+
+function setupRiskMatrixForm() {
+    ['rmLowMax', 'rmMediumMax', 'rmHighMax'].forEach(function (id) {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', () => {
+                syncRiskMatrixThresholds();
+                renderRiskMatrixPreview();
+            });
+        }
+    });
+    document.getElementById('riskMatrixForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('rmSaveBtn');
+        const status = document.getElementById('rmStatus');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        status.style.display = 'none';
+
+        try {
+            const lowMax = parseInt(document.getElementById('rmLowMax').value, 10);
+            const mediumMax = parseInt(document.getElementById('rmMediumMax').value, 10);
+            const highMax = parseInt(document.getElementById('rmHighMax').value, 10);
+
+            if (lowMax >= mediumMax || mediumMax >= highMax) {
+                throw new Error('Thresholds must be strictly increasing: Low < Medium < High');
+            }
+            if (lowMax < 1 || highMax > 25) {
+                throw new Error('Values must be between 1 and 25.');
+            }
+
+            await updateRiskMatrix({ lowMax, mediumMax, highMax });
+
+            syncRiskMatrixThresholds();
+            renderRiskMatrixPreview();
+
+            status.style.color = '#2e7d32';
+            status.innerHTML = '<i class="fas fa-check-circle"></i> Saved successfully';
+            status.style.display = 'inline';
+            setTimeout(() => { status.style.display = 'none'; }, 3000);
+        } catch (err) {
+            status.style.color = '#dc3545';
+            status.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + err.message;
+            status.style.display = 'inline';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save Thresholds';
+        }
+    });
+}
+</script>
+
+</body>
+</html>

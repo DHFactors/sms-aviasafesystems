@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top Hazards — AviaSAFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0b2a42; min-height: 100vh; }
+        #pageContent { display: none; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .page-header h2 { margin: 0; color: #0b2a42; }
+        .section-title { font-size: 1.25rem; font-weight: 600; color: #0b2a42; margin: 1.5rem 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .section-title:first-of-type { margin-top: 0; }
+        .filter-bar { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; background: #fff; padding: 0.75rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .filter-bar label { font-size: 0.85rem; font-weight: 500; color: #0b2a42; }
+        .filter-bar select { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; cursor: pointer; }
+        .btn-refresh { margin-left: auto; background: #1a6b8a; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.15s; }
+        .btn-refresh:hover { background: #0b2a42; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        @media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
+        .chart-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem; }
+        .chart-card h3 { font-size: 0.85rem; font-weight: 600; color: #0b2a42; margin-bottom: 1rem; }
+        .chart-wrapper { position: relative; height: 260px; }
+        .chart-full { grid-column: 1 / -1; }
+        .chart-full .chart-wrapper { height: 280px; }
+        .state-container { position: relative; min-height: 100px; }
+        .state-loading::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 1; }
+        .state-loading::after { content: 'Loading...'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.9rem; z-index: 2; }
+        .state-empty, .state-error { display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
+        .state-empty .empty-msg, .state-error .error-msg { font-size: 0.9rem; color: #64748b; }
+        .state-error .error-msg { color: #dc3545; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.75rem; }
+        .stat-card { background: #fff; padding: 0.9rem; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .stat-card .num { font-size: 1.5rem; font-weight: 700; color: #0b2a42; }
+        .stat-card .lbl { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 0.25rem; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div id="pageContent">
+
+        <div class="page-header">
+            <h2><i class="fas fa-triangle-exclamation"></i> Top Hazards</h2>
+            <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        </div>
+
+        <div class="filter-bar">
+            <label for="daysFilter"><i class="fas fa-calendar-alt"></i> Period:</label>
+            <select id="daysFilter">
+                <option value="30">Last 30 Days</option>
+                <option value="90" selected>Last 90 Days</option>
+                <option value="180">Last 180 Days</option>
+                <option value="365">Last 365 Days</option>
+            </select>
+            <button id="refreshBtn" class="btn-refresh"><i class="fas fa-rotate"></i> Refresh</button>
+        </div>
+
+        <div class="section-title"><i class="fas fa-triangle-exclamation"></i> Hazard Occurrence Frequency</div>
+        <div class="chart-grid">
+            <div class="chart-card chart-full">
+                <h3>Hazard Occurrence Frequency <a href="/hazards/index.html" class="btn btn-primary btn-sm" style="float:right;font-size:0.8rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Full Hazard Register</a></h3>
+                <div id="hazardChart" class="chart-wrapper state-container">
+                    <canvas id="hazardChartCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title"><i class="fas fa-book"></i> Hazard Register Summary</div>
+        <div class="chart-card">
+            <div id="hazardStatsGrid" class="stats-grid"></div>
+            <div style="text-align:center;padding-top:1rem;">
+                <a href="/hazards/create.html" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Hazard</a>
+                <a href="/hazards/index.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> Full Hazard Register</a>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/shell.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    nav: [
+        { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+        { href: '/dashboard/index.html', label: 'SMS Health', icon: 'fa-heart-pulse' },
+        { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+        { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN'] },
+    ],
+};
+</script>
+<script src="/js/api/dashboard.js"></script>
+<script src="/js/dashboard-utils.js"></script>
+<script src="/js/hazards.js"></script>
+<script>
+let chartInstances = {};
+let currentDays = 90;
+
+function safeArray(data) {
+    return Array.isArray(data) ? data : [];
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await waitForFirebase();
+    const session = await getCurrentUser();
+    if (!session) { window.location.href = '/login.html'; return; }
+    if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'CAAN_SMD' && session.role !== 'SUPER_ADMIN') {
+        window.location.href = '/login.html';
+        return;
+    }
+    if (typeof window.updateShellTenant === 'function') {
+        const tenantName = session.tenantId ? session.tenantId.toUpperCase() : 'Cross-Tenant Safety Overview';
+        window.updateShellTenant(tenantName, session.tenantId ? 'Safety Dashboard · ICAO operator' : 'State-level aggregated view');
+    }
+    document.getElementById('pageContent').style.display = 'block';
+
+    const daysEl = document.getElementById('daysFilter');
+    if (daysEl) {
+        currentDays = parseInt(daysEl.value, 10);
+        daysEl.addEventListener('change', () => {
+            currentDays = parseInt(daysEl.value, 10);
+            loadAll();
+        });
+    }
+    document.getElementById('refreshBtn').addEventListener('click', loadAll);
+    loadAll();
+});
+
+async function loadAll() {
+    await Promise.all([
+        loadHazardFrequency(),
+        loadHazardStats(),
+    ]);
+}
+
+async function loadHazardFrequency() {
+    const el = document.getElementById('hazardChart');
+    setLoading(el);
+    try {
+        const data = safeArray(await DashboardAPI.getHazardFrequency(currentDays));
+        if (data.length === 0) {
+            setEmpty(el, 'No hazard data available');
+            return;
+        }
+        setReady(el);
+        renderHazardChart(data);
+    } catch (err) {
+        setError(el, err.message);
+    }
+}
+
+function renderHazardChart(data) {
+    destroyChart('hazardChartCanvas');
+    const ctx = document.getElementById('hazardChartCanvas');
+    if (!ctx) return;
+
+    const top = data.slice(0, 10);
+    chartInstances.hazard = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: top.map(d => d.occurrence_type),
+            datasets: [{
+                label: 'Occurrences',
+                data: top.map(d => d.count),
+                backgroundColor: '#1a6b8a',
+                borderRadius: 4,
+            }],
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+            },
+            plugins: { legend: { display: false } },
+        },
+    });
+}
+
+async function loadHazardStats() {
+    const container = document.getElementById('hazardStatsGrid');
+    try {
+        const stats = await HazardsAPI.getStats();
+        if (!stats || !stats.by_status) {
+            container.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;">No hazard data available.</p>';
+            return;
+        }
+        const statuses = stats.by_status;
+        const total = stats.total || 0;
+        let html = '';
+        for (const [status, count] of Object.entries(statuses)) {
+            const color = status === 'Open' ? '#1565c0' : status === 'Processing' ? '#e65100' : status === 'Under Review' ? '#d97706' : status === 'Closed' ? '#2e7d32' : '#dc3545';
+            html += `
+                <div class="stat-card" style="border-left:3px solid ${color};">
+                    <div class="num">${count}</div>
+                    <div class="lbl">${status}</div>
+                </div>`;
+        }
+        html += `
+            <div class="stat-card" style="background:#0b2a42;">
+                <div class="num" style="color:#fff;">${total}</div>
+                <div class="lbl" style="color:#cbd5e1;">Total</div>
+            </div>`;
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;">Error loading hazard data.</p>';
+        console.error('Hazard stats error:', err);
+    }
+}
+
+function destroyChart(key) {
+    if (chartInstances[key]) {
+        chartInstances[key].destroy();
+        delete chartInstances[key];
+    }
+}
+
+function setLoading(el) {
+    el.dataset.state = 'loading';
+    el.classList.remove('state-ready', 'state-empty', 'state-error');
+    el.classList.add('state-loading');
+}
+
+function setReady(el) {
+    el.dataset.state = 'ready';
+    el.classList.remove('state-loading', 'state-empty', 'state-error');
+    el.classList.add('state-ready');
+}
+
+function setEmpty(el, msg) {
+    el.dataset.state = 'empty';
+    el.classList.remove('state-loading', 'state-ready', 'state-error');
+    el.classList.add('state-empty');
+    if (!el.querySelector('.empty-msg')) {
+        const p = document.createElement('p');
+        p.className = 'empty-msg';
+        p.textContent = msg;
+        el.appendChild(p);
+    }
+}
+
+function setError(el, msg) {
+    el.dataset.state = 'error';
+    el.classList.remove('state-loading', 'state-ready', 'state-empty');
+    el.classList.add('state-error');
+    let errEl = el.querySelector('.error-msg');
+    if (!errEl) {
+        errEl = document.createElement('p');
+        errEl.className = 'error-msg';
+        el.appendChild(errEl);
+    }
+    errEl.textContent = `Error: ${msg}`;
+}
+</script>
+
+</body>
+</html>

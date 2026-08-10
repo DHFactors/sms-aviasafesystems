@@ -32,6 +32,16 @@
         return cfg;
     }
 
+    // Hide/show sidebar items that declare a restricted set of roles.
+    // A nav item may specify `roles: ['AIRLINE_ADMIN', ...]` to be shown
+    // only to users whose role is in that list.
+    function applyNavVisibility(role) {
+        document.querySelectorAll('.sidebar-nav li[data-roles]').forEach(function (li) {
+            const allowed = (li.dataset.roles || '').split(',').filter(function (r) { return r; });
+            li.style.display = allowed.indexOf(role) !== -1 ? '' : 'none';
+        });
+    }
+
     function buildSidebar() {
         const aside = document.createElement('aside');
         aside.className = 'shell-sidebar';
@@ -55,6 +65,9 @@
         const ul = document.createElement('ul');
         (cfg.nav || []).forEach(function (item) {
             const li = document.createElement('li');
+            if (Array.isArray(item.roles) && item.roles.length) {
+                li.dataset.roles = item.roles.join(',');
+            }
             const a = document.createElement('a');
             if (item.href) {
                 a.href = item.href;
@@ -288,8 +301,11 @@
                 if (user && user.getIdTokenResult) {
                     user.getIdTokenResult(true).then(function (tokenResult) {
                         const claims = (tokenResult && tokenResult.claims) || {};
+                        applyNavVisibility(claims.role || 'USER');
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                     }).catch(function () {});
+                } else {
+                    applyNavVisibility('USER');
                 }
             });
         }
