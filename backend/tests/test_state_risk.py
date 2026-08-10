@@ -475,7 +475,7 @@ def test_update_ssp_target_requires_admin():
 
 
 # ============================================================================
-# CAAN survey health (SMS pillars across tenants)
+# CAAN survey maturity (SMS pillars across tenants)
 # ============================================================================
 
 def _survey_svc(monkeypatch, surveys):
@@ -493,49 +493,49 @@ def _survey_svc(monkeypatch, surveys):
     return DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
 
 
-def test_get_caan_survey_health_aggregates_pillars(monkeypatch):
+def test_get_caan_survey_maturity_aggregates_pillars(monkeypatch):
     svc = _survey_svc(monkeypatch, surveys=[
         {
             "tenant_id": "air1",
             "safety_policy": 4.0, "safety_risk_management": 3.0,
             "safety_assurance": 5.0, "safety_promotion": 4.0,
-            "overall_sms_health": 4.0,
+            "overall_sms_maturity": 4.0,
         },
         {
             "tenant_id": "air1",
             "safety_policy": 2.0, "safety_risk_management": 3.0,
             "safety_assurance": 3.0, "safety_promotion": 4.0,
-            "overall_sms_health": 3.0,
+            "overall_sms_maturity": 3.0,
         },
         {
             "tenant_id": "air2",
             "safety_policy": 5.0, "safety_risk_management": 5.0,
             "safety_assurance": 5.0, "safety_promotion": 5.0,
-            "overall_sms_health": 5.0,
+            "overall_sms_maturity": 5.0,
         },
     ])
-    result = svc.get_caan_survey_health()
+    result = svc.get_caan_survey_maturity()
     assert result["national"]["response_count"] == 3
     by_id = {op["tenant_id"]: op for op in result["operators"]}
     assert by_id["air1"]["response_count"] == 2
     assert by_id["air1"]["pillars"]["safety_policy"] == 3.0
-    assert by_id["air1"]["overall_sms_health"] == 3.5
-    assert by_id["air2"]["overall_sms_health"] == 5.0
+    assert by_id["air1"]["overall_sms_maturity"] == 3.5
+    assert by_id["air2"]["overall_sms_maturity"] == 5.0
     # National pillar average across all responses
     assert result["national"]["pillars"]["safety_policy"] == round((4.0 + 2.0 + 5.0) / 3, 2)
-    # Best SMS health ranks first
+    # Best SMS maturity ranks first
     assert result["operators"][0]["tenant_id"] == "air2"
 
 
-def test_get_caan_survey_health_empty(monkeypatch):
+def test_get_caan_survey_maturity_empty(monkeypatch):
     svc = _survey_svc(monkeypatch, surveys=[])
-    result = svc.get_caan_survey_health()
+    result = svc.get_caan_survey_maturity()
     assert result["operators"] == []
-    assert result["national"]["overall_sms_health"] is None
+    assert result["national"]["overall_sms_maturity"] is None
     assert result["national"]["response_count"] == 0
 
 
-def test_get_caan_sms_health_assessment_low_pillars(monkeypatch):
+def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
     from app.services.dashboard_service import DashboardService
 
     written = {}
@@ -589,7 +589,7 @@ def test_get_caan_sms_health_assessment_low_pillars(monkeypatch):
             "tenant_id": "air1",
             "safety_policy": 2.0, "safety_risk_management": 2.0,
             "safety_assurance": 4.0, "safety_promotion": 4.0,
-            "overall_sms_health": 3.0,
+            "overall_sms_maturity": 3.0,
             "question_scores": {"q1": 2.0, "q5": 2.0},
             "submitted_at": datetime.now(timezone.utc),
         },
@@ -597,13 +597,13 @@ def test_get_caan_sms_health_assessment_low_pillars(monkeypatch):
             "tenant_id": "air2",
             "safety_policy": 5.0, "safety_risk_management": 5.0,
             "safety_assurance": 5.0, "safety_promotion": 5.0,
-            "overall_sms_health": 5.0,
+            "overall_sms_maturity": 5.0,
             "submitted_at": datetime.now(timezone.utc),
         },
     ])
     monkeypatch.setattr("app.firebase.get_db", lambda: db)
     svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
-    result = svc.get_caan_sms_health_assessment(days=90)
+    result = svc.get_caan_sms_maturity_assessment(days=90)
 
     assert result["period_days"] == 90
     by_id = {op["tenant_id"]: op for op in result["operators"]}
@@ -619,10 +619,10 @@ def test_get_caan_sms_health_assessment_low_pillars(monkeypatch):
 
 
 # ============================================================================
-# Airline SMS health (tenant-scoped counterpart of the CAAN dashboard)
+# Airline SMS maturity (tenant-scoped counterpart of the CAAN dashboard)
 # ============================================================================
 
-def test_get_airline_sms_health_tenant_scoped(monkeypatch):
+def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
     from app.services.dashboard_service import DashboardService
 
     written = {}
@@ -677,7 +677,7 @@ def test_get_airline_sms_health_tenant_scoped(monkeypatch):
             "tenant_id": "air1",
             "safety_policy": 5.0, "safety_risk_management": 1.0,
             "safety_assurance": 2.0, "safety_promotion": 4.0,
-            "overall_sms_health": 3.0,
+            "overall_sms_maturity": 3.0,
             "question_scores": {"q1": 5.0},
             "submitted_at": datetime.now(timezone.utc),
         })
@@ -686,13 +686,13 @@ def test_get_airline_sms_health_tenant_scoped(monkeypatch):
         "tenant_id": "air2",
         "safety_policy": 5.0, "safety_risk_management": 5.0,
         "safety_assurance": 5.0, "safety_promotion": 5.0,
-        "overall_sms_health": 5.0,
+        "overall_sms_maturity": 5.0,
         "submitted_at": datetime.now(timezone.utc),
     })
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
-    result = svc.get_airline_sms_health(days=365)
+    result = svc.get_airline_sms_maturity(days=365)
 
     assert result["tenant_id"] == "air1"
     assert result["response_count"] == 6
@@ -714,7 +714,7 @@ def test_get_airline_sms_health_tenant_scoped(monkeypatch):
     assert written.get("period_days") == 365
 
 
-def test_get_airline_sms_health_empty(monkeypatch):
+def test_get_airline_sms_maturity_empty(monkeypatch):
     from app.services.dashboard_service import DashboardService
 
     class _Snap:
@@ -757,7 +757,7 @@ def test_get_airline_sms_health_empty(monkeypatch):
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
-    result = svc.get_airline_sms_health(days=365)
+    result = svc.get_airline_sms_maturity(days=365)
 
     assert result["tenant_id"] == "air1"
     assert result["overall_score"] is None
@@ -766,16 +766,16 @@ def test_get_airline_sms_health_empty(monkeypatch):
     assert result["response_count"] == 0
 
 
-def test_get_airline_sms_health_requires_tenant():
+def test_get_airline_sms_maturity_requires_tenant():
     from app.services.dashboard_service import DashboardService
 
     svc = DashboardService({"uid": "nobody", "role": "USER"})
-    result = svc.get_airline_sms_health()
+    result = svc.get_airline_sms_maturity()
     assert result["overall_score"] is None
     assert result["assessment"]["priority_actions"] == []
 
 
-def test_get_airline_sms_health_missing_pillars(monkeypatch):
+def test_get_airline_sms_maturity_missing_pillars(monkeypatch):
     from app.services.dashboard_service import DashboardService
 
     class _Snap:
@@ -825,15 +825,15 @@ def test_get_airline_sms_health_missing_pillars(monkeypatch):
             "tenant_id": "air1",
             "safety_policy": 4.0, "safety_risk_management": 2.0,
             "safety_assurance": 3.0,  # safety_promotion intentionally absent
-            "overall_sms_health": 3.0,
+            "overall_sms_maturity": 3.0,
             "submitted_at": datetime.now(timezone.utc),
         })
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
     monkeypatch.setattr(
-        "app.services.dashboard_service.recommend_sms_health_actions",
+        "app.services.dashboard_service.recommend_sms_maturity_actions",
         lambda *a, **k: [{"action": "Mock action A"}, {"action": "Mock action B"}])
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
-    result = svc.get_airline_sms_health(days=365)
+    result = svc.get_airline_sms_maturity(days=365)
 
     assert result["pillars"]["safety_policy"] == 75.0
     assert "safety_promotion" not in result["pillars"]
@@ -844,7 +844,7 @@ def test_get_airline_sms_health_missing_pillars(monkeypatch):
         "Safety Assurance", "Safety Risk Management"]
 
 
-def test_get_airline_sms_health_history_ordering(monkeypatch):
+def test_get_airline_sms_maturity_history_ordering(monkeypatch):
     from app.services.dashboard_service import DashboardService
 
     class _Snap:
@@ -892,19 +892,19 @@ def test_get_airline_sms_health_history_ordering(monkeypatch):
     docs = [
         # Strong month (2 responses, ~45 days ago)
         {"tenant_id": "air1", "safety_policy": 5.0, "safety_risk_management": 5.0,
-         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_health": 5.0,
+         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_maturity": 5.0,
          "submitted_at": older},
         {"tenant_id": "air1", "safety_policy": 5.0, "safety_risk_management": 5.0,
-         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_health": 5.0,
+         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_maturity": 5.0,
          "submitted_at": older + timedelta(hours=1)},
         # Weaker month (1 response, now)
         {"tenant_id": "air1", "safety_policy": 2.0, "safety_risk_management": 2.0,
-         "safety_assurance": 4.0, "safety_promotion": 4.0, "overall_sms_health": 3.0,
+         "safety_assurance": 4.0, "safety_promotion": 4.0, "overall_sms_maturity": 3.0,
          "submitted_at": datetime.now(timezone.utc)},
     ]
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
-    result = svc.get_airline_sms_health(days=365)
+    result = svc.get_airline_sms_maturity(days=365)
 
     assert len(result["history"]) == 2
     periods = [h["period"] for h in result["history"]]
@@ -918,7 +918,7 @@ def test_get_airline_sms_health_history_ordering(monkeypatch):
 
 
 # ============================================================================
-# Airline SMS health API (route-level auth + envelope)
+# Airline SMS maturity API (route-level auth + envelope)
 # ============================================================================
 
 def _empty_firestore():
@@ -960,16 +960,16 @@ def _empty_firestore():
     return _DB()
 
 
-def test_airline_sms_health_route_requires_auth(monkeypatch):
+def test_airline_sms_maturity_route_requires_auth(monkeypatch):
     from fastapi.testclient import TestClient
     from app.main import app
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _empty_firestore())
-    resp = TestClient(app).get("/api/v1/dashboard/airline/sms-health")
+    resp = TestClient(app).get("/api/v1/dashboard/airline/sms-maturity")
     assert resp.status_code in (401, 403)
 
 
-def test_airline_sms_health_route_tenant_required(monkeypatch):
+def test_airline_sms_maturity_route_tenant_required(monkeypatch):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.middleware.auth import get_current_user
@@ -978,13 +978,13 @@ def test_airline_sms_health_route_tenant_required(monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: {
         "uid": "u", "role": "USER", "tenant_id": None, "email": "user@aviasafe.com"}
     try:
-        resp = TestClient(app).get("/api/v1/dashboard/airline/sms-health")
+        resp = TestClient(app).get("/api/v1/dashboard/airline/sms-maturity")
         assert resp.status_code == 403
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
 
-def test_airline_sms_health_route_200_empty(monkeypatch):
+def test_airline_sms_maturity_route_200_empty(monkeypatch):
     from fastapi.testclient import TestClient
     from app.main import app
     from app.middleware.auth import get_current_user
@@ -994,7 +994,7 @@ def test_airline_sms_health_route_200_empty(monkeypatch):
         "uid": "officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1",
         "email": "officer@air1.com"}
     try:
-        resp = TestClient(app).get("/api/v1/dashboard/airline/sms-health")
+        resp = TestClient(app).get("/api/v1/dashboard/airline/sms-maturity")
         assert resp.status_code == 200
         payload = resp.json()
         assert payload.get("status") == "success"

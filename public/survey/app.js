@@ -27,7 +27,7 @@ const i18n = {
         submitErr: "Submission failed. Please check your network connection.",
         successTitle: "Submission Successful",
         successBody: "Your response has been recorded anonymously within the tenant safety system.",
-        surveyTitle: "SMS Health Assessment",
+        surveyTitle: "SMS Maturity Assessment",
         surveySubtitle: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10951 and state requirements."
     },
     ne: {

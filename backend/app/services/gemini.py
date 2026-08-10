@@ -269,7 +269,7 @@ def mock_analysis(narrative: str) -> Dict[str, Any]:
 
 
 # ============================================================================
-# SMS SURVEY HEALTH RECOMMENDATIONS
+# SMS SURVEY MATURITY RECOMMENDATIONS
 # ============================================================================
 
 SURVEY_PILLAR_NAMES = {
@@ -289,7 +289,7 @@ Reference ICAO standards and guidance where relevant:
 """
 
 
-def sms_health_tier(pct: float) -> str:
+def sms_maturity_tier(pct: float) -> str:
     if pct >= 85:
         return "strong"
     if pct >= 70:
@@ -299,7 +299,7 @@ def sms_health_tier(pct: float) -> str:
     return "critical"
 
 
-def _mock_sms_health_actions(pillar: str, pct: float, tier: str) -> dict:
+def _mock_sms_maturity_actions(pillar: str, pct: float, tier: str) -> dict:
     base = {
         "safety_policy": {
             "summary": "Safety policy awareness and management commitment are below target.",
@@ -367,7 +367,7 @@ def _mock_sms_health_actions(pillar: str, pct: float, tier: str) -> dict:
     return entry
 
 
-def mock_sms_health_recommendations(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def mock_sms_maturity_recommendations(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     pcts = data.get("pcts") or {}
     tiers = data.get("tiers") or {}
     recs = []
@@ -375,14 +375,14 @@ def mock_sms_health_recommendations(data: Dict[str, Any]) -> List[Dict[str, Any]
         pct = pcts.get(p)
         if pct is None or pct >= 70:
             continue
-        recs.append(_mock_sms_health_actions(p, pct, tiers.get(p) or sms_health_tier(pct)))
+        recs.append(_mock_sms_maturity_actions(p, pct, tiers.get(p) or sms_maturity_tier(pct)))
     return recs
 
 
-def recommend_sms_health_actions(tenant_id: str, data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Generate per-pillar SMS health improvement recommendations for low-scoring pillars."""
+def recommend_sms_maturity_actions(tenant_id: str, data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Generate per-pillar SMS maturity improvement recommendations for low-scoring pillars."""
     if not model:
-        return mock_sms_health_recommendations(data)
+        return mock_sms_maturity_recommendations(data)
 
     pcts = data.get("pcts") or {}
     low = {p: pcts[p] for p in SURVEY_PILLAR_ORDER if pcts.get(p) is not None and pcts[p] < 70}
@@ -390,7 +390,7 @@ def recommend_sms_health_actions(tenant_id: str, data: Dict[str, Any]) -> List[D
         return []
 
     pillar_block = "\n".join(
-        f"- {SURVEY_PILLAR_NAMES.get(p, p)}: {pct}% (tier: {sms_health_tier(pct)})"
+        f"- {SURVEY_PILLAR_NAMES.get(p, p)}: {pct}% (tier: {sms_maturity_tier(pct)})"
         for p, pct in low.items()
     )
     all_scores = ", ".join(
@@ -399,7 +399,7 @@ def recommend_sms_health_actions(tenant_id: str, data: Dict[str, Any]) -> List[D
     question_context = data.get("question_averages") or {}
     q_lines = "\n".join(f"  - {qid}: avg {v}/5" for qid, v in sorted(question_context.items()))[:settings.AI_NARRATIVE_TRUNCATE]
 
-    prompt = f"""You are an ICAO SMS safety analyst producing an organizational safety health action plan.
+    prompt = f"""You are an ICAO SMS safety analyst producing an organizational safety maturity action plan.
 Operator tenant id: {tenant_id}
 Survey responses analysed: {data.get('response_count', 0)}
 Pillar scores (percentage scale): {all_scores}
@@ -452,4 +452,4 @@ Provide one recommendation object per low-scoring pillar. Do not invent pillar s
     except Exception as e:
         logger.error(f"Gemini survey recommendations failed: {e}")
 
-    return mock_sms_health_recommendations(data)
+    return mock_sms_maturity_recommendations(data)

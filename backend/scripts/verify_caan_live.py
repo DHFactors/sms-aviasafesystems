@@ -3,7 +3,7 @@
 # PATH: backend/scripts/verify_caan_live.py
 # PURPOSE: One-off live verification: mints a custom token for a CAAN_SMD seed
 #          user via the Admin SDK, exchanges it for an ID token, then calls the
-#          live /api/v1/dashboard/caan/survey-health and /api/v1/state-risk/*
+#          live /api/v1/dashboard/caan/survey-maturity and /api/v1/state-risk/*
 #          endpoints to confirm they return data (not 403).
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
@@ -56,7 +56,7 @@ def main():
     print(f"Minted CAAN_SMD token (uid={uid})")
 
     for method, path in [
-        ("GET", "/api/v1/dashboard/caan/survey-health"),
+        ("GET", "/api/v1/dashboard/caan/survey-maturity"),
         ("GET", "/api/v1/dashboard/caan/benchmark"),
         ("GET", "/api/v1/state-risk/register?year=2026&quarter=3"),
         ("GET", "/api/v1/state-risk/aggregate?year=2026&quarter=3"),
@@ -64,9 +64,9 @@ def main():
         try:
             resp = requests.request(method, API + path, headers=headers, timeout=90)
             body = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text
-            if method == "GET" and path == "/api/v1/dashboard/caan/survey-health":
+            if method == "GET" and path == "/api/v1/dashboard/caan/survey-maturity":
                 print(f"{method} {path} -> {resp.status_code}")
-                print("  survey-health raw:", json.dumps(body, default=str)[:1500])
+                print("  survey-maturity raw:", json.dumps(body, default=str)[:1500])
                 continue
             if method == "GET" and path == "/api/v1/dashboard/caan/benchmark":
                 print(f"{method} {path} -> {resp.status_code}")
@@ -84,7 +84,7 @@ def main():
                 keys = list(body.keys())
                 if "operators" in body:
                     summary = {"status": body.get("status"), "operators": len(body["operators"]),
-                               "national_overall": body.get("national", {}).get("overall_sms_health"),
+                               "national_overall": body.get("national", {}).get("overall_sms_maturity"),
                                "national_responses": body.get("national", {}).get("response_count")}
                 elif "risks" in body:
                     summary = {"status": body.get("status"), "count": body.get("count"),

@@ -7,7 +7,7 @@ PURPOSE: State Regulator (SSP) dashboard. Works generically for any country's
          civil-aviation authority (CAAN/Nepal, DGCA/India, ...): the regulator
          is resolved from /api/v1/regulators (URL ?regulator= override, default
          'caan') and every national aggregation is scoped via regulator_id.
-         Provides the national view of SMS health (survey pillars), the state
+         Provides the national view of SMS maturity (survey pillars), the state
          risk register (ICAO top-risk categories vs SSP targets, with staleness
          detection), and the live cross-tenant aggregation. SSP-target editing
          is restricted to SUPER_ADMIN. Uses the shared dashboard shell
@@ -105,21 +105,21 @@ AUTHOR: AviaSAFE Systems
         <p>Checking state safety access...</p>
     </div>
 
-    <!-- ==================== SMS HEALTH ==================== -->
-    <section id="sms-health" class="shell-scroll-spy" style="display:none;">
+    <!-- ==================== SMS MATURITY ==================== -->
+    <section id="sms-maturity" class="shell-scroll-spy" style="display:none;">
         <div class="section-head">
             <div>
-                <h2><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> National SMS Health</h2>
-                <div class="section-sub" id="smsHealthSub">Aggregated ICAO Annex 19 survey culture across all operators</div>
+                <h2><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> National SMS Maturity</h2>
+                <div class="section-sub" id="smsMaturitySub">Aggregated ICAO Annex 19 survey culture across all operators</div>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="loadSmsHealth(); loadSmsHealthAssessment(false);"><i class="fas fa-rotate"></i> Refresh</button>
+            <button class="btn btn-outline btn-sm" onclick="loadSmsMaturity(); loadSmsMaturityAssessment(false);"><i class="fas fa-rotate"></i> Refresh</button>
         </div>
         <div style="background:#fff8e1;border:1px solid #ffca28;border-radius:8px;padding:10px 14px;font-size:13px;color:#8a6d00;margin-bottom:16px;line-height:1.5;">
-            <strong>[BETA NOTICE]</strong> Survey pillar scores are computed live from submitted responses. SMS Health Assessment (Gemini) targets pillars scoring below 70%.
+            <strong>[BETA NOTICE]</strong> Survey pillar scores are computed live from submitted responses. SMS Maturity Assessment (Gemini) targets pillars scoring below 70%.
         </div>
-        <div id="smsHealthStats" class="stat-grid"></div>
+        <div id="smsMaturityStats" class="stat-grid"></div>
         <div class="card">
-            <h3>Operator SMS Health vs National Average</h3>
+            <h3>Operator SMS Maturity vs National Average</h3>
             <div style="overflow-x:auto;"><table>
                 <thead><tr>
                     <th>Operator</th>
@@ -127,17 +127,17 @@ AUTHOR: AviaSAFE Systems
                     <th>Risk Mgmt</th>
                     <th>Safety Assurance</th>
                     <th>Safety Promotion</th>
-                    <th>Overall SMS Health</th>
+                    <th>Overall SMS Maturity</th>
                     <th>Responses</th>
                 </tr></thead>
-                <tbody id="smsHealthBody"></tbody>
+                <tbody id="smsMaturityBody"></tbody>
             </table></div>
         </div>
         <div class="card">
             <div class="section-head">
                 <div>
-                    <h3><i class="fas fa-robot" style="color:#1a6b8a;"></i> SMS Health Assessment</h3>
-                    <div class="section-sub">ICAO-aligned assessment of each operator's SMS health, with improvement actions for pillars scoring below 70% (Gemini). Aggregated over the selected period.</div>
+                    <h3><i class="fas fa-robot" style="color:#1a6b8a;"></i> SMS Maturity Assessment</h3>
+                    <div class="section-sub">ICAO-aligned assessment of each operator's SMS maturity, with improvement actions for pillars scoring below 70% (Gemini). Aggregated over the selected period.</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                     <select id="recDays" class="form-control" style="width:auto;">
@@ -146,10 +146,10 @@ AUTHOR: AviaSAFE Systems
                         <option value="180">Last 180 days</option>
                         <option value="365">Last 365 days</option>
                     </select>
-                    <button class="btn btn-outline btn-sm" onclick="loadSmsHealthAssessment(true)"><i class="fas fa-wand-magic-sparkles"></i> Regenerate</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadSmsMaturityAssessment(true)"><i class="fas fa-wand-magic-sparkles"></i> Regenerate</button>
                 </div>
             </div>
-            <div id="smsHealthRecs" style="margin-top:4px;"><p style="color:#64748b;">Loading SMS health assessment...</p></div>
+            <div id="smsMaturityRecs" style="margin-top:4px;"><p style="color:#64748b;">Loading SMS maturity assessment...</p></div>
         </div>
     </section>
 
@@ -277,7 +277,7 @@ window.SHELL_CONFIG = {
     brand: 'AviaSAFE',
     roleLabel: 'State Safety Programme (SSP)',
     nav: [
-        { id: 'sms-health', label: 'SMS Health', icon: 'fa-heart-pulse' },
+        { id: 'sms-maturity', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
         { id: 'risk-register', label: 'Risk Register vs SSP', icon: 'fa-book' },
         { id: 'aggregation', label: 'Cross-Tenant Aggregation', icon: 'fa-chart-bar' },
     ],
@@ -313,7 +313,7 @@ function applyRegulatorBranding() {
         const el = document.getElementById(id);
         if (el) el.textContent = `${base} — ${name}${country ? ` (${country})` : ''}${opCount ? ` · ${opCount} operators` : ''}`;
     };
-    setSub('smsHealthSub', 'Aggregated ICAO Annex 19 survey culture across all operators');
+    setSub('smsMaturitySub', 'Aggregated ICAO Annex 19 survey culture across all operators');
     setSub('registerSub', 'ICAO top-risk categories measured against state SSP targets');
     setSub('aggregationSub', 'Live recomputation of national risk from tenant hazards and reports');
 }
@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
     document.getElementById('authGate').style.display = 'none';
     await loadRegulatorMeta();
-    ['sms-health', 'risk-register', 'aggregation'].forEach(id => {
+    ['sms-maturity', 'risk-register', 'aggregation'].forEach(id => {
         document.getElementById(id).style.display = 'block';
     });
     const regShort = regulatorMeta?.short_name || 'State Regulator';
@@ -346,8 +346,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         'Safety Management Division · ' + (isSuperAdmin ? 'SUPER_ADMIN' : 'CAAN_SMD')
     );
     populateYearSelects();
-document.getElementById('recDays').addEventListener('change', () => loadSmsHealthAssessment(false));
-await Promise.all([loadSmsHealth(), loadSmsHealthAssessment(false), loadRegister(), loadAggregation()]);
+document.getElementById('recDays').addEventListener('change', () => loadSmsMaturityAssessment(false));
+await Promise.all([loadSmsMaturity(), loadSmsMaturityAssessment(false), loadRegister(), loadAggregation()]);
 });
 
 function populateYearSelects() {
@@ -380,19 +380,19 @@ function currentPeriod(prefix) {
 }
 
 // ============================================================================
-// SMS HEALTH
+// SMS MATURITY
 // ============================================================================
-async function loadSmsHealth() {
-    const statsEl = document.getElementById('smsHealthStats');
-    const body = document.getElementById('smsHealthBody');
+async function loadSmsMaturity() {
+    const statsEl = document.getElementById('smsMaturityStats');
+    const body = document.getElementById('smsMaturityBody');
     statsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
     try {
-        const data = await ApiClient.get(`/api/v1/dashboard/caan/survey-health?${regQuery()}`);
+        const data = await ApiClient.get(`/api/v1/dashboard/caan/survey-maturity?${regQuery()}`);
         const nat = data.national || {};
         const ops = data.operators || [];
 
         statsEl.innerHTML = `
-            <div class="stat-card gold"><div class="num">${nat.overall_sms_health ?? '—'}</div><div class="lbl">National SMS Health (1-5)</div></div>
+            <div class="stat-card gold"><div class="num">${nat.overall_sms_maturity ?? '—'}</div><div class="lbl">National SMS Maturity (1-5)</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_policy ?? '—'}</div><div class="lbl">Safety Policy</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_risk_management ?? '—'}</div><div class="lbl">Risk Management</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_assurance ?? '—'}</div><div class="lbl">Safety Assurance</div></div>
@@ -405,7 +405,7 @@ async function loadSmsHealth() {
             return;
         }
         body.innerHTML = ops.map(o => {
-            const overall = o.overall_sms_health;
+            const overall = o.overall_sms_maturity;
             const cls = overall >= 4 ? 'b-acceptable' : overall >= 3 ? 'b-tolerable' : 'b-intolerable';
             return `<tr>
                 <td><strong>${o.tenant_id}</strong></td>
@@ -418,21 +418,21 @@ async function loadSmsHealth() {
             </tr>`;
         }).join('');
     } catch (err) {
-        statsEl.innerHTML = '<div class="error">Failed to load SMS health: ' + err.message + '</div>';
+        statsEl.innerHTML = '<div class="error">Failed to load SMS maturity: ' + err.message + '</div>';
         body.innerHTML = '';
     }
 }
 
 // ============================================================================
-// SMS HEALTH ASSESSMENT
+// SMS MATURITY ASSESSMENT
 // ============================================================================
-async function loadSmsHealthAssessment(refresh) {
-    const el = document.getElementById('smsHealthRecs');
+async function loadSmsMaturityAssessment(refresh) {
+    const el = document.getElementById('smsMaturityRecs');
     if (!el) return;
     const days = document.getElementById('recDays').value;
-    el.innerHTML = '<p style="color:#64748b;"><i class="fas fa-spinner fa-spin"></i> Generating SMS health assessment (aggregating survey responses)...</p>';
+    el.innerHTML = '<p style="color:#64748b;"><i class="fas fa-spinner fa-spin"></i> Generating SMS maturity assessment (aggregating survey responses)...</p>';
     try {
-        const data = await ApiClient.get(`/api/v1/dashboard/caan/sms-health-assessment?days=${days}&refresh=${refresh ? 'true' : 'false'}&${regQuery()}`);
+        const data = await ApiClient.get(`/api/v1/dashboard/caan/sms-maturity-assessment?days=${days}&refresh=${refresh ? 'true' : 'false'}&${regQuery()}`);
         const ops = data.operators || [];
         if (!ops.length) {
             el.innerHTML = '<p class="empty">No survey data in the selected period.</p>';
@@ -471,12 +471,12 @@ async function loadSmsHealthAssessment(refresh) {
             }).join('');
             const opName = op.tenant_id;
             return `<div style="margin-bottom:20px;">
-                <h4 style="color:#0b2a42;margin:0 0 8px;"><i class="fas fa-building"></i> ${opName} <span style="font-weight:400;color:#64748b;font-size:12px;">(${op.response_count} responses · overall ${op.overall_sms_health ?? '—'}/5)</span></h4>
+                <h4 style="color:#0b2a42;margin:0 0 8px;"><i class="fas fa-building"></i> ${opName} <span style="font-weight:400;color:#64748b;font-size:12px;">(${op.response_count} responses · overall ${op.overall_sms_maturity ?? '—'}/5)</span></h4>
                 ${cards}
             </div>`;
         }).join('');
     } catch (err) {
-        el.innerHTML = '<div class="error">Failed to load SMS health assessment: ' + err.message + '</div>';
+        el.innerHTML = '<div class="error">Failed to load SMS maturity assessment: ' + err.message + '</div>';
     }
 }
 

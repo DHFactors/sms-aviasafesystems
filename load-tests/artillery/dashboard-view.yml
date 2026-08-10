@@ -30,5 +30,5 @@ scenarios:
       - get:
           url: "/api/dashboard/actions?days=90"
       - get:
-          url: "/api/dashboard/airline/sms-health?days=365"
+          url: "/api/dashboard/airline/sms-maturity?days=365"
       - think: 1

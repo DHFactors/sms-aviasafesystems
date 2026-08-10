@@ -52,7 +52,7 @@ Legend: ✅ **Resolved** · 🔶 **Partially resolved** · ⏳ **Open**
   canonical `severity_level`/`probability_level`/`risk_index`/`risk_level` for compatibility;
   consumers should prefer the canonical fields.
 - **No notifications service** (email/portal alerts) is implemented.
-- **Survey health metrics** are not yet charter-compliant (TD-6) — the SMS Health component scores
+- **Survey maturity metrics** are not yet charter-compliant (TD-6) — the SMS Maturity component scores
   should be treated as interim until re-alignment.
 - **`public/docs/tenant-guide` is served as static docs**, not dynamic onboarding UI.
 

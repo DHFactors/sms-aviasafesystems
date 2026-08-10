@@ -80,15 +80,15 @@
         <div class="card" style="text-align:center;padding:40px;">
             <i class="fas fa-lock" style="font-size:48px;color:#ea4335;margin-bottom:16px;"></i>
             <h3>Authentication Required</h3>
-            <p style="color:#5f6368;">Please <a href="/login.html">log in</a> with an admin account to view your SMS health dashboard.</p>
+            <p style="color:#5f6368;">Please <a href="/login.html">log in</a> with an admin account to view your SMS maturity dashboard.</p>
         </div>
     </div>
 
     <div id="appContent" style="display:none;">
 
-        <!-- ==================== SECTION 1: OVERALL SMS HEALTH ==================== -->
+        <!-- ==================== SECTION 1: OVERALL SMS MATURITY ==================== -->
         <div class="section-title shell-scroll-spy" id="overview">
-            <i class="fas fa-heart-pulse"></i> Overall SMS Health
+            <i class="fas fa-heart-pulse"></i> Overall SMS Maturity
         </div>
 
         <!-- Tenant Selector (SUPER_ADMIN only) -->
@@ -99,14 +99,14 @@
             </select>
         </div>
 
-        <div class="card" id="smsHealthCard" style="display:none;">
+        <div class="card" id="smsMaturityCard" style="display:none;">
             <div class="section-head">
                 <div>
-                    <h3 style="margin:0;"><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> <span id="healthTenantName">Current SMS Health</span></h3>
+                    <h3 style="margin:0;"><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> <span id="maturityTenantName">Current SMS Maturity</span></h3>
                     <div class="section-sub">Scored from ICAO Annex 19 survey responses over the selected period. Pillars scoring below 70% drive the AI assessment below.</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <select id="healthDays" class="form-control" style="width:auto;" onchange="onHealthDaysChange()">
+                    <select id="maturityDays" class="form-control" style="width:auto;" onchange="onMaturityDaysChange()">
                         <option value="30">Last 30 days</option>
                         <option value="90">Last 90 days</option>
                         <option value="180">Last 180 days</option>
@@ -117,9 +117,9 @@
                 </div>
             </div>
             <div id="overviewStats" class="stat-grid">
-                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading SMS health...</div>
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading SMS maturity...</div>
             </div>
-            <div id="healthBanner" style="display:none;margin-top:8px;"></div>
+            <div id="maturityBanner" style="display:none;margin-top:8px;"></div>
         </div>
 
         <!-- ==================== SECTION 2: ICAO SMS COMPONENTS ==================== -->
@@ -131,12 +131,12 @@
             <div id="componentsGrid" class="stat-grid"></div>
         </div>
 
-        <!-- ==================== SECTION 3: SMS HEALTH ASSESSMENT ==================== -->
+        <!-- ==================== SECTION 3: SMS MATURITY ASSESSMENT ==================== -->
         <div class="section-title shell-scroll-spy" id="assessment">
-            <i class="fas fa-robot"></i> SMS Health Assessment
+            <i class="fas fa-robot"></i> SMS Maturity Assessment
         </div>
         <div class="card" id="assessmentCard" style="display:none;">
-            <div id="assessmentContent"><p class="loading"><i class="fas fa-spinner fa-spin"></i> Generating SMS health assessment...</p></div>
+            <div id="assessmentContent"><p class="loading"><i class="fas fa-spinner fa-spin"></i> Generating SMS maturity assessment...</p></div>
         </div>
 
         <!-- ==================== SECTION 4: ASSESSMENT HISTORY ==================== -->
@@ -144,7 +144,7 @@
             <i class="fas fa-history"></i> Assessment History
         </div>
         <div class="card" id="historyCard" style="display:none;">
-            <div class="section-sub" style="margin-bottom:1rem;">Monthly SMS health trend across the selected period.</div>
+            <div class="section-sub" style="margin-bottom:1rem;">Monthly SMS maturity trend across the selected period.</div>
             <div style="overflow-x:auto;"><table>
                 <thead><tr>
                     <th>Period</th>
@@ -286,9 +286,9 @@ window.SHELL_CONFIG = {
     roleLabel: 'Airline SMS Dashboard',
     nav: [
         { href: '/safety.html', label: 'Back to Dashboard', icon: 'fa-arrow-left' },
-        { id: 'overview', label: 'Overall SMS Health', icon: 'fa-heart-pulse' },
+        { id: 'overview', label: 'Overall SMS Maturity', icon: 'fa-heart-pulse' },
         { id: 'components', label: 'ICAO Components', icon: 'fa-cubes' },
-        { id: 'assessment', label: 'SMS Health Assessment', icon: 'fa-robot' },
+        { id: 'assessment', label: 'SMS Maturity Assessment', icon: 'fa-robot' },
         { id: 'history', label: 'Assessment History', icon: 'fa-history' },
         { id: 'survey', label: 'Survey Period Management', icon: 'fa-poll' },
         { id: 'administration', label: 'Administration', icon: 'fa-user-gear' },
@@ -299,7 +299,7 @@ window.SHELL_CONFIG = {
 var tenants = [];
 var selectedTenantId = '';
 var currentUser = null;
-var smsHealthData = null;
+var smsMaturityData = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     await waitForFirebase();
@@ -377,18 +377,18 @@ async function onTenantChange() {
     var tenantId = document.getElementById('tenantSelect').value;
     selectedTenantId = tenantId;
 
-    var cards = ['smsHealthCard', 'componentsCard', 'assessmentCard', 'historyCard', 'surveyInfoCard', 'surveyFormCard', 'surveyLinkCard', 'adminRateLimitCard', 'adminInstructionsCard', 'adminUsersCard'];
+    var cards = ['smsMaturityCard', 'componentsCard', 'assessmentCard', 'historyCard', 'surveyInfoCard', 'surveyFormCard', 'surveyLinkCard', 'adminRateLimitCard', 'adminInstructionsCard', 'adminUsersCard'];
     cards.forEach(function(id) {
         document.getElementById(id).style.display = 'none';
     });
-    document.getElementById('healthBanner').style.display = 'none';
+    document.getElementById('maturityBanner').style.display = 'none';
 
     if (!tenantId) {
         return;
     }
 
     var tenant = tenants.find(function(t) { return t.id === tenantId; });
-    document.getElementById('healthTenantName').textContent = tenant && tenant.name ? tenant.name + ' — Current SMS Health' : 'Current SMS Health';
+    document.getElementById('maturityTenantName').textContent = tenant && tenant.name ? tenant.name + ' — Current SMS Maturity' : 'Current SMS Maturity';
 
     await Promise.all([loadSurveyInfo(), loadSmsDashboard(), loadAdminConfig(), loadAdminUsers()]);
 }
@@ -699,10 +699,10 @@ function escapeHtml(str) {
 }
 
 // ============================================================================
-// SMS HEALTH DASHBOARD (sections 1-4)
+// SMS MATURITY DASHBOARD (sections 1-4)
 // ============================================================================
 
-function onHealthDaysChange() {
+function onMaturityDaysChange() {
     loadSmsDashboard();
 }
 
@@ -710,29 +710,29 @@ async function loadSmsDashboard() {
     var tenantId = selectedTenantId;
     if (!tenantId) return;
 
-    var days = document.getElementById('healthDays').value;
+    var days = document.getElementById('maturityDays').value;
     var statsEl = document.getElementById('overviewStats');
-    var bannerEl = document.getElementById('healthBanner');
+    var bannerEl = document.getElementById('maturityBanner');
 
-    document.getElementById('smsHealthCard').style.display = 'block';
+    document.getElementById('smsMaturityCard').style.display = 'block';
     document.getElementById('componentsCard').style.display = 'block';
     document.getElementById('assessmentCard').style.display = 'block';
     document.getElementById('historyCard').style.display = 'block';
 
-    statsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading SMS health...</div>';
+    statsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading SMS maturity...</div>';
     bannerEl.style.display = 'none';
     document.getElementById('componentsGrid').innerHTML = '';
-    document.getElementById('assessmentContent').innerHTML = '<p class="loading"><i class="fas fa-spinner fa-spin"></i> Generating SMS health assessment...</p>';
+    document.getElementById('assessmentContent').innerHTML = '<p class="loading"><i class="fas fa-spinner fa-spin"></i> Generating SMS maturity assessment...</p>';
     document.getElementById('historyBody').innerHTML = '<tr><td colspan="9" class="loading"><i class="fas fa-spinner fa-spin"></i> Loading history...</td></tr>';
 
     try {
-        var data = await ApiClient.get('/api/v1/dashboard/airline/sms-health?days=' + days);
-        smsHealthData = data;
+        var data = await ApiClient.get('/api/v1/dashboard/airline/sms-maturity?days=' + days);
+        smsMaturityData = data;
         DashboardRender.renderAll(data);
     } catch (err) {
-        statsEl.innerHTML = '<div class="error">Failed to load SMS health: ' + err.message + '</div>';
+        statsEl.innerHTML = '<div class="error">Failed to load SMS maturity: ' + err.message + '</div>';
         document.getElementById('componentsGrid').innerHTML = '';
-        document.getElementById('assessmentContent').innerHTML = '<div class="error">Failed to load SMS health assessment: ' + err.message + '</div>';
+        document.getElementById('assessmentContent').innerHTML = '<div class="error">Failed to load SMS maturity assessment: ' + err.message + '</div>';
         document.getElementById('historyBody').innerHTML = '<tr><td colspan="9" class="error">Failed to load assessment history: ' + err.message + '</td></tr>';
     }
 }

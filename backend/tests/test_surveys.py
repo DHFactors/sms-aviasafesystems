@@ -90,7 +90,7 @@ def test_pillar_scores_grouping():
 
 def test_overall_and_percentage():
     scores = sc.compute_pillar_scores(VALID_ANSWERS)
-    overall = sc.compute_overall_health(scores)
+    overall = sc.compute_overall_maturity(scores)
     assert overall == round((4.4 + 4.25 + 3.8 + 4.4) / 4, 2)
     assert sc.compute_percentage_score(5.0) == 100.0
     assert sc.compute_percentage_score(3.0) == 50.0
@@ -205,13 +205,13 @@ def test_survey_route_anonymous_success(monkeypatch):
     body = resp.json()
     assert body["status"] == "success"
     assert body["data"]["tenant_id"] == "tara-air"
-    assert body["data"]["overall_sms_health"] is not None
+    assert body["data"]["overall_sms_maturity"] is not None
 
     # Scored doc persisted to surveys, raw doc to responses
     assert len(db.surveys.docs) == 1
     _, survey = db.surveys.docs[0]
     assert survey["tenant_id"] == "tara-air"
-    assert survey["overall_sms_health"] is not None
+    assert survey["overall_sms_maturity"] is not None
     assert survey["safety_policy"] == 4.4
     assert isinstance(survey["submitted_at"], datetime)
     assert survey["submitted_at"].tzinfo is not None

@@ -2,7 +2,7 @@
 
 Covers the `regulators` collection service (enumerate regulators + their
 operators), the /api/v1/regulators routes (authz + envelope), and regulator
-scoping of the state-risk aggregation and CAAN survey-health endpoints so the
+scoping of the state-risk aggregation and CAAN survey-maturity endpoints so the
 system generalizes to any country's regulator (CAAN/Nepal, DGCA/India, ...).
 """
 
@@ -291,10 +291,10 @@ def test_aggregate_scoped_to_regulator_operators(monkeypatch):
 
 
 # ============================================================================
-# Regulator scoping of CAAN survey health
+# Regulator scoping of CAAN survey maturity
 # ============================================================================
 
-def _patch_survey_health_dbs(monkeypatch, surveys):
+def _patch_survey_maturity_dbs(monkeypatch, surveys):
     from app.services.dashboard_service import DashboardService
 
     class _DB:
@@ -307,19 +307,19 @@ def _patch_survey_health_dbs(monkeypatch, surveys):
     return DashboardService({"uid": "caan", "role": "CAAN_SMD"})
 
 
-def test_survey_health_scoped_to_regulator(monkeypatch):
-    svc = _patch_survey_health_dbs(monkeypatch, surveys=[
+def test_survey_maturity_scoped_to_regulator(monkeypatch):
+    svc = _patch_survey_maturity_dbs(monkeypatch, surveys=[
         {"tenant_id": "air1", "safety_policy": 4.0, "safety_risk_management": 4.0,
-         "safety_assurance": 4.0, "safety_promotion": 4.0, "overall_sms_health": 4.0},
+         "safety_assurance": 4.0, "safety_promotion": 4.0, "overall_sms_maturity": 4.0},
         {"tenant_id": "air2", "safety_policy": 2.0, "safety_risk_management": 2.0,
-         "safety_assurance": 2.0, "safety_promotion": 2.0, "overall_sms_health": 2.0},
+         "safety_assurance": 2.0, "safety_promotion": 2.0, "overall_sms_maturity": 2.0},
         {"tenant_id": "other-state", "safety_policy": 5.0, "safety_risk_management": 5.0,
-         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_health": 5.0},
+         "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_maturity": 5.0},
     ])
-    scoped = svc.get_caan_survey_health(regulator_id="caan")
+    scoped = svc.get_caan_survey_maturity(regulator_id="caan")
     ids = {op["tenant_id"] for op in scoped["operators"]}
     assert ids == {"air1", "air2"}
     assert scoped["national"]["response_count"] == 2
 
-    full = svc.get_caan_survey_health()
+    full = svc.get_caan_survey_maturity()
     assert len(full["operators"]) == 3

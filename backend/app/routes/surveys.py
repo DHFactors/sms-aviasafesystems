@@ -22,7 +22,7 @@ from app.middleware.rate_limit import rate_limit
 from app.services.audit_service import log_audit, request_context
 from app.services.survey_scoring import (
     SURVEY_VERSION,
-    compute_overall_health,
+    compute_overall_maturity,
     compute_percentage_score,
     compute_pillar_scores,
     compute_question_scores,
@@ -80,7 +80,7 @@ async def submit_survey(
 
     The response is validated against the master question contract, scored
     into the four ICAO pillars (1-5) server-side, written to both
-    `tenants/{id}/surveys` (scored, consumed by the airline + CAAN SMS health
+    `tenants/{id}/surveys` (scored, consumed by the airline + CAAN SMS maturity
     dashboards) and `tenants/{id}/responses` (raw, for audit).
     """
     tenant_id = payload.tenantId.strip()
@@ -126,7 +126,7 @@ async def submit_survey(
         )
 
     pillar_scores = compute_pillar_scores(payload.answers)
-    overall = compute_overall_health(pillar_scores)
+    overall = compute_overall_maturity(pillar_scores)
     question_scores = compute_question_scores(payload.answers)
     now = datetime.now(timezone.utc)
 
@@ -150,8 +150,8 @@ async def submit_survey(
         "safety_risk_management": pillar_scores["safety_risk_management"],
         "safety_assurance": pillar_scores["safety_assurance"],
         "safety_promotion": pillar_scores["safety_promotion"],
-        "overall_sms_health": overall,
-        "overallSMSHealth": overall,
+        "overall_sms_maturity": overall,
+        "overallSMSMaturity": overall,
         "pillarScores": pillar_scores,
         "overall_score_pct": compute_percentage_score(overall),
     }
@@ -191,7 +191,7 @@ async def submit_survey(
         metadata={
             "department": payload.department,
             "language": payload.language,
-            "overall_sms_health": overall,
+            "overall_sms_maturity": overall,
         },
     )
 
@@ -200,7 +200,7 @@ async def submit_survey(
         "data": {
             "id": survey_id,
             "tenant_id": tenant_id,
-            "overall_sms_health": overall,
+            "overall_sms_maturity": overall,
             "overall_score_pct": compute_percentage_score(overall),
             "pillar_scores": pillar_scores,
         },

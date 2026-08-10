@@ -12,7 +12,7 @@
 | Check | Result | Notes |
 |---|---|---|
 | Backend unit/integration tests | **PASS** | `67 passed` in 11.66s |
-| API responses (live) | **PASS** | `/health`, `/`, CAAN survey-health, benchmark, state-risk register/aggregate all 200 |
+| API responses (live) | **PASS** | `/health`, `/`, CAAN survey-maturity, benchmark, state-risk register/aggregate all 200 |
 | Error handling | **PASS** | Consistent envelope `{success, error, detail, errors, request_id}`; unhandled exceptions masked (detail only in DEBUG); 401/403/422/429/404 handled |
 | Input validation | **PASS** | Pydantic v2 models with `ge/le` bounds (severity 1–5, probability 1–5, risk-matrix 1–25, year/quarter ranges); 422 with field-level errors |
 | RBAC (SUPER_ADMIN / CAAN_SMD / AIRLINE_ADMIN / USER) | **PASS** | Middleware deps `get_admin_user`, `get_caan_user`, `get_tenant_user`, `get_safety_manager`; tested cross-tenant reads, USER→403, CAAN/SM/SA confirm flows |

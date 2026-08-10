@@ -21,8 +21,8 @@ The platform collects three core data sources and answers two questions per audi
 
 | Audience | Question |
 |---|---|
-| **Airlines (Service Providers)** | *How healthy is our SMS? What are our highest operational risks?* |
-| **CAAN (State)** | *How healthy is each operator's SMS? What are the highest operational risks across the industry? How effective is the SSP over time?* |
+| **Airlines (Service Providers)** | *How mature is our SMS? What are our highest operational risks?* |
+| **CAAN (State)** | *How mature is each operator's SMS? What are the highest operational risks across the industry? How effective is the SSP over time?* |
 
 Supporting modules extend the core flows: Hazard Register, Corrective Action Notices & Plans
 (CAN/CAP), Verification & Closure, Flight Diversions, Quarterly/Annual Reports with PDF export, and

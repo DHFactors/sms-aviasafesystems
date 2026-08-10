@@ -14,8 +14,8 @@ const CAAN_ENDPOINTS = [
   '/api/dashboard/caan/trends',
   '/api/dashboard/caan/risk',
   '/api/dashboard/caan/hazards',
-  '/api/dashboard/caan/survey-health',
-  '/api/dashboard/caan/sms-health-assessment',
+  '/api/dashboard/caan/survey-maturity',
+  '/api/dashboard/caan/sms-maturity-assessment',
   '/api/dashboard/caan/benchmark',
 ];
 

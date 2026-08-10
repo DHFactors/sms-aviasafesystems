@@ -8,7 +8,7 @@ profile. Both **k6** and **Artillery** configs are provided.
 | Scenario                     | Concurrent users | Endpoints hit                                      |
 |------------------------------|------------------|----------------------------------------------------|
 | Report submission            | 100              | `POST /api/reports/vsr` (and `/mor`)               |
-| Dashboard viewing            | 50               | `/api/dashboard/{overview,trends,hazards,actions,airline/sms-health}` |
+| Dashboard viewing            | 50               | `/api/dashboard/{overview,trends,hazards,actions,airline/sms-maturity}` |
 | CAAN aggregated viewing      | 10               | `/api/dashboard/caan/*` (7 endpoints)              |
 
 **Success criterion: HTTP response time < 500 ms (p95).**

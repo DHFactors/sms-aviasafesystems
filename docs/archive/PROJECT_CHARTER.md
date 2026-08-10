@@ -5,8 +5,8 @@ The AviaSAFE SMS Platform is an aviation-only Safety Management System (SMS) int
 
 Its purpose is to provide:
 
-Airlines (Service Providers): Real-time understanding of their SMS Health and Operational Risks.
-CAAN (State): Real-time SSP intelligence by aggregating SMS Health and Operational Risks across all operators.
+Airlines (Service Providers): Real-time understanding of their SMS Maturity and Operational Risks.
+CAAN (State): Real-time SSP intelligence by aggregating SMS Maturity and Operational Risks across all operators.
 
 This project is not an investigation management system, CAPA system, QMS, ERP, OEI, or enterprise risk platform.
 
@@ -33,7 +33,7 @@ Assessment:
 
 Outputs:
 
-Overall SMS Health Score
+Overall SMS Maturity Score
 Pillar Scores
 Element Scores
 Department Comparison
@@ -91,7 +91,7 @@ Must answer only two questions:
 
 1.
 
-How healthy is our SMS?
+How mature is our SMS?
 
 (Source: Survey)
 
@@ -109,7 +109,7 @@ Must answer:
 
 1.
 
-How healthy is each operator's SMS?
+How mature is each operator's SMS?
 
 2.
 

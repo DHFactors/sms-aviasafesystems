@@ -28,7 +28,7 @@ Current-state roadmap for the AviaSAFE SMS Platform. Supersedes the earlier "Saf
 Per the [Product Charter](./docs/archive/PROJECT_CHARTER.md), feature expansion requires explicit approval.
 Candidate product work (not committed):
 
-- Monitoring / alerting for SMS health thresholds.
+- Monitoring / alerting for SMS maturity thresholds.
 - Notifications service (email/portal).
 - AI assistant enhancements (evaluation set, per-tenant prompt tuning).
 - State-of-the-System reports and SSP effectiveness reporting automation.

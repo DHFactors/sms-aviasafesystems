@@ -21,7 +21,7 @@
 - **Automated Escalation (Phases 2–3) shipped** — CANs past their `target_completion_date` auto-flip to **Escalated**, CAPs past due to **Overdue**, audited to the `audit_logs` collection. Driven by a new **Cloud Scheduler** job (`check-overdue`, daily 00:00 UTC) calling an internal `POST /api/v1/admin/tasks/check-overdue` endpoint.
 - **Master Register (Phase 4) shipped** — unified Hazards + CANs + CAPs view (`/dashboard/master-register.html`) with status/department/search filters, sortable table, and stat cards.
 - **Responsible Manager dashboard (Phase 5) shipped** — "My Tasks" (`/dashboard/responsible-manager.html`) scoped to the signed-in user's assigned CANs/CAPs; USERs with a `department` claim are routed there on login.
-- **SMS Health visibility fixed** — SMS Health link added to the airline dashboard sidebar (`safety.html`); a **National SMS Health** summary card added to the CAAN landing dashboard (`caan.html`), one-click to the full State Risk Register.
+- **SMS Maturity visibility fixed** — SMS Maturity link added to the airline dashboard sidebar (`safety.html`); a **National SMS Maturity** summary card added to the CAAN landing dashboard (`caan.html`), one-click to the full State Risk Register.
 - **Backend suite green** — **183 backend tests passing** (was 176; +7 new escalation / master-register tests).
 
 **Key Risks**
@@ -40,7 +40,7 @@
 **Key Modules**
 | Module | Focus |
 |--------|-------|
-| Module 1: SMS Health Assessment | Bilingual gap-analysis survey, survey lifecycle (open/close), per-tenant config, national aggregation |
+| Module 1: SMS Maturity Assessment | Bilingual gap-analysis survey, survey lifecycle (open/close), per-tenant config, national aggregation |
 | Module 2: Hazard / Risk Monitoring | Hazard register, auto-hazard creation from reports, risk matrix, trends, flight diversions, state regulator dashboard, escalation |
 | Module 3: Risk Management (CAN/CAP) | Corrective action / preventive action register, review workflow, escalation to Escalated/Overdue |
 | Module 4: Department & Role Workflows | Department-scoped assignments, Master Register, Responsible Manager ("My Tasks") |
@@ -65,7 +65,7 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 |--------|-----|--------|
 | Feature commit | `8316cc9` | Render auto-deploy (backend) + Firebase Hosting (beta + prod) |
 | Docs commit | `115f09b` | — |
-| SMS Health sidebar + CAAN card | deployed | Firebase Hosting (beta + prod) |
+| SMS Maturity sidebar + CAAN card | deployed | Firebase Hosting (beta + prod) |
 
 ### 3.2 Databases (Firestore native)
 
@@ -88,7 +88,7 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 |---------|---------|--------|
 | **Firebase Auth** | Authentication (email + custom claims: AIRLINE_ADMIN, CAAN_SMD, SUPER_ADMIN, USER) | ✅ Active |
 | **Upstash Redis** | Rate limiting (beta only; `REDIS_URL` set on beta service) | ✅ Active (beta) |
-| **Gemini AI** | SMS health scoring / recommendations | ✅ Configured (key in env) |
+| **Gemini AI** | SMS maturity scoring / recommendations | ✅ Configured (key in env) |
 | **Sender.net** | Contact form subscriber capture | ✅ Active — key set on both beta + prod Render services |
 
 ---
@@ -112,8 +112,8 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 | Master Register page `/dashboard/master-register.html` | Module 4 | ✅ Complete | Beta + Prod |
 | Responsible Manager page `/dashboard/responsible-manager.html` | Module 4 | ✅ Complete | Beta + Prod |
 | Sidebar links (Master Register, My Tasks) + role routing (`getRoleDestination`) | Module 4 | ✅ Complete | Beta + Prod |
-| SMS Health sidebar link on `safety.html` → `/dashboard/index.html` | Module 1 | ✅ Complete | Beta + Prod |
-| National SMS Health card on `caan.html` (with tier, click-through) | Module 1 | ✅ Complete | Beta + Prod |
+| SMS Maturity sidebar link on `safety.html` → `/dashboard/index.html` | Module 1 | ✅ Complete | Beta + Prod |
+| National SMS Maturity card on `caan.html` (with tier, click-through) | Module 1 | ✅ Complete | Beta + Prod |
 | Verification docs updated (manual checklist + audit_logs corrections) | — | ✅ Complete | `115f09b` |
 
 ### 4.2 Completed Features (prior)
@@ -151,8 +151,8 @@ New tests cover: CAN escalated when past due, idempotency on re-run, CAP overdue
 |------|--------|-------|
 | Airline Dashboard | ✅ Verified | All flows working |
 | CAAN Dashboard | ✅ Verified | All 7 operators visible |
-| SMS Health (per-tenant) | ✅ Linked | Sidebar link on `safety.html` → `/dashboard/index.html` (live, HTTP 200) |
-| National SMS Health (CAAN) | ✅ Card added | `caan.html` stat card + tier, click-through to State Risk Register |
+| SMS Maturity (per-tenant) | ✅ Linked | Sidebar link on `safety.html` → `/dashboard/index.html` (live, HTTP 200) |
+| National SMS Maturity (CAAN) | ✅ Card added | `caan.html` stat card + tier, click-through to State Risk Register |
 | Master Register | ⏳ To verify live | Endpoint live (auth-gated); page deployed |
 | Responsible Manager | ⏳ To verify live | Requires a USER account with a `department` claim |
 | Escalation | ✅ Endpoint verified | Manual scheduler run returned HTTP 200; escalation run clean |
@@ -211,7 +211,7 @@ New tests cover: CAN escalated when past due, idempotency on re-run, CAP overdue
 | **Operational Data** | 0 | No surveys/hazards/reports/CAN-CAP |
 | **Users** | 24 | Pre-provisioned seed accounts present in `users` collection |
 | **Backend** | ✅ Deployed | Latest code (incl. escalation + master register), auto-deploy |
-| **Frontend** | ✅ Deployed | Latest code (incl. SMS Health links + CAAN card) |
+| **Frontend** | ✅ Deployed | Latest code (incl. SMS Maturity links + CAAN card) |
 
 ### 7.2 Go-Live Checklist
 
@@ -298,7 +298,7 @@ New tests cover: CAN escalated when past due, idempotency on re-run, CAP overdue
 | 4 | Production has no operational data | N/A | ✅ Intentional | Clean slate for go-live (24 seed user accounts present) |
 | 5 | Monitoring / alerting | Medium | ⚠️ Pending | Not yet configured |
 | 6 | MFA (TOTP/SMS) | Medium | ⚠️ Pending | Not yet implemented |
-| 7 | Legacy/orphaned dashboard pages | Low | ⚠️ Known | `public/dashboard/index.html`, `public/portal/*` not linked from nav (SMS Health now linked from `safety.html`) |
+| 7 | Legacy/orphaned dashboard pages | Low | ⚠️ Known | `public/dashboard/index.html`, `public/portal/*` not linked from nav (SMS Maturity now linked from `safety.html`) |
 | 8 | New flows require live manual verification | Low | ⚠️ Pending | Master Register / My Tasks / department filters verified in tests, pending on-screen checks |
 
 ---

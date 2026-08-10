@@ -55,7 +55,7 @@ def generate_survey_batch(
             "tenant_id": tenant_id,
             **elements,
             **pillar_scores,
-            "overall_sms_health": overall,
+            "overall_sms_maturity": overall,
             "department": dept,
             "years_of_experience": year_exp,
             "respondent_name": rng.choice(NEPALI_NAMES) if rng.random() > 0.3 else None,

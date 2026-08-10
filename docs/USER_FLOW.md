@@ -358,7 +358,7 @@ CAAN_SMD without `tenant_id`) in the top-level `caan_reports` collection. `REPOR
 | `GET /api/dashboard/caan/trends` | Cross-tenant trend lines |
 | `GET /api/dashboard/caan/risk` | Cross-tenant risk distribution |
 | `GET /api/dashboard/caan/hazards` | Cross-tenant hazard frequency |
-| `GET /api/dashboard/caan/survey-health` | Survey participation/health via `collection_group("surveys")` |
+| `GET /api/dashboard/caan/survey-maturity` | Survey participation/maturity via `collection_group("surveys")` |
 | `GET /api/dashboard/caan/benchmark` | Airline benchmarking (currently placeholder) |
 
 **Platform admin** (`public/admin/index.html`, guard `get_admin_user`):

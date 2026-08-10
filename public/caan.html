@@ -210,10 +210,10 @@ AUTHOR: AviaSAFE Systems
             <div class="number" id="highRiskCount">0</div>
             <div class="label">High Risk Items</div>
         </div>
-        <div class="stat-card" onclick="window.location.href='/caan-state-risk.html'" style="cursor:pointer;" title="View national SMS health">
-            <div class="number" id="nationalSMSHealth">--</div>
-            <div class="label">National SMS Health</div>
-            <div class="label" id="nationalSMSHealthTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
+        <div class="stat-card" onclick="window.location.href='/caan-state-risk.html'" style="cursor:pointer;" title="View national SMS maturity">
+            <div class="number" id="nationalSMSMaturity">--</div>
+            <div class="label">National SMS Maturity</div>
+            <div class="label" id="nationalSMSMaturityTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
         </div>
     </div>
 
@@ -469,7 +469,7 @@ async function loadIndustryData() {
         document.getElementById('highRiskCount').textContent = highRiskCount;
         document.getElementById('tenantsTableBody').innerHTML = html;
 
-        await loadNationalSmsHealth();
+        await loadNationalSmsMaturity();
 
         renderCaanHeatMap(heatMapData);
         renderCaanTopRisks(topRisks);
@@ -491,13 +491,13 @@ async function loadIndustryData() {
     }
 }
 
-async function loadNationalSmsHealth() {
-    const scoreEl = document.getElementById('nationalSMSHealth');
-    const tierEl = document.getElementById('nationalSMSHealthTier');
+async function loadNationalSmsMaturity() {
+    const scoreEl = document.getElementById('nationalSMSMaturity');
+    const tierEl = document.getElementById('nationalSMSMaturityTier');
     try {
-        const data = await ApiClient.get('/api/v1/dashboard/caan/survey-health');
+        const data = await ApiClient.get('/api/v1/dashboard/caan/survey-maturity');
         const nat = (data && data.national) || {};
-        const v = nat.overall_sms_health;
+        const v = nat.overall_sms_maturity;
         scoreEl.textContent = v != null ? v.toFixed(1) : '--';
         if (tierEl) {
             if (v == null) {
@@ -510,7 +510,7 @@ async function loadNationalSmsHealth() {
             }
         }
     } catch (err) {
-        console.error('Error loading national SMS health:', err);
+        console.error('Error loading national SMS maturity:', err);
         scoreEl.textContent = '--';
         if (tierEl) tierEl.textContent = '';
     }

@@ -183,14 +183,14 @@ fields: `severity_level`, `probability_level`, `risk_index`, `risk_level`, `risk
 | GET | `/caan/risk` | CAAN risk view |
 | GET | `/caan/hazards` | CAAN hazard view |
 | GET | `/caan/trends` | CAAN trends |
-| GET | `/caan/survey-health` | National SMS health from survey pillars (aggregated over a regulator's operators) |
-| GET | `/caan/sms-health-assessment` | Gemini assessment per operator; low pillars (<70%) get actions (aggregated over a regulator's operators) |
+| GET | `/caan/survey-maturity` | National SMS maturity from survey pillars (aggregated over a regulator's operators) |
+| GET | `/caan/sms-maturity-assessment` | Gemini assessment per operator; low pillars (<70%) get actions (aggregated over a regulator's operators) |
 | GET | `/admin/system` | System status (SUPER_ADMIN) |
 | GET | `/admin/tenants` | Tenant list (SUPER_ADMIN) |
 | GET | `/admin/usage` | Usage analytics (SUPER_ADMIN) |
 
-**Regulator scoping (CAAN / State Regulator):** `GET /caan/survey-health` and
-`GET /caan/sms-health-assessment` accept an optional `regulator_id` query param. When supplied,
+**Regulator scoping (CAAN / State Regulator):** `GET /caan/survey-maturity` and
+`GET /caan/sms-maturity-assessment` accept an optional `regulator_id` query param. When supplied,
 the aggregation covers only the operator tenants overseen by that State Regulator (see §3.13);
 omitted, it covers all tenants.
 
@@ -200,7 +200,7 @@ Survey submission is **anonymous by default**: a Bearer token is optional. Publi
 submit without login; an authenticated user with a tenant may only submit to their own tenant
 (cross-tenant roles may submit anywhere). Each response is validated against the master
 question contract, scored server-side into the four ICAO pillars (1-5), persisted to
-`tenants/{id}/surveys` (scored — feeds the airline + CAAN SMS health dashboards) and
+`tenants/{id}/surveys` (scored — feeds the airline + CAAN SMS maturity dashboards) and
 `tenants/{id}/responses` (raw), and audited with `SURVEY_SUBMITTED`.
 
 | Method | Path | Description |
@@ -232,7 +232,7 @@ Rules:
   likert `q2`…`q23_peer` → `1-5`). `q24_comments` is optional free text.
 - Pillar grouping: `safety_policy` = q1–q5, `safety_risk_management` = q6–q13,
   `safety_assurance` = q14–q16 + q19–q20, `safety_promotion` = q17–q18 + q21–q23.
-- Responses: `201` with `{id, tenant_id, overall_sms_health, overall_score_pct, pillar_scores}`.
+- Responses: `201` with `{id, tenant_id, overall_sms_maturity, overall_score_pct, pillar_scores}`.
 - Rate limited to **`SURVEY_RATE_LIMIT` submissions per tenant per day** (default 5, env-configurable;
   overridable per tenant via `tenants/{id}/config.survey_rate_limit`). Counter key: `rl:survey:{tenantId}:{date}`.
 

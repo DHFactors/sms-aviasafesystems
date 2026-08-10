@@ -1,7 +1,7 @@
 ### Airline Dashboard
 - [ ] Login as safety.tara-air@taraair.com
 - [ ] Dashboard loads with KPIs
-- [ ] "SMS Health Assessment" section visible
+- [ ] "SMS Maturity Assessment" section visible
 - [ ] "Hazard Register" shows hazards
 - [ ] "Latest Reports" shows reports
 - [ ] "CAN/CAP" section visible
@@ -14,7 +14,7 @@
 - [ ] Login as sms.inspector@caan.gov.np
 - [ ] CAAN dashboard loads
 - [ ] All 7 operators visible
-- [ ] National SMS Health displayed
+- [ ] National SMS Maturity displayed
 - [ ] Aggregate statistics shown
 - [ ] Regulator metadata present
 
@@ -22,7 +22,7 @@
 - [ ] Go to /portal/survey/?tenant=tara-air
 - [ ] Survey instructions displayed
 - [ ] Submit survey
-- [ ] Check dashboard for updated SMS Health
+- [ ] Check dashboard for updated SMS Maturity
 
 ### Report Flow
 - [ ] Submit a VSR

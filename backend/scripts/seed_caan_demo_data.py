@@ -33,7 +33,7 @@ COUNTRY_NAME = "Nepal"
 
 # The operators overseen by the CAAN State Regulator. Order matters only for
 # the printed summary. Base maturity (1-5) drives the seeded SMS culture so the
-# CAAN dashboard shows a realistic spread of health across operators.
+# CAAN dashboard shows a realistic spread of maturity across operators.
 OPERATORS = [
     {"id": "sita-air", "name": "Sita Air", "maturity": 3.9},
     {"id": "yeti-airlines", "name": "Yeti Airlines", "maturity": 3.6},
@@ -67,7 +67,7 @@ from app.services.survey_scoring import (
     BINARY_QUESTIONS,
     QUESTION_PILLARS,
     SURVEY_VERSION,
-    compute_overall_health,
+    compute_overall_maturity,
     compute_percentage_score,
     compute_pillar_scores,
     compute_question_scores,
@@ -123,7 +123,7 @@ def random_answers(maturity: float) -> dict:
 
 def survey_doc(tid: str, answers: dict, submitted_at: datetime, idx: int) -> dict:
     pillar_scores = compute_pillar_scores(answers)
-    overall = compute_overall_health(pillar_scores)
+    overall = compute_overall_maturity(pillar_scores)
     question_scores = compute_question_scores(answers)
     return {
         "tenant_id": tid,
@@ -145,8 +145,8 @@ def survey_doc(tid: str, answers: dict, submitted_at: datetime, idx: int) -> dic
         "safety_risk_management": pillar_scores["safety_risk_management"],
         "safety_assurance": pillar_scores["safety_assurance"],
         "safety_promotion": pillar_scores["safety_promotion"],
-        "overall_sms_health": overall,
-        "overallSMSHealth": overall,
+        "overall_sms_maturity": overall,
+        "overallSMSMaturity": overall,
         "pillarScores": pillar_scores,
         "overall_score_pct": compute_percentage_score(overall),
     }
@@ -270,7 +270,7 @@ def seed_regulator():
 
 
 # ============================================================================
-# 2. Survey responses (SMS health)
+# 2. Survey responses (SMS maturity)
 # ============================================================================
 
 def seed_surveys(force: bool = False):

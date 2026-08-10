@@ -67,7 +67,7 @@ service cloud.firestore {
     }
 
     // ========================================================================
-    // SURVEY SCORES — Scored pillar docs consumed by CAAN survey-health
+    // SURVEY SCORES — Scored pillar docs consumed by CAAN survey-maturity
     // ========================================================================
 
     match /tenants/{tenantId}/surveys/{surveyId} {

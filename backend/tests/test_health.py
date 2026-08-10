@@ -53,7 +53,7 @@ def test_cors_allows_canonical_frontend_origins(client):
 
     for origin in CANONICAL_ALLOWED_ORIGINS:
         resp = client.options(
-            "/api/v1/dashboard/airline/sms-health",
+            "/api/v1/dashboard/airline/sms-maturity",
             headers={
                 "Origin": origin,
                 "Access-Control-Request-Method": "GET",

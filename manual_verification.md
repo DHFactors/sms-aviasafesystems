@@ -16,7 +16,7 @@ This document contains the comprehensive manual verification checklist for the A
 |---|------|-----------------|--------|
 | 1 | Login as `safety.tara-air@taraair.com` | Successful login to dashboard | ✅ |
 | 2 | Dashboard loads | KPIs, Risk & Trends, Top Hazards visible | ✅ |
-| 3 | "SMS Health Assessment" section | Visible with health score and pillar breakdowns | ✅ |
+| 3 | "SMS Maturity Assessment" section | Visible with maturity score and pillar breakdowns | ✅ |
 | 4 | "Hazard Register" | Shows hazards (4-7 per tenant) | ✅ |
 | 5 | "Latest Reports" | Shows recent VSR/MOR submissions | ✅ |
 | 6 | "CAN/CAP" section | Visible with progress indicators | ✅ |
@@ -43,14 +43,14 @@ This document contains the comprehensive manual verification checklist for the A
 | 1 | Login as `sms.inspector@caan.gov.np` | Successful login to CAAN dashboard | ✅ |
 | 2 | CAAN dashboard loads | National view with all operators | ✅ |
 | 3 | All 7 operators visible | List includes all seeded tenants | ✅ |
-| 4 | National SMS Health | Aggregated health score displayed | ✅ |
+| 4 | National SMS Maturity | Aggregated maturity score displayed | ✅ |
 | 5 | Aggregate statistics | Summary statistics across all operators | ✅ |
 | 6 | Regulator metadata | Regulator ID and name displayed | ✅ |
 | 7 | State Risk Dashboard | Risk categories (RE, RI, etc.) displayed | ✅ |
 
 ### Regulator Specific Checks
 - [ ] Cross-tenant data is aggregated (not showing individual reports)
-- [ ] Survey Health shows aggregated pillar scores
+- [ ] Survey Maturity shows aggregated pillar scores
 - [ ] State Risk Dashboard shows national risk trends
 - [ ] Regulator ID (`caan`) is read correctly
 - [ ] Tagged operators (7) are all visible
@@ -69,11 +69,11 @@ This document contains the comprehensive manual verification checklist for the A
 | 4 | Survey instructions | Displayed (from Safety Officer's settings) | ✅ |
 | 5 | Survey progress | "0 of 23 answered" updates as questions are answered | ✅ |
 | 6 | Submit survey | Success message displayed | ✅ |
-| 7 | Check dashboard | SMS Health score updates after submission | ✅ |
+| 7 | Check dashboard | SMS Maturity score updates after submission | ✅ |
 
 ### Survey Display Verification
 - [ ] Tenant name displayed in extra large, centered font
-- [ ] Title reads "SMS Health Assessment"
+- [ ] Title reads "SMS Maturity Assessment"
 - [ ] Subtitle reads: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10951 and state requirements."
 - [ ] Bilingual support (English/Nepali) works
 - [ ] Anonymous option is available
@@ -295,7 +295,7 @@ This document contains the comprehensive manual verification checklist for the A
 
 ## Nuance: Production State Regulator Dashboard
 
-On production (`sms.aviasafesystems.com`), the State Regulator dashboard finds no regulators document, so it falls back to the default `caan` ID and shows an empty register/health view until the regulator + tenants are seeded at go-live.
+On production (`sms.aviasafesystems.com`), the State Regulator dashboard finds no regulators document, so it falls back to the default `caan` ID and shows an empty register/maturity view until the regulator + tenants are seeded at go-live.
 
 **This is intentional** and consistent with the go-live-on-contract-signing policy.
 
@@ -349,4 +349,4 @@ Confirmed on all four points (verified live, not assumed):
 2. Unique passwords per user — Yes. Each of the 24 beta accounts now has its own strong, unique password (14+ chars, mixed case, numbers, specials). The shared DEFAULT_SEED_PASSWORD no longer works for these accounts. Passwords are issued via BETA_CREDENTIALS_2026-08-08.md (kept out of the repo).
 3. Beta shows seeded data — Confirmed. sms-db-beta: 7 tenants, 1 regulator (caan), 1033 surveys, 125 hazards, 980 reports. All dashboards populate.
 4. Production shows empty dashboard — Confirmed. sms-db: 0 tenants, 0 regulators, 0 surveys/hazards/reports; only the 24 users. Dashboards (tenant + CAAN/State Regulator) render empty — consistent with the go-live-on-contract-signing policy.
-One nuance: on prod, the State Regulator dashboard finds no regulators doc, so it falls back to the default caan id and shows an empty register/health view until the regulator + tenants are seeded at go-live.
+One nuance: on prod, the State Regulator dashboard finds no regulators doc, so it falls back to the default caan id and shows an empty register/maturity view until the regulator + tenants are seeded at go-live.

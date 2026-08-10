@@ -7,7 +7,7 @@
 #          `regulators` collection and each operator tenant carries a
 #          `regulator_id` + `country` tag. This service enumerates regulators
 #          and their operators, and provides the flat operator-tenant list used
-#          to scope cross-tenant aggregations (SMS health, national risk).
+#          to scope cross-tenant aggregations (SMS maturity, national risk).
 # ============================================================================
 
 from typing import Any, Dict, List, Optional

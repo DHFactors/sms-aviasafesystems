@@ -16,12 +16,12 @@ from loguru import logger
 from app.core.config import settings
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
-from app.services.gemini import recommend_sms_health_actions, sms_health_tier, SURVEY_PILLAR_NAMES
+from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
 
 SURVEY_PILLARS = ["safety_policy", "safety_risk_management", "safety_assurance", "safety_promotion"]
-SMS_HEALTH_CACHE_TTL = 6 * 3600  # seconds
+SMS_MATURITY_CACHE_TTL = 6 * 3600  # seconds
 
-# Friendly labels for the SMS health tiers produced by the shared engine.
+# Friendly labels for the SMS maturity tiers produced by the shared engine.
 TIER_LABELS = {
     "strong": "Good",
     "watch": "Watch",
@@ -66,11 +66,11 @@ class DashboardService:
             "org_kpis": org_kpis,
         }
 
-    def get_airline_sms_health(self, **overrides) -> Dict[str, Any]:
-        """Tenant-scoped SMS health for the authenticated airline.
+    def get_airline_sms_maturity(self, **overrides) -> Dict[str, Any]:
+        """Tenant-scoped SMS maturity for the authenticated airline.
 
-        Derives every value from the same core SMS health model used by the
-        CAAN dashboard (_survey_docs + _aggregate_surveys + _sms_health_model +
+        Derives every value from the same core SMS maturity model used by the
+        CAAN dashboard (_survey_docs + _aggregate_surveys + _sms_maturity_model +
         _tenant_recommendations); only the data scope differs — this tenant's
         surveys only (claims.tenant_id).
         """
@@ -109,7 +109,7 @@ class DashboardService:
         if not op:
             return empty
 
-        model = self._sms_health_model(op)
+        model = self._sms_maturity_model(op)
         recs = self._tenant_recommendations(tenant_id, days, op, model, generated_at)
 
         latest = None
@@ -140,8 +140,8 @@ class DashboardService:
             "period_days": days,
         }
 
-    def _sms_health_model(self, op: Dict[str, Any]) -> Dict[str, Any]:
-        """Shared SMS health model derived from one aggregated operator row.
+    def _sms_maturity_model(self, op: Dict[str, Any]) -> Dict[str, Any]:
+        """Shared SMS maturity model derived from one aggregated operator row.
 
         This is the single source of the score math for both the Airline and
         CAAN dashboards: pillar percentages, tiers, strengths, and
@@ -156,13 +156,13 @@ class DashboardService:
                 continue
             pct = round((v - 1) / 4 * 100, 1)
             pcts[p] = pct
-            tiers[p] = sms_health_tier(pct)
+            tiers[p] = sms_maturity_tier(pct)
             if pct < 70:
                 low.append({"pillar": p, "score": v, "pct": pct, "tier": tiers[p]})
 
-        overall_1_5 = op["overall_sms_health"]
+        overall_1_5 = op["overall_sms_maturity"]
         overall_pct = round((overall_1_5 - 1) / 4 * 100, 1) if overall_1_5 is not None else None
-        overall_tier = sms_health_tier(overall_pct) if overall_pct is not None else None
+        overall_tier = sms_maturity_tier(overall_pct) if overall_pct is not None else None
 
         return {
             "pcts": pcts,
@@ -185,13 +185,13 @@ class DashboardService:
         self, tenant_id: str, days: int, op: Dict[str, Any],
         model: Dict[str, Any], generated_at: datetime, refresh: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Cache-aware SMS health assessment actions for a single tenant.
+        """Cache-aware SMS maturity assessment actions for a single tenant.
 
         Reused by both the CAAN and Airline dashboards so the AI assessment is
         generated once per tenant+period and shared across scopes.
         """
         recs: List[Dict[str, Any]] = []
-        cached = self._read_sms_health(tenant_id, days)
+        cached = self._read_sms_maturity(tenant_id, days)
         use_cache = (
             not refresh
             and cached is not None
@@ -201,7 +201,7 @@ class DashboardService:
             try:
                 gen_dt = cached["generated_at"]
                 if hasattr(gen_dt, "timestamp"):
-                    use_cache = (generated_at - gen_dt).total_seconds() < SMS_HEALTH_CACHE_TTL
+                    use_cache = (generated_at - gen_dt).total_seconds() < SMS_MATURITY_CACHE_TTL
                 else:
                     use_cache = False
             except Exception:
@@ -209,20 +209,20 @@ class DashboardService:
         if use_cache:
             recs = cached.get("recommendations", [])
         elif model["low_pillars"]:
-            recs = recommend_sms_health_actions(tenant_id, {
+            recs = recommend_sms_maturity_actions(tenant_id, {
                 "pillars": op["pillars"],
                 "pcts": model["pcts"],
                 "tiers": model["tiers"],
                 "question_averages": op.get("question_averages", {}),
                 "response_count": op["response_count"],
             })
-            self._write_sms_health(tenant_id, days, {
+            self._write_sms_maturity(tenant_id, days, {
                 "period_days": days,
                 "generated_at": generated_at,
                 "pillars": op["pillars"],
                 "pcts": model["pcts"],
                 "tiers": model["tiers"],
-                "overall_sms_health": op["overall_sms_health"],
+                "overall_sms_maturity": op["overall_sms_maturity"],
                 "question_averages": op.get("question_averages", {}),
                 "low_pillars": model["low_pillars"],
                 "recommendations": recs,
@@ -265,9 +265,9 @@ class DashboardService:
             if not ops:
                 continue
             op = ops[0]
-            overall = op["overall_sms_health"]
+            overall = op["overall_sms_maturity"]
             overall_pct = round((overall - 1) / 4 * 100, 1) if overall is not None else None
-            overall_tier = sms_health_tier(overall_pct) if overall_pct is not None else None
+            overall_tier = sms_maturity_tier(overall_pct) if overall_pct is not None else None
 
             latest_ts = None
             for d in buckets[period]:
@@ -375,12 +375,12 @@ class DashboardService:
         reports = self._caan_reports(**overrides)
         return MetricsService.calculate_hazard_frequency(reports)
 
-    def get_caan_survey_health(self, **overrides) -> Dict[str, Any]:
-        """Aggregate SMS survey health across all tenants.
+    def get_caan_survey_maturity(self, **overrides) -> Dict[str, Any]:
+        """Aggregate SMS survey maturity across all tenants.
 
         Pulls every survey response in the tenants/{id}/surveys collection
         group and computes, per operator, the average ICAO pillar scores and
-        overall SMS health (1-5). Returns both the per-operator breakdown and
+        overall SMS maturity (1-5). Returns both the per-operator breakdown and
         the national averages. `regulator_id` scopes the aggregation to one
         State Regulator's operators (e.g. CAAN for Nepal).
         """
@@ -394,13 +394,13 @@ class DashboardService:
                 docs = [d for d in docs if (d.to_dict().get("tenant_id") or None) in allowed]
         return self._aggregate_surveys(docs)
 
-    def get_caan_sms_health_assessment(self, **overrides) -> Dict[str, Any]:
-        """Aggregate period SMS health and generate an AI SMS health assessment
+    def get_caan_sms_maturity_assessment(self, **overrides) -> Dict[str, Any]:
+        """Aggregate period SMS maturity and generate an AI SMS maturity assessment
         with recommended actions for every pillar scoring below 70%
         (tiers: action/critical).
 
-        Assessments are cached per tenant in tenants/{id}/sms_health and
-        reused within SMS_HEALTH_CACHE_TTL unless refresh=True.
+        Assessments are cached per tenant in tenants/{id}/sms_maturity and
+        reused within SMS_MATURITY_CACHE_TTL unless refresh=True.
         `regulator_id` scopes the assessment to one State Regulator's operators.
         """
         days = overrides.get("days", 90)
@@ -419,12 +419,12 @@ class DashboardService:
         operators = []
         for op in data.get("operators", []):
             tid = op.get("tenant_id", "unknown")
-            model = self._sms_health_model(op)
+            model = self._sms_maturity_model(op)
             recs = self._tenant_recommendations(tid, days, op, model, generated_at, refresh)
             operators.append({
                 "tenant_id": tid,
                 "response_count": op["response_count"],
-                "overall_sms_health": op["overall_sms_health"],
+                "overall_sms_maturity": op["overall_sms_maturity"],
                 "pillars": op["pillars"],
                 "pcts": model["pcts"],
                 "tiers": model["tiers"],
@@ -445,7 +445,7 @@ class DashboardService:
             from app.firebase import get_db
             docs = list(get_db().collection_group("surveys").get())
         except Exception as e:
-            logger.warning(f"CAAN survey health query failed: {e}")
+            logger.warning(f"CAAN survey maturity query failed: {e}")
             return []
         if not days:
             return docs
@@ -477,7 +477,7 @@ class DashboardService:
                 "response_count": 0,
                 "pillars": {},
                 "question_scores": {},
-                "overall_sms_health": None,
+                "overall_sms_maturity": None,
             })
             entry["response_count"] += 1
             for p in SURVEY_PILLARS:
@@ -493,7 +493,9 @@ class DashboardService:
                         bucket = entry["question_scores"].setdefault(qid, [0.0, 0])
                         bucket[0] += float(val)
                         bucket[1] += 1
-            ov = data.get("overall_sms_health")
+            ov = data.get("overall_sms_maturity")
+            if not isinstance(ov, (int, float)):
+                ov = data.get("overall_sms_health")
             if isinstance(ov, (int, float)):
                 national_overall["sum"] += float(ov)
                 national_overall["n"] += 1
@@ -508,10 +510,10 @@ class DashboardService:
             }
             entry.pop("question_scores", None)
             vals = [v for v in entry["pillars"].values() if v is not None]
-            entry["overall_sms_health"] = round(sum(vals) / len(vals), 2) if vals else None
+            entry["overall_sms_maturity"] = round(sum(vals) / len(vals), 2) if vals else None
             rows.append(entry)
 
-        rows = sorted(rows, key=lambda t: t["overall_sms_health"] or 0, reverse=True)
+        rows = sorted(rows, key=lambda t: t["overall_sms_maturity"] or 0, reverse=True)
         return {
             "operators": rows,
             "national": {
@@ -519,35 +521,35 @@ class DashboardService:
                     p: round(national[p]["sum"] / national[p]["n"], 2) if national[p]["n"] else None
                     for p in SURVEY_PILLARS
                 },
-                "overall_sms_health": round(national_overall["sum"] / national_overall["n"], 2)
+                "overall_sms_maturity": round(national_overall["sum"] / national_overall["n"], 2)
                 if national_overall["n"] else None,
                 "response_count": sum(e["response_count"] for e in rows),
             },
         }
 
-    def _read_sms_health(self, tenant_id: str, days: int) -> Optional[Dict[str, Any]]:
+    def _read_sms_maturity(self, tenant_id: str, days: int) -> Optional[Dict[str, Any]]:
         try:
             from app.firebase import get_db
             ref = (
                 get_db().collection("tenants").document(tenant_id)
-                .collection("sms_health").document(f"days_{days}")
+                .collection("sms_maturity").document(f"days_{days}")
             )
             snap = ref.get()
             return snap.to_dict() if snap.exists else None
         except Exception as e:
-            logger.warning(f"Failed to read sms_health cache for {tenant_id}: {e}")
+            logger.warning(f"Failed to read sms_maturity cache for {tenant_id}: {e}")
             return None
 
-    def _write_sms_health(self, tenant_id: str, days: int, data: Dict[str, Any]) -> None:
+    def _write_sms_maturity(self, tenant_id: str, days: int, data: Dict[str, Any]) -> None:
         try:
             from app.firebase import get_db
             ref = (
                 get_db().collection("tenants").document(tenant_id)
-                .collection("sms_health").document(f"days_{days}")
+                .collection("sms_maturity").document(f"days_{days}")
             )
             ref.set(data)
         except Exception as e:
-            logger.warning(f"Failed to write sms_health cache for {tenant_id}: {e}")
+            logger.warning(f"Failed to write sms_maturity cache for {tenant_id}: {e}")
 
     def get_caan_benchmark(self, **overrides) -> Dict[str, Any]:
         reports = self._caan_reports(**overrides)

@@ -30,9 +30,9 @@ scenarios:
       - get:
           url: "/api/dashboard/caan/hazards"
       - get:
-          url: "/api/dashboard/caan/survey-health"
+          url: "/api/dashboard/caan/survey-maturity"
       - get:
-          url: "/api/dashboard/caan/sms-health-assessment"
+          url: "/api/dashboard/caan/sms-maturity-assessment"
       - get:
           url: "/api/dashboard/caan/benchmark"
       - think: 2

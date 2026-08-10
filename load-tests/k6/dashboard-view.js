@@ -13,7 +13,7 @@ const DASHBOARD_ENDPOINTS = [
   '/api/dashboard/trends?days=180',
   '/api/dashboard/hazards?days=90',
   '/api/dashboard/actions?days=90',
-  '/api/dashboard/airline/sms-health?days=365',
+  '/api/dashboard/airline/sms-maturity?days=365',
 ];
 
 export const options = {

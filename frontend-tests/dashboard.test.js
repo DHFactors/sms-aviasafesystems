@@ -4,7 +4,7 @@
  * The render logic in public/js/dashboard-render.js is dependency-free (no
  * firebase/DOM framework) so it can be exercised in plain Node with a minimal
  * document shim. The fixtures mirror the payload of
- * GET /api/v1/dashboard/airline/sms-health (the backend `_sms_health_model`).
+ * GET /api/v1/dashboard/airline/sms-maturity (the backend `_sms_maturity_model`).
  */
 'use strict';
 
@@ -121,7 +121,7 @@ function test_render_full_data() {
     assert.ok(overview.includes('12'), 'response count rendered');
     assert.ok(overview.includes('2026-08-01'), 'latest assessment date rendered');
 
-    const bannerEl = doc.__els.healthBanner;
+    const bannerEl = doc.__els.maturityBanner;
     assert.ok(bannerEl.innerHTML.includes('Action needed'), 'low-pillar banner shown');
     assert.strictEqual(bannerEl.style.display, 'block', 'banner visible');
 
@@ -154,7 +154,7 @@ function test_render_empty_data() {
 
     const statsEl = doc.__els.overviewStats;
     assert.ok(statsEl.innerHTML.includes('—'), 'overall score shows em-dash when null');
-    assert.ok(doc.__els.healthBanner.innerHTML.includes('No survey responses'), 'empty banner shown');
+    assert.ok(doc.__els.maturityBanner.innerHTML.includes('No survey responses'), 'empty banner shown');
 
     const components = doc.__els.componentsGrid.innerHTML;
     assert.ok(components.includes('No data'), 'pillars show no-data badge');

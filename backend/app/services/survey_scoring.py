@@ -1,7 +1,7 @@
 """Shared ICAO SMS survey scoring.
 
 Single source of truth that turns raw survey answers into the pillar scores
-(1-5) consumed by the airline and CAAN SMS health dashboards. The question ->
+(1-5) consumed by the airline and CAAN SMS maturity dashboards. The question ->
 pillar grouping mirrors the master question contract
 (public/portal/survey/default_q.js, v3.0.0) so scores computed here match the
 questions employees are actually asked.
@@ -115,7 +115,7 @@ def compute_pillar_scores(answers: Dict[str, Any]) -> Dict[str, Optional[float]]
     return result
 
 
-def compute_overall_health(
+def compute_overall_maturity(
     pillar_scores: Dict[str, Optional[float]],
 ) -> Optional[float]:
     """Average of the pillar scores on the 1-5 scale. None when no pillar

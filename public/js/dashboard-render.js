@@ -1,11 +1,11 @@
 /**
  * Airline SMS Dashboard render helpers.
  *
- * Pure-ish DOM rendering for the four SMS health sections of the Airline SMS
+ * Pure-ish DOM rendering for the four SMS maturity sections of the Airline SMS
  * Dashboard. Kept dependency-free so the same logic is unit-testable in Node
  * (via a minimal document shim) and runs in the browser. The data contract
- * mirrors the backend `_sms_health_model` payload served by
- * GET /api/v1/dashboard/airline/sms-health.
+ * mirrors the backend `_sms_maturity_model` payload served by
+ * GET /api/v1/dashboard/airline/sms-maturity.
  */
 (function (root, factory) {
     if (typeof module !== 'undefined' && module.exports) {
@@ -54,7 +54,7 @@
         var tierLabel = data.tier_label || (tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null);
 
         statsEl.innerHTML =
-            '<div class="stat-card gold"><div class="num">' + fmtPct(data.overall_score) + '</div><div class="lbl">Overall SMS Health</div></div>' +
+            '<div class="stat-card gold"><div class="num">' + fmtPct(data.overall_score) + '</div><div class="lbl">Overall SMS Maturity</div></div>' +
             '<div class="stat-card"><div class="num">' + tierBadge(tier, tierLabel) + '</div><div class="lbl">Tier</div></div>' +
             '<div class="stat-card green"><div class="num">' + (data.latest_assessment_date || '—') + '</div><div class="lbl">Latest Assessment</div></div>' +
             '<div class="stat-card"><div class="num">' + (data.response_count != null ? data.response_count : '—') + '</div><div class="lbl">Survey Responses</div></div>';
@@ -63,10 +63,10 @@
         var lowCount = (data.assessment && data.assessment.improvement_opportunities || []).length;
         var banner;
         if (data.overall_score == null) {
-            banner = '<div class="loading" style="padding:1rem;">No survey responses in the selected period. Run the safety survey to generate an SMS health score.</div>';
+            banner = '<div class="loading" style="padding:1rem;">No survey responses in the selected period. Run the safety survey to generate an SMS maturity score.</div>';
         } else if (lowCount > 0) {
             banner = '<div style="background:#fde8d0;border:1px solid #f5b380;border-radius:8px;padding:10px 14px;font-size:13px;color:#8a4b00;line-height:1.5;">' +
-                '<strong>Action needed:</strong> ' + lowCount + ' pillar(s) score below 70% — see the SMS Health Assessment below for improvement actions.</div>';
+                '<strong>Action needed:</strong> ' + lowCount + ' pillar(s) score below 70% — see the SMS Maturity Assessment below for improvement actions.</div>';
         } else {
             banner = '<div style="background:#e6f4ea;border:1px solid #9ed6ad;border-radius:8px;padding:10px 14px;font-size:13px;color:#1e7e34;line-height:1.5;">' +
                 '<strong>Good standing:</strong> all pillars scored at or above 70% in the selected period.</div>';
@@ -181,7 +181,7 @@
 
     function renderAll(data, doc) {
         data = data || {};
-        renderOverview(data, getEl('overviewStats', doc), getEl('healthBanner', doc));
+        renderOverview(data, getEl('overviewStats', doc), getEl('maturityBanner', doc));
         renderComponents(data, doc);
         renderAssessment(data, doc);
         renderHistory(data, doc);

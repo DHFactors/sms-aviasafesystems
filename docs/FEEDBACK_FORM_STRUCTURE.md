@@ -43,7 +43,7 @@ This document defines the fields for the beta feedback form. Create the form in 
 | Hazards | Hazard register and hazard lifecycle |
 | Risk Matrix | Risk scoring / matrix calculations |
 | CAP | Corrective Action Plans |
-| Dashboard | SMS health score, trend and admin dashboards |
+| Dashboard | SMS maturity score, trend and admin dashboards |
 | Login/Auth | Sign-in, token verification, role access |
 | CAAN State Risk | National / state risk register |
 | UI/UX | Layout, navigation, responsiveness, copy |

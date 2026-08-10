@@ -180,19 +180,19 @@ async def get_master_register(
     return _envelope(data)
 
 
-@router.get("/airline/sms-health")
-async def get_airline_sms_health(
+@router.get("/airline/sms-maturity")
+async def get_airline_sms_maturity(
     days: int = Query(365, ge=30, le=730),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
-    """Tenant-scoped SMS health: overall score, ICAO pillars, SMS health
+    """Tenant-scoped SMS maturity: overall score, ICAO pillars, SMS maturity
     assessment, and historical trends — for the authenticated airline only.
     """
     svc = DashboardService(user)
     try:
-        data = svc.get_airline_sms_health(days=days)
+        data = svc.get_airline_sms_maturity(days=days)
     except Exception as e:
-        logger.error(f"Airline SMS health failed for tenant {user.get('tenant_id')}: {e}")
+        logger.error(f"Airline SMS maturity failed for tenant {user.get('tenant_id')}: {e}")
         data = {
             "tenant": user.get("tenant_id"),
             "tenant_id": user.get("tenant_id"),
@@ -255,18 +255,18 @@ async def get_caan_hazards(
     return _envelope(data)
 
 
-@router.get("/caan/survey-health")
-async def get_caan_survey_health(
-    regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the health view"),
+@router.get("/caan/survey-maturity")
+async def get_caan_survey_maturity(
+    regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the maturity view"),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)
-    data = svc.get_caan_survey_health(regulator_id=regulator_id)
+    data = svc.get_caan_survey_maturity(regulator_id=regulator_id)
     return _envelope(data)
 
 
-@router.get("/caan/sms-health-assessment")
-async def get_caan_sms_health_assessment(
+@router.get("/caan/sms-maturity-assessment")
+async def get_caan_sms_maturity_assessment(
     days: int = Query(90, ge=30, le=365),
     refresh: bool = Query(False),
     regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the assessment"),
@@ -274,9 +274,9 @@ async def get_caan_sms_health_assessment(
 ):
     svc = DashboardService(user)
     try:
-        data = svc.get_caan_sms_health_assessment(days=days, refresh=refresh, regulator_id=regulator_id)
+        data = svc.get_caan_sms_maturity_assessment(days=days, refresh=refresh, regulator_id=regulator_id)
     except Exception as e:
-        logger.error(f"CAAN SMS health assessment failed: {e}")
+        logger.error(f"CAAN SMS maturity assessment failed: {e}")
         data = {"period_days": days, "generated_at": None, "operators": [], "national": None, "error": str(e)}
     return _envelope(data)
 

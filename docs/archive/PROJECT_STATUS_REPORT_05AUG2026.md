@@ -191,7 +191,7 @@ Legend: ✅ Fully implemented · 🟡 Partially implemented · ❌ Not implement
 | Quarterly/Annual reporting + PDF | ✅ | reportlab 4.1.0; valid PDF |
 | Flight diversions | ✅ | Covered by regression suite |
 | Airline dashboard | ✅ | Live `/api/v1/dashboard/overview` 200 |
-| CAAN SSP dashboard | 🟡 | Aggregation works; trend/benchmark had placeholder `None` (CAAN state-risk + survey-health now live-verified 200) |
+| CAAN SSP dashboard | 🟡 | Aggregation works; trend/benchmark had placeholder `None` (CAAN state-risk + survey-maturity now live-verified 200) |
 | Admin portal & tenant mgmt | ✅ | SUPER_ADMIN-gated; risk-matrix GET/PUT live-verified |
 | **Survey (SMS capability)** | 🟡 | **TD-6 — not charter-compliant; no backend endpoint** |
 | Seed dataset (930/620/245) | ✅ | Present in `sms-db` (6 tenants) |

@@ -39,7 +39,7 @@
 **Key Modules**
 | Module | Focus |
 |--------|-------|
-| Module 1: SMS Health Assessment | Bilingual gap-analysis survey, survey lifecycle (open/close), per-tenant config |
+| Module 1: SMS Maturity Assessment | Bilingual gap-analysis survey, survey lifecycle (open/close), per-tenant config |
 | Module 2: Hazard / Risk Monitoring | Hazard register, auto-hazard creation from reports, risk matrix (5/9/15), trends, flight diversions, state regulator dashboard |
 | Module 3: Risk Management (CAN/CAP) | Corrective action / preventive action register and review workflow |
 
@@ -73,7 +73,7 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 |---------|---------|--------|
 | **Firebase Auth** | Authentication (email + custom claims: AIRLINE_ADMIN, CAAN_SMD, SUPER_ADMIN, USER) | ✅ Active |
 | **Upstash Redis** | Rate limiting (beta only; `REDIS_URL` set on beta service) | ✅ Active (beta) |
-| **Gemini AI** | SMS health scoring / recommendations | ✅ Configured (key in env) |
+| **Gemini AI** | SMS maturity scoring / recommendations | ✅ Configured (key in env) |
 | **Sender.net** | Contact form subscriber capture | ✅ Active — key set on both beta + prod Render services; verified live |
 
 ---
@@ -84,7 +84,7 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 
 | Feature | Module | Status | Deployed |
 |---------|--------|--------|----------|
-| SMS Health Assessment | Module 1 | ✅ Complete | Beta + Prod |
+| SMS Maturity Assessment | Module 1 | ✅ Complete | Beta + Prod |
 | Portal Survey (v3, canonical `/survey/`) | Module 1 | ✅ Complete | Beta + Prod |
 | Survey Popup (unlogged / no-tenant visitors) | Module 1 | ✅ Complete | Beta + Prod |
 | Survey Closed Handling (open/close dates) | Module 1 | ✅ Complete | Beta + Prod |
