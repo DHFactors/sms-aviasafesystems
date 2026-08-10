@@ -70,6 +70,12 @@
     </div>
 </nav>
 
+<!-- Uniform top section: tenant name + logged-in user email -->
+<section class="dash-hero">
+    <h1 id="dashHeroTitle">Master Register</h1>
+    <div class="dash-hero-user" id="dashHeroUser">—</div>
+</section>
+
 <div class="page">
     <div class="header-bar">
         <h2><i class="fas fa-table-list"></i> Unified Hazard · CAN · CAP Register</h2>
@@ -141,6 +147,15 @@ firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
+    const heroTitle = document.getElementById('dashHeroTitle');
+    const heroUser = document.getElementById('dashHeroUser');
+    if (heroUser) heroUser.textContent = user.email;
+    if (heroTitle) {
+        user.getIdTokenResult(true).then(function(tr) {
+            const t = (tr.claims && tr.claims.tenant_id) || '';
+            if (t) heroTitle.textContent = t.replace(/-/g, ' ').toUpperCase();
+        }).catch(function() {});
+    }
     loadRegister();
 });
 
@@ -319,5 +334,36 @@ async function logout() {
     catch (e) { console.error(e); }
 }
 </script>
+
+<!-- ========== FOOTER (landing-page style) ========== -->
+<footer class="app-footer">
+    <div class="container">
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <span class="footer-divider">|</span>
+            <a href="/survey/">Survey</a>
+            <span class="footer-divider">|</span>
+            <a href="/login.html">Login</a>
+            <span class="footer-divider">|</span>
+            <a href="#">Privacy Policy</a>
+            <span class="footer-divider">|</span>
+            <a href="#">Terms of Service</a>
+            <span class="footer-divider">|</span>
+            <a href="/contact.html">Contact</a>
+            <span class="footer-divider">|</span>
+            <a href="/admin/login.html">Developer Login</a>
+        </div>
+        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.8;">
+            A project by <strong>Ghanshyam Acharya</strong>.
+        </p>
+        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
+            &copy; 2026 AviaSAFEsystem. All rights reserved.
+        </p>
+        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
+            ICAO Annex 19 &middot; Doc 9859 &middot; Doc 10951 &mdash; Safety Intelligence Platform
+        </p>
+    </div>
+</footer>
+
 </body>
 </html>

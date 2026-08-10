@@ -123,6 +123,24 @@
         return header;
     }
 
+    // Uniform top section: centered tenant name (title) + logged-in user email.
+    function buildHero() {
+        const hero = document.createElement('section');
+        hero.className = 'shell-hero';
+        hero.id = 'shellHero';
+        const title = document.createElement('h1');
+        title.className = 'shell-hero-title';
+        title.id = 'shellHeroTitle';
+        title.textContent = cfg.tenantTitle || cfg.roleLabel || (cfg.brand || 'AviaSAFE');
+        const user = document.createElement('div');
+        user.className = 'shell-hero-user';
+        user.id = 'shellHeroUser';
+        user.textContent = '—';
+        hero.appendChild(title);
+        hero.appendChild(user);
+        return hero;
+    }
+
     function buildFooter() {
         const footer = document.createElement('footer');
         footer.className = 'shell-footer';
@@ -165,6 +183,11 @@
         p2.style.margin = '0.25rem 0 0';
         p2.textContent = '© ' + new Date().getFullYear() + ' AviaSAFEsystem. All rights reserved.';
         container.appendChild(p2);
+
+        const p3 = document.createElement('p');
+        p3.style.margin = '0.25rem 0 0';
+        p3.textContent = 'ICAO Annex 19 · Doc 9859 · Doc 10951 — Safety Intelligence Platform';
+        container.appendChild(p3);
 
         footer.appendChild(container);
         return footer;
@@ -247,6 +270,7 @@
         content.className = 'shell-content';
         while (shell.firstChild) content.appendChild(shell.firstChild);
         main.appendChild(buildHeader());
+        main.appendChild(buildHero());
         main.appendChild(content);
         main.appendChild(buildFooter());
         shell.appendChild(sidebar);
@@ -259,6 +283,8 @@
             firebase.auth().onAuthStateChanged(function (user) {
                 const el = document.getElementById('shellUser');
                 if (el && user) el.textContent = user.email;
+                const heroUser = document.getElementById('shellHeroUser');
+                if (heroUser) heroUser.textContent = user ? user.email : '—';
                 if (user && user.getIdTokenResult) {
                     user.getIdTokenResult(true).then(function (tokenResult) {
                         const claims = (tokenResult && tokenResult.claims) || {};
@@ -280,6 +306,8 @@
             if (nameEl) nameEl.textContent = title || '';
             if (metaEl) metaEl.textContent = meta || '';
         }
+        const heroTitle = document.getElementById('shellHeroTitle');
+        if (heroTitle) heroTitle.textContent = cfg.tenantTitle || cfg.roleLabel || '';
     };
 
     if (document.readyState === 'loading') {

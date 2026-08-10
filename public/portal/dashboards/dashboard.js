@@ -78,6 +78,9 @@ function monitorAuthState(onAuthStateChanged, collection, getDocs, query, orderB
             else if (user.email.includes("taraair")) currentTenant = "tara-air";
             else currentTenant = "unknown";
 
+            const heroUser = document.getElementById('dashHeroUser');
+            if (heroUser) heroUser.textContent = user.email;
+
             loadDashboardUI();
             fetchTenantData(collection, getDocs, query, orderBy, limit);
         } else {

@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                const heroUser = document.getElementById('dashHeroUser');
+                if (heroUser) heroUser.textContent = user.email;
                 loadDashboardUI();
                 fetchAggregatedSSPData();
             } else {

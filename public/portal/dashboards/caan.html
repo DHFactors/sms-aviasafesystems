@@ -56,6 +56,16 @@
         .score-high { color: #388E3C; font-weight: bold; }
         .score-mid { color: #F57C00; font-weight: bold; }
         .score-low { color: var(--alert); font-weight: bold; }
+
+        /* Uniform hero + footer */
+        .dash-hero { min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 0.75rem; padding: 2rem 1.5rem; background: linear-gradient(135deg, var(--navy) 0%, #00539C 100%); color: var(--white); }
+        .dash-hero h1 { margin: 0; font-size: 2rem; font-weight: 800; color: var(--white); }
+        .dash-hero .dash-hero-user { font-size: 0.95rem; opacity: 0.9; }
+        .app-footer { background: var(--navy); color: var(--white); padding: 1.5rem 0; text-align: center; border-top: 4px solid var(--caan-gold); margin-top: 2rem; }
+        .app-footer .footer-links { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .app-footer a { color: rgba(255,255,255,0.85); text-decoration: none; font-size: 0.8rem; }
+        .app-footer a:hover { color: var(--white); text-decoration: underline; }
+        .app-footer p { margin: 0.25rem 0 0; font-size: 0.75rem; color: rgba(255,255,255,0.7); }
     </style>
 </head>
 <body>
@@ -64,6 +74,12 @@
         <h2>🏛️ CAAN Safety Management Division (SMD)</h2>
         <button id="logoutBtn" class="btn-logout">Secure Logout</button>
     </nav>
+
+    <!-- Uniform top section: tenant name + logged-in user email -->
+    <section class="dash-hero">
+        <h1>CAAN SMD Regulator</h1>
+        <div class="dash-hero-user" id="dashHeroUser">—</div>
+    </section>
 
     <div class="container">
         
@@ -112,5 +128,19 @@
     </div>
 
     <script type="module" src="caan.js"></script>
+
+    <!-- ========== FOOTER (landing-page style) ========== -->
+    <footer class="app-footer">
+        <div class="footer-links">
+            <a href="/">Home</a><span> | </span>
+            <a href="/survey/">Survey</a><span> | </span>
+            <a href="/login.html">Login</a><span> | </span>
+            <a href="/contact.html">Contact</a><span> | </span>
+            <a href="/admin/login.html">Developer Login</a>
+        </div>
+        <p>A project by <strong>Ghanshyam Acharya</strong>.</p>
+        <p>&copy; 2026 AviaSAFEsystem. All rights reserved.</p>
+        <p>ICAO Annex 19 &middot; Doc 9859 &middot; Doc 10951 &mdash; Safety Intelligence Platform</p>
+    </footer>
 </body>
 </html>

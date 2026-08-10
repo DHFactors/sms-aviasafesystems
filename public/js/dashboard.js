@@ -49,9 +49,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('dashboardSection').style.display = 'block';
 
-    const title = tenantId ? `${tenantId.toUpperCase()} — Safety Dashboard` : 'Cross-Tenant Safety Overview';
+    const tenantName = tenantId ? tenantId.toUpperCase() : 'Cross-Tenant Safety Overview';
     if (typeof window.updateShellTenant === 'function') {
-        window.updateShellTenant(title, tenantId ? 'ICAO operator' : 'State-level aggregated view');
+        window.updateShellTenant(tenantName, tenantId ? 'Safety Dashboard · ICAO operator' : 'State-level aggregated view');
     }
 
     if (role === 'AIRLINE_ADMIN' || role === 'CAAN_SMD') {
@@ -100,7 +100,6 @@ async function loadAll() {
     await Promise.all([
         loadKpis(),
         loadRiskDistribution(),
-        loadSSMRiskTrends(),
         loadMonthlyTrends(),
         loadHazardFrequency(),
         loadRecentReports(),

@@ -247,6 +247,33 @@ select.form-control { appearance: auto; }
     text-decoration: none;
 }
 
+/* ========== UNIFORM DASHBOARD HERO (tenant name + user email) ========== */
+.dash-hero {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.75rem;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: var(--color-white);
+}
+
+.dash-hero h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--color-white);
+}
+
+.dash-hero .dash-hero-user {
+    font-size: 0.95rem;
+    opacity: 0.9;
+}
+
 /* ========== FOOTER ========== */
 .app-footer {
     background: var(--color-primary);   /* Matches header color */

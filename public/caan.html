@@ -163,14 +163,10 @@ AUTHOR: AviaSAFE Systems
 <body>
 
 <div class="caan-page">
-    <!-- Header -->
-    <div class="caan-header">
-        <div>
-            <h1><i class="fas fa-building" style="color: var(--color-primary);"></i> CAAN SMD Dashboard</h1>
-            <div class="subtitle">
-                <span class="caan-badge"><i class="fas fa-shield-alt"></i> Regulator Access</span>
-                <span style="margin-left: var(--spacing-md);">Aggregated Industry Safety Data</span>
-            </div>
+    <!-- Slim top bar (brand + actions) -->
+    <div class="caan-header" style="margin-bottom:0;">
+        <div style="display:flex;align-items:center;gap:var(--spacing-sm);font-weight:700;">
+            <i class="fas fa-shield-alt" style="color:var(--color-primary);"></i> CAAN SMD
         </div>
         <div style="display:flex;gap:var(--spacing-md);align-items:center;">
             <a href="/caan-state-risk.html" class="btn btn-primary btn-sm">
@@ -181,6 +177,12 @@ AUTHOR: AviaSAFE Systems
             </button>
         </div>
     </div>
+
+    <!-- Uniform top section: tenant name + logged-in user email -->
+    <section class="dash-hero">
+        <h1>CAAN SMD Regulator</h1>
+        <div class="dash-hero-user" id="dashHeroUser">—</div>
+    </section>
 
     <!-- Privacy Notice -->
     <div class="privacy-notice">
@@ -212,16 +214,6 @@ AUTHOR: AviaSAFE Systems
             <div class="number" id="nationalSMSHealth">--</div>
             <div class="label">National SMS Health</div>
             <div class="label" id="nationalSMSHealthTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
-        </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="chart-grid">
-        <div class="chart-card chart-full" style="grid-column:1/-1;">
-            <h3><i class="fas fa-chart-line"></i> SSP Risk Trends</h3>
-            <div class="chart-wrapper" style="position:relative;height:300px;">
-                <canvas id="caanSSPRiskChart"></canvas>
-            </div>
         </div>
     </div>
 
@@ -370,6 +362,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
+    // Populate uniform hero with the signed-in user
+    const heroUser = document.getElementById('dashHeroUser');
+    if (heroUser) heroUser.textContent = user.email;
+
     // Load data
     await loadIndustryData();
 });
@@ -475,7 +471,6 @@ async function loadIndustryData() {
 
         await loadNationalSmsHealth();
 
-        renderSSPRiskTrends(allReports);
         renderCaanHeatMap(heatMapData);
         renderCaanTopRisks(topRisks);
         loadNationalHazardWidget();
@@ -897,6 +892,36 @@ async function logout() {
 
 initFeedbackWidget();
 </script>
+
+<!-- ========== FOOTER (landing-page style) ========== -->
+<footer class="app-footer">
+    <div class="container">
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <span class="footer-divider">|</span>
+            <a href="/survey/">Survey</a>
+            <span class="footer-divider">|</span>
+            <a href="/login.html">Login</a>
+            <span class="footer-divider">|</span>
+            <a href="#">Privacy Policy</a>
+            <span class="footer-divider">|</span>
+            <a href="#">Terms of Service</a>
+            <span class="footer-divider">|</span>
+            <a href="/contact.html">Contact</a>
+            <span class="footer-divider">|</span>
+            <a href="/admin/login.html">Developer Login</a>
+        </div>
+        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.8;">
+            A project by <strong>Ghanshyam Acharya</strong>.
+        </p>
+        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
+            &copy; 2026 AviaSAFEsystem. All rights reserved.
+        </p>
+        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
+            ICAO Annex 19 &middot; Doc 9859 &middot; Doc 10951 &mdash; Safety Intelligence Platform
+        </p>
+    </div>
+</footer>
 
 </body>
 </html>
