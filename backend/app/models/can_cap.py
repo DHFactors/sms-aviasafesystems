@@ -42,8 +42,28 @@ class CANFormFields(BaseModel):
 
 
 class CAPFormFields(BaseModel):
-    """Optional corrective action / closure block (FORM SMSM 8.8.2)."""
-    rca: Optional[str] = None
+    """Optional corrective action / closure block (FORM SMSM 8.8.2).
+
+    Mirrors the official CAA Corrective Action Plan form grid:
+    Section 5.1 analysis items (1)-(5) plus identification header and the
+    managerial / CAA sign-off blocks.
+    """
+    # ── Identification header ──
+    company_name: Optional[str] = None
+    base_location: Optional[str] = None
+    area_system_of_interest: Optional[str] = None
+    finding_number: Optional[str] = None
+    file_ref: Optional[str] = None
+    # ── Section 5.1 analysis ──
+    factual_review: Optional[str] = None          # 5.1(1)
+    rca: Optional[str] = None                     # 5.1(2)
+    short_term_ca: Optional[str] = None           # 5.1(3)
+    long_term_ca: Optional[str] = None            # 5.1(4) - incl. induced hazards assessment
+    implementation_timeline: Optional[str] = None # 5.1(5)
+    # ── Sign-off blocks ──
+    managerial_approval: Optional[dict] = None    # {name, signature, date}
+    caa_acceptance: Optional[dict] = None         # {accepted: bool, signature, date}
+    # ── Residual risk / closure ──
     residual_severity: Optional[int] = Field(None, ge=1, le=5)
     residual_probability: Optional[int] = Field(None, ge=1, le=5)
     residual_risk_index: Optional[int] = Field(None, ge=1, le=25)

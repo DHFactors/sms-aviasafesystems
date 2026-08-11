@@ -6,10 +6,15 @@
     <title>Review CAP - AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/can-cap-print.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
-        .page { max-width: 800px; margin: 0 auto; padding: 1.5rem; }
+        .page { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+        .cap-section { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #0b2a42; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem; margin: 1.1rem 0 0.6rem; }
+        .btn-pdf { display: inline-flex; align-items: center; gap: 0.5rem; background: #b91c1c; color: #fff; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+        .btn-pdf:hover { opacity: 0.85; }
+        .cap-form td { white-space: pre-wrap; word-break: break-word; }
         .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #1a6b8a; font-size: 0.875rem; margin-bottom: 1rem; text-decoration: none; }
         .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 1.25rem; }
         .card h2 { font-size: 1rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -72,33 +77,96 @@
     <div id="capContent" style="display:none;">
         <!-- CAP Details -->
         <div class="card">
-            <h2><i class="fas fa-tasks"></i> <span id="capRefDisplay"></span>
-                <span id="capStatusBadge" style="margin-left:0.5rem;"></span>
-            </h2>
-            <div class="detail-grid">
-                <div class="detail-field full-width">
-                    <div class="label">Action Plan</div>
-                    <div class="value" id="fieldActionPlan"></div>
-                </div>
-                <div class="detail-field full-width">
-                    <div class="label">Timeline</div>
-                    <div class="value" id="fieldTimeline"></div>
-                </div>
-                <div class="detail-field"><div class="label">Submitted By</div><div class="value" id="fieldSubmittedBy"></div></div>
-                <div class="detail-field"><div class="label">Submitted At</div><div class="value" id="fieldSubmittedAt"></div></div>
-                <div class="detail-field"><div class="label">Target Completion</div><div class="value" id="fieldTargetDate"></div></div>
-                <div class="detail-field"><div class="label">Resources Required</div><div class="value" id="fieldResources"></div></div>
-                <div class="detail-field full-width">
-                    <div class="label">Implementation Plan</div>
-                    <div class="value" id="fieldImplPlan"></div>
-                </div>
-                <div class="detail-field full-width">
-                    <div class="label">Root Cause Analysis (RCA)</div>
-                    <div class="value" id="fieldRca"></div>
-                </div>
-                <div class="detail-field"><div class="label">Residual Risk (S×P)</div><div class="value" id="fieldResidualRisk"></div></div>
-                <div class="detail-field"><div class="label">Process Owner</div><div class="value" id="fieldProcessOwner"></div></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+                <h2 style="margin:0;"><i class="fas fa-tasks"></i> <span id="capRefDisplay"></span>
+                    <span id="capStatusBadge" style="margin-left:0.5rem;"></span>
+                </h2>
+                <button type="button" class="btn-pdf no-print" onclick="window.print()"><i class="fas fa-file-pdf"></i> Download / Export PDF</button>
             </div>
+
+            <h3 class="cap-section">Identification</h3>
+            <table class="cap-form">
+                <tr>
+                    <th>Company Name</th>
+                    <td id="fieldCompanyName">-</td>
+                    <th>Base Location</th>
+                    <td id="fieldBaseLocation">-</td>
+                </tr>
+                <tr>
+                    <th>Area / System of Interest</th>
+                    <td id="fieldAreaSystem">-</td>
+                    <th>Finding Number</th>
+                    <td id="fieldFindingNumber">-</td>
+                </tr>
+                <tr>
+                    <th>File Ref</th>
+                    <td id="fieldFileRef">-</td>
+                    <th>Submitted By</th>
+                    <td id="fieldSubmittedBy">-</td>
+                </tr>
+                <tr>
+                    <th>Submitted At</th>
+                    <td id="fieldSubmittedAt">-</td>
+                    <th>Target Completion</th>
+                    <td id="fieldTargetDate">-</td>
+                </tr>
+            </table>
+
+            <h3 class="cap-section">Section 5.1 — Analysis &amp; Corrective Action</h3>
+            <table class="cap-form">
+                <tr>
+                    <th>Factual Review <span class="cap-form-note">5.1(1)</span></th>
+                    <td id="fieldFactualReview">-</td>
+                </tr>
+                <tr>
+                    <th>Root Cause Analysis <span class="cap-form-note">5.1(2)</span></th>
+                    <td id="fieldRca">-</td>
+                </tr>
+                <tr>
+                    <th>Short-Term Corrective Action <span class="cap-form-note">5.1(3)</span></th>
+                    <td id="fieldShortTermCa">-</td>
+                </tr>
+                <tr>
+                    <th>Long-Term Corrective Action <span class="cap-form-note">5.1(4)</span></th>
+                    <td id="fieldLongTermCa">-</td>
+                </tr>
+                <tr>
+                    <th>Implementation Timeline <span class="cap-form-note">5.1(5)</span></th>
+                    <td id="fieldImplementationTimeline">-</td>
+                </tr>
+            </table>
+
+            <h3 class="cap-section">Plan Details</h3>
+            <table class="cap-form">
+                <tr>
+                    <th>Action Plan</th>
+                    <td id="fieldActionPlan">-</td>
+                </tr>
+                <tr>
+                    <th>Timeline</th>
+                    <td id="fieldTimeline">-</td>
+                </tr>
+                <tr>
+                    <th>Resources Required</th>
+                    <td id="fieldResources">-</td>
+                    <th>Process Owner</th>
+                    <td id="fieldProcessOwner">-</td>
+                </tr>
+                <tr>
+                    <th>Implementation Plan</th>
+                    <td colspan="3" id="fieldImplPlan">-</td>
+                </tr>
+                <tr>
+                    <th>Residual Risk (S×P)</th>
+                    <td id="fieldResidualRisk">-</td>
+                    <th>Managerial Approval</th>
+                    <td id="fieldManagerialApproval">-</td>
+                </tr>
+                <tr>
+                    <th>CAA Acceptance</th>
+                    <td colspan="3" id="fieldCaaAcceptance">-</td>
+                </tr>
+            </table>
         </div>
 
         <!-- Review Section -->
@@ -111,8 +179,6 @@
                     <div class="detail-field"><div class="label">Reviewed At</div><div class="value" id="fieldReviewedAt"></div></div>
                     <div class="detail-field full-width"><div class="label">Review Comments</div><div class="value" id="fieldReviewComments"></div></div>
                     <div class="detail-field"><div class="label">Revision Deadline</div><div class="value" id="fieldRevisionDeadline"></div></div>
-                    <div class="detail-field"><div class="label">CA Acceptance</div><div class="value" id="fieldCaAcceptance"></div></div>
-                    <div class="detail-field"><div class="label">Manager Approval</div><div class="value" id="fieldManagerApproval"></div></div>
                     <div class="detail-field full-width"><div class="label">Closing Remarks</div><div class="value" id="fieldClosingRemarks"></div></div>
                     <div class="detail-field"><div class="label">SAG Signed By</div><div class="value" id="fieldSagSignedBy"></div></div>
                     <div class="detail-field"><div class="label">Closed At</div><div class="value" id="fieldClosedAt"></div></div>
@@ -155,6 +221,38 @@
                         <label>SAG Signed By</label>
                         <input class="form-control" id="reviewSagSignedBy" placeholder="Auto-filled from your email">
                     </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>CAA Acceptance</label>
+                        <select class="form-control" id="reviewCaaAccepted">
+                            <option value="">—</option>
+                            <option value="true">Accepted</option>
+                            <option value="false">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>CAA Acceptance Date</label>
+                        <input class="form-control" id="reviewCaaDate" type="date">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>CAA Acceptance Signature</label>
+                    <input class="form-control" id="reviewCaaSignature" placeholder="Type full name as signature">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Managerial Approval — Name</label>
+                        <input class="form-control" id="reviewMaName" placeholder="Full name of approving manager">
+                    </div>
+                    <div class="form-group">
+                        <label>Managerial Approval — Signature</label>
+                        <input class="form-control" id="reviewMaSignature" placeholder="Type full name as signature">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Managerial Approval — Date</label>
+                    <input class="form-control" id="reviewMaDate" type="date">
                 </div>
                 <div class="form-group">
                     <label>Review Comments</label>
@@ -225,10 +323,29 @@ async function loadCap(id) {
     }
 }
 
+function formatApproval(d) {
+    if (!d) return '-';
+    const parts = [];
+    if (d.accepted !== undefined && d.accepted !== null) parts.push(d.accepted ? 'Accepted' : 'Rejected');
+    if (d.name) parts.push(d.name);
+    if (d.signature) parts.push('Signature: ' + d.signature);
+    if (d.date) parts.push(formatCanDate(d.date));
+    return parts.join('  ·  ') || '-';
+}
+
 function renderCap() {
     const c = capData;
     document.getElementById('capRefDisplay').textContent = c.cap_reference;
     document.getElementById('capStatusBadge').innerHTML = `<span class="badge ${capStatusBadgeClass(c.status)}">${c.status}</span>`;
+    document.getElementById('fieldCompanyName').textContent = c.company_name || '-';
+    document.getElementById('fieldBaseLocation').textContent = c.base_location || '-';
+    document.getElementById('fieldAreaSystem').textContent = c.area_system_of_interest || '-';
+    document.getElementById('fieldFindingNumber').textContent = c.finding_number || '-';
+    document.getElementById('fieldFileRef').textContent = c.file_ref || '-';
+    document.getElementById('fieldFactualReview').textContent = c.factual_review || '-';
+    document.getElementById('fieldShortTermCa').textContent = c.short_term_ca || '-';
+    document.getElementById('fieldLongTermCa').textContent = c.long_term_ca || '-';
+    document.getElementById('fieldImplementationTimeline').textContent = c.implementation_timeline || '-';
     document.getElementById('fieldActionPlan').textContent = c.action_plan || '-';
     document.getElementById('fieldTimeline').textContent = c.timeline || '-';
     document.getElementById('fieldSubmittedBy').textContent = c.submitted_by || '-';
@@ -242,6 +359,10 @@ function renderCap() {
             ? `${c.residual_severity} × ${c.residual_probability} = ${c.residual_risk_index} (${c.residual_risk_level || '-'})`
             : '-';
     document.getElementById('fieldProcessOwner').textContent = c.process_owner || '-';
+    document.getElementById('fieldManagerialApproval').textContent = formatApproval(c.managerial_approval);
+    const caaAccept = formatApproval(c.caa_acceptance);
+    document.getElementById('fieldCaaAcceptance').textContent =
+        caaAccept !== '-' ? caaAccept : (c.ca_acceptance || '-');
 
     document.getElementById('canLinkBack').href = `/can_cap/can_detail.html?id=${c.can_id}`;
 
@@ -253,8 +374,6 @@ function renderCap() {
         document.getElementById('fieldReviewedAt').textContent = formatCanDate(c.reviewed_at);
         document.getElementById('fieldReviewComments').textContent = c.review_comments || '-';
         document.getElementById('fieldRevisionDeadline').textContent = formatCanDate(c.revision_deadline);
-        document.getElementById('fieldCaAcceptance').textContent = c.ca_acceptance || '-';
-        document.getElementById('fieldManagerApproval').textContent = c.manager_approval || '-';
         document.getElementById('fieldClosingRemarks').textContent = c.closing_remarks || '-';
         document.getElementById('fieldSagSignedBy').textContent = c.sag_signed_by || '-';
         document.getElementById('fieldClosedAt').textContent = formatCanDate(c.closed_at);
@@ -269,6 +388,28 @@ async function submitReview(decision) {
     const comments = document.getElementById('reviewComments').value.trim();
     const revisionDeadline = document.getElementById('revisionDeadline').value;
 
+    const maName = document.getElementById('reviewMaName').value.trim();
+    const maSignature = document.getElementById('reviewMaSignature').value.trim();
+    const maDate = document.getElementById('reviewMaDate').value;
+    const managerialApproval = (maName || maSignature || maDate)
+        ? {
+            name: maName || null,
+            signature: maSignature || null,
+            date: maDate ? new Date(maDate).toISOString() : null,
+        }
+        : null;
+
+    const caaAccepted = document.getElementById('reviewCaaAccepted').value;
+    const caaSignature = document.getElementById('reviewCaaSignature').value.trim();
+    const caaDate = document.getElementById('reviewCaaDate').value;
+    const caaAcceptance = caaAccepted !== ''
+        ? {
+            accepted: caaAccepted === 'true',
+            signature: caaSignature || null,
+            date: caaDate ? new Date(caaDate).toISOString() : null,
+        }
+        : null;
+
     const data = {
         status: decision,
         comments: comments || null,
@@ -279,6 +420,8 @@ async function submitReview(decision) {
         sag_sign: document.getElementById('reviewSagSign').value.trim() || null,
         sag_signed_by: document.getElementById('reviewSagSignedBy').value.trim() || null,
         closing_remarks: document.getElementById('reviewClosingRemarks').value.trim() || null,
+        managerial_approval: managerialApproval,
+        caa_acceptance: caaAcceptance,
     };
 
     const btns = document.querySelectorAll('.btn-review');

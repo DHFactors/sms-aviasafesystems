@@ -6,6 +6,7 @@
     <title>CAN Detail - AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/can-cap-print.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -37,6 +38,8 @@
         .action-btn-review { background: #fef3c7; color: #d97706; }
         .action-btn-close { background: #e8f5e9; color: #2e7d32; }
         .action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+        .btn-pdf { display: inline-flex; align-items: center; gap: 0.5rem; background: #b91c1c; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; margin-left: auto; }
+        .btn-pdf:hover { opacity: 0.85; }
         .cap-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
         .cap-card .cap-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
         .cap-card .cap-header h4 { margin: 0; font-size: 0.9rem; }
@@ -67,6 +70,9 @@
     </div>
 
     <div id="canContent" style="display:none;">
+        <div class="action-bar" style="justify-content:flex-end;">
+            <button type="button" class="action-btn btn-pdf" onclick="window.print()"><i class="fas fa-file-pdf"></i> Download / Export PDF</button>
+        </div>
         <div class="action-bar" id="statusButtons"></div>
 
         <div class="card">
@@ -157,7 +163,10 @@ async function loadCaps(canId) {
             <div class="cap-card" style="cursor:pointer;" onclick="window.location.href='/can_cap/cap_review.html?id=${c.id}'">
                 <div class="cap-header">
                     <h4>${c.cap_reference}</h4>
-                    <span class="badge ${capStatusBadgeClass(c.status)}">${c.status}</span>
+                    <span style="display:flex;align-items:center;gap:0.5rem;">
+                        <span class="badge ${capStatusBadgeClass(c.status)}">${c.status}</span>
+                        <a href="/can_cap/cap_review.html?id=${c.id}" class="btn btn-outline btn-sm no-print" style="font-size:0.78rem;" onclick="event.stopPropagation();"><i class="fas fa-file-pdf"></i> Export PDF</a>
+                    </span>
                 </div>
                 <p style="font-size:0.85rem;color:#475569;">Submitted by ${c.submitted_by || '-'} on ${formatCanDate(c.submitted_at)}</p>
                 <p style="font-size:0.85rem;color:#475569;">Target: ${formatCanDate(c.target_completion_date)}</p>
