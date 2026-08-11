@@ -62,7 +62,7 @@ def _empty_org_kpis():
 
 @router.get("/overview")
 async def get_dashboard_overview(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     logger.info(f"Dashboard overview request: user={user.get('email')}, role={user.get('role')}, tenant_id={user.get('tenant_id')}, days={days}")
@@ -95,7 +95,7 @@ def _safe_airline(method_name: str, svc: DashboardService, **kwargs):
 
 @router.get("/recent")
 async def get_recent_reports(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1),
     cursor: Optional[str] = Query(None),
@@ -111,7 +111,7 @@ async def get_recent_reports(
 
 @router.get("/risk")
 async def get_risk_distribution(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     svc = DashboardService(user)
@@ -121,7 +121,7 @@ async def get_risk_distribution(
 
 @router.get("/trends")
 async def get_monthly_trends(
-    days: int = Query(180, ge=1, le=730),
+    days: int = Query(180, ge=0, le=730),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     svc = DashboardService(user)
@@ -146,7 +146,7 @@ async def get_ssp_risk_trends(
 
 @router.get("/hazards")
 async def get_hazard_frequency(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     svc = DashboardService(user)
@@ -156,7 +156,7 @@ async def get_hazard_frequency(
 
 @router.get("/actions")
 async def get_actions_summary(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     svc = DashboardService(user)
@@ -217,7 +217,7 @@ async def get_airline_sms_maturity(
 
 @router.get("/caan/overview")
 async def get_caan_overview(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)
@@ -227,7 +227,7 @@ async def get_caan_overview(
 
 @router.get("/caan/trends")
 async def get_caan_trends(
-    days: int = Query(180, ge=1, le=730),
+    days: int = Query(180, ge=0, le=730),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)
@@ -237,7 +237,7 @@ async def get_caan_trends(
 
 @router.get("/caan/risk")
 async def get_caan_risk(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)
@@ -247,7 +247,7 @@ async def get_caan_risk(
 
 @router.get("/caan/hazards")
 async def get_caan_hazards(
-    days: int = Query(90, ge=1, le=365),
+    days: Optional[int] = Query(90, ge=0),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)

@@ -96,6 +96,16 @@ AUTHOR: AviaSAFE Systems
                 <h2><i class="fas fa-gauge-high" style="color:#1a6b8a;"></i> Executive Summary</h2>
                 <div class="section-sub">State-level safety oversight — aggregated across all domestic operators (ICAO Annex 19 / Doc 10951)</div>
             </div>
+            <div class="filter-bar" style="display:flex;align-items:center;gap:0.6rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:0.45rem 0.75rem;">
+                <label for="time-period-select" style="font-size:0.8rem;font-weight:600;color:#475569;"><i class="fas fa-calendar-alt"></i> Period:</label>
+                <select id="time-period-select" style="padding:0.4rem 0.75rem;border:1px solid #e2e8f0;border-radius:6px;font-size:0.85rem;background:#fff;cursor:pointer;">
+                    <option value="0">All Time</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90" selected>Last 90 Days</option>
+                    <option value="180">Last 180 Days</option>
+                    <option value="365">Last 365 Days</option>
+                </select>
+            </div>
         </div>
 
         <div class="privacy-notice">
@@ -241,8 +251,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         'CAAN · Safety Management Division'
     );
 
-    await loadStateData();
+    const periodEl = document.getElementById('time-period-select');
+    if (periodEl) {
+        periodEl.addEventListener('change', () => {
+            window.reloadDashboardData(periodEl.value);
+        });
+    }
+
+    await loadStateData(readDaysFilter());
 });
+
+// ============================================================================
+// GLOBAL RELOAD ENTRY POINT (bound to the date-range dropdown)
+// days = 0 / null / "" => "All Time" (no created_at cutoff applied).
+// ============================================================================
+window.reloadDashboardData = function reloadDashboardData(days) {
+    return loadStateData(days);
+};
+
+function readDaysFilter() {
+    const el = document.getElementById('time-period-select');
+    return el ? el.value : 0;
+}
+
+// Timezone-safe period check: compares the absolute instant (UTC) of a stored
+// timestamp against the cutoff. Handles Firestore Timestamp objects, JS Date,
+// {seconds} shapes and ISO strings alike.
+function withinPeriod(ts, cutoff) {
+    if (!cutoff) return true;
+    if (ts == null) return false;
+    let d;
+    if (ts instanceof Date) d = ts;
+    else if (typeof ts === 'object' && typeof ts.toDate === 'function') d = ts.toDate();
+    else if (typeof ts === 'object' && typeof ts.seconds === 'number') d = new Date(ts.seconds * 1000);
+    else d = new Date(ts);
+    if (isNaN(d.getTime())) return false;
+    return d.getTime() >= cutoff.getTime();
+}
 
 // ============================================================================
 // STATE-SCOPED DATA LOADING
@@ -250,7 +295,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 // every API call uses the State regulator scope (regulator_id) or the CAAN
 // aggregate endpoints. The survey maturity endpoint returns data.state.
 // ============================================================================
-async function loadStateData() {
+async function loadStateData(days) {
+    let cutoff = null;
+    const n = parseInt(days, 10);
+    if (n > 0) cutoff = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+
     const [tenantsSnap, reportsSnap, responsesSnap, hazardsSnap, maturityData] = await Promise.all([
         safeFirestore(db.collection('tenants').get()),
         safeFirestore(db.collectionGroup('reports').get()),
@@ -296,6 +345,7 @@ async function loadStateData() {
     if (reportsSnap) {
         reportsSnap.forEach(doc => {
             const data = doc.data();
+            if (!withinPeriod(data.created_at, cutoff)) return;
             allReports.push(data);
             const tid = doc.ref.path.split('/')[1];
             const t = ensure(tid);
@@ -311,6 +361,7 @@ async function loadStateData() {
     if (hazardsSnap) {
         hazardsSnap.forEach(doc => {
             const data = doc.data();
+            if (!withinPeriod(data.created_at, cutoff)) return;
             const tid = doc.ref.path.split('/')[1];
             const t = ensure(tid);
             const rl = data.risk_level || '';
@@ -320,6 +371,8 @@ async function loadStateData() {
 
     if (responsesSnap) {
         responsesSnap.forEach(doc => {
+            const data = doc.data();
+            if (!withinPeriod(data.submitted_at || data.created_at, cutoff)) return;
             const tid = doc.ref.path.split('/')[1];
             ensure(tid).responses++;
         });

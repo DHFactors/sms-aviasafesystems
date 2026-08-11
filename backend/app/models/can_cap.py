@@ -25,21 +25,57 @@ class CANPriority(str, Enum):
     LOW = "Low"
 
 
+# ─── Buddha Air FORM SMSM 8.8.2 — shared optional fields ───
+# All of these are Optional and default to None so existing clients keep
+# working unchanged; new fields only appear when provided.
+
+class CANFormFields(BaseModel):
+    """Optional issuance block of the Corrective Action Notice (FORM SMSM 8.8.2)."""
+    copies_to: Optional[str] = None
+    requested_function: Optional[str] = None
+    addressed_function: Optional[str] = None
+    initial_severity: Optional[int] = Field(None, ge=1, le=5)
+    initial_probability: Optional[int] = Field(None, ge=1, le=5)
+    initial_risk_index: Optional[int] = Field(None, ge=1, le=25)
+    classification_type: Optional[str] = None
+    classification_level: Optional[str] = None
+
+
+class CAPFormFields(BaseModel):
+    """Optional corrective action / closure block (FORM SMSM 8.8.2)."""
+    rca: Optional[str] = None
+    residual_severity: Optional[int] = Field(None, ge=1, le=5)
+    residual_probability: Optional[int] = Field(None, ge=1, le=5)
+    residual_risk_index: Optional[int] = Field(None, ge=1, le=25)
+    residual_risk_level: Optional[str] = None
+    sag_sign: Optional[str] = None
+    sag_signed_by: Optional[str] = None
+    sag_signed_at: Optional[datetime] = None
+    manager_approval: Optional[str] = None
+    ca_acceptance: Optional[str] = None
+    process_owner: Optional[str] = None
+    manager_confirmation: Optional[str] = None
+    closing_remarks: Optional[str] = None
+    closed_by: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    closed_signature: Optional[str] = None
+
+
 # ─── CAN ───
 
-class CANCreate(BaseModel):
+class CANCreate(CANFormFields):
     hazard_id: str = Field(...)
     title: str = Field(..., min_length=3, max_length=200)
     description: str = Field(..., min_length=10)
     required_action: str = Field(...)
     target_completion_date: datetime = Field(...)
     assigned_to: str = Field(...)
-    assigned_to_uid: str = Field(...)
+    assigned_to_uid: Optional[str] = None
     department: Optional[str] = None
     priority: str = Field(..., pattern="^(High|Medium|Low)$")
 
 
-class CANUpdate(BaseModel):
+class CANUpdate(CANFormFields):
     title: Optional[str] = Field(None, min_length=3, max_length=200)
     description: Optional[str] = Field(None, min_length=10)
     required_action: Optional[str] = None
@@ -49,9 +85,10 @@ class CANUpdate(BaseModel):
     department: Optional[str] = None
     priority: Optional[str] = None
     status: Optional[CANStatus] = None
+    process_owner: Optional[str] = None
 
 
-class CANResponse(BaseModel):
+class CANResponse(CANFormFields, CAPFormFields):
     id: str
     can_reference: str
     hazard_id: str
@@ -76,7 +113,7 @@ class CANResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CANListItem(BaseModel):
+class CANListItem(CANFormFields):
     id: str
     can_reference: str
     hazard_id: str
@@ -90,7 +127,7 @@ class CANListItem(BaseModel):
 
 # ─── CAP ───
 
-class CAPCreate(BaseModel):
+class CAPCreate(CAPFormFields):
     can_id: str = Field(...)
     action_plan: str = Field(..., min_length=10)
     timeline: str = Field(...)
@@ -100,7 +137,7 @@ class CAPCreate(BaseModel):
     target_completion_date: datetime = Field(...)
 
 
-class CAPUpdate(BaseModel):
+class CAPUpdate(CAPFormFields):
     status: Optional[CAPStatus] = None
     action_plan: Optional[str] = None
     timeline: Optional[str] = None
@@ -110,13 +147,13 @@ class CAPUpdate(BaseModel):
     review_comments: Optional[str] = None
 
 
-class CAPReview(BaseModel):
+class CAPReview(CAPFormFields):
     status: CAPStatus
     comments: Optional[str] = None
     revision_deadline: Optional[datetime] = None
 
 
-class CAPResponse(BaseModel):
+class CAPResponse(CAPFormFields):
     id: str
     can_id: str
     cap_reference: str

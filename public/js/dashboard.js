@@ -81,9 +81,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (daysEl) {
         currentDays = parseInt(daysEl.value, 10);
         daysEl.addEventListener('change', () => {
-            currentDays = parseInt(daysEl.value, 10);
+            reloadDashboardData(daysEl.value);
+        });
+    }
+
+    const timePeriodEl = document.getElementById('time-period-select');
+    if (timePeriodEl) {
+        timePeriodEl.addEventListener('change', () => {
+            reloadDashboardData(timePeriodEl.value);
+        });
+    }
+
+    const dateRangeEl = document.getElementById('date-range');
+    if (dateRangeEl) {
+        dateRangeEl.addEventListener('change', () => {
+            reloadDashboardData(dateRangeEl.value);
+        });
+    }
+
+    const recentRangeEl = document.getElementById('recentRange');
+    if (recentRangeEl) {
+        recentDays = parseInt(recentRangeEl.value, 10);
+        recentRangeEl.addEventListener('change', () => {
+            recentDays = parseInt(recentRangeEl.value, 10);
             currentPage = 1;
-            loadAll();
+            loadRecentReports();
         });
     }
 
@@ -95,8 +117,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAll();
 });
 
+// ============================================================================
+// Global dashboard reload entry point (wired to the date-range dropdowns on
+// safety.html and caan.html). Re-queries KPIs, Risk Matrix, Hazards, the
+// CAN/CAP table and the supporting charts for the selected period.
+// days = 0 / null / "0" / "" means "All Time" (no date cutoff).
+// ============================================================================
+window.reloadDashboardData = function reloadDashboardData(days) {
+    const n = parseInt(days, 10);
+    currentDays = n > 0 ? n : null;
+    currentPage = 1;
+    return loadAll();
+};
+
 async function loadAll() {
-    await loadKpis();
+    const jobs = [loadKpis()];
+
+    if (document.getElementById('riskChart')) jobs.push(loadRiskDistribution());
+    if (document.getElementById('trendChart')) jobs.push(loadMonthlyTrends());
+    if (document.getElementById('ssmRiskChart')) jobs.push(loadSSMRiskTrends());
+    if (document.getElementById('hazardChart')) jobs.push(loadHazardFrequency());
+    if (document.getElementById('reportsTable')) jobs.push(loadRecentReports());
+    if (typeof fetchCans === 'function') jobs.push(fetchCans(currentDays));
+
+    await Promise.all(jobs);
 }
 
 async function loadKpis() {

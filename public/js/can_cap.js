@@ -7,6 +7,8 @@ const CanCapAPI = {
         if (params.priority) qs.set('priority', params.priority);
         if (params.assigned_to) qs.set('assigned_to', params.assigned_to);
         if (params.search) qs.set('search', params.search);
+        const n = Number(params.days);
+        if (n > 0) qs.set('days', n);
         return ApiClient.get(`/api/cans?${qs.toString()}`);
     },
 
@@ -31,6 +33,8 @@ const CanCapAPI = {
         if (params.status) qs.set('status', params.status);
         if (params.can_id) qs.set('can_id', params.can_id);
         if (params.search) qs.set('search', params.search);
+        const n = Number(params.days);
+        if (n > 0) qs.set('days', n);
         return ApiClient.get(`/api/cans/caps?${qs.toString()}`);
     },
 
@@ -78,3 +82,65 @@ function formatCanDate(d) {
 ApiClient.patch = function(path, body) {
     return ApiClient._request('PATCH', path, body);
 };
+
+// ============================================================================
+// Global CAN/CAP dashboard table loader (used by safety.html date filter)
+// Renders CAN rows into #cansTableBody when present and returns the fetched
+// list so callers (reloadDashboardData) can await it.
+// days = 0 / null / undefined means "All Time" (no date cutoff).
+// ============================================================================
+async function fetchCans(days) {
+    const tbody = document.getElementById('cansTableBody');
+    if (!tbody) {
+        try {
+            return await CanCapAPI.listCans({ days });
+        } catch (e) {
+            console.error('fetchCans failed:', e);
+            return [];
+        }
+    }
+
+    const countEl = document.getElementById('canCapCount');
+    const stateEl = document.getElementById('cansTableState');
+    if (stateEl) {
+        stateEl.style.display = 'block';
+        stateEl.textContent = 'Loading CANs...';
+    }
+
+    try {
+        const cans = await CanCapAPI.listCans({ days });
+        if (countEl) countEl.textContent = cans.length;
+        if (stateEl) stateEl.style.display = 'none';
+
+        tbody.innerHTML = '';
+        if (!cans || cans.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:2rem;"><i class="fas fa-inbox"></i> No CANs found for the selected period.</td></tr>';
+            return [];
+        }
+
+        for (const c of cans) {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.addEventListener('click', () => {
+                window.location.href = `/can_cap/can_detail.html?id=${c.id}`;
+            });
+            tr.innerHTML = `
+                <td><strong>${c.can_reference || '-'}</strong></td>
+                <td>${c.title || '-'}</td>
+                <td><span class="badge ${canPriorityBadgeClass(c.priority)}">${c.priority || '-'}</span></td>
+                <td><span class="badge ${canStatusBadgeClass(c.status)}">${c.status || '-'}</span></td>
+                <td>${c.assigned_to || '-'}</td>
+                <td>${formatCanDate(c.target_completion_date)}</td>
+                <td>${formatCanDate(c.issued_at)}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+        return cans;
+    } catch (err) {
+        if (stateEl) stateEl.style.display = 'none';
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error loading CANs: ${err.message}</td></tr>`;
+        return [];
+    }
+}
+
+window.fetchCans = fetchCans;

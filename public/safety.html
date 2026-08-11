@@ -276,6 +276,7 @@
         <div class="filter-bar">
             <label for="daysFilter"><i class="fas fa-calendar-alt"></i> Period:</label>
             <select id="daysFilter">
+                <option value="0">All Time</option>
                 <option value="30">Last 30 Days</option>
                 <option value="90" selected>Last 90 Days</option>
                 <option value="180">Last 180 Days</option>
@@ -287,6 +288,96 @@
         <!-- Section 1: KPI Cards -->
         <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
         <div id="kpiGrid" class="kpi-grid state-container"></div>
+
+        <!-- Section 2: Risk & Trends -->
+        <div class="section-title shell-scroll-spy" id="risk-trends"><i class="fas fa-chart-bar"></i> Risk & Trends</div>
+        <div class="chart-grid">
+            <div class="chart-card">
+                <h3>Risk Distribution</h3>
+                <div id="riskChart" class="chart-wrapper state-container">
+                    <canvas id="riskChartCanvas"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Monthly Trends</h3>
+                <div id="trendChart" class="chart-wrapper state-container">
+                    <canvas id="trendChartCanvas"></canvas>
+                </div>
+            </div>
+            <div class="chart-card chart-full">
+                <h3>SSM Risk Trend (Avg Risk Index by SSP Category)</h3>
+                <div id="ssmRiskChart" class="chart-wrapper state-container">
+                    <canvas id="ssmRiskChartCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Top Hazards -->
+        <div class="section-title shell-scroll-spy" id="hazards"><i class="fas fa-triangle-exclamation"></i> Top Hazards</div>
+        <div class="chart-grid">
+            <div class="chart-card chart-full">
+                <h3>Hazard Occurrence Frequency <a href="/top-hazards.html" class="btn btn-outline btn-sm" style="float:right;font-size:0.8rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Top Hazards</a></h3>
+                <div id="hazardChart" class="chart-wrapper state-container">
+                    <canvas id="hazardChartCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Corrective Action (CAN/CAP) Register -->
+        <div class="section-title shell-scroll-spy" id="corrective-actions"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</div>
+        <div id="canCapTable" class="table-card state-container">
+            <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
+                <span style="font-size:0.85rem;color:#475569;"><i class="fas fa-clipboard-check"></i> CAN Register — <strong id="canCapCount">0</strong> notices</span>
+                <a href="/can_cap/issue.html" style="margin-left:auto;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-plus"></i> Issue CAN</a>
+                <a href="/can_cap/cans.html" style="margin-left:1rem;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> All CANs</a>
+                <a href="/can_cap/caps.html" style="margin-left:1rem;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> CAP Register</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>CAN Ref</th>
+                        <th>Title</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Target Date</th>
+                        <th>Issued At</th>
+                    </tr>
+                </thead>
+                <tbody id="cansTableBody"></tbody>
+            </table>
+            <div id="cansTableState" class="state-empty" style="display:none;padding:1rem;"></div>
+        </div>
+
+        <!-- Section 5: Latest Reports -->
+        <div class="section-title shell-scroll-spy" id="reports"><i class="fas fa-chart-bar"></i> Latest Reports</div>
+        <div id="reportsTable" class="table-card state-container">
+            <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
+                <label for="recentRange"><i class="fas fa-calendar-alt"></i> Timeline:</label>
+                <select id="recentRange">
+                    <option value="7">This Week</option>
+                    <option value="30" selected>This Month</option>
+                    <option value="90">This Quarter</option>
+                    <option value="365">This Year</option>
+                </select>
+                <a href="/reports/index.html" style="margin-left:auto;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> View All Reports</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Occurrence</th>
+                        <th>Location</th>
+                        <th>Risk Index</th>
+                        <th>Risk Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="reportsBody"></tbody>
+            </table>
+            <div id="pagination" class="pagination"></div>
+        </div>
 
     </div>
 </div>

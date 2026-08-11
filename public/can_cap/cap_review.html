@@ -15,6 +15,7 @@
         .card h2 { font-size: 1rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
         .card h2 i { width: 1.25rem; text-align: center; }
         .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .detail-field { margin-bottom: 0.5rem; }
         .detail-field .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 600; }
         .detail-field .value { font-size: 0.95rem; color: #0b2a42; margin-top: 0.15rem; word-break: break-word; white-space: pre-wrap; }
@@ -48,7 +49,7 @@
         #message { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; font-size: 0.85rem; }
         #message.success { display: block; background: #e6f4ea; color: #1e7e34; border-left: 4px solid #34a853; }
         #message.error { display: block; background: #fce8e6; color: #d33426; border-left: 4px solid #ea4335; }
-        @media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { .detail-grid, .form-row { grid-template-columns: 1fr; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -91,6 +92,12 @@
                     <div class="label">Implementation Plan</div>
                     <div class="value" id="fieldImplPlan"></div>
                 </div>
+                <div class="detail-field full-width">
+                    <div class="label">Root Cause Analysis (RCA)</div>
+                    <div class="value" id="fieldRca"></div>
+                </div>
+                <div class="detail-field"><div class="label">Residual Risk (S×P)</div><div class="value" id="fieldResidualRisk"></div></div>
+                <div class="detail-field"><div class="label">Process Owner</div><div class="value" id="fieldProcessOwner"></div></div>
             </div>
         </div>
 
@@ -104,6 +111,11 @@
                     <div class="detail-field"><div class="label">Reviewed At</div><div class="value" id="fieldReviewedAt"></div></div>
                     <div class="detail-field full-width"><div class="label">Review Comments</div><div class="value" id="fieldReviewComments"></div></div>
                     <div class="detail-field"><div class="label">Revision Deadline</div><div class="value" id="fieldRevisionDeadline"></div></div>
+                    <div class="detail-field"><div class="label">CA Acceptance</div><div class="value" id="fieldCaAcceptance"></div></div>
+                    <div class="detail-field"><div class="label">Manager Approval</div><div class="value" id="fieldManagerApproval"></div></div>
+                    <div class="detail-field full-width"><div class="label">Closing Remarks</div><div class="value" id="fieldClosingRemarks"></div></div>
+                    <div class="detail-field"><div class="label">SAG Signed By</div><div class="value" id="fieldSagSignedBy"></div></div>
+                    <div class="detail-field"><div class="label">Closed At</div><div class="value" id="fieldClosedAt"></div></div>
                 </div>
             </div>
 
@@ -116,9 +128,41 @@
                         <option value="Overdue">Mark as Overdue</option>
                     </select>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>CA Acceptance (Accept / Reject)</label>
+                        <select class="form-control" id="reviewAcceptance">
+                            <option value="">—</option>
+                            <option value="Yes">Yes — Accept corrective action</option>
+                            <option value="No">No — Reject corrective action</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Manager Approval</label>
+                        <select class="form-control" id="reviewManagerApproval">
+                            <option value="">—</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>SAG Signature</label>
+                        <input class="form-control" id="reviewSagSign" placeholder="Type full name as signature">
+                    </div>
+                    <div class="form-group">
+                        <label>SAG Signed By</label>
+                        <input class="form-control" id="reviewSagSignedBy" placeholder="Auto-filled from your email">
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>Review Comments</label>
                     <textarea class="form-control" id="reviewComments" placeholder="Provide feedback on the CAP"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Closing Remarks</label>
+                    <textarea class="form-control" id="reviewClosingRemarks" placeholder="Final remarks on closure of the corrective action"></textarea>
                 </div>
                 <div class="form-group" id="revisionDeadlineGroup" style="display:none;">
                     <label>Revision Deadline</label>
@@ -152,6 +196,7 @@ let canIdFromCap = null;
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     currentUser = user;
+    document.getElementById('reviewSagSignedBy').value = user.email || '';
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (!id) { showError('No CAP ID provided'); return; }
@@ -191,6 +236,12 @@ function renderCap() {
     document.getElementById('fieldTargetDate').textContent = formatCanDate(c.target_completion_date);
     document.getElementById('fieldResources').textContent = c.resources_required || 'None';
     document.getElementById('fieldImplPlan').textContent = c.implementation_plan || 'None';
+    document.getElementById('fieldRca').textContent = c.rca || '-';
+    document.getElementById('fieldResidualRisk').textContent =
+        c.residual_severity && c.residual_probability
+            ? `${c.residual_severity} × ${c.residual_probability} = ${c.residual_risk_index} (${c.residual_risk_level || '-'})`
+            : '-';
+    document.getElementById('fieldProcessOwner').textContent = c.process_owner || '-';
 
     document.getElementById('canLinkBack').href = `/can_cap/can_detail.html?id=${c.can_id}`;
 
@@ -202,6 +253,11 @@ function renderCap() {
         document.getElementById('fieldReviewedAt').textContent = formatCanDate(c.reviewed_at);
         document.getElementById('fieldReviewComments').textContent = c.review_comments || '-';
         document.getElementById('fieldRevisionDeadline').textContent = formatCanDate(c.revision_deadline);
+        document.getElementById('fieldCaAcceptance').textContent = c.ca_acceptance || '-';
+        document.getElementById('fieldManagerApproval').textContent = c.manager_approval || '-';
+        document.getElementById('fieldClosingRemarks').textContent = c.closing_remarks || '-';
+        document.getElementById('fieldSagSignedBy').textContent = c.sag_signed_by || '-';
+        document.getElementById('fieldClosedAt').textContent = formatCanDate(c.closed_at);
     } else {
         document.getElementById('reviewCompleted').style.display = 'none';
         document.getElementById('reviewForm').style.display = 'block';
@@ -218,6 +274,11 @@ async function submitReview(decision) {
         comments: comments || null,
         revision_deadline: (decision === 'Revision Required' && revisionDeadline)
             ? new Date(revisionDeadline).toISOString() : null,
+        ca_acceptance: document.getElementById('reviewAcceptance').value || null,
+        manager_approval: document.getElementById('reviewManagerApproval').value || null,
+        sag_sign: document.getElementById('reviewSagSign').value.trim() || null,
+        sag_signed_by: document.getElementById('reviewSagSignedBy').value.trim() || null,
+        closing_remarks: document.getElementById('reviewClosingRemarks').value.trim() || null,
     };
 
     const btns = document.querySelectorAll('.btn-review');

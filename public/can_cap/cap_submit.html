@@ -29,6 +29,15 @@
         .can-info { background: #f0f4ff; border-left: 4px solid #1a6b8a; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; }
         .can-info h4 { margin: 0 0 0.5rem; font-size: 0.9rem; color: #0b2a42; }
         .can-info p { margin: 0; font-size: 0.85rem; color: #475569; }
+        select.form-control { appearance: auto; }
+        .risk-preview { background: #f0f4ff; border: 1px solid #dbe7f5; border-radius: 6px; padding: 0.6rem 0.9rem; font-size: 0.85rem; color: #475569; margin-top: 0.4rem; }
+        .risk-preview strong { color: #0b2a42; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff8e1; color: #f9a825; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-critical { background: #fde8e8; color: #dc3545; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
         @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,6 +85,49 @@
                 <textarea class="form-control" id="fieldImplPlan" placeholder="Step-by-step implementation approach"></textarea>
             </div>
 
+            <div class="form-group">
+                <label>Root Cause Analysis (RCA)</label>
+                <textarea class="form-control" id="fieldRca" placeholder="Root cause / contributing factors identified (FORM SMSM 8.8.2)"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Process Owner</label>
+                <input class="form-control" id="fieldProcessOwner" placeholder="Owner accountable for implementing and sustaining this action">
+            </div>
+
+            <div style="font-size:0.95rem;font-weight:600;color:#0b2a42;margin:0.5rem 0 1rem;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fas fa-th"></i> Residual Risk Assessment (Severity × Probability)
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Residual Severity (1–5)</label>
+                    <select class="form-control" id="fieldResidualSeverity">
+                        <option value="">—</option>
+                        <option value="1">1 — Negligible</option>
+                        <option value="2">2 — Minor</option>
+                        <option value="3">3 — Major</option>
+                        <option value="4">4 — Hazardous</option>
+                        <option value="5">5 — Catastrophic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Residual Probability (1–5)</label>
+                    <select class="form-control" id="fieldResidualProbability">
+                        <option value="">—</option>
+                        <option value="1">1 — Improbable</option>
+                        <option value="2">2 — Remote</option>
+                        <option value="3">3 — Occasional</option>
+                        <option value="4">4 — Probable</option>
+                        <option value="5">5 — Frequent</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="risk-preview">
+                Residual Risk Index: <strong id="residualRiskIndexValue">—</strong> &nbsp;·&nbsp; Level: <span id="residualRiskLevel" class="badge badge-default">—</span>
+            </div>
+
             <div style="text-align:right;margin-top:1.5rem;">
                 <button type="button" class="btn-submit" onclick="submitCap()"><i class="fas fa-paper-plane"></i> Submit CAP</button>
             </div>
@@ -97,6 +149,7 @@ firebase.auth().onAuthStateChanged(function(user) {
     canId = params.get('can_id');
     if (!canId) { showMessage('No CAN ID provided', 'error'); return; }
     loadCanInfo(canId);
+    wireResidualRisk();
 });
 
 async function loadCanInfo(id) {
@@ -110,6 +163,35 @@ async function loadCanInfo(id) {
     }
 }
 
+function wireResidualRisk() {
+    const sev = document.getElementById('fieldResidualSeverity');
+    const prob = document.getElementById('fieldResidualProbability');
+    const indexEl = document.getElementById('residualRiskIndexValue');
+    const levelEl = document.getElementById('residualRiskLevel');
+
+    function update() {
+        const s = parseInt(sev.value, 10);
+        const p = parseInt(prob.value, 10);
+        if (!s || !p) {
+            indexEl.textContent = '—';
+            levelEl.textContent = '—';
+            levelEl.className = 'badge badge-default';
+            return;
+        }
+        const ri = s * p;
+        let level = 'Low', cls = 'badge-low';
+        if (ri > 15) { level = 'Very High'; cls = 'badge-critical'; }
+        else if (ri > 9) { level = 'High'; cls = 'badge-high'; }
+        else if (ri > 5) { level = 'Medium'; cls = 'badge-medium'; }
+        indexEl.textContent = ri;
+        levelEl.textContent = level;
+        levelEl.className = 'badge ' + cls;
+    }
+
+    sev.addEventListener('change', update);
+    prob.addEventListener('change', update);
+}
+
 async function submitCap() {
     const actionPlan = document.getElementById('fieldActionPlan').value.trim();
     const timeline = document.getElementById('fieldTimeline').value.trim();
@@ -119,6 +201,17 @@ async function submitCap() {
     if (!timeline) { showMessage('Timeline is required', 'error'); return; }
     if (!targetDate) { showMessage('Target completion date is required', 'error'); return; }
 
+    const rSev = parseInt(document.getElementById('fieldResidualSeverity').value, 10);
+    const rProb = parseInt(document.getElementById('fieldResidualProbability').value, 10);
+    const residualRiskIndex = (rSev && rProb) ? rSev * rProb : null;
+    let residualRiskLevel = null;
+    if (residualRiskIndex) {
+        if (residualRiskIndex > 15) residualRiskLevel = 'Very High';
+        else if (residualRiskIndex > 9) residualRiskLevel = 'High';
+        else if (residualRiskIndex > 5) residualRiskLevel = 'Medium';
+        else residualRiskLevel = 'Low';
+    }
+
     const data = {
         can_id: canId,
         action_plan: actionPlan,
@@ -126,6 +219,12 @@ async function submitCap() {
         target_completion_date: new Date(targetDate).toISOString(),
         resources_required: document.getElementById('fieldResources').value.trim() || null,
         implementation_plan: document.getElementById('fieldImplPlan').value.trim() || null,
+        rca: document.getElementById('fieldRca').value.trim() || null,
+        process_owner: document.getElementById('fieldProcessOwner').value.trim() || null,
+        residual_severity: rSev || null,
+        residual_probability: rProb || null,
+        residual_risk_index: residualRiskIndex,
+        residual_risk_level: residualRiskLevel,
     };
 
     const btn = document.querySelector('.btn-submit');

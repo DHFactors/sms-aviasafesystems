@@ -706,27 +706,40 @@ class DashboardService:
     # ------------------------------------------------------------------
 
     def _base_filter(self, days: int = DEFAULT_DAYS, **overrides) -> ReportFilter:
-        """Build a tenant-scoped filter with a default date range."""
-        now = datetime.now(timezone.utc)
-        date_from = now - timedelta(days=days)
+        """Build a tenant-scoped filter with a date range.
+
+        days=0 / days=None means "All Time" — no created_at cutoff is applied.
+        """
+        date_from = date_to = None
+        if days:
+            now = datetime.now(timezone.utc)
+            date_from = now - timedelta(days=days)
+            date_to = now
         params = dict(
             tenant_id=self.tenant_id,
             cross_tenant=False,
             date_from=date_from,
-            date_to=now,
+            date_to=date_to,
         )
         params.update(overrides)
-        logger.debug(f"_base_filter: tenant_id={self.tenant_id}, days={days}, date_from={date_from}, date_to={now}")
+        logger.debug(f"_base_filter: tenant_id={self.tenant_id}, days={days}, date_from={date_from}, date_to={date_to}")
         return ReportFilter(**params)
 
     def _caan_filter(self, days: int = DEFAULT_DAYS, **overrides) -> ReportFilter:
-        """Build a cross-tenant filter for CAAN_SMD / SUPER_ADMIN."""
-        now = datetime.now(timezone.utc)
+        """Build a cross-tenant filter for CAAN_SMD / SUPER_ADMIN.
+
+        days=0 / days=None means "All Time" — no created_at cutoff is applied.
+        """
+        date_from = date_to = None
+        if days:
+            now = datetime.now(timezone.utc)
+            date_from = now - timedelta(days=days)
+            date_to = now
         params = dict(
             tenant_id=None,
             cross_tenant=True,
-            date_from=now - timedelta(days=days),
-            date_to=now,
+            date_from=date_from,
+            date_to=date_to,
         )
         params.update(overrides)
         return ReportFilter(**params)

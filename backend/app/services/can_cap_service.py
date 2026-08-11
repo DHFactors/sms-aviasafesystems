@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
@@ -6,6 +6,7 @@ from app.core.config import settings
 from app.firebase import get_tenant_collection, get_cross_tenant_collection
 from app.services.hazard_service import HazardService
 from app.services.users import get_user_department
+from app.services.repository import coerce_utc_datetime
 
 
 CAN_COLLECTION = "can_cap"
@@ -72,7 +73,7 @@ class CanCapService:
             "required_action": payload["required_action"],
             "target_completion_date": payload["target_completion_date"],
             "assigned_to": payload["assigned_to"],
-            "assigned_to_uid": payload["assigned_to_uid"],
+            "assigned_to_uid": payload.get("assigned_to_uid", ""),
             "department": payload.get("department")
             or (
                 get_user_department(
@@ -90,6 +91,15 @@ class CanCapService:
             "created_by": user["uid"],
             "created_at": now,
             "updated_at": now,
+            # Buddha Air FORM SMSM 8.8.2 — CAN issuance block (all optional)
+            "copies_to": payload.get("copies_to"),
+            "requested_function": payload.get("requested_function"),
+            "addressed_function": payload.get("addressed_function"),
+            "initial_severity": payload.get("initial_severity"),
+            "initial_probability": payload.get("initial_probability"),
+            "initial_risk_index": payload.get("initial_risk_index"),
+            "classification_type": payload.get("classification_type"),
+            "classification_level": payload.get("classification_level"),
         }
 
         try:
@@ -147,9 +157,15 @@ class CanCapService:
             for doc in docs:
                 data = doc.to_dict()
                 data["id"] = doc.id
-                self._serialize_timestamps(data)
 
                 if filters:
+                    if filters.get("days"):
+                        cutoff = datetime.now(timezone.utc) - timedelta(days=filters["days"])
+                        issued = coerce_utc_datetime(
+                            data.get("issued_at") or data.get("created_at")
+                        )
+                        if issued is None or issued < cutoff:
+                            continue
                     if filters.get("hazard_id") and data.get("hazard_id") != filters["hazard_id"]:
                         continue
                     if filters.get("status") and data.get("status") != filters["status"]:
@@ -167,6 +183,7 @@ class CanCapService:
                         if s not in ref and s not in title:
                             continue
 
+                self._serialize_timestamps(data)
                 results.append(data)
 
             results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
@@ -296,6 +313,13 @@ class CanCapService:
             "submitted_at": now,
             "created_at": now,
             "updated_at": now,
+            # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)
+            "rca": payload.get("rca"),
+            "residual_severity": payload.get("residual_severity"),
+            "residual_probability": payload.get("residual_probability"),
+            "residual_risk_index": payload.get("residual_risk_index"),
+            "residual_risk_level": payload.get("residual_risk_level"),
+            "process_owner": payload.get("process_owner"),
         }
 
         try:
@@ -359,7 +383,12 @@ class CanCapService:
             status_f = filters.get("status")
             can_id_f = filters.get("can_id")
             department_f = filters.get("department")
+            days_f = filters.get("days")
             search = (filters.get("search") or "").lower()
+
+            cutoff = None
+            if days_f:
+                cutoff = datetime.now(timezone.utc) - timedelta(days=days_f)
 
             results = []
             for can_doc in docs:
@@ -371,6 +400,12 @@ class CanCapService:
                     data = cap.to_dict()
                     if status_f and data.get("status") != status_f:
                         continue
+                    if cutoff:
+                        submitted = coerce_utc_datetime(
+                            data.get("submitted_at") or data.get("created_at")
+                        )
+                        if submitted is None or submitted < cutoff:
+                            continue
                     data["id"] = cap.id
                     data["can_id"] = can_doc.id
                     data["can_reference"] = can_data.get("can_reference", "")
@@ -459,9 +494,28 @@ class CanCapService:
                             "reviewed_at": now,
                             "review_comments": review.get("comments"),
                             "updated_at": now,
+                            # Buddha Air FORM SMSM 8.8.2 — review / sign-off block
+                            "rca": review.get("rca"),
+                            "residual_severity": review.get("residual_severity"),
+                            "residual_probability": review.get("residual_probability"),
+                            "residual_risk_index": review.get("residual_risk_index"),
+                            "residual_risk_level": review.get("residual_risk_level"),
+                            "ca_acceptance": review.get("ca_acceptance"),
+                            "manager_approval": review.get("manager_approval"),
+                            "manager_confirmation": review.get("manager_confirmation"),
+                            "closing_remarks": review.get("closing_remarks"),
+                            "sag_sign": review.get("sag_sign"),
                         }
+                        if review.get("sag_sign"):
+                            update_data["sag_signed_by"] = review.get("sag_signed_by")
+                            update_data["sag_signed_at"] = review.get("sag_signed_at") or now
                         if review.get("revision_deadline"):
                             update_data["revision_deadline"] = review["revision_deadline"]
+
+                        if review["status"] == "Completed":
+                            update_data["closed_by"] = review.get("closed_by") or user.get("email", user["uid"])
+                            update_data["closed_at"] = review.get("closed_at") or now
+                            update_data["closed_signature"] = review.get("closed_signature")
 
                         ref.update(update_data)
 
@@ -560,6 +614,6 @@ class CanCapService:
     @staticmethod
     def _serialize_timestamps(data: dict) -> None:
         for key in ("created_at", "updated_at", "issued_at", "submitted_at", "reviewed_at",
-                     "target_completion_date", "revision_deadline"):
+                     "target_completion_date", "revision_deadline", "sag_signed_at", "closed_at"):
             if key in data and hasattr(data[key], "isoformat"):
                 data[key] = data[key].isoformat()

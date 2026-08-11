@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue CAN - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 760px; margin: 0 auto; padding: 1.5rem; }
+        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #1a6b8a; font-size: 0.875rem; margin-bottom: 1rem; text-decoration: none; }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 1.25rem; }
+        .card h2 { font-size: 1rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .card h2 i { width: 1.25rem; text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 0.25rem; }
+        .form-group label .required { color: #dc3545; margin-left: 2px; }
+        .form-control { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        .form-control:focus { outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26,107,138,0.1); }
+        textarea.form-control { min-height: 80px; resize: vertical; }
+        select.form-control { appearance: auto; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+        .btn-submit { background: #0b2a42; color: #fff; border: none; padding: 0.75rem 2rem; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+        #message { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; font-size: 0.85rem; }
+        #message.success { display: block; background: #e6f4ea; color: #1e7e34; border-left: 4px solid #34a853; }
+        #message.error { display: block; background: #fce8e6; color: #d33426; border-left: 4px solid #ea4335; }
+        .risk-preview { background: #f0f4ff; border: 1px solid #dbe7f5; border-radius: 6px; padding: 0.6rem 0.9rem; font-size: 0.85rem; color: #475569; margin-top: 0.4rem; }
+        .risk-preview strong { color: #0b2a42; }
+        .hint { font-size: 0.72rem; color: #94a3b8; margin-top: 0.25rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-medium { background: #fff8e1; color: #f9a825; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-critical { background: #fde8e8; color: #dc3545; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        @media (max-width: 600px) { .form-row, .form-row-3 { grid-template-columns: 1fr; } }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="page">
+    <a href="/can_cap/cans.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to CANs</a>
+    <div id="message"></div>
+
+    <div class="card">
+        <h2><i class="fas fa-clipboard-check"></i> Issue Corrective Action Notice (FORM SMSM 8.8.2)</h2>
+
+        <form id="canForm" onsubmit="return false;">
+            <div class="form-group">
+                <label>Linked Hazard <span class="required">*</span></label>
+                <select class="form-control" id="fieldHazard" required>
+                    <option value="">— Select a hazard —</option>
+                </select>
+                <div class="hint">The hazard that triggered this Corrective Action Notice.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Title <span class="required">*</span></label>
+                <input class="form-control" id="fieldTitle" required minlength="3" maxlength="200" placeholder="Short, descriptive title of the corrective action">
+            </div>
+
+            <div class="form-group">
+                <label>Description <span class="required">*</span></label>
+                <textarea class="form-control" id="fieldDescription" required minlength="10" placeholder="Description of the non-conformity / finding and its context"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Required Action <span class="required">*</span></label>
+                <textarea class="form-control" id="fieldRequiredAction" required placeholder="Action required of the responsible party to correct the finding"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Target Completion Date <span class="required">*</span></label>
+                    <input class="form-control" id="fieldTargetDate" type="date" required>
+                </div>
+                <div class="form-group">
+                    <label>Priority <span class="required">*</span></label>
+                    <select class="form-control" id="fieldPriority" required>
+                        <option value="High">High</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Assigned To (email) <span class="required">*</span></label>
+                    <input class="form-control" id="fieldAssignedTo" type="email" required placeholder="responsible@operator.com">
+                </div>
+                <div class="form-group">
+                    <label>Department</label>
+                    <input class="form-control" id="fieldDepartment" placeholder="e.g., CAMO, Part-145 (auto-detected if blank)">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Requested Function</label>
+                    <input class="form-control" id="fieldRequestedFunction" placeholder="e.g., CAMO, Quality Assurance, Engineering">
+                </div>
+                <div class="form-group">
+                    <label>Addressed Function</label>
+                    <input class="form-control" id="fieldAddressedFunction" placeholder="Function that must respond to this notice">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Copies To</label>
+                <input class="form-control" id="fieldCopiesTo" placeholder="Comma-separated recipients (email or role)">
+            </div>
+
+            <div class="section-title" style="font-size:0.95rem;font-weight:600;color:#0b2a42;margin:0.5rem 0 1rem;display:flex;align-items:center;gap:0.5rem;">
+                <i class="fas fa-th"></i> Initial Risk Assessment (Severity × Probability)
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Severity (1–5)</label>
+                    <select class="form-control" id="fieldSeverity">
+                        <option value="">—</option>
+                        <option value="1">1 — Negligible</option>
+                        <option value="2">2 — Minor</option>
+                        <option value="3">3 — Major</option>
+                        <option value="4">4 — Hazardous</option>
+                        <option value="5">5 — Catastrophic</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Probability (1–5)</label>
+                    <select class="form-control" id="fieldProbability">
+                        <option value="">—</option>
+                        <option value="1">1 — Improbable</option>
+                        <option value="2">2 — Remote</option>
+                        <option value="3">3 — Occasional</option>
+                        <option value="4">4 — Probable</option>
+                        <option value="5">5 — Frequent</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="risk-preview" id="initialRiskPreview">
+                Risk Index: <strong id="initialRiskIndex">—</strong> &nbsp;·&nbsp; Level: <span id="initialRiskLevel" class="badge badge-default">—</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Classification Type</label>
+                    <select class="form-control" id="fieldClassType">
+                        <option value="">—</option>
+                        <option value="Safety">Safety</option>
+                        <option value="Quality">Quality</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Technical">Technical</option>
+                        <option value="Administrative">Administrative</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Classification Level</label>
+                    <select class="form-control" id="fieldClassLevel">
+                        <option value="">—</option>
+                        <option value="Level I — Minor">Level I — Minor</option>
+                        <option value="Level II — Major">Level II — Major</option>
+                        <option value="Level III — Significant">Level III — Significant</option>
+                        <option value="Level IV — Critical">Level IV — Critical</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="text-align:right;margin-top:1.5rem;">
+                <button type="button" class="btn-submit" onclick="submitCan()"><i class="fas fa-paper-plane"></i> Issue CAN</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/can_cap.js"></script>
+<script src="/js/hazards.js"></script>
+<script>
+let hazards = [];
+
+firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) { window.location.href = '/login.html'; return; }
+    loadHazards();
+    wireRiskPreview();
+});
+
+async function loadHazards() {
+    const sel = document.getElementById('fieldHazard');
+    try {
+        hazards = await HazardsAPI.list({});
+        if (!hazards || hazards.length === 0) {
+            sel.innerHTML = '<option value="">— No hazards found —</option>';
+            return;
+        }
+        sel.innerHTML = hazards.map(h => {
+            const label = [h.hazard_id, h.title].filter(Boolean).join(' — ');
+            const meta = [h.status, h.risk_level].filter(Boolean).join(' · ');
+            return `<option value="${h.id}">${label}${meta ? ' (' + meta + ')' : ''}</option>`;
+        }).join('');
+    } catch (err) {
+        sel.innerHTML = '<option value="">— Error loading hazards: ' + err.message + ' —</option>';
+    }
+}
+
+function wireRiskPreview() {
+    const sev = document.getElementById('fieldSeverity');
+    const prob = document.getElementById('fieldProbability');
+    const indexEl = document.getElementById('initialRiskIndex');
+    const levelEl = document.getElementById('initialRiskLevel');
+
+    function update() {
+        const s = parseInt(sev.value, 10);
+        const p = parseInt(prob.value, 10);
+        if (!s || !p) {
+            indexEl.textContent = '—';
+            levelEl.textContent = '—';
+            levelEl.className = 'badge badge-default';
+            return;
+        }
+        const ri = s * p;
+        let level = 'Low', cls = 'badge-low';
+        if (ri > 15) { level = 'Very High'; cls = 'badge-critical'; }
+        else if (ri > 9) { level = 'High'; cls = 'badge-high'; }
+        else if (ri > 5) { level = 'Medium'; cls = 'badge-medium'; }
+        indexEl.textContent = ri;
+        levelEl.textContent = level;
+        levelEl.className = 'badge ' + cls;
+    }
+
+    sev.addEventListener('change', update);
+    prob.addEventListener('change', update);
+}
+
+async function submitCan() {
+    const hazardId = document.getElementById('fieldHazard').value;
+    const title = document.getElementById('fieldTitle').value.trim();
+    const description = document.getElementById('fieldDescription').value.trim();
+    const requiredAction = document.getElementById('fieldRequiredAction').value.trim();
+    const targetDate = document.getElementById('fieldTargetDate').value;
+    const assignedTo = document.getElementById('fieldAssignedTo').value.trim();
+    const priority = document.getElementById('fieldPriority').value;
+
+    if (!hazardId) { showMessage('Please select a linked hazard', 'error'); return; }
+    if (!title || title.length < 3) { showMessage('Title is required (min 3 characters)', 'error'); return; }
+    if (!description || description.length < 10) { showMessage('Description is required (min 10 characters)', 'error'); return; }
+    if (!requiredAction) { showMessage('Required action is required', 'error'); return; }
+    if (!targetDate) { showMessage('Target completion date is required', 'error'); return; }
+    if (!assignedTo) { showMessage('Assigned-to email is required', 'error'); return; }
+
+    const sev = parseInt(document.getElementById('fieldSeverity').value, 10);
+    const prob = parseInt(document.getElementById('fieldProbability').value, 10);
+    const riskIndex = (sev && prob) ? sev * prob : null;
+
+    const data = {
+        hazard_id: hazardId,
+        title: title,
+        description: description,
+        required_action: requiredAction,
+        target_completion_date: new Date(targetDate).toISOString(),
+        assigned_to: assignedTo,
+        assigned_to_uid: '',
+        department: document.getElementById('fieldDepartment').value.trim() || null,
+        priority: priority,
+        copies_to: document.getElementById('fieldCopiesTo').value.trim() || null,
+        requested_function: document.getElementById('fieldRequestedFunction').value.trim() || null,
+        addressed_function: document.getElementById('fieldAddressedFunction').value.trim() || null,
+        initial_severity: sev || null,
+        initial_probability: prob || null,
+        initial_risk_index: riskIndex,
+        classification_type: document.getElementById('fieldClassType').value || null,
+        classification_level: document.getElementById('fieldClassLevel').value || null,
+    };
+
+    const btn = document.querySelector('.btn-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Issuing...';
+
+    try {
+        const result = await CanCapAPI.issueCan(data);
+        showMessage(`CAN ${result.can_reference} issued successfully!`, 'success');
+        setTimeout(() => {
+            window.location.href = `/can_cap/can_detail.html?id=${result.id}`;
+        }, 1500);
+    } catch (err) {
+        showMessage('Error: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Issue CAN';
+    }
+}
+
+function showMessage(text, type) {
+    const msg = document.getElementById('message');
+    msg.textContent = text;
+    msg.className = type;
+    msg.style.display = 'block';
+    if (type === 'error') {
+        setTimeout(() => { msg.style.display = 'none'; }, 6000);
+    }
+}
+</script>
+</body>
+</html>

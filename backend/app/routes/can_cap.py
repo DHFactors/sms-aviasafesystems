@@ -49,6 +49,7 @@ async def list_cans(
     assigned_to: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    days: Optional[int] = Query(None, ge=0, description="Only CANs issued within the last N days. 0 or omitted = All Time."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     effective_tenant = user.get("tenant_id", "default")
@@ -66,6 +67,8 @@ async def list_cans(
         filters["department"] = department
     if search:
         filters["search"] = search
+    if days:
+        filters["days"] = days
 
     docs = service.list_cans(user, filters)
     return [_to_can_list_item(d) for d in docs]
@@ -87,6 +90,7 @@ async def list_all_caps(
     can_id: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    days: Optional[int] = Query(None, ge=0, description="Only CAPs submitted within the last N days. 0 or omitted = All Time."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """List all CAPs for the current tenant, each joined with the CAN it refers
@@ -102,6 +106,8 @@ async def list_all_caps(
         filters["department"] = department
     if search:
         filters["search"] = search
+    if days:
+        filters["days"] = days
     docs = service.list_all_caps(user, filters)
     return [_to_cap_list_item(d) for d in docs]
 
@@ -288,6 +294,31 @@ def _to_can_response(data: dict) -> dict:
         "created_at": data.get("created_at"),
         "updated_at": data.get("updated_at"),
         "latest_cap": data.get("latest_cap"),
+        # Buddha Air FORM SMSM 8.8.2 fields
+        "copies_to": data.get("copies_to"),
+        "requested_function": data.get("requested_function"),
+        "addressed_function": data.get("addressed_function"),
+        "initial_severity": data.get("initial_severity"),
+        "initial_probability": data.get("initial_probability"),
+        "initial_risk_index": data.get("initial_risk_index"),
+        "classification_type": data.get("classification_type"),
+        "classification_level": data.get("classification_level"),
+        "process_owner": data.get("process_owner"),
+        "rca": data.get("rca"),
+        "residual_severity": data.get("residual_severity"),
+        "residual_probability": data.get("residual_probability"),
+        "residual_risk_index": data.get("residual_risk_index"),
+        "residual_risk_level": data.get("residual_risk_level"),
+        "sag_sign": data.get("sag_sign"),
+        "sag_signed_by": data.get("sag_signed_by"),
+        "sag_signed_at": data.get("sag_signed_at"),
+        "manager_approval": data.get("manager_approval"),
+        "ca_acceptance": data.get("ca_acceptance"),
+        "manager_confirmation": data.get("manager_confirmation"),
+        "closing_remarks": data.get("closing_remarks"),
+        "closed_by": data.get("closed_by"),
+        "closed_at": data.get("closed_at"),
+        "closed_signature": data.get("closed_signature"),
     }
 
 
@@ -303,6 +334,14 @@ def _to_can_list_item(data: dict) -> dict:
         "department": data.get("department"),
         "target_completion_date": data.get("target_completion_date"),
         "issued_at": data.get("issued_at"),
+        "copies_to": data.get("copies_to"),
+        "requested_function": data.get("requested_function"),
+        "addressed_function": data.get("addressed_function"),
+        "initial_severity": data.get("initial_severity"),
+        "initial_probability": data.get("initial_probability"),
+        "initial_risk_index": data.get("initial_risk_index"),
+        "classification_type": data.get("classification_type"),
+        "classification_level": data.get("classification_level"),
     }
 
 
@@ -328,6 +367,23 @@ def _to_cap_response(data: dict) -> dict:
         "revision_deadline": data.get("revision_deadline"),
         "created_at": data.get("created_at"),
         "updated_at": data.get("updated_at"),
+        # Buddha Air FORM SMSM 8.8.2 fields
+        "rca": data.get("rca"),
+        "residual_severity": data.get("residual_severity"),
+        "residual_probability": data.get("residual_probability"),
+        "residual_risk_index": data.get("residual_risk_index"),
+        "residual_risk_level": data.get("residual_risk_level"),
+        "sag_sign": data.get("sag_sign"),
+        "sag_signed_by": data.get("sag_signed_by"),
+        "sag_signed_at": data.get("sag_signed_at"),
+        "manager_approval": data.get("manager_approval"),
+        "ca_acceptance": data.get("ca_acceptance"),
+        "process_owner": data.get("process_owner"),
+        "manager_confirmation": data.get("manager_confirmation"),
+        "closing_remarks": data.get("closing_remarks"),
+        "closed_by": data.get("closed_by"),
+        "closed_at": data.get("closed_at"),
+        "closed_signature": data.get("closed_signature"),
     }
 
 
@@ -345,4 +401,7 @@ def _to_cap_list_item(data: dict) -> dict:
         "department": data.get("department"),
         "submitted_by": data.get("submitted_by", ""),
         "submitted_at": data.get("submitted_at"),
+        "rca": data.get("rca"),
+        "residual_risk_level": data.get("residual_risk_level"),
+        "ca_acceptance": data.get("ca_acceptance"),
     }

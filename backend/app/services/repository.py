@@ -7,6 +7,49 @@ from app.core.config import settings
 from app.firebase import get_tenant_collection, get_cross_tenant_collection
 
 
+def coerce_utc_datetime(value) -> Optional[datetime]:
+    """Coerce a stored timestamp (aware/naive datetime, ISO string, or a
+    Firestore-like Timestamp object) into a timezone-aware UTC datetime so date
+    range comparisons are timezone-safe. Returns None for unparseable values."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    for attr in ("to_datetime", "datetime"):
+        conv = getattr(value, attr, None)
+        if callable(conv):
+            try:
+                dt = conv()
+            except Exception:
+                continue
+            if isinstance(dt, datetime):
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone(timezone.utc)
+    ts = getattr(value, "timestamp", None)
+    if callable(ts):
+        try:
+            return datetime.fromtimestamp(ts(), tz=timezone.utc)
+        except (TypeError, ValueError, OSError, OverflowError):
+            return None
+    return None
+
+
 class ReportFilter:
     def __init__(
         self,
@@ -143,14 +186,19 @@ class ReportRepository:
                 results.append(data)
 
             if len(results) == 0 and len(raw_all) > 0 and (filter.date_from or filter.date_to):
-                logger.warning(f"Date filter ({filter.date_from} to {filter.date_to}) returned 0 results but {len(raw_all)} docs exist unfiltered. Retrying without date filter (likely ISO-string timestamps or old seed data).")
+                logger.warning(f"Date filter ({filter.date_from} to {filter.date_to}) returned 0 results but {len(raw_all)} docs exist unfiltered. Retrying with a timezone-safe in-memory date filter (likely ISO-string timestamps or old seed data).")
                 unfiltered = []
                 for doc in raw_all:
                     data = doc.to_dict()
                     data["id"] = doc.id
                     self._serialize_timestamps(data)
                     unfiltered.append(data)
-                results = unfiltered
+                results = [
+                    d for d in unfiltered
+                    if self._doc_in_date_range(
+                        d.get(filter.sort_by), filter.date_from, filter.date_to
+                    )
+                ]
 
             self._cache[cache_key] = (now, results)
             if len(results) == 0:
@@ -288,6 +336,26 @@ class ReportRepository:
             filter.sort_order,
         ]
         return "::".join(parts)
+
+    @staticmethod
+    def _doc_in_date_range(
+        value, date_from: Optional[datetime], date_to: Optional[datetime]
+    ) -> bool:
+        """Timezone-safe inclusive range check used by the in-memory fallback.
+
+        The value may be an ISO string, naive/aware datetime or a Timestamp-like
+        object; coerce_utc_datetime normalizes everything to UTC before comparing.
+        """
+        if not date_from and not date_to:
+            return True
+        dt = coerce_utc_datetime(value)
+        if dt is None:
+            return False
+        if date_from and dt < date_from:
+            return False
+        if date_to and dt > date_to:
+            return False
+        return True
 
     @staticmethod
     def _serialize_timestamps(data: dict) -> None:
