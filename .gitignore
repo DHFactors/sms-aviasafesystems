@@ -15,6 +15,7 @@ service-account.json
 beta-testing-credentials.csv
 BETA_CREDENTIALS_*.md
 credential.md
+caan_credential.md
 
 # Python Virtual Environments
 .venv/
