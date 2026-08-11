@@ -19,6 +19,8 @@
     //     roleLabel: 'Airline Safety Manager',     // shown under brand in sidebar
     //     tenantTitle: 'SITA AIR',                 // optional (tenant scope)
     //     tenantMeta: 'ICAO: STA · Nepal',         // optional additional info
+    //     heroSubtitle: 'Corporate Safety Dept',   // optional hero subtitle override
+    //                                                (defaults to department label)
     //     nav: [ { id: 'overview', label: 'Overview', icon: 'fa-gauge-high' }, ... ],
     //     links: [ { href, label }, ... ]          // optional footer links
     //   }
@@ -150,7 +152,7 @@
         const user = document.createElement('div');
         user.className = 'shell-hero-user';
         user.id = 'shellHeroUser';
-        user.textContent = '—';
+        user.textContent = cfg.heroSubtitle || '—';
         hero.appendChild(title);
         hero.appendChild(user);
         return hero;
@@ -271,7 +273,7 @@
                         applyNavVisibility(claims.role || 'USER');
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                         if (heroUser && typeof getDepartmentLabel === 'function') {
-                            heroUser.textContent = getDepartmentLabel(claims) || '—';
+                            heroUser.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }
                     }).catch(function () {
                         if (heroUser) heroUser.textContent = '—';
