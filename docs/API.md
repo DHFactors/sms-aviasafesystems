@@ -130,6 +130,14 @@ fields: `severity_level`, `probability_level`, `risk_index`, `risk_level`, `risk
 | GET | `/{can_id}/caps` | List CAPs of a CAN |
 | PATCH | `/{can_id}/status` | CAN status transition |
 
+**CAP payload (CAA CAP form alignment, commits `5171d45` + `81fab62`)** — a CAP document mirrors
+FORM SMSM 8.8.2 and the official CAA CAP form:
+- **Identification header:** `company_name`, `base_location`, `area_system_of_interest`, `finding_number`, `file_ref`
+- **Section 5.1(1)–5.1(5) analysis:** `factual_review`, `rca` (root cause analysis), `short_term_ca`, `long_term_ca`, `implementation_timeline`
+- **Sign-off dicts:** `managerial_approval` (name/title/date) and `caa_acceptance` (name/date)
+- **Review flow:** `PATCH /caps/{cap_id}/review` records CA acceptance and SAG sign-off; `PATCH /caps/{cap_id}/status` drives the status lifecycle; classification is corrective vs preventive.
+- `GET /caps/{cap_id}` returns all fields above; the record exports as an A4 document via `window.print()` (`public/css/can-cap-print.css`).
+
 ### 3.6 Verification — `/api/v1/verification`
 
 | Method | Path | Description |

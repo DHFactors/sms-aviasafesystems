@@ -13,21 +13,23 @@
 |------|-------|
 | **Project Name** | AviaSAFE SMS |
 | **Report Date** | 2026-08-11 |
-| **Overall Status** | **RBAC credentials + Super-Admin lifecycle/demo-data tooling + State terminology refactor** — department-scoped role claims deployed to Auth, tenant lifecycle status + dummy-data tools added, "National"→"State" rename completed |
+| **Overall Status** | **RBAC credentials + State terminology refactor + SMSM 8.8.2 CAN/CAP form equivalence + official CAA CAP form (5.1(1)–5.1(5)) with A4 PDF export** — department-scoped role claims live in Auth, "National"→"State" rename completed, CAN/CAP forms now mirror FORM SMSM 8.8.2 / the CAA CAP document, and the CAP record exports as an A4 PDF |
 | **Current Phase** | Beta Testing (pre-production) |
 
 **Key Highlights**
+- **CAN/CAP = SMSM 8.8.2 form equivalence (commit `5171d45`, deployed beta + prod)** — CAN issuance carries initial severity/probability/risk-index + classification; CAP submission carries RCA, residual-risk assessment and process owner; CAP review records CA acceptance and SAG sign-off. Dashboard "All Time" (`days=0`) date filter fixed for `/trends` + `/caan/trends` (previously returned 422).
+- **Official CAA CAP form + A4 PDF export (commit `81fab62`)** — CAP schema extended with identification header (`company_name`, `base_location`, `area_system_of_interest`, `finding_number`, `file_ref`), Section 5.1(1)–5.1(5) analysis items (`factual_review`, `rca`, `short_term_ca`, `long_term_ca`, `implementation_timeline`) and `managerial_approval` / `caa_acceptance` sign-off dicts. `cap_submit.html` / `cap_review.html` rebuilt as the CAA document grid; `css/can-cap-print.css` renders the form as a clean A4 document via `window.print()` on `cap_review.html` and `can_detail.html`.
 - **RBAC role mapping for the simplified credentials deployed live (2026-08-11)** — `safety@{tenant}.com` stays **AIRLINE_ADMIN**; `camo`/`145`/`ops@{tenant}.com` became **USER** accounts carrying a `department` custom claim (**CAMO / Part-145 / Flight Operations**) so they route to the Responsible Manager dashboard. **28 accounts updated in Firebase Auth** and the `users` collection re-synced (**51 docs**) in both `sms-db-beta` and `sms-db`.
 - **Super-Admin tenant lifecycle status management** — new `POST /api/v1/admin/tenants/{id}/status` endpoint + production-setup UI: status (Trial/Active/Inactive) either set explicitly or derived from contract dates + payment status; audit-logged.
 - **Super-Admin dummy-data seed/unseed tooling** — `POST /api/v1/admin/demo-data` seeds/unseeds VSR/MOR/CAN/CAP demo docs (tagged `admin-demo-1`); unseed deletes only demo-tagged docs and never touches real data.
 - **"National" → "State" terminology + API-contract refactor** — global rename (UI, JS identifiers, `data.national` → `data.state`, services, tests, docs) with a recursive contract guard; cross-tenant reporting now scopes via `_effective_tenant()` (CAAN_SMD/SUPER_ADMIN default to state scope, explicit `tenant_id` overrides).
 - **CAAN state-regulator tenant** — `seed/operators.create_caan_tenant()` creates the `tenants/caan` state-regulator doc in the full-seed flow; `DEMO_USERS` consolidated to a single `smd-caan-001` bound to `tenant_id="caan"`.
-- **Backend suite green** — **231 backend tests passing** (was 195; +18 admin lifecycle/demo-data, +9 state-scoping, +9 RBAC claims).
+- **Backend suite green** — **231 backend tests passing** (re-verified after the CAP schema changes).
 
 **Key Risks**
 - **No SUPER_ADMIN account** — after removing `super-admin-001`, provisioning/seed routes (`/api/v1/admin/*`) require promoting a CAAN_SMD account to `SUPER_ADMIN`. Until then those routes are unusable.
 - **Production seeding deferred to go-live** — `sms-db` still has 0 tenants / 0 operational data (by design); tenants/users must be created post-contract.
-- **Frontend hosting deploy pending for this release** — the terminology + admin-UI changes in this repo land on Firebase Hosting only after `firebase deploy` for beta + prod (backend auto-deploys on push).
+- **Frontend hosting deploy pending for the CAA form/PDF release** — the CAN/CAP 8.8.2 + `days=0` release (`5171d45`) is live on both hostings, but commit `81fab62` (CAA CAP form + A4 PDF export) reaches Firebase Hosting beta + prod only after `firebase deploy`.
 - **Monitoring & alerts not yet configured** — no dashboards/alerting on the Render backends or Firebase project.
 
 ---
@@ -61,7 +63,9 @@
 
 Both hostings serve the same `public/` directory. Frontend routing (`public/js/firebase.js`) selects the beta backend/database by hostname containing `beta`.
 
-**Changes since last report (2026-08-10):** the RBAC claims, tenant lifecycle status, demo-data tooling and State-terminology refactor ship in this repo. The backend auto-deploys on push (Render); the frontend changes (`production-setup.html`, `caan.html`, `caan-state-risk.html`) deploy to Firebase Hosting beta + prod with `firebase deploy` — pending as of this report.
+**Changes since last report (2026-08-10):** alongside the RBAC/State work, two CAN/CAP releases landed today:
+1. **`5171d45` — SMSM 8.8.2 CAN/CAP form equivalence + dashboard `days=0` filter fix** — **deployed to Firebase Hosting beta + prod** (both returned HTTP 200).
+2. **`81fab62` — official CAA CAP form structure 5.1(1)–5.1(5) + A4 PDF export stylesheet** — committed + pushed to `main` (Render backend auto-deploys on push); Firebase Hosting beta + prod deploy **pending as of this report**.
 
 ### 3.2 Databases (Firestore native)
 
@@ -105,6 +109,11 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 | Production-setup UI: tenant Status badge + Manage form + Dummy Data card (Step 5) | Admin | ✅ Complete | Repo (pending hosting deploy) |
 | "National" → "State" terminology + API-contract refactor (`data.state`, `_effective_tenant()`, recursive guard) | Reporting / State Risk | ✅ Complete | Repo (pending hosting deploy) |
 | CAAN state-regulator tenant doc (`create_caan_tenant`, `SEED_VERSION 1.2.0`, `smd-caan-001`) | Seeding | ✅ Complete | Repo |
+| CAN issuance = SMSM 8.8.2 (severity/probability/risk-index, classification, reference) + CAP submission = SMSM 8.8.2 (cause/effect, RCA, residual-risk, process owner) — `5171d45` | CAN/CAP | ✅ Complete | ✅ Beta + Prod hosting (live) |
+| CAP review = SMSM 8.8.2 (CA acceptance, SAG sign-off, status flow, corrective/preventive classification) — `5171d45` | CAN/CAP | ✅ Complete | ✅ Beta + Prod hosting (live) |
+| Dashboard date-filter fix — `days=0` = "All Time" for `/trends` + `/caan/trends` (was returning 422) — `5171d45` | Dashboard | ✅ Complete | ✅ Beta + Prod hosting (live) |
+| Official CAA CAP form schema — identification header (`company_name`, `base_location`, `area_system_of_interest`, `finding_number`, `file_ref`), Section 5.1(1)–5.1(5) (`factual_review`, `rca`, `short_term_ca`, `long_term_ca`, `implementation_timeline`), `managerial_approval` + `caa_acceptance` sign-off dicts — `81fab62` | CAN/CAP | ✅ Complete | ⏳ Hosting deploy pending (backend auto-deployed) |
+| A4 PDF export — `css/can-cap-print.css` (`@media print`, A4 page, form-grid borders, chrome stripped) + "Download / Export PDF" buttons on `cap_review.html`/`can_detail.html` wired to `window.print()` — `81fab62` | CAN/CAP | ✅ Complete | ⏳ Hosting deploy pending |
 | `tests/test_rbac_claims.py` + `tests/test_reporting_scoping.py` + 18 new admin tests | Testing | ✅ Complete | Repo |
 
 ### 4.2 Completed Features (prior)
@@ -129,7 +138,7 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-10.md` §4 for the full inventory (simpl
 | Metrics / Health / Contact / Feedback | 25 | ✅ Passing |
 | **Total** | **231** | ✅ Passing |
 
-**+36 since 2026-08-10:** 18 admin (tenant status derivation, update, demo seed/unseed, routes), 9 state-scoping (API contract + `_effective_tenant`), 9 RBAC claims.
+**+36 since 2026-08-10:** 18 admin (tenant status derivation, update, demo seed/unseed, routes), 9 state-scoping (API contract + `_effective_tenant`), 9 RBAC claims. **Suite re-verified at 231 passing after the CAA CAP schema changes** (commit `81fab62`).
 
 ### 5.2 Frontend Tests — **4 passing**
 
@@ -146,6 +155,8 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-10.md` §4 for the full inventory (simpl
 | Auth claims applied | ✅ `safety`→`{"role":"AIRLINE_ADMIN","tenant_id":...}`; `camo`/`145`/`ops`→`{"role":"USER","tenant_id":...,"department":...}` |
 | `users` collection sync | ✅ 51 docs in `sms-db-beta` + `sms-db` |
 | No SUPER_ADMIN (`super-admin-001`) | ✅ Not present — nothing to remove |
+| CAN/CAP = SMSM 8.8.2 release (`5171d45`) | ✅ Backend tests 231/231; hosted on beta + prod (HTTP 200) |
+| CAA CAP form + PDF release (`81fab62`) | ✅ Backend tests 231/231; pushed to `main` (hosting deploy pending) |
 
 ---
 
@@ -203,7 +214,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | **Operational Data** | 0 | No surveys/hazards/reports/CAN-CAP |
 | **Users** | 51 | Pre-provisioned accounts in `users` collection (28 simplified + legacy), claims current as of 2026-08-11 |
 | **Backend** | ✅ Deployed | Latest code auto-deploys on push |
-| **Frontend** | ⏳ Deploy pending | `firebase deploy` for this release (terminology + admin UI) |
+| **Frontend** | 🟡 Mostly live | CAN/CAP 8.8.2 + `days=0` release (`5171d45`) live on beta + prod; CAA form + PDF release (`81fab62`) pending `firebase deploy` |
 
 ### 7.2 Go-Live Checklist
 
@@ -212,7 +223,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | Production Domain | ✅ Configured | `sms.aviasafesystems.com` |
 | SSL Certificate | ✅ Valid | Firebase Hosting managed (Let's Encrypt) |
 | Backend | ✅ Deployed | Render auto-deploy |
-| Frontend | ⏳ Deploy pending | This release's admin/CAAN UI on `firebase deploy` |
+| Frontend | ⏳ Deploy pending | CAA CAP form + PDF export release (`81fab62`) on `firebase deploy` |
 | Database | ✅ Ready | Clean slate, PITR 7-day |
 | Rate Limiting | ✅ Configured | IP-based, 60 req/min per IP (configurable) |
 | Scheduled escalation job | ✅ Configured | Cloud Scheduler `check-overdue`, daily 00:00 UTC |
@@ -240,7 +251,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | Document | Status | Location |
 |----------|--------|----------|
 | Architecture Overview | ✅ Complete | `docs/ARCHITECTURE.md` |
-| API Documentation | ✅ Updated 2026-08-11 | `docs/API.md` (State terminology applied) |
+| API Documentation | ✅ Updated 2026-08-11 | `docs/API.md` (State terminology + CAP payload schema / CAA form fields) |
 | Security Guide | ✅ Complete | `docs/SECURITY.md` |
 | Deployment Guide | ✅ Complete | `docs/DEPLOYMENT.md` |
 | Operations Guide | ✅ Complete | `docs/OPERATIONS.md` |
@@ -270,7 +281,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | 2 | **No SUPER_ADMIN account** | High | ⚠️ Action | Removed 2026-08-10; promote a CAAN_SMD to restore admin routes |
 | 3 | Sender.net domain verification | Low | ⚠️ Pending | Free-plan limitation; sending domain not yet verified |
 | 4 | Production has no operational data | N/A | ✅ Intentional | Clean slate for go-live (51 user accounts present) |
-| 5 | Frontend hosting deploy pending for this release | Low | ⚠️ Pending | `firebase deploy` beta + prod to serve terminology/admin-UI changes |
+| 5 | Frontend hosting deploy pending for the CAA form/PDF release | Low | ⚠️ Pending | `firebase deploy` beta + prod for `81fab62` (CAN/CAP 8.8.2 + `days=0` release already live) |
 | 6 | Monitoring / alerting | Medium | ⚠️ Pending | Not yet configured |
 | 7 | MFA (TOTP/SMS) | Medium | ⚠️ Pending | Not yet implemented |
 | 8 | Legacy/orphaned dashboard pages | Low | ⚠️ Known | `public/dashboard/index.html`, `public/portal/*` not linked from nav |
@@ -282,7 +293,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | # | Milestone | Target Date | Status |
 |---|-----------|-------------|--------|
 | 1 | **Restore SUPER_ADMIN** (promote a CAAN_SMD account) | Immediate | ⚠️ Action |
-| 2 | Deploy frontend hosting (this release's admin/CAAN UI) | Immediate | ⏳ Pending |
+| 2 | Deploy frontend hosting (CAA CAP form + PDF export release `81fab62`) | Immediate | ⏳ Pending |
 | 3 | Distribute simplified credentials to beta testers | Immediate | ⏳ Pending |
 | 4 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti) | Immediate | ⏳ Pending |
 | 5 | Beta Launch | TBD | ⏳ Pending |
@@ -311,7 +322,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`14
 | # | Recommendation | Priority | Owner |
 |---|----------------|----------|-------|
 | 1 | **Promote a CAAN_SMD account to SUPER_ADMIN** to restore admin routes | High | Super Admin |
-| 2 | Deploy frontend hosting (beta + prod) for this release | High | DevOps |
+| 2 | Deploy frontend hosting (beta + prod) for the CAA CAP form + PDF export release (`81fab62`) | High | DevOps |
 | 3 | Distribute the simplified credential sheet to beta testers | High | Project Manager |
 | 4 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti Airlines) | High | Project Manager |
 | 5 | Conduct beta testing for 2 weeks | High | Testers |
