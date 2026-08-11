@@ -11,6 +11,7 @@ from seed.config import (
     INVESTIGATION_STATUSES,
     NEPAL_AIRPORTS,
     AIRCRAFT_REGISTRATIONS,
+    SEED_VERSION,
 )
 from seed.generator import (
     SeededRandom,
@@ -120,6 +121,7 @@ def _generate_vsr_document(
         "consequence": rng.choice(["Minor", "Major", "Hazardous", "Catastrophic"]),
         "sms_category": rng.choice(sms_categories),
         **icao_risk,
+        "seed_version": SEED_VERSION,
     }
 
     if ai_analysis:
@@ -192,6 +194,7 @@ def _generate_mor_document(
         "sms_category": "Safety",
         "investigation_status": investigation_status,
         **icao_risk,
+        "seed_version": SEED_VERSION,
     }
 
     if ai_analysis:

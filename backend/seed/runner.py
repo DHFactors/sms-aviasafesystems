@@ -45,33 +45,67 @@ def set_seed_status(db, status: dict):
     doc_ref.set(status)
 
 
-def clear_seed_data(db, tenant_ids: list):
+# Collections + deterministic document-id prefixes that this runner owns.
+# Only docs matching a prefix are candidates for purging; anything else (live
+# submissions, admin/CAAN demo seeders) is left untouched.
+RUNNER_COLLECTION_PREFIXES = {
+    "surveys": ("svy_",),
+    "reports": ("vsr_", "mor_"),
+    "hazards": ("haz_",),
+    "can_cap": ("can_",),
+}
+
+
+def _is_stale(doc_id: str, doc_data: dict, prefixes: tuple) -> bool:
+    """Runner-created docs that a successful seed would have (re)tagged with the
+    current SEED_VERSION. Anything with a runner prefix but a different/missing
+    version is leftover from an older seed and safe to remove."""
+    if not any(doc_id.startswith(p) for p in prefixes):
+        return False
+    stored_version = (doc_data or {}).get("seed_version")
+    return stored_version != SEED_VERSION
+
+
+def purge_stale_seed(db) -> dict:
+    """Remove runner-owned docs left over from earlier seed versions.
+
+    Runs only AFTER the whole seed has succeeded, so a failed re-seed can never
+    wipe existing data (previously the clear ran first and left the database
+    empty on mid-run failures).
+    """
     from app.core.config import settings
 
-    for tenant_id in tenant_ids:
+    removed = {"surveys": 0, "reports": 0, "hazards": 0, "can_cap": 0, "caps": 0}
+    for tenant_id in [p["id"] for p in OPERATOR_PROFILES]:
         tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
 
-        reports = tenant_ref.collection(settings.FIREBASE_COLLECTION_REPORTS).stream()
-        for r in reports:
-            r.reference.delete()
+        for sub, prefixes in RUNNER_COLLECTION_PREFIXES.items():
+            try:
+                snaps = tenant_ref.collection(sub).stream()
+            except Exception as e:
+                logger.warning(f"Purge scan failed for {tenant_id}/{sub}: {e}")
+                continue
+            for s in snaps:
+                if _is_stale(s.id, s.to_dict(), prefixes):
+                    s.reference.delete()
+                    removed[sub] += 1
 
-        surveys = tenant_ref.collection("surveys").stream()
-        for s in surveys:
-            s.reference.delete()
+        try:
+            cans = tenant_ref.collection("can_cap").stream()
+        except Exception:
+            cans = []
+        for can in cans:
+            try:
+                caps = can.reference.collection("caps").stream()
+            except Exception:
+                caps = []
+            for cap in caps:
+                if _is_stale(cap.id, cap.to_dict(), ("cap_",)):
+                    cap.reference.delete()
+                    removed["caps"] += 1
 
-        metadata = tenant_ref.collection(settings.FIREBASE_COLLECTION_METADATA).stream()
-        for m in metadata:
-            m.reference.delete()
-
-        tenant_ref.delete()
-
-    logger.info(f"Cleared existing seed data for {len(tenant_ids)} tenants")
-
-    seed_doc = db.document(SEED_DOC_PATH)
-    if seed_doc.get().exists:
-        seed_doc.delete()
-
-    logger.info("Cleared seed metadata")
+    logger.info(f"Purged stale seed docs: {removed}")
+    return removed
 
 
 def run(
@@ -98,10 +132,6 @@ def run(
         logger.info("Use --force to re-seed")
         return {"status": "skipped", "version": SEED_VERSION, "seeded_at": status.get("seeded_at")}
 
-    if force and not dry_run:
-        tenant_ids = [p["id"] for p in OPERATOR_PROFILES]
-        clear_seed_data(db, tenant_ids)
-
     all_doing_all = not surveys_only and not reports_only and not users_only
     counts = {
         "version": SEED_VERSION,
@@ -110,10 +140,18 @@ def run(
         "surveys": 0,
         "vsr_reports": 0,
         "mor_reports": 0,
+        "hazards": 0,
+        "cans": 0,
+        "caps": 0,
         "state_risk_categories": 0,
     }
 
     if dry_run:
+        from seed.hazard_can import estimate_counts
+        hc = estimate_counts()
+        counts["hazards"] = hc["hazards"]
+        counts["cans"] = hc["cans"]
+        counts["caps"] = hc["caps"]
         for p in OPERATOR_PROFILES:
             counts["tenants"] += 1
             counts["surveys"] += p["survey_count"]
@@ -123,6 +161,9 @@ def run(
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "
                      f"{counts['mor_reports']} MOR, "
+                     f"{counts['hazards']} hazards, "
+                     f"{counts['cans']} CANs, "
+                     f"{counts['caps']} CAPs, "
                      f"{counts['state_risk_categories']} state risk categories")
         return counts
 
@@ -156,16 +197,30 @@ def run(
         total_mor = create_all_mor_reports(db)
         counts["mor_reports"] = total_mor
 
+    if all_doing_all or reports_only:
+        logger.info("=== Seeding hazards + CAN/CAP ===")
+        from seed.hazard_can import create_all_hazard_can_data
+        hc = create_all_hazard_can_data(db)
+        counts["hazards"] = hc["hazards"]
+        counts["cans"] = hc["cans"]
+        counts["caps"] = hc["caps"]
+
     if all_doing_all:
         logger.info("=== Seeding state risk register reference ===")
         from seed.state_risk import create_all_state_risk_reference
         counts["state_risk_categories"] = create_all_state_risk_reference(db)
 
     if not dry_run:
+        # Purge runner-owned leftovers only after the whole seed succeeded, so a
+        # failed re-seed can no longer wipe existing data (non-destructive-until-success).
+        if all_doing_all:
+            purge_stale_seed(db)
         counts["seeded_at"] = datetime.now(timezone.utc).isoformat()
         set_seed_status(db, counts)
         logger.info(f"Seed complete: {counts['surveys']} surveys, "
-                     f"{counts['vsr_reports']} VSR, {counts['mor_reports']} MOR "
+                     f"{counts['vsr_reports']} VSR, {counts['mor_reports']} MOR, "
+                     f"{counts['hazards']} hazards, {counts['cans']} CANs, "
+                     f"{counts['caps']} CAPs "
                      f"across {counts['tenants']} tenants with {counts['users']} users")
 
     return counts
@@ -173,7 +228,7 @@ def run(
 
 def main():
     parser = argparse.ArgumentParser(description="AviaSAFE Demo Data Seeder")
-    parser.add_argument("--force", action="store_true", help="Re-seed (delete and recreate)")
+    parser.add_argument("--force", action="store_true", help="Re-seed (overwrite + purge stale)")
     parser.add_argument("--dry-run", action="store_true", help="Show counts without writing")
     parser.add_argument("--surveys-only", action="store_true", help="Only seed survey data")
     parser.add_argument("--reports-only", action="store_true", help="Only seed VSR + MOR data")

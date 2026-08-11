@@ -9,6 +9,7 @@ from seed.config import (
     ALL_ICAO_ELEMENTS,
     SURVEY_DEPARTMENTS,
     NEPALI_NAMES,
+    SEED_VERSION,
 )
 from seed.generator import (
     SeededRandom,
@@ -61,7 +62,7 @@ def generate_survey_batch(
             "respondent_name": rng.choice(NEPALI_NAMES) if rng.random() > 0.3 else None,
             "submitted_at": timestamp,
             "seed_index": i,
-            "seed_version": "1.0.0",
+            "seed_version": SEED_VERSION,
         })
 
     return surveys
