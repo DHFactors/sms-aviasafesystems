@@ -52,7 +52,7 @@ AUTHOR: AviaSAFE Systems
     <!-- ================= STEP 1: CREATE REGULATOR ================= -->
     <div class="admin-card">
         <h2><span class="step-badge">Step 1</span>Create State Regulator</h2>
-        <p class="card-sub">The national civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</p>
+        <p class="card-sub">The state civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</p>
         <form id="regulatorForm">
             <div class="form-row">
                 <div class="form-group">
@@ -149,6 +149,42 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:12p
             <button class="btn btn-outline btn-sm" onclick="loadAuditLog()"><i class="fas fa-rotate"></i> Refresh</button>
         </div>
         <div id="auditArea"><div class="empty-state">No audit entries loaded yet.</div></div>
+    </div>
+
+    <!-- ================= STEP 5: DEMO DATA (VSR/MOR/CAN/CAP) ================= -->
+    <div class="admin-card">
+        <h2><span class="step-badge">Step 5</span>Dummy Data — VSR / MOR / CAN / CAP</h2>
+        <p class="card-sub">Seed dummy operational data (voluntary reports, mandatory reports, corrective actions and preventive actions) into one tenant or every tenant. <strong>Unseed</strong> removes only the dummy documents created here — real data is never touched.</p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Scope</label>
+                <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;">
+                        <input type="radio" name="demoScope" value="all" checked onchange="demoScopeChanged()"> All tenants
+                    </label>
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;">
+                        <input type="radio" name="demoScope" value="one" onchange="demoScopeChanged()"> Single tenant
+                    </label>
+                    <select id="demoTenantSelect" disabled style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;">
+                        <option value="">— select tenant —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Data types</label>
+                <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="vsr" checked> VSR</label>
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="mor" checked> MOR</label>
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="can" checked> CAN</label>
+                    <label style="font-size:0.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="cap" checked> CAP</label>
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-success" onclick="demoData('seed')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>
+            <button class="btn btn-danger" onclick="demoData('unseed')"><i class="fas fa-broom"></i> Unseed Dummy Data</button>
+        </div>
+        <div id="demoDataArea" style="margin-top:14px;"></div>
     </div>
 
     <!-- ================= EXISTING DATA ================= -->
@@ -368,29 +404,6 @@ function closeConfirm() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-document.getElementById('confirmDeployBtn').addEventListener('click', async function () {
-    document.getElementById('confirmModal').style.display = 'none';
-    var area = document.getElementById('previewArea');
-    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Deploying seed plan...</div>';
-    try {
-        var resp = await AdminUI.apiPost('/api/v1/admin/seed/deploy', {
-            setup_key: AdminUI.ensureSetupKey(),
-            force: pendingDeployForce,
-        });
-        var r = resp.result || {};
-        AdminUI.toast('Deploy complete: ' + r.surveys_seeded + ' surveys, ' + r.hazards_seeded + ' hazards, ' + r.reports_seeded + ' reports.', 'success');
-        area.innerHTML = '<div class="status-box success">' +
-            '<strong>Deploy complete</strong> — ' + r.operators + ' operators, ' +
-            r.surveys_seeded + ' surveys, ' + r.hazards_seeded + ' hazards, ' + r.reports_seeded + ' reports ' +
-            'at ' + AdminUI.fmtDate(r.seeded_at) + '.' +
-            '</div><div class="status-box info" style="white-space:pre-wrap;">' + AdminUI.esc((r.details || []).join('\n')) + '</div>';
-        loadExisting();
-        loadAuditLog();
-    } catch (err) {
-        area.innerHTML = '<div class="status-box error">Deploy failed: ' + AdminUI.esc(err.message) + '</div>';
-    }
-});
-
 // ============================================================================
 // STEP 4 — AUDIT LOG
 // ============================================================================
@@ -466,25 +479,170 @@ async function loadExistingTenants() {
     try {
         var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
         var tenants = resp.tenants || [];
+        populateDemoTenantSelect(tenants);
         if (!tenants.length) {
             el.innerHTML = '<div class="empty-state">No tenants yet.</div>';
             return;
         }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>ID</th><th>Name</th><th>Country</th><th>Regulator</th><th>Surveys</th><th>Hazards</th><th>Reports</th><th>Active</th>' +
+            '<th>ID</th><th>Name</th><th>Country</th><th>Regulator</th><th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Status</th><th>Contract</th><th>Payment</th><th></th>' +
             '</tr></thead><tbody>' + tenants.map(function (t) {
                 var c = t.counts || {};
-                var active = t.active !== false ? '<span class="badge badge-success">active</span>' : '<span class="badge badge-danger">inactive</span>';
-                return '<tr><td><code>' + AdminUI.esc(t.id) + '</code></td>' +
+                var st = t.status || (t.active === false ? 'Inactive' : 'Active');
+                var stBadge = statusBadge(st);
+                var start = (t.contract && t.contract.start_date) || '—';
+                var end = (t.contract && t.contract.end_date) || '—';
+                var pay = t.payment_status || '—';
+                var payBadge = pay === 'Paid' ? '<span class="badge badge-success">Paid</span>'
+                    : pay === 'Unpaid' ? '<span class="badge badge-danger">Unpaid</span>'
+                    : '<span class="badge badge-warn">—</span>';
+                return '<tr>' +
+                    '<td><code>' + AdminUI.esc(t.id) + '</code></td>' +
                     '<td>' + AdminUI.esc(t.name || t.id) + '</td>' +
                     '<td>' + AdminUI.esc(t.country || '—') + '</td>' +
                     '<td>' + AdminUI.esc(t.regulator_id || '—') + '</td>' +
-                    '<td>' + c.surveys + '</td><td>' + c.hazards + '</td><td>' + c.reports + '</td>' +
-                    '<td>' + active + '</td></tr>';
+                    '<td>' + c.surveys + '</td><td>' + c.hazards + '</td><td>' + c.reports + '</td><td>' + (c.cans || 0) + '</td>' +
+                    '<td>' + stBadge + '</td>' +
+                    '<td>' + AdminUI.esc(start) + ' → ' + AdminUI.esc(end) + '</td>' +
+                    '<td>' + payBadge + '</td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="toggleStatusForm(\'' + AdminUI.esc(t.id) + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>' +
+                    '<tr id="mgr-' + AdminUI.esc(t.id) + '" style="display:none;background:#f8fafc;"><td colspan="12">' +
+                    '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:6px 0;">' +
+                    '<div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;color:#64748b;">Status</label>' +
+                    '<select id="mg-status-' + AdminUI.esc(t.id) + '" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;">' +
+                    '<option value="">Keep / auto</option><option value="Trial">Trial</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>' +
+                    '<div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;color:#64748b;">Contract start</label>' +
+                    '<input type="date" id="mg-start-' + AdminUI.esc(t.id) + '" value="' + AdminUI.esc(start === '—' ? '' : start) + '" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"></div>' +
+                    '<div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;color:#64748b;">Contract end</label>' +
+                    '<input type="date" id="mg-end-' + AdminUI.esc(t.id) + '" value="' + AdminUI.esc(end === '—' ? '' : end) + '" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"></div>' +
+                    '<div style="display:flex;flex-direction:column;gap:4px;"><label style="font-size:0.75rem;color:#64748b;">Payment</label>' +
+                    '<select id="mg-pay-' + AdminUI.esc(t.id) + '" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;">' +
+                    '<option value="">Keep</option><option value="Paid"' + (pay === 'Paid' ? ' selected' : '') + '>Paid</option><option value="Unpaid"' + (pay === 'Unpaid' ? ' selected' : '') + '>Unpaid</option></select></div>' +
+                    '<button class="btn btn-success btn-sm" onclick="saveStatus(\'' + AdminUI.esc(t.id) + '\')"><i class="fas fa-save"></i> Save</button>' +
+                    '</div></td></tr>';
             }).join('') + '</tbody></table></div>';
     } catch (err) {
         el.innerHTML = '<div class="status-box error">' + AdminUI.esc(err.message) + '</div>';
     }
+}
+
+function statusBadge(st) {
+    st = st || 'Active';
+    var cls = st === 'Active' ? 'badge-success' : (st === 'Trial' ? 'badge-info' : 'badge-danger');
+    return '<span class="badge ' + cls + '">' + AdminUI.esc(st) + '</span>';
+}
+
+function toggleStatusForm(tid) {
+    var row = document.getElementById('mgr-' + tid);
+    if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+async function saveStatus(tid) {
+    var body = { setup_key: AdminUI.ensureSetupKey() };
+    var status = document.getElementById('mg-status-' + tid).value;
+    var start = document.getElementById('mg-start-' + tid).value;
+    var end = document.getElementById('mg-end-' + tid).value;
+    var pay = document.getElementById('mg-pay-' + tid).value;
+    if (status) body.status = status;
+    if (start) body.contract_start_date = start;
+    if (end) body.contract_end_date = end;
+    if (pay) body.payment_status = pay;
+    if (!body.status && !body.contract_start_date && !body.contract_end_date && !body.payment_status) {
+        AdminUI.toast('Nothing to update.', 'error');
+        return;
+    }
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/tenants/' + encodeURIComponent(tid) + '/status', body);
+        AdminUI.toast('Status saved: ' + resp.tenant.status, 'success');
+        loadExisting();
+    } catch (err) {
+        AdminUI.toast('Save failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// STEP 5 — DEMO DATA (VSR / MOR / CAN / CAP)
+// ============================================================================
+
+function populateDemoTenantSelect(tenants) {
+    var sel = document.getElementById('demoTenantSelect');
+    var current = sel.value;
+    sel.innerHTML = '<option value="">— select tenant —</option>' + (tenants || []).map(function (t) {
+        return '<option value="' + AdminUI.esc(t.id) + '">' + AdminUI.esc(t.name || t.id) + ' (' + AdminUI.esc(t.id) + ')</option>';
+    }).join('');
+    if (current) sel.value = current;
+}
+
+function demoScopeChanged() {
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    document.getElementById('demoTenantSelect').disabled = scope !== 'one';
+}
+
+function demoData(action) {
+    var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
+    if (!kinds.length) {
+        AdminUI.toast('Select at least one data type (VSR/MOR/CAN/CAP).', 'error');
+        return;
+    }
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var body = { setup_key: AdminUI.ensureSetupKey(), action: action, kinds: kinds };
+    if (scope === 'one') {
+        var tid = document.getElementById('demoTenantSelect').value;
+        if (!tid) {
+            AdminUI.toast('Select a tenant.', 'error');
+            return;
+        }
+        body.all = false;
+        body.tenant_ids = [tid];
+    } else {
+        body.all = true;
+    }
+
+    var verb = action === 'seed' ? 'Seed' : 'Unseed';
+    document.getElementById('confirmText').innerHTML =
+        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + '</strong>' +
+        (scope === 'one' ? ' for tenant <code>' + AdminUI.esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
+        '? Unseed removes only the documents created by this seeder — real data is untouched.';
+    document.getElementById('confirmModal').style.display = 'flex';
+    pendingDemoAction = body;
+}
+
+var pendingDemoAction = null;
+
+document.getElementById('confirmDeployBtn').addEventListener('click', async function () {
+    if (!pendingDemoAction) return deploySeedConfirm();
+    document.getElementById('confirmModal').style.display = 'none';
+    var body = pendingDemoAction;
+    pendingDemoAction = null;
+    var area = document.getElementById('demoDataArea');
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' +
+        (body.action === 'seed' ? 'Seeding' : 'Unseeding') + ' dummy data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/demo-data', body);
+        var rows = (resp.results || []).map(function (r) {
+            var payload = r.seeded || r.removed || {};
+            var detail = Object.keys(payload).map(function (k) { return k.toUpperCase() + '=' + payload[k]; }).join(', ');
+            return '<tr><td><code>' + AdminUI.esc(r.tenant_id) + '</code></td>' +
+                '<td>' + (r.error ? '<span class="badge badge-danger">' + AdminUI.esc(r.error) + '</span>' : AdminUI.esc(detail || 'ok')) + '</td></tr>';
+        }).join('');
+        area.innerHTML = '<div class="status-box success"><strong>' +
+            (body.action === 'seed' ? 'Seed complete' : 'Unseed complete') + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
+            (rows ? '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Tenant</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '');
+        loadExisting();
+        loadAuditLog();
+    } catch (err) {
+        area.innerHTML = '<div class="status-box error">' + AdminUI.esc(err.message) + '</div>';
+    }
+});
+
+function deploySeedConfirm() {
+    var force = document.getElementById('forceReseed').checked;
+    var area = document.getElementById('previewArea');
+    document.getElementById('confirmText').innerHTML =
+        'Deploy the CAAN demo seed plan? This ' + (force ? '<strong>force re-seeds</strong> (replaces existing surveys)' : 'skips operators that already have surveys') +
+        ' and writes the regulator, tenant tags, and seeded hazards/reports to the current database.';
+    pendingDeployForce = force;
+    document.getElementById('confirmModal').style.display = 'flex';
 }
 </script>
 

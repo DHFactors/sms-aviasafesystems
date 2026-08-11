@@ -250,11 +250,11 @@ def list_tenants_admin() -> List[Dict[str, Any]]:
             td = dict(t.to_dict() or {})
             td["id"] = t.id
             td["counts"] = {}
-            for sub in ("surveys", "hazards", "reports"):
+            for sub in ("surveys", "hazards", "reports", "can_cap"):
                 try:
-                    td["counts"][sub] = len(list(t.reference.collection(sub).limit(500).get()))
+                    td["counts"][sub if sub != "can_cap" else "cans"] = len(list(t.reference.collection(sub).limit(500).get()))
                 except Exception:
-                    td["counts"][sub] = 0
+                    td["counts"]["cans" if sub == "can_cap" else sub] = 0
             rows.append(td)
         rows.sort(key=lambda r: (r.get("name") or r.get("id") or "").lower())
         return rows

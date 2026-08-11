@@ -1,4 +1,4 @@
-"""State-level risk register tests (Part 2: national risk vs SSP).
+"""State-level risk register tests (Part 2: state risk vs SSP).
 
 Verifies aggregation of tenant data into ICAO top-risk categories, persistence
 of the register, SSP target handling, and the benchmark wiring.
@@ -125,7 +125,7 @@ def _svc(monkeypatch, hazards=None, reports=None, reference=None):
     return StateRiskService({"uid": "caan-user", "role": "CAAN_SMD"})
 
 
-def test_aggregate_national_risk(monkeypatch):
+def test_aggregate_state_risk(monkeypatch):
     svc = _svc(
         monkeypatch,
         hazards=[
@@ -134,7 +134,7 @@ def test_aggregate_national_risk(monkeypatch):
             {"tenant_id": "air2", "occurrence_category": "BIRD", "severity_level": 1, "probability_level": 1, "risk_level": "Low"},
         ],
     )
-    result = svc.aggregate_national_risk(2026, 3)
+    result = svc.aggregate_state_risk(2026, 3)
     assert result["year"] == 2026
     assert result["quarter"] == 3
     by_cat = {r["icoc_category"]: r for r in result["risks"]}
@@ -142,7 +142,7 @@ def test_aggregate_national_risk(monkeypatch):
     assert by_cat["BIRD"]["current_risk_index"] == 4
     assert by_cat["LOCI"]["current_risk_index"] == 25
     assert by_cat["LOCI"]["contributing_tenants"] == ["air1"]
-    # National top risk should rank highest risk index first
+    # State top risk should rank highest risk index first
     assert result["risks"][0]["icoc_category"] == "LOCI"
 
 
@@ -153,7 +153,7 @@ def test_aggregate_includes_reports(monkeypatch):
             {"tenant_id": "air1", "occurrence_category": "ENG", "severity_level": 4, "probability_level": 2, "risk_level": "High"},
         ],
     )
-    result = svc.aggregate_national_risk(2026, 2)
+    result = svc.aggregate_state_risk(2026, 2)
     by_cat = {r["icoc_category"]: r for r in result["risks"]}
     assert by_cat["ENG"]["count"] == 1
     assert by_cat["ENG"]["current_risk_index"] == 8
@@ -161,7 +161,7 @@ def test_aggregate_includes_reports(monkeypatch):
 
 def test_aggregate_empty_returns_no_rows(monkeypatch):
     svc = _svc(monkeypatch)
-    result = svc.aggregate_national_risk(2026, 1)
+    result = svc.aggregate_state_risk(2026, 1)
     assert result["risks"] == []
 
 
@@ -515,14 +515,14 @@ def test_get_caan_survey_maturity_aggregates_pillars(monkeypatch):
         },
     ])
     result = svc.get_caan_survey_maturity()
-    assert result["national"]["response_count"] == 3
+    assert result["state"]["response_count"] == 3
     by_id = {op["tenant_id"]: op for op in result["operators"]}
     assert by_id["air1"]["response_count"] == 2
     assert by_id["air1"]["pillars"]["safety_policy"] == 3.0
     assert by_id["air1"]["overall_sms_maturity"] == 3.5
     assert by_id["air2"]["overall_sms_maturity"] == 5.0
-    # National pillar average across all responses
-    assert result["national"]["pillars"]["safety_policy"] == round((4.0 + 2.0 + 5.0) / 3, 2)
+    # State pillar average across all responses
+    assert result["state"]["pillars"]["safety_policy"] == round((4.0 + 2.0 + 5.0) / 3, 2)
     # Best SMS maturity ranks first
     assert result["operators"][0]["tenant_id"] == "air2"
 
@@ -531,8 +531,8 @@ def test_get_caan_survey_maturity_empty(monkeypatch):
     svc = _survey_svc(monkeypatch, surveys=[])
     result = svc.get_caan_survey_maturity()
     assert result["operators"] == []
-    assert result["national"]["overall_sms_maturity"] is None
-    assert result["national"]["response_count"] == 0
+    assert result["state"]["overall_sms_maturity"] is None
+    assert result["state"]["response_count"] == 0
 
 
 def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):

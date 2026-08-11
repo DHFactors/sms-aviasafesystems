@@ -277,7 +277,7 @@ async def get_caan_sms_maturity_assessment(
         data = svc.get_caan_sms_maturity_assessment(days=days, refresh=refresh, regulator_id=regulator_id)
     except Exception as e:
         logger.error(f"CAAN SMS maturity assessment failed: {e}")
-        data = {"period_days": days, "generated_at": None, "operators": [], "national": None, "error": str(e)}
+        data = {"period_days": days, "generated_at": None, "operators": [], "state": None, "error": str(e)}
     return _envelope(data)
 
 

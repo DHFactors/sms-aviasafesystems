@@ -84,8 +84,8 @@ def main():
                 keys = list(body.keys())
                 if "operators" in body:
                     summary = {"status": body.get("status"), "operators": len(body["operators"]),
-                               "national_overall": body.get("national", {}).get("overall_sms_maturity"),
-                               "national_responses": body.get("national", {}).get("response_count")}
+                               "state_overall": body.get("state", {}).get("overall_sms_maturity"),
+                               "state_responses": body.get("state", {}).get("response_count")}
                 elif "risks" in body:
                     summary = {"status": body.get("status"), "count": body.get("count"),
                                "first": (body["risks"][0] if body.get("risks") else None)}

@@ -28,6 +28,18 @@ def _get_tenant_name(tenant_id: str) -> Optional[str]:
     return tenant_id
 
 
+def _effective_tenant(user: Dict[str, Any], tenant_id: Optional[str] = None) -> Optional[str]:
+    """Resolve the report scope for the authenticated user.
+
+    Cross-tenant roles (CAAN_SMD / SUPER_ADMIN) are state by default and may
+    only scope to an operator when an explicit ``tenant_id`` query param is given.
+    Tenant roles always use their own tenant (query param is already nulled).
+    """
+    if user.get("role") in settings.CROSS_TENANT_ROLES:
+        return tenant_id
+    return tenant_id or user.get("tenant_id")
+
+
 # ── Generate Quarterly Report ──
 
 
@@ -40,7 +52,7 @@ async def generate_quarterly_report(
 ):
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
-    effective_tenant = tenant_id or user.get("tenant_id")
+    effective_tenant = _effective_tenant(user, tenant_id)
     if user.get("role") not in settings.CROSS_TENANT_ROLES and not effective_tenant:
         raise HTTPException(403, "No tenant assigned")
 
@@ -86,7 +98,7 @@ async def list_quarterly_reports(
 ):
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
-    effective_tenant = tenant_id or user.get("tenant_id")
+    effective_tenant = _effective_tenant(user, tenant_id)
 
     try:
         if effective_tenant:
@@ -127,7 +139,7 @@ async def get_quarterly_report(
     report_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    effective_tenant = user.get("tenant_id")
+    effective_tenant = _effective_tenant(user)
 
     try:
         if effective_tenant:
@@ -153,7 +165,7 @@ async def export_quarterly_report(
     report_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    effective_tenant = user.get("tenant_id")
+    effective_tenant = _effective_tenant(user)
 
     try:
         if effective_tenant:
@@ -196,7 +208,7 @@ async def generate_annual_report(
 ):
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
-    effective_tenant = tenant_id or user.get("tenant_id")
+    effective_tenant = _effective_tenant(user, tenant_id)
     if user.get("role") not in settings.CROSS_TENANT_ROLES and not effective_tenant:
         raise HTTPException(403, "No tenant assigned")
 
@@ -242,7 +254,7 @@ async def list_annual_reports(
 ):
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
-    effective_tenant = tenant_id or user.get("tenant_id")
+    effective_tenant = _effective_tenant(user, tenant_id)
 
     try:
         if effective_tenant:
@@ -283,7 +295,7 @@ async def get_annual_report(
     report_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    effective_tenant = user.get("tenant_id")
+    effective_tenant = _effective_tenant(user)
 
     try:
         if effective_tenant:
@@ -309,7 +321,7 @@ async def export_annual_report(
     report_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    effective_tenant = user.get("tenant_id")
+    effective_tenant = _effective_tenant(user)
 
     try:
         if effective_tenant:

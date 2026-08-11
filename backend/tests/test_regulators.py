@@ -233,7 +233,7 @@ def test_regulators_detail_unknown(monkeypatch):
 
 
 # ============================================================================
-# Regulator scoping of national risk aggregation
+# Regulator scoping of state risk aggregation
 # ============================================================================
 
 class _FakeDoc:
@@ -279,13 +279,13 @@ def test_aggregate_scoped_to_regulator_operators(monkeypatch):
         ],
         reports=[],
     )
-    scoped = svc.aggregate_national_risk(2026, 3, regulator_id="caan")
+    scoped = svc.aggregate_state_risk(2026, 3, regulator_id="caan")
     by_cat = {r["icoc_category"]: r for r in scoped["risks"]}
     # The "other-state" tenant is NOT overseen by CAAN -> excluded.
     assert by_cat["BIRD"]["count"] == 2
     assert by_cat["BIRD"]["contributing_tenants"] == ["air1", "air2"]
 
-    full = svc.aggregate_national_risk(2026, 3)
+    full = svc.aggregate_state_risk(2026, 3)
     by_cat_full = {r["icoc_category"]: r for r in full["risks"]}
     assert by_cat_full["BIRD"]["count"] == 3
 
@@ -319,7 +319,7 @@ def test_survey_maturity_scoped_to_regulator(monkeypatch):
     scoped = svc.get_caan_survey_maturity(regulator_id="caan")
     ids = {op["tenant_id"] for op in scoped["operators"]}
     assert ids == {"air1", "air2"}
-    assert scoped["national"]["response_count"] == 2
+    assert scoped["state"]["response_count"] == 2
 
     full = svc.get_caan_survey_maturity()
     assert len(full["operators"]) == 3

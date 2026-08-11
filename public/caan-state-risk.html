@@ -6,8 +6,8 @@ DATE CREATED: 2026-08-04
 PURPOSE: State Regulator (SSP) dashboard. Works generically for any country's
          civil-aviation authority (CAAN/Nepal, DGCA/India, ...): the regulator
          is resolved from /api/v1/regulators (URL ?regulator= override, default
-         'caan') and every national aggregation is scoped via regulator_id.
-         Provides the national view of SMS maturity (survey pillars), the state
+         'caan') and every state aggregation is scoped via regulator_id.
+         Provides the state view of SMS maturity (survey pillars), the state
          risk register (ICAO top-risk categories vs SSP targets, with staleness
          detection), and the live cross-tenant aggregation. SSP-target editing
          is restricted to SUPER_ADMIN. Uses the shared dashboard shell
@@ -109,7 +109,7 @@ AUTHOR: AviaSAFE Systems
     <section id="sms-maturity" class="shell-scroll-spy" style="display:none;">
         <div class="section-head">
             <div>
-                <h2><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> National SMS Maturity</h2>
+                <h2><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> State SMS Maturity</h2>
                 <div class="section-sub" id="smsMaturitySub">Aggregated ICAO Annex 19 survey culture across all operators</div>
             </div>
             <button class="btn btn-outline btn-sm" onclick="loadSmsMaturity(); loadSmsMaturityAssessment(false);"><i class="fas fa-rotate"></i> Refresh</button>
@@ -119,7 +119,7 @@ AUTHOR: AviaSAFE Systems
         </div>
         <div id="smsMaturityStats" class="stat-grid"></div>
         <div class="card">
-            <h3>Operator SMS Maturity vs National Average</h3>
+            <h3>Operator SMS Maturity vs State Average</h3>
             <div style="overflow-x:auto;"><table>
                 <thead><tr>
                     <th>Operator</th>
@@ -153,11 +153,11 @@ AUTHOR: AviaSAFE Systems
         </div>
     </section>
 
-    <!-- ==================== NATIONAL RISK REGISTER ==================== -->
+    <!-- ==================== STATE RISK REGISTER ==================== -->
     <section id="risk-register" class="shell-scroll-spy" style="display:none;">
         <div class="section-head">
             <div>
-                <h2><i class="fas fa-book" style="color:#1a6b8a;"></i> National Risk Register — Hazard Risk vs SSP Top Risk</h2>
+                <h2><i class="fas fa-book" style="color:#1a6b8a;"></i> State Risk Register — Hazard Risk vs SSP Top Risk</h2>
                 <div class="section-sub" id="registerSub">ICAO top-risk categories measured against state SSP targets</div>
             </div>
             <button class="btn btn-outline btn-sm" onclick="loadRegister()"><i class="fas fa-rotate"></i> Refresh</button>
@@ -210,7 +210,7 @@ AUTHOR: AviaSAFE Systems
         <div class="section-head">
             <div>
                 <h2><i class="fas fa-chart-bar" style="color:#1a6b8a;"></i> Cross-Tenant Aggregation (Live)</h2>
-                <div class="section-sub" id="aggregationSub">Live recomputation of national risk from tenant hazards and reports — not yet persisted</div>
+                <div class="section-sub" id="aggregationSub">Live recomputation of state risk from tenant hazards and reports — not yet persisted</div>
             </div>
             <button class="btn btn-outline btn-sm" onclick="loadAggregation()"><i class="fas fa-rotate"></i> Recompute</button>
         </div>
@@ -238,7 +238,7 @@ AUTHOR: AviaSAFE Systems
             </table></div>
         </div>
         <div class="card">
-            <h3>National Current Risk by ICAO Category (Live)</h3>
+            <h3>State Current Risk by ICAO Category (Live)</h3>
             <div style="overflow-x:auto;"><table>
                 <thead><tr>
                     <th>#</th>
@@ -315,7 +315,7 @@ function applyRegulatorBranding() {
     };
     setSub('smsMaturitySub', 'Aggregated ICAO Annex 19 survey culture across all operators');
     setSub('registerSub', 'ICAO top-risk categories measured against state SSP targets');
-    setSub('aggregationSub', 'Live recomputation of national risk from tenant hazards and reports');
+    setSub('aggregationSub', 'Live recomputation of state risk from tenant hazards and reports');
 }
 
 function regQuery() {
@@ -388,11 +388,11 @@ async function loadSmsMaturity() {
     statsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
     try {
         const data = await ApiClient.get(`/api/v1/dashboard/caan/survey-maturity?${regQuery()}`);
-        const nat = data.national || {};
+        const nat = data.state || {};
         const ops = data.operators || [];
 
         statsEl.innerHTML = `
-            <div class="stat-card gold"><div class="num">${nat.overall_sms_maturity ?? '—'}</div><div class="lbl">National SMS Maturity (1-5)</div></div>
+            <div class="stat-card gold"><div class="num">${nat.overall_sms_maturity ?? '—'}</div><div class="lbl">State SMS Maturity (1-5)</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_policy ?? '—'}</div><div class="lbl">Safety Policy</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_risk_management ?? '—'}</div><div class="lbl">Risk Management</div></div>
             <div class="stat-card"><div class="num">${nat.pillars?.safety_assurance ?? '—'}</div><div class="lbl">Safety Assurance</div></div>
@@ -481,7 +481,7 @@ async function loadSmsMaturityAssessment(refresh) {
 }
 
 // ============================================================================
-// NATIONAL RISK REGISTER
+// STATE RISK REGISTER
 // ============================================================================
 function tolerabilityClass(t) {
     const v = (t || '').toLowerCase();

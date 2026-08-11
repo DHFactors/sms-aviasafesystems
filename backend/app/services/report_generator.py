@@ -280,7 +280,7 @@ class ReportGenerator:
         can_total = len(cans)
 
         # Pull the persisted state-level register so risk_reduction_rate and
-        # SSP target/actual comparison reflect the national (aggregated) view
+        # SSP target/actual comparison reflect the state (aggregated) view
         # instead of a hardcoded placeholder.
         state_metrics = {}
         try:
@@ -295,7 +295,7 @@ class ReportGenerator:
                     "risk_reduction_rate": round(float(reduction), 1) if reduction is not None else 0.0,
                     "ssp_target_avg": self._avg_ssp_target(rows),
                     "ssp_actual_avg": self._avg_ssp_actual(rows),
-                    "national_categories_tracked": len(rows),
+                    "state_categories_tracked": len(rows),
                 }
         except Exception as e:
             logger.warning(f"Failed to read state risk register for SSP indicators: {e}")
@@ -308,7 +308,7 @@ class ReportGenerator:
             "risk_reduction_rate": state_metrics.get("risk_reduction_rate", 0.0),
             "ssp_target_avg": state_metrics.get("ssp_target_avg"),
             "ssp_actual_avg": state_metrics.get("ssp_actual_avg"),
-            "national_categories_tracked": state_metrics.get("national_categories_tracked"),
+            "state_categories_tracked": state_metrics.get("state_categories_tracked"),
         }
 
     @staticmethod

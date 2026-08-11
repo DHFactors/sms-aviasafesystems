@@ -134,8 +134,9 @@ def run(
 
     if all_doing_all or (not users_only and not reports_only):
         logger.info("=== Seeding tenants ===")
-        from seed.operators import create_all_tenants
+        from seed.operators import create_all_tenants, create_caan_tenant
         tenant_ids = create_all_tenants(db)
+        create_caan_tenant(db)
         counts["tenants"] = len(tenant_ids)
 
     if all_doing_all or surveys_only:

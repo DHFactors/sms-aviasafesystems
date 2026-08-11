@@ -1,7 +1,7 @@
 # 📝 AviaSAFE SMS — Project Status Report
 
 **Project**: AviaSAFE SMS — Safety Climate Measurement System (ICAO Annex 19 compliant)
-**Report Date**: 2026-08-10
+**Report Date**: 2026-08-11
 **Prepared by**: AviaSAFE Systems engineering (Opencode-assisted)
 **Verification**: All figures below were verified live against the deployed backends (Render), frontend hostings (Firebase Hosting beta + prod), Firebase Auth, both Firestore databases, and the backend test suite on the report date.
 
@@ -12,20 +12,22 @@
 | Item | Value |
 |------|-------|
 | **Project Name** | AviaSAFE SMS |
-| **Report Date** | 2026-08-10 |
-| **Overall Status** | **Credential modernization + data-integrity hardening** — simplified user credentials, stricter hazard-source enforcement, and SMS Maturity rename shipped to beta + prod |
+| **Report Date** | 2026-08-11 |
+| **Overall Status** | **RBAC credentials + Super-Admin lifecycle/demo-data tooling + State terminology refactor** — department-scoped role claims deployed to Auth, tenant lifecycle status + dummy-data tools added, "National"→"State" rename completed |
 | **Current Phase** | Beta Testing (pre-production) |
 
 **Key Highlights**
-- **Simplified credentials (2026-08-10) shipped** — 28 new functional role accounts (`safety`, `camo`, `145`, `ops`) across all 7 operators using a readable scheme: `{role}@{tenant}.com` / `{TENANT_CODE}-{ROLE}-2026` (e.g. `safety@buddha-air.com` / `BHA-Safety-2026`). All verified signing in via the Identity Toolkit path.
-- **CAAN SUPER_ADMIN removed** — `super-admin-001` (`safety.director@caan.gov.np`) deleted from Auth + Firestore `users`. No `SUPER_ADMIN` currently exists; admin routes now require promoting a CAAN_SMD first.
-- **Hazard-source integrity enforced** — hazard creation restricted to an allowed source allow-list; flight diversions now **auto-create linked hazards** (with `source=FLIGHT_DIVERSION`, `source_id`, and a link back to the diversion). New seed + audit scripts added.
-- **SMS Maturity terminology rename** — "SMS health" → "SMS maturity" across the API, dashboards, docs, and tests (rename-only; no functional impact).
-- **Backend suite green** — **195 backend tests passing** (was 183).
+- **RBAC role mapping for the simplified credentials deployed live (2026-08-11)** — `safety@{tenant}.com` stays **AIRLINE_ADMIN**; `camo`/`145`/`ops@{tenant}.com` became **USER** accounts carrying a `department` custom claim (**CAMO / Part-145 / Flight Operations**) so they route to the Responsible Manager dashboard. **28 accounts updated in Firebase Auth** and the `users` collection re-synced (**51 docs**) in both `sms-db-beta` and `sms-db`.
+- **Super-Admin tenant lifecycle status management** — new `POST /api/v1/admin/tenants/{id}/status` endpoint + production-setup UI: status (Trial/Active/Inactive) either set explicitly or derived from contract dates + payment status; audit-logged.
+- **Super-Admin dummy-data seed/unseed tooling** — `POST /api/v1/admin/demo-data` seeds/unseeds VSR/MOR/CAN/CAP demo docs (tagged `admin-demo-1`); unseed deletes only demo-tagged docs and never touches real data.
+- **"National" → "State" terminology + API-contract refactor** — global rename (UI, JS identifiers, `data.national` → `data.state`, services, tests, docs) with a recursive contract guard; cross-tenant reporting now scopes via `_effective_tenant()` (CAAN_SMD/SUPER_ADMIN default to state scope, explicit `tenant_id` overrides).
+- **CAAN state-regulator tenant** — `seed/operators.create_caan_tenant()` creates the `tenants/caan` state-regulator doc in the full-seed flow; `DEMO_USERS` consolidated to a single `smd-caan-001` bound to `tenant_id="caan"`.
+- **Backend suite green** — **231 backend tests passing** (was 195; +18 admin lifecycle/demo-data, +9 state-scoping, +9 RBAC claims).
 
 **Key Risks**
 - **No SUPER_ADMIN account** — after removing `super-admin-001`, provisioning/seed routes (`/api/v1/admin/*`) require promoting a CAAN_SMD account to `SUPER_ADMIN`. Until then those routes are unusable.
 - **Production seeding deferred to go-live** — `sms-db` still has 0 tenants / 0 operational data (by design); tenants/users must be created post-contract.
+- **Frontend hosting deploy pending for this release** — the terminology + admin-UI changes in this repo land on Firebase Hosting only after `firebase deploy` for beta + prod (backend auto-deploys on push).
 - **Monitoring & alerts not yet configured** — no dashboards/alerting on the Render backends or Firebase project.
 
 ---
@@ -59,12 +61,7 @@
 
 Both hostings serve the same `public/` directory. Frontend routing (`public/js/firebase.js`) selects the beta backend/database by hostname containing `beta`.
 
-**Deployments since last report (2026-08-08 → 2026-08-10):**
-| Deploy | Ref | Target |
-|--------|-----|--------|
-| SMS Maturity rename | `1654fd0` | Render auto-deploy (backend) + Firebase Hosting (beta + prod) |
-| Hazard source enforcement + diversion auto-create | `f67d358` | Render auto-deploy (backend) + Firebase Hosting (beta + prod) |
-| Simplified credentials scheme + migration script | `e11a5d9` | Render auto-deploy (backend) |
+**Changes since last report (2026-08-10):** the RBAC claims, tenant lifecycle status, demo-data tooling and State-terminology refactor ship in this repo. The backend auto-deploys on push (Render); the frontend changes (`production-setup.html`, `caan.html`, `caan-state-risk.html`) deploy to Firebase Hosting beta + prod with `firebase deploy` — pending as of this report.
 
 ### 3.2 Databases (Firestore native)
 
@@ -73,10 +70,9 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 | `sms-db` | Production | ✅ 7-day | 0 | **51** | 0 tenants / 0 surveys / 0 hazards / 0 reports | ✅ Go-live ready (clean slate) |
 | `sms-db-beta` | Beta | ✅ 7-day | 7 | **51** | 1,033 surveys · 980 reports · 42 hazards · 3 CAN/CAP | ✅ Fully seeded |
 
-> **2026-08-10 change:** both databases now carry **51 user docs** (was 24). The 28 simplified role
-> accounts were created in Firebase Auth (shared beta + prod) and mirrored into the `users`
-> collection of both databases via `backfill_users_from_auth`. The former CAAN SUPER_ADMIN doc was
-> deleted.
+> **2026-08-11 change:** the 28 simplified role accounts were **re-claimed** in Firebase Auth (shared beta + prod) via
+> `simplify_credentials.py --apply` — `safety` kept AIRLINE_ADMIN; `camo`/`145`/`ops` switched to USER with a
+> `department` claim. `users` re-synced to **51 docs** in both databases via `backfill_users_from_auth`.
 
 ### 3.3 Scheduled Jobs
 
@@ -97,41 +93,43 @@ Both hostings serve the same `public/` directory. Frontend routing (`public/js/f
 
 ## 4. Development Status
 
-### 4.1 Completed This Period (2026-08-10)
+### 4.1 Completed This Period (2026-08-11)
 
 | Feature | Module | Status | Deployed |
 |---------|--------|--------|----------|
-| Simplified credential scheme (`{role}@{tenant}.com` / `{CODE}-{ROLE}-2026`) | Auth | ✅ Complete | Auth (shared beta + prod) |
-| 28 functional role accounts created (7 operators × safety/camo/145/ops) | Auth | ✅ Complete | Auth + `users` (both DBs) |
-| Remove CAAN SUPER_ADMIN `super-admin-001` | Auth | ✅ Complete | Auth + `users` (both DBs) |
-| Migration script `backend/scripts/simplify_credentials.py` (dry-run + apply) | Tooling | ✅ Complete | Repo |
-| `seed/config.py` + `seed/users.py` extended for the new scheme | Seeding | ✅ Complete | Repo |
-| Hazard creation source allow-list (`HAZARD_CREATION_SOURCES`) | Module 2 | ✅ Complete | Beta + Prod |
-| Auto-create hazard from flight diversion with `source_id` + link-back | Module 2 | ✅ Complete | Beta + Prod |
-| `seed_flight_diversions.py` + `inspect-report-hazard-link.js` scripts | Tooling | ✅ Complete | Repo |
-| SMS Maturity terminology rename (API, UI, docs, tests) | Module 1 | ✅ Complete | Beta + Prod |
-| Credential reference updated (`credential.md`, `docs/BETA_TESTERS.md`) | Docs | ✅ Complete | Repo (credential.md local-only) |
+| RBAC role mapping for simplified credentials (`safety`=AIRLINE_ADMIN; `camo`/`145`/`ops`=USER + `department` claim) | Auth | ✅ Complete | Auth (shared beta + prod) + `users` (both DBs) |
+| `simplify_credentials.py` claim-sync (dry-run + apply) — 28 accounts updated, 51 users backfilled | Tooling | ✅ Complete | Auth + Firestore (live) |
+| Tenant lifecycle status endpoint `POST /api/v1/admin/tenants/{id}/status` (Trial/Active/Inactive, contract dates, payment) | Admin | ✅ Complete | Repo (Render auto-deploy on push) |
+| Demo-data seed/unseed endpoint `POST /api/v1/admin/demo-data` (VSR/MOR/CAN/CAP, `admin-demo-1` tagged, safe unseed) | Admin | ✅ Complete | Repo (Render auto-deploy on push) |
+| `admin_data_service.py` + audit logging (`TENANT_STATUS_UPDATED`, `DEMO_DATA_SEED/UNSEED`) | Admin | ✅ Complete | Repo |
+| Production-setup UI: tenant Status badge + Manage form + Dummy Data card (Step 5) | Admin | ✅ Complete | Repo (pending hosting deploy) |
+| "National" → "State" terminology + API-contract refactor (`data.state`, `_effective_tenant()`, recursive guard) | Reporting / State Risk | ✅ Complete | Repo (pending hosting deploy) |
+| CAAN state-regulator tenant doc (`create_caan_tenant`, `SEED_VERSION 1.2.0`, `smd-caan-001`) | Seeding | ✅ Complete | Repo |
+| `tests/test_rbac_claims.py` + `tests/test_reporting_scoping.py` + 18 new admin tests | Testing | ✅ Complete | Repo |
 
 ### 4.2 Completed Features (prior)
 
-See `docs/PROJECT_STATUS_REPORT_2026-08-08.md` §4 for the full inventory (department mapping, escalation, Master Register, Responsible Manager, survey, hazard register, risk matrix, trends, flight diversions, state regulator dashboard, CAN/CAP, admin panel, landing page, security & compliance).
+See `docs/PROJECT_STATUS_REPORT_2026-08-10.md` §4 for the full inventory (simplified credential scheme creation, CAAN SUPER_ADMIN removal, hazard-source enforcement + diversion auto-hazard, SMS Maturity rename, department mapping, escalation, Master Register, Responsible Manager, survey, hazard register, risk matrix, trends, flight diversions, state regulator dashboard, CAN/CAP, admin panel, landing page, security & compliance).
 
 ---
 
 ## 5. Testing Status
 
-### 5.1 Backend Tests — **195 passing** (all green, `python -m pytest tests/ -q`)
+### 5.1 Backend Tests — **231 passing** (all green, `python -m pytest tests/ -q`)
 
 | Category | Test Count | Status |
 |----------|------------|--------|
-| Admin & Super-Admin | 64 | ✅ Passing |
-| Hazards / Risk Assessment / Diversions | 48 | ✅ Passing |
-| Regulator & State Risk | 42 | ✅ Passing |
-| Surveys | 16 | ✅ Passing |
-| Contact (Sender.net endpoint) | 6 | ✅ Passing |
-| Health / Metrics / Infrastructure | 12 | ✅ Passing |
-| Escalation & Master Register | 7 | ✅ Passing |
-| **Total** | **195** | ✅ Passing |
+| Admin seed / tenant lifecycle / demo-data (`test_admin_seed.py`) | 38 | ✅ Passing |
+| Super-Admin credentials (`test_admin_credentials.py`) | 17 | ✅ Passing |
+| Regulator & State Risk (`test_state_risk.py` + `test_regulators.py` + `test_reporting_scoping.py`) | 51 | ✅ Passing |
+| Risk Assessment & Lifecycle (`test_risk_assessment_lifecycle.py` + `test_risk_matrix.py` + `test_dashboard_risk_trends.py`) | 41 | ✅ Passing |
+| RBAC credential claims (`test_rbac_claims.py`) | 9 | ✅ Passing |
+| Surveys & Tenants (`test_surveys.py` + `test_tenants_config.py` + `test_tenants_users.py`) | 43 | ✅ Passing |
+| Escalation & Master Register (`test_escalation_master_register.py`) | 7 | ✅ Passing |
+| Metrics / Health / Contact / Feedback | 25 | ✅ Passing |
+| **Total** | **231** | ✅ Passing |
+
+**+36 since 2026-08-10:** 18 admin (tenant status derivation, update, demo seed/unseed, routes), 9 state-scoping (API contract + `_effective_tenant`), 9 RBAC claims.
 
 ### 5.2 Frontend Tests — **4 passing**
 
@@ -139,17 +137,15 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-08.md` §4 for the full inventory (depar
 |----------|------------|--------|
 | Dashboard Render Tests (`node frontend-tests/dashboard.test.js`, `npm test`) | 4 | ✅ Passing |
 
-### 5.3 Live Credential Verification (2026-08-10)
+### 5.3 Live Verification (2026-08-11)
 
 | Check | Result |
 |-------|--------|
-| `safety@buddha-air.com` / `BHA-Safety-2026` sign-in | ✅ OK |
-| `camo@tara-air.com` / `TARA-CAMO-2026` sign-in | ✅ OK |
-| `145@yeti-airlines.com` / `YETI-145-2026` sign-in | ✅ OK |
-| `ops@air-dynasty.com` / `DYNASTY-Ops-2026` sign-in | ✅ OK |
-| `safety@simrik-air.com` / `SIMRIK-Safety-2026` sign-in | ✅ OK |
-| `safety.director@caan.gov.np` (removed SUPER_ADMIN) | ✅ Rejected (400) |
+| `simplify_credentials.py --apply` (beta backfill) | ✅ 28/28 accounts updated, 51 users synced (`sms-db-beta`) |
+| `simplify_credentials.py --apply --db sms-db` (prod backfill) | ✅ 28/28 accounts updated, 51 users synced (`sms-db`) |
+| Auth claims applied | ✅ `safety`→`{"role":"AIRLINE_ADMIN","tenant_id":...}`; `camo`/`145`/`ops`→`{"role":"USER","tenant_id":...,"department":...}` |
 | `users` collection sync | ✅ 51 docs in `sms-db-beta` + `sms-db` |
+| No SUPER_ADMIN (`super-admin-001`) | ✅ Not present — nothing to remove |
 
 ---
 
@@ -161,28 +157,28 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-08.md` §4 for the full inventory (depar
 |--------|--------|---------|
 | **Environment** | `sms-db-beta` | Fully seeded, PITR 7-day |
 | **Tenants** | 7 | sita-air, buddha-air, tara-air, yeti-airlines, summit-air, simrik-air, air-dynasty |
-| **Regulator** | 1 | caan (Nepal) |
+| **Regulator** | 1 | caan (Nepal) — now a `tenants/caan` state-regulator doc |
 | **Users** | 51 | 28 simplified role accounts + 21 legacy operator + 2 CAAN_SMD |
 | **Surveys** | 1,033 | Seeded responses |
 | **Hazards** | 42 | Clean seeded data (per tenant: 5–7) |
 | **Reports** | 980 | Seeded VSR/MOR |
 | **CAN/CAP** | 3 | Tara Air demo corrective actions |
-| **Audit logs** | active | Escalation writes to `audit_logs` |
+| **Audit logs** | active | Escalation + tenant-status + demo-data writes to `audit_logs` |
 
-### 6.2 Beta Access — Simplified Accounts (2026-08-10)
+### 6.2 Beta Access — Simplified Accounts (2026-08-11, RBAC roles)
 
-| Role | Email | Password | Status |
-|------|-------|----------|--------|
-| AIRLINE_ADMIN | safety@buddha-air.com | `BHA-Safety-2026` | ✅ Working |
-| AIRLINE_ADMIN | safety@tara-air.com | `TARA-Safety-2026` | ✅ Working |
-| AIRLINE_ADMIN | camo@tara-air.com | `TARA-CAMO-2026` | ✅ Working |
-| AIRLINE_ADMIN | 145@yeti-airlines.com | `YETI-145-2026` | ✅ Working |
-| AIRLINE_ADMIN | ops@air-dynasty.com | `DYNASTY-Ops-2026` | ✅ Working |
-| CAAN_SMD | sms.inspector@caan.gov.np | shared seed | ✅ Working |
-| CAAN_SMD | director.safety@caan.gov.np | shared seed | ✅ Working |
-| ~~SUPER_ADMIN~~ | ~~safety.director@caan.gov.np~~ | — | ❌ Removed |
+| Role | Department | Email | Password | Status |
+|------|-----------|-------|----------|--------|
+| AIRLINE_ADMIN | Safety | safety@buddha-air.com | `BHA-Safety-2026` | ✅ Working |
+| AIRLINE_ADMIN | Safety | safety@tara-air.com | `TARA-Safety-2026` | ✅ Working |
+| USER | CAMO | camo@tara-air.com | `TARA-CAMO-2026` | ✅ Working → Responsible Manager |
+| USER | Part-145 | 145@yeti-airlines.com | `YETI-145-2026` | ✅ Working → Responsible Manager |
+| USER | Flight Operations | ops@air-dynasty.com | `DYNASTY-Ops-2026` | ✅ Working → Responsible Manager |
+| CAAN_SMD | — | sms.inspector@caan.gov.np | shared seed | ✅ Working |
+| CAAN_SMD | — | director.safety@caan.gov.np | shared seed | ✅ Working |
+| ~~SUPER_ADMIN~~ | — | ~~safety.director@caan.gov.np~~ | — | ❌ Removed |
 
-Full 28-account table: `credential.md` (§ Simplified Role Accounts).
+Full 28-account table: `credential.md` (§ Simplified Role Accounts). `camo`/`145`/`ops` route to `/dashboard/responsible-manager.html` via their `department` claim (`getRoleDestination`); `safety` routes to the full dashboard.
 
 ### 6.3 Beta Tester Onboarding
 
@@ -205,9 +201,9 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | **Environment** | `sms-db` | Clean slate — PITR 7-day |
 | **Tenants** | 0 | Will be created post-contract |
 | **Operational Data** | 0 | No surveys/hazards/reports/CAN-CAP |
-| **Users** | 51 | Pre-provisioned accounts in `users` collection (28 simplified + legacy) |
-| **Backend** | ✅ Deployed | Latest code (incl. hazard/diversion + credentials), auto-deploy |
-| **Frontend** | ✅ Deployed | Latest code (SMS Maturity rename) |
+| **Users** | 51 | Pre-provisioned accounts in `users` collection (28 simplified + legacy), claims current as of 2026-08-11 |
+| **Backend** | ✅ Deployed | Latest code auto-deploys on push |
+| **Frontend** | ⏳ Deploy pending | `firebase deploy` for this release (terminology + admin UI) |
 
 ### 7.2 Go-Live Checklist
 
@@ -216,7 +212,7 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | Production Domain | ✅ Configured | `sms.aviasafesystems.com` |
 | SSL Certificate | ✅ Valid | Firebase Hosting managed (Let's Encrypt) |
 | Backend | ✅ Deployed | Render auto-deploy |
-| Frontend | ✅ Deployed | Firebase Hosting |
+| Frontend | ⏳ Deploy pending | This release's admin/CAAN UI on `firebase deploy` |
 | Database | ✅ Ready | Clean slate, PITR 7-day |
 | Rate Limiting | ✅ Configured | IP-based, 60 req/min per IP (configurable) |
 | Scheduled escalation job | ✅ Configured | Cloud Scheduler `check-overdue`, daily 00:00 UTC |
@@ -244,13 +240,13 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | Document | Status | Location |
 |----------|--------|----------|
 | Architecture Overview | ✅ Complete | `docs/ARCHITECTURE.md` |
-| API Documentation | ✅ Complete | `docs/API.md` (SMS maturity rename applied) |
+| API Documentation | ✅ Updated 2026-08-11 | `docs/API.md` (State terminology applied) |
 | Security Guide | ✅ Complete | `docs/SECURITY.md` |
 | Deployment Guide | ✅ Complete | `docs/DEPLOYMENT.md` |
 | Operations Guide | ✅ Complete | `docs/OPERATIONS.md` |
 | User Flow | ✅ Complete | `docs/USER_FLOW.md` |
 | Known Limitations | ✅ Complete | `docs/KNOWN_LIMITATIONS.md` |
-| Manual Verification Checklist | ✅ Updated | `manual_verification.md` |
+| Manual Verification Checklist | ✅ Updated 2026-08-11 | `manual_verification.md` (231 passing; RBAC + State checks) |
 | Beta Testers Reference | ✅ Updated 2026-08-10 | `docs/BETA_TESTERS.md` |
 | Credential Reference | ✅ Updated 2026-08-10 | `credential.md` (local-only, gitignored) |
 
@@ -261,7 +257,8 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | Status Report 05 Aug 2026 | ✅ Archived | `docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md` |
 | Status Report 07 Aug 2026 | ✅ In place | `docs/PROJECT_STATUS_REPORT_2026-08-07.md` |
 | Status Report 08 Aug 2026 | ✅ In place | `docs/PROJECT_STATUS_REPORT_2026-08-08.md` |
-| Status Report 10 Aug 2026 | ✅ This report | `docs/PROJECT_STATUS_REPORT_2026-08-10.md` |
+| Status Report 10 Aug 2026 | ✅ In place | `docs/PROJECT_STATUS_REPORT_2026-08-10.md` |
+| Status Report 11 Aug 2026 | ✅ This report | `docs/PROJECT_STATUS_REPORT_2026-08-11.md` |
 
 ---
 
@@ -273,9 +270,10 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | 2 | **No SUPER_ADMIN account** | High | ⚠️ Action | Removed 2026-08-10; promote a CAAN_SMD to restore admin routes |
 | 3 | Sender.net domain verification | Low | ⚠️ Pending | Free-plan limitation; sending domain not yet verified |
 | 4 | Production has no operational data | N/A | ✅ Intentional | Clean slate for go-live (51 user accounts present) |
-| 5 | Monitoring / alerting | Medium | ⚠️ Pending | Not yet configured |
-| 6 | MFA (TOTP/SMS) | Medium | ⚠️ Pending | Not yet implemented |
-| 7 | Legacy/orphaned dashboard pages | Low | ⚠️ Known | `public/dashboard/index.html`, `public/portal/*` not linked from nav |
+| 5 | Frontend hosting deploy pending for this release | Low | ⚠️ Pending | `firebase deploy` beta + prod to serve terminology/admin-UI changes |
+| 6 | Monitoring / alerting | Medium | ⚠️ Pending | Not yet configured |
+| 7 | MFA (TOTP/SMS) | Medium | ⚠️ Pending | Not yet implemented |
+| 8 | Legacy/orphaned dashboard pages | Low | ⚠️ Known | `public/dashboard/index.html`, `public/portal/*` not linked from nav |
 
 ---
 
@@ -284,13 +282,14 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | # | Milestone | Target Date | Status |
 |---|-----------|-------------|--------|
 | 1 | **Restore SUPER_ADMIN** (promote a CAAN_SMD account) | Immediate | ⚠️ Action |
-| 2 | Distribute simplified credentials to beta testers | Immediate | ⏳ Pending |
-| 3 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti) | Immediate | ⏳ Pending |
-| 4 | Beta Launch | TBD | ⏳ Pending |
-| 5 | Beta Testing Period | 2 weeks (post-launch) | ⏳ Pending |
-| 6 | Feedback Collection | During beta | ⏳ Pending |
-| 7 | Production Go-Live | Post-beta | ⏳ Pending |
-| 8 | Post-Launch Monitoring | Ongoing | ⏳ Pending |
+| 2 | Deploy frontend hosting (this release's admin/CAAN UI) | Immediate | ⏳ Pending |
+| 3 | Distribute simplified credentials to beta testers | Immediate | ⏳ Pending |
+| 4 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti) | Immediate | ⏳ Pending |
+| 5 | Beta Launch | TBD | ⏳ Pending |
+| 6 | Beta Testing Period | 2 weeks (post-launch) | ⏳ Pending |
+| 7 | Feedback Collection | During beta | ⏳ Pending |
+| 8 | Production Go-Live | Post-beta | ⏳ Pending |
+| 9 | Post-Launch Monitoring | Ongoing | ⏳ Pending |
 
 ---
 
@@ -312,14 +311,15 @@ Full 28-account table: `credential.md` (§ Simplified Role Accounts).
 | # | Recommendation | Priority | Owner |
 |---|----------------|----------|-------|
 | 1 | **Promote a CAAN_SMD account to SUPER_ADMIN** to restore admin routes | High | Super Admin |
-| 2 | Distribute the simplified credential sheet to beta testers | High | Project Manager |
-| 3 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti Airlines) | High | Project Manager |
-| 4 | Conduct beta testing for 2 weeks | High | Testers |
-| 5 | Configure monitoring and alerts (Render + Firebase + GCP Scheduler) | Medium | DevOps |
-| 6 | Prepare production seeding plan and execute at go-live | Medium | Super Admin |
-| 7 | Implement MFA (TOTP/SMS) | Medium | Development Team |
-| 8 | Clean up orphaned dashboard pages (`dashboard/index.html` legacy, `portal/*`) | Low | Development Team |
+| 2 | Deploy frontend hosting (beta + prod) for this release | High | DevOps |
+| 3 | Distribute the simplified credential sheet to beta testers | High | Project Manager |
+| 4 | Invite beta testers (Sita Air, CAAN, Tara Air, Yeti Airlines) | High | Project Manager |
+| 5 | Conduct beta testing for 2 weeks | High | Testers |
+| 6 | Configure monitoring and alerts (Render + Firebase + GCP Scheduler) | Medium | DevOps |
+| 7 | Prepare production seeding plan and execute at go-live | Medium | Super Admin |
+| 8 | Implement MFA (TOTP/SMS) | Medium | Development Team |
+| 9 | Clean up orphaned dashboard pages (`dashboard/index.html` legacy, `portal/*`) | Low | Development Team |
 
 ---
 
-*End of report. Generated 2026-08-10 from live environment data.*
+*End of report. Generated 2026-08-11 from live environment data.*

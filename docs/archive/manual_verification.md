@@ -14,7 +14,7 @@
 - [ ] Login as sms.inspector@caan.gov.np
 - [ ] CAAN dashboard loads
 - [ ] All 7 operators visible
-- [ ] National SMS Maturity displayed
+- [ ] State SMS Maturity displayed
 - [ ] Aggregate statistics shown
 - [ ] Regulator metadata present
 

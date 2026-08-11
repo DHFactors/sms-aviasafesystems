@@ -45,7 +45,7 @@ This document defines the fields for the beta feedback form. Create the form in 
 | CAP | Corrective Action Plans |
 | Dashboard | SMS maturity score, trend and admin dashboards |
 | Login/Auth | Sign-in, token verification, role access |
-| CAAN State Risk | National / state risk register |
+| CAAN State Risk | State / state risk register |
 | UI/UX | Layout, navigation, responsiveness, copy |
 
 ---

@@ -381,7 +381,7 @@ class DashboardService:
         Pulls every survey response in the tenants/{id}/surveys collection
         group and computes, per operator, the average ICAO pillar scores and
         overall SMS maturity (1-5). Returns both the per-operator breakdown and
-        the national averages. `regulator_id` scopes the aggregation to one
+        the state averages. `regulator_id` scopes the aggregation to one
         State Regulator's operators (e.g. CAAN for Nepal).
         """
         days = overrides.get("days")
@@ -436,7 +436,7 @@ class DashboardService:
             "period_days": days,
             "generated_at": generated_at.isoformat(),
             "operators": operators,
-            "national": data.get("national"),
+            "state": data.get("state"),
         }
 
     def _survey_docs(self, days: Optional[int] = None) -> list:
@@ -466,8 +466,8 @@ class DashboardService:
 
     def _aggregate_surveys(self, docs) -> Dict[str, Any]:
         by_tenant: Dict[str, Dict[str, Any]] = {}
-        national = {p: {"sum": 0.0, "n": 0} for p in SURVEY_PILLARS}
-        national_overall = {"sum": 0.0, "n": 0}
+        state = {p: {"sum": 0.0, "n": 0} for p in SURVEY_PILLARS}
+        state_overall = {"sum": 0.0, "n": 0}
 
         for d in docs:
             data = d.to_dict()
@@ -484,8 +484,8 @@ class DashboardService:
                 v = data.get(p)
                 if isinstance(v, (int, float)):
                     entry["pillars"][p] = entry["pillars"].get(p, 0.0) + float(v)
-                    national[p]["sum"] += float(v)
-                    national[p]["n"] += 1
+                    state[p]["sum"] += float(v)
+                    state[p]["n"] += 1
             qs = data.get("question_scores")
             if isinstance(qs, dict):
                 for qid, val in qs.items():
@@ -497,8 +497,8 @@ class DashboardService:
             if not isinstance(ov, (int, float)):
                 ov = data.get("overall_sms_health")
             if isinstance(ov, (int, float)):
-                national_overall["sum"] += float(ov)
-                national_overall["n"] += 1
+                state_overall["sum"] += float(ov)
+                state_overall["n"] += 1
 
         rows = []
         for tid, entry in by_tenant.items():
@@ -516,13 +516,13 @@ class DashboardService:
         rows = sorted(rows, key=lambda t: t["overall_sms_maturity"] or 0, reverse=True)
         return {
             "operators": rows,
-            "national": {
+            "state": {
                 "pillars": {
-                    p: round(national[p]["sum"] / national[p]["n"], 2) if national[p]["n"] else None
+                    p: round(state[p]["sum"] / state[p]["n"], 2) if state[p]["n"] else None
                     for p in SURVEY_PILLARS
                 },
-                "overall_sms_maturity": round(national_overall["sum"] / national_overall["n"], 2)
-                if national_overall["n"] else None,
+                "overall_sms_maturity": round(state_overall["sum"] / state_overall["n"], 2)
+                if state_overall["n"] else None,
                 "response_count": sum(e["response_count"] for e in rows),
             },
         }
@@ -593,7 +593,7 @@ class DashboardService:
             return {
                 "industry_anon_rate": None,
                 "benchmark_data": {
-                    "top_national_risks": [
+                    "top_state_risks": [
                         {
                             "category": e.get("icoc_category"),
                             "name": e.get("name"),

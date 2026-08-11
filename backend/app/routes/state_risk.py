@@ -4,7 +4,7 @@
 # VERSION: 1.0.0
 # DATE CREATED: 2026-08-04
 # PURPOSE: State-level risk register endpoints. CAAN_SMD / SUPER_ADMIN view the
-#          national risk profile (aggregated across tenants, measured against
+#          state risk profile (aggregated across tenants, measured against
 #          SSP targets). SUPER_ADMIN maintains SSP targets.
 # AUTHOR: Ghanshyam Acharya
 # CODE OWNER: AviaSafeSystems
@@ -45,7 +45,7 @@ async def get_state_risk_register(
 
 
 @router.get("/aggregate")
-async def get_aggregated_national_risk(
+async def get_aggregated_state_risk(
     year: int = Query(..., ge=2000, le=2100),
     quarter: int = Query(..., ge=1, le=4),
     regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the aggregation"),
@@ -55,7 +55,7 @@ async def get_aggregated_national_risk(
     yet persisted). When `regulator_id` is provided the aggregation is scoped
     to that State Regulator's operators."""
     svc = StateRiskService(user)
-    return {"success": True, **svc.aggregate_national_risk(year, quarter, regulator_id=regulator_id)}
+    return {"success": True, **svc.aggregate_state_risk(year, quarter, regulator_id=regulator_id)}
 
 
 @router.post("/sync")
@@ -65,7 +65,7 @@ async def sync_state_risk_register(
     regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the sync"),
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
-    """Persist the aggregated national risk into the state risk register,
+    """Persist the aggregated state risk into the state risk register,
     carrying over existing SSP targets where present."""
     svc = StateRiskService(user)
     result = svc.sync_register_from_aggregation(year, quarter, regulator_id=regulator_id)

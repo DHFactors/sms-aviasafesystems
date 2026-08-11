@@ -1,4 +1,4 @@
-SEED_VERSION = "1.1.0"
+SEED_VERSION = "1.2.0"
 SEED_DOC_PATH = "seed_metadata/seed"
 
 SURVEY_COLLECTION = "surveys"
@@ -665,24 +665,32 @@ INVESTIGATION_STATUSES = ["NOT_INVESTIGATED", "INVESTIGATING", "INVESTIGATED", "
 
 DEMO_USERS = [
     {
-        "uid": "caan-smd-001",
-        "email": "sms.inspector@caan.gov.np",
+        "uid": "smd-caan-001",
+        "email": "smd_caan@caan.gov.np",
         "password": DEMO_USER_PASSWORD,
-        "full_name": "Captain Bishwa Ratna Pun",
+        "full_name": "CAAN Safety Management Department",
         "organization": "CAAN",
         "role": "CAAN_SMD",
-        "tenant_id": None,
-    },
-    {
-        "uid": "caan-director-001",
-        "email": "director.safety@caan.gov.np",
-        "password": DEMO_USER_PASSWORD,
-        "full_name": "Mr. Dipak Bahadur Rawal",
-        "organization": "CAAN",
-        "role": "CAAN_SMD",
-        "tenant_id": None,
+        "tenant_id": "caan",
     },
 ]
+
+CAAN_TENANT = {
+    "id": "caan",
+    "name": "Civil Aviation Authority of Nepal",
+    "type": "state_regulator",
+    "icao": "CAAN",
+    "iata": "",
+    "country": "Nepal",
+    "base": "Kathmandu (KTM/VNKT)",
+    "fleet_size": 0,
+    "employees": 0,
+    "survey_count": 0,
+    "culture_description": "State regulator tenant housing the CAAN SMD account.",
+    "aircraft_types": [],
+    "routes": [],
+    "email_domain": "caan.gov.np",
+}
 
 OPERATOR_USER_TEMPLATES = {
     "safety_manager": {
@@ -738,13 +746,13 @@ CREDENTIAL_EMAIL_DOMAINS = {
 
 SIMPLIFIED_ROLE_ACCOUNTS = [
     {"token": "safety", "password_token": "Safety", "app_role": "AIRLINE_ADMIN",
-     "full_name": "Safety Manager"},
-    {"token": "camo", "password_token": "CAMO", "app_role": "AIRLINE_ADMIN",
-     "full_name": "CAMO Manager"},
-    {"token": "145", "password_token": "145", "app_role": "AIRLINE_ADMIN",
-     "full_name": "Part-145 Maintenance"},
-    {"token": "ops", "password_token": "Ops", "app_role": "AIRLINE_ADMIN",
-     "full_name": "Operations Manager"},
+     "full_name": "Safety Manager", "department": ""},
+    {"token": "camo", "password_token": "CAMO", "app_role": "USER",
+     "full_name": "CAMO Manager", "department": "CAMO"},
+    {"token": "145", "password_token": "145", "app_role": "USER",
+     "full_name": "Part-145 Maintenance", "department": "Part-145"},
+    {"token": "ops", "password_token": "Ops", "app_role": "USER",
+     "full_name": "Operations Manager", "department": "Flight Operations"},
 ]
 
 
@@ -761,3 +769,28 @@ def simplified_password(role_token: str, op_id: str) -> str:
         role_token,
     )
     return f"{code}-{pwd_token}-2026"
+
+
+def build_simplified_role_plan():
+    """Return the full list of simplified role accounts across all operators.
+
+    One account per SIMPLIFIED_ROLE_ACCOUNTS entry for every OPERATOR_PROFILES
+    tenant, carrying the RBAC app_role + department claim used by both the
+    Auth-provisioning script and the tests.
+    """
+    plan = []
+    for profile in OPERATOR_PROFILES:
+        op_id = profile["id"]
+        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+            plan.append({
+                "op_id": op_id,
+                "op_name": profile["name"],
+                "token": role["token"],
+                "email": simplified_email(role["token"], op_id),
+                "password": simplified_password(role["token"], op_id),
+                "app_role": role["app_role"],
+                "department": role.get("department") or "",
+                "full_name": f"{role['full_name']} ({profile['name']})",
+                "uid": f"{role['token']}-{op_id}-001",
+            })
+    return plan

@@ -24,7 +24,7 @@ RISK_REGISTER_SUBCOLLECTION = "risk_register"
 
 # ICAO-aligned top safety risk categories (state-level SSP register).
 # Keys mirror the ADREP occurrence categories used across tenant reports.
-# Default ssp_target is the baseline national risk-index target (1-25).
+# Default ssp_target is the baseline state risk-index target (1-25).
 ICAO_TOP_RISK_CATEGORIES = [
     {"category": "LOCI", "name": "Loss of Control Inflight", "icao_reference": "ICAO Doc 9854 / SSP", "ssp_target": 12},
     {"category": "CFIT", "name": "Controlled Flight Into Terrain", "icao_reference": "ICAO Doc 9854 / SSP", "ssp_target": 10},
@@ -100,16 +100,16 @@ class StateRiskService:
             return None
 
     # ------------------------------------------------------------------
-    # Public: aggregation (drills tenant data up to national level)
+    # Public: aggregation (drills tenant data up to state level)
     # ------------------------------------------------------------------
 
-    def aggregate_national_risk(self, year: int, quarter: int, regulator_id: Optional[str] = None) -> Dict[str, Any]:
+    def aggregate_state_risk(self, year: int, quarter: int, regulator_id: Optional[str] = None) -> Dict[str, Any]:
         """Aggregate all tenant hazards/reports by ICAO category and compute
-        national current risk index per category.
+        state current risk index per category.
 
         `regulator_id` scopes the aggregation to that State Regulator's
         operators (e.g. CAAN for Nepal). When omitted, every operator tenant is
-        included (the whole-state national view).
+        included (the whole-state state view).
         """
         hazards = self._cross_tenant_hazards()
         reports = self._cross_tenant_reports()
@@ -193,7 +193,7 @@ class StateRiskService:
         return {"year": year, "quarter": quarter, "risks": rows}
 
     def sync_register_from_aggregation(self, year: int, quarter: int, regulator_id: Optional[str] = None) -> Dict[str, Any]:
-        """Persist the aggregated national risk into the state risk register,
+        """Persist the aggregated state risk into the state risk register,
         measuring actual values against seeded SSP targets where present.
 
         All register writes are committed in a single Firestore batch so the
@@ -201,7 +201,7 @@ class StateRiskService:
         Every entry records `aggregated_at` (UTC ISO) so consumers can detect
         how stale the register is relative to live tenant data.
         """
-        agg = self.aggregate_national_risk(year, quarter, regulator_id=regulator_id)
+        agg = self.aggregate_state_risk(year, quarter, regulator_id=regulator_id)
         now = datetime.now(timezone.utc).isoformat()
         updated_by = self.user.get("uid", "system")
         collection = _risk_collection()

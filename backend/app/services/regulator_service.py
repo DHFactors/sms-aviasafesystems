@@ -2,12 +2,12 @@
 # FILE: regulator_service.py
 # PATH: backend/app/services/regulator_service.py
 # PURPOSE: State Regulator model. A State Regulator (e.g. CAAN for Nepal,
-#          DGCA for India) is the national civil-aviation authority that
+#          DGCA for India) is the state civil-aviation authority that
 #          oversees a set of operator tenants. Regulators live in the
 #          `regulators` collection and each operator tenant carries a
 #          `regulator_id` + `country` tag. This service enumerates regulators
 #          and their operators, and provides the flat operator-tenant list used
-#          to scope cross-tenant aggregations (SMS maturity, national risk).
+#          to scope cross-tenant aggregations (SMS maturity, state risk).
 # ============================================================================
 
 from typing import Any, Dict, List, Optional

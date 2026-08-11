@@ -2,13 +2,13 @@
 # FILE: seed_caan_demo_data.py
 # PATH: backend/scripts/seed_caan_demo_data.py
 # PURPOSE: Seed beta so the CAAN (State Regulator) dashboard can be effectively
-#          checked as national oversight. Writes, for ALL operator tenants:
+#          checked as state oversight. Writes, for ALL operator tenants:
 #            * a `regulators/caan` State Regulator document (Nepal)
 #            * `country` + `regulator_id` tags on each operator tenant
 #            * survey responses in tenants/{id}/surveys (+ raw responses),
 #              scored with the same survey_scoring math as live submissions
 #            * hazards + reports in tenants/{id}/hazards and tenants/{id}/reports
-#              so the National Risk Register / Cross-Tenant Aggregation populate
+#              so the State Risk Register / Cross-Tenant Aggregation populate
 #          Idempotent: previously seeded docs (marked with seed_version) are
 #          removed before re-seeding. Production sms-db is never touched.
 #
@@ -307,7 +307,7 @@ def seed_surveys(force: bool = False):
 
 
 # ============================================================================
-# 3. Hazards + reports (National Risk Register / Cross-Tenant Aggregation)
+# 3. Hazards + reports (State Risk Register / Cross-Tenant Aggregation)
 # ============================================================================
 
 def seed_hazards_and_reports(force: bool = False):

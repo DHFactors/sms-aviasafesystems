@@ -30,6 +30,8 @@ def create_user(auth, user_spec: dict) -> dict:
     claims = {"role": user_spec["role"]}
     if user_spec.get("tenant_id"):
         claims["tenant_id"] = user_spec["tenant_id"]
+    if user_spec.get("department"):
+        claims["department"] = user_spec["department"]
 
     auth.set_custom_user_claims(user_spec["uid"], claims)
 
@@ -38,6 +40,7 @@ def create_user(auth, user_spec: dict) -> dict:
         "email": user_spec["email"],
         "role": user_spec["role"],
         "tenant_id": user_spec.get("tenant_id"),
+        "department": user_spec.get("department"),
         "full_name": user_spec["full_name"],
     }
 
@@ -105,6 +108,7 @@ def create_all_users(auth) -> list:
                 "organization": op_name,
                 "role": role["app_role"],
                 "tenant_id": op_id,
+                "department": role.get("department") or "",
             }
             created_users.append(create_user(auth, role_user))
 

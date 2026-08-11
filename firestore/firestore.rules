@@ -167,7 +167,7 @@ service cloud.firestore {
     }
 
     // ========================================================================
-    // STATE RISK REGISTER — National/SSP-level risk (CAAN + SUPER_ADMIN only)
+    // STATE RISK REGISTER — State/SSP-level risk (CAAN + SUPER_ADMIN only)
     // ========================================================================
 
     match /state/ssp/risk_register/{riskId} {

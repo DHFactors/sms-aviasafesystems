@@ -23,11 +23,15 @@ class _SubRef:
         self._tid = tid
         self._sub = sub
         self._doc = doc
+        self.id = doc.get("id") or "sub-doc"
 
     def delete(self):
         items = self._db._subs.get((self._tid, self._sub), [])
         if self._doc in items:
             items.remove(self._doc)
+
+    def collection(self, sub):
+        return _FakeSubColl(self._db, self.id, sub)
 
 
 class _SubSnap:
@@ -106,7 +110,8 @@ class _FakeSubColl:
 
     def add(self, doc):
         self._db._subs.setdefault((self._tid, self._sub), []).append(dict(doc))
-        return _FakeRef(self._db, f"sub:{self._tid}/{self._sub}", len(self._db._subs[(self._tid, self._sub)]) - 1)
+        ref = _FakeRef(self._db, f"sub:{self._tid}/{self._sub}", len(self._db._subs[(self._tid, self._sub)]) - 1)
+        return (None, ref)
 
     def get(self):
         return [_SubSnap(self._db, self._tid, self._sub, d)
@@ -180,6 +185,7 @@ class _FakeDB:
 def _patch_db(monkeypatch, db=None):
     db = db or _FakeDB()
     monkeypatch.setattr("app.services.production_seed.get_db", lambda: db)
+    monkeypatch.setattr("app.services.admin_data_service.get_db", lambda: db)
     return db
 
 
@@ -417,3 +423,237 @@ def test_admin_list_tenants_route(monkeypatch):
     resp = _client().get("/api/v1/admin/tenants")
     assert resp.status_code == 200
     assert resp.json()["tenants"][0]["id"] == "tara-air"
+
+
+# ============================================================================
+# Tenant lifecycle status (admin_data_service)
+# ============================================================================
+
+def _seed_tenant(db, tid="tara-air", **extra):
+    doc = {"tenant_id": tid, "name": "Tara Air", "active": True}
+    doc.update(extra)
+    db._stores["tenants"][tid] = doc
+    return doc
+
+
+def test_derive_tenant_status_explicit():
+    from app.services.admin_data_service import derive_tenant_status
+    assert derive_tenant_status({}, None, explicit="Trial") == "Trial"
+    assert derive_tenant_status({}, None, explicit="Inactive") == "Inactive"
+
+
+def test_derive_tenant_status_unpaid_is_inactive():
+    from app.services.admin_data_service import derive_tenant_status
+    assert derive_tenant_status({}, "Unpaid") == "Inactive"
+
+
+def test_derive_tenant_status_expired_contract():
+    from datetime import date, timedelta
+    from app.services.admin_data_service import derive_tenant_status
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    assert derive_tenant_status({"end_date": yesterday}, "Paid") == "Inactive"
+
+
+def test_derive_tenant_status_future_contract_is_trial():
+    from datetime import date, timedelta
+    from app.services.admin_data_service import derive_tenant_status
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    assert derive_tenant_status({"start_date": tomorrow}, "Paid") == "Trial"
+
+
+def test_update_tenant_status_explicit(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import update_tenant_status
+    doc = update_tenant_status("tara-air", _admin_user(), status="Trial")
+    stored = db._stores["tenants"]["tara-air"]
+    assert stored["status"] == "Trial"
+    assert stored["active"] is False
+    assert any(l["action"] == "TENANT_STATUS_UPDATED" for l in db._stores["audit_logs"].values())
+    assert doc["status"] == "Trial"
+
+
+def test_update_tenant_status_derived_from_contract(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import update_tenant_status
+    update_tenant_status("tara-air", _admin_user(),
+                         contract_start_date="2026-09-01", contract_end_date="2027-08-31")
+    stored = db._stores["tenants"]["tara-air"]
+    # Contract starts in the future -> Trial
+    assert stored["status"] == "Trial"
+    assert stored["contract"]["start_date"] == "2026-09-01"
+    assert stored["contract"]["end_date"] == "2027-08-31"
+
+
+def test_update_tenant_status_unpaid(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import update_tenant_status
+    update_tenant_status("tara-air", _admin_user(), payment_status="Unpaid")
+    assert db._stores["tenants"]["tara-air"]["status"] == "Inactive"
+    assert db._stores["tenants"]["tara-air"]["payment_status"] == "Unpaid"
+
+
+def test_update_tenant_status_missing_tenant(monkeypatch):
+    _patch_db(monkeypatch)
+    from app.services.admin_data_service import update_tenant_status
+    try:
+        update_tenant_status("nope", _admin_user(), status="Active")
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "not found" in str(e)
+
+
+# ============================================================================
+# Demo-data seed / unseed (admin_data_service)
+# ============================================================================
+
+def test_seed_demo_data_service(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import seed_tenant_demo_data
+    result = seed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
+    assert result["seeded"]["vsr"] == 5
+    assert result["seeded"]["mor"] == 3
+    assert result["seeded"]["can"] == 3
+    assert result["seeded"]["cap"] == 3
+
+    reports = db._subs[("tara-air", "reports")]
+    assert sum(1 for r in reports if r["report_type"] == "voluntary") == 5
+    assert sum(1 for r in reports if r["report_type"] == "mandatory") == 3
+    assert len(db._subs[("tara-air", "can_cap")]) == 3
+    assert len(db._subs[("tara-air", "hazards")]) == 3
+    assert len(db._subs[("sub-doc", "caps")]) == 3
+    assert any(l["action"] == "DEMO_DATA_SEED" for l in db._stores["audit_logs"].values())
+
+
+def test_unseed_demo_data_service(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import seed_tenant_demo_data, unseed_tenant_demo_data
+    seed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
+    result = unseed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
+    assert result["removed"]["vsr"] == 5
+    assert result["removed"]["mor"] == 3
+    assert result["removed"]["can"] == 3
+    assert result["removed"]["cap"] == 3
+    assert db._subs.get(("tara-air", "reports")) == []
+    assert db._subs.get(("tara-air", "can_cap")) == []
+    assert db._subs.get(("tara-air", "hazards")) == []
+    assert db._subs.get(("sub-doc", "caps")) == []
+
+
+def test_unseed_caps_only_keeps_cans(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import seed_tenant_demo_data, unseed_tenant_demo_data
+    seed_tenant_demo_data("tara-air", ["can", "cap"], _admin_user())
+    unseed_tenant_demo_data("tara-air", ["cap"], _admin_user())
+    assert len(db._subs[("tara-air", "can_cap")]) == 3
+    assert len(db._subs[("tara-air", "hazards")]) == 3
+    assert db._subs.get(("sub-doc", "caps")) == []
+
+
+def test_unseed_does_not_touch_real_data(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    db._subs[("tara-air", "reports")] = [{"report_type": "voluntary", "seed_version": "real"}]
+    db._subs[("tara-air", "can_cap")] = [{"can_reference": "CAN-001", "seed_version": "real"}]
+    from app.services.admin_data_service import unseed_tenant_demo_data
+    unseed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
+    assert len(db._subs[("tara-air", "reports")]) == 1
+    assert len(db._subs[("tara-air", "can_cap")]) == 1
+
+
+# ============================================================================
+# Route-level: tenant status + demo-data
+# ============================================================================
+
+def test_admin_tenant_status_route(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/tenants/tara-air/status", json={
+        "setup_key": "test-setup-key",
+        "status": "Inactive",
+        "contract_start_date": "2026-01-01",
+        "contract_end_date": "2026-12-31",
+        "payment_status": "Paid",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["tenant"]["status"] == "Inactive"
+    assert db._stores["tenants"]["tara-air"]["active"] is False
+
+
+def test_admin_tenant_status_route_bad_key(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/tenants/tara-air/status", json={
+        "setup_key": "wrong", "status": "Active",
+    })
+    assert resp.status_code == 403
+
+
+def test_admin_demo_data_route_seed(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db, tid="sita-air")
+    resp = _client().post("/api/v1/admin/demo-data", json={
+        "setup_key": "test-setup-key",
+        "action": "seed",
+        "all": False,
+        "tenant_ids": ["sita-air"],
+        "kinds": ["vsr", "mor"],
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["results"][0]["tenant_id"] == "sita-air"
+    assert body["results"][0]["seeded"]["vsr"] == 5
+    assert len(db._subs[("sita-air", "reports")]) == 8
+
+
+def test_admin_demo_data_route_unseed(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db, tid="sita-air")
+    from app.services.admin_data_service import seed_tenant_demo_data
+    seed_tenant_demo_data("sita-air", ["vsr"], _admin_user())
+    resp = _client().post("/api/v1/admin/demo-data", json={
+        "setup_key": "test-setup-key",
+        "action": "unseed",
+        "all": False,
+        "tenant_ids": ["sita-air"],
+        "kinds": ["vsr"],
+    })
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["removed"]["vsr"] == 5
+    assert db._subs.get(("sita-air", "reports")) == []
+
+
+def test_admin_demo_data_route_no_tenants(monkeypatch):
+    _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    resp = _client().post("/api/v1/admin/demo-data", json={
+        "setup_key": "test-setup-key",
+        "action": "seed",
+        "all": True,
+        "kinds": ["vsr"],
+    })
+    assert resp.status_code == 400
+
+
+def test_admin_demo_data_route_invalid_kind(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/demo-data", json={
+        "setup_key": "test-setup-key",
+        "action": "seed",
+        "all": False,
+        "tenant_ids": ["tara-air"],
+        "kinds": ["bogus"],
+    })
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["error"]

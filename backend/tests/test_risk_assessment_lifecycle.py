@@ -755,8 +755,8 @@ class TestCrossTenantAndAuthorization:
         data = resp.json()
         assert data["tenant_id"] == "test-airline", resp.text
 
-    def test_caan_generates_national_report(self, client):
-        """CAAN can still generate a national (cross-tenant) quarterly report."""
+    def test_caan_generates_state_report(self, client):
+        """CAAN can still generate a state (cross-tenant) quarterly report."""
         resp = client.post(
             "/api/v1/reporting/quarterly?year=2026&quarter=1",
             json={},
@@ -767,8 +767,8 @@ class TestCrossTenantAndAuthorization:
         assert data["tenant_id"] is None, resp.text
         assert data["report_type"] == "quarterly"
 
-    def test_caan_national_report_pdf_export(self, client):
-        """CAAN national report exports a valid PDF (reportlab)."""
+    def test_caan_state_report_pdf_export(self, client):
+        """CAAN state report exports a valid PDF (reportlab)."""
         from app.services.pdf_generator import HAS_REPORTLAB
         gen = client.post(
             "/api/v1/reporting/quarterly?year=2026&quarter=2",

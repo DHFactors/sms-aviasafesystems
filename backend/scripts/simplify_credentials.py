@@ -8,9 +8,11 @@ Password: {TENANT_CODE}-{ROLE}-2026      e.g. BHA-Safety-2026
 What this does per operator tenant (Buddha Air, Tara Air, Sita Air, Yeti
 Airlines, Summit Air, Simrik Air, Air Dynasty):
   * Creates the four functional role accounts (safety, camo, 145, ops) using
-    the simplified email + password format, as AIRLINE_ADMIN bound to the
-    tenant. Accounts that already exist are updated in place (email, password,
-    claims) rather than duplicated.
+    the simplified email + password format. `safety` is AIRLINE_ADMIN (full
+    tenant dashboard); `camo`, `145` and `ops` are USER accounts carrying a
+    `department` custom claim (CAMO / Part-145 / Flight Operations) that routes
+    them to the responsible-manager dashboard. Accounts that already exist are
+    updated in place (email, password, claims) rather than duplicated.
   * Leaves the legacy Safety Manager / Accountable Executive / Department
     Manager accounts untouched.
   * Removes the CAAN super-admin account (`super-admin-001`) from Auth and the
@@ -50,13 +52,7 @@ from loguru import logger
 logger.remove()
 logger.add(sys.stdout, format="{time:HH:mm:ss} | {level:<7} | {message}", level="INFO")
 
-from seed.config import (
-    OPERATOR_PROFILES,
-    SIMPLIFIED_ROLE_ACCOUNTS,
-    simplified_email,
-    simplified_password,
-    CREDENTIAL_TENANT_CODES,
-)
+from seed.config import build_simplified_role_plan
 
 SUPER_ADMIN_UID = "super-admin-001"
 
@@ -92,21 +88,7 @@ def _email_exists(auth, email: str) -> bool:
 
 def build_plan():
     """Return the list of (op_id, role_spec) accounts the scheme defines."""
-    plan = []
-    for profile in OPERATOR_PROFILES:
-        op_id = profile["id"]
-        for role in SIMPLIFIED_ROLE_ACCOUNTS:
-            plan.append({
-                "op_id": op_id,
-                "op_name": profile["name"],
-                "token": role["token"],
-                "email": simplified_email(role["token"], op_id),
-                "password": simplified_password(role["token"], op_id),
-                "app_role": role["app_role"],
-                "full_name": f"{role['full_name']} ({profile['name']})",
-                "uid": f"{role['token']}-{op_id}-001",
-            })
-    return plan
+    return build_simplified_role_plan()
 
 
 def dry_run(auth):
@@ -115,12 +97,13 @@ def dry_run(auth):
     print("=" * 78)
     plan = build_plan()
     print(f"\nSimplified scheme accounts to ensure ({len(plan)}):\n")
-    print(f"{'Tenant':<22}{'Role':<8}{'Email':<32}{'Password':<20}{'Status'}")
-    print("-" * 100)
+    print(f"{'Tenant':<22}{'Role':<8}{'Department':<20}{'Email':<32}{'Password':<20}{'Status'}")
+    print("-" * 118)
     for acc in plan:
         exists = _email_exists(auth, acc["email"])
         status = "EXISTS (will update)" if exists else "CREATE"
-        print(f"{acc['op_name']:<22}{acc['token']:<8}{acc['email']:<32}{acc['password']:<20}{status}")
+        print(f"{acc['op_name']:<22}{acc['token']:<8}{acc['department']:<20}"
+              f"{acc['email']:<32}{acc['password']:<20}{status}")
 
     # Super admin removal
     try:
@@ -164,9 +147,12 @@ def apply_auth(auth):
                                  email_verified=True)
                 updated += 1
                 action = "updated"
-            auth.update_user(acc["uid"], custom_claims={
-                "role": acc["app_role"], "tenant_id": acc["op_id"]})
-            print(f"  [{action}] {acc['email']}  {acc['password']}")
+            claims = {"role": acc["app_role"], "tenant_id": acc["op_id"]}
+            if acc.get("department"):
+                claims["department"] = acc["department"]
+            auth.update_user(acc["uid"], custom_claims=claims)
+            print(f"  [{action}] {acc['email']}  {acc['password']}  "
+                  f"claims={claims}")
         except Exception as e:
             logger.error(f"Failed {acc['email']}: {e}")
 

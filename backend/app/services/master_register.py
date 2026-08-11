@@ -44,12 +44,12 @@ def build_master_register(
     cross_tenant = user.get("role") in settings.CROSS_TENANT_ROLES
 
     def _hazards():
-        if cross_tenant and not tenant_id:
+        if cross_tenant:
             return get_cross_tenant_collection(HAZARD_COLLECTION).get()
         return get_tenant_collection(tenant_id, HAZARD_COLLECTION).get()
 
     def _cans():
-        if cross_tenant and not tenant_id:
+        if cross_tenant:
             return get_cross_tenant_collection(CAN_COLLECTION).get()
         return get_tenant_collection(tenant_id, CAN_COLLECTION).get()
 

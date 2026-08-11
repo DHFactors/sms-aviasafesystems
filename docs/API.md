@@ -183,7 +183,7 @@ fields: `severity_level`, `probability_level`, `risk_index`, `risk_level`, `risk
 | GET | `/caan/risk` | CAAN risk view |
 | GET | `/caan/hazards` | CAAN hazard view |
 | GET | `/caan/trends` | CAAN trends |
-| GET | `/caan/survey-maturity` | National SMS maturity from survey pillars (aggregated over a regulator's operators) |
+| GET | `/caan/survey-maturity` | State SMS maturity from survey pillars (aggregated over a regulator's operators) |
 | GET | `/caan/sms-maturity-assessment` | Gemini assessment per operator; low pillars (<70%) get actions (aggregated over a regulator's operators) |
 | GET | `/admin/system` | System status (SUPER_ADMIN) |
 | GET | `/admin/tenants` | Tenant list (SUPER_ADMIN) |
@@ -305,12 +305,12 @@ the same PUT contract with survey instructions and adds an auth-optional GET.
 
 ### 3.12 State Risk — `/api/v1/state-risk` (CAAN_SMD / SUPER_ADMIN)
 
-National risk register + live cross-tenant aggregation for the State Safety Programme.
+State risk register + live cross-tenant aggregation for the State Safety Programme.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/register` | Persisted national risk register for a period |
-| GET | `/aggregate` | Live recomputation of national risk from tenant hazards/reports |
+| GET | `/register` | Persisted state risk register for a period |
+| GET | `/aggregate` | Live recomputation of state risk from tenant hazards/reports |
 | POST | `/sync` | Rebuild the persisted register from the live aggregation |
 | PUT | `/register/{risk_id}/ssp-target` | Set SSP target / risk-reduction rate (SUPER_ADMIN) |
 
@@ -320,9 +320,9 @@ Regulator's operators. When `regulator_id` is omitted the aggregation spans all 
 ### 3.13 Regulators — `/api/v1/regulators` (CAAN_SMD / SUPER_ADMIN)
 
 State Regulator model. A State Regulator (e.g. **CAAN** for Nepal, **DGCA** for India) is the
-national civil-aviation authority overseeing a set of operator tenants. Regulators live in the
+state civil-aviation authority overseeing a set of operator tenants. Regulators live in the
 Firestore `regulators` collection; each operator tenant carries `regulator_id` + `country` tags.
-This is the generic national-oversight model behind the State Regulator dashboard
+This is the generic state-oversight model behind the State Regulator dashboard
 (`public/caan-state-risk.html`), which reads the regulator via `GET /{regulator_id}` (URL
 `?regulator=` override, default `caan`).
 

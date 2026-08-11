@@ -17,7 +17,7 @@ Legend: ✅ **Resolved** · 🔶 **Partially resolved** · ⏳ **Open**
   timestamp so consumers can detect how stale the register is relative to live tenant data.
 
 **Remaining gap:**
-- `aggregate_national_risk` performs a **full on-demand scan** of `collection_group("hazards")`
+- `aggregate_state_risk` performs a **full on-demand scan** of `collection_group("hazards")`
   and `collection_group("reports")` on every call (`StateRiskService._cross_tenant_hazards` /
   `_cross_tenant_reports`, `backend/app/services/state_risk_service.py`).
 - In a high-volume multi-tenant environment this becomes expensive (all docs read per request) and
@@ -63,7 +63,7 @@ Legend: ✅ **Resolved** · 🔶 **Partially resolved** · ⏳ **Open**
   generated.
 - There is **no event broker** (no Firebase Cloud Functions, no Pub/Sub, no Firestore triggers;
   confirmed absent — no `functions/` package, no cloudbuild, no trigger wiring).
-- When `PUT /register/{id}/ssp-target` updates a national tolerance, tenant safety managers are
+- When `PUT /register/{id}/ssp-target` updates a state tolerance, tenant safety managers are
   **not notified**; they only observe the change on their next report generation (polling-by-user).
 
 **Impact:**

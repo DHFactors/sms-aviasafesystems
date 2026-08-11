@@ -210,10 +210,10 @@ AUTHOR: AviaSAFE Systems
             <div class="number" id="highRiskCount">0</div>
             <div class="label">High Risk Items</div>
         </div>
-        <div class="stat-card" onclick="window.location.href='/caan-state-risk.html'" style="cursor:pointer;" title="View national SMS maturity">
-            <div class="number" id="nationalSMSMaturity">--</div>
-            <div class="label">National SMS Maturity</div>
-            <div class="label" id="nationalSMSMaturityTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
+        <div class="stat-card" onclick="window.location.href='/caan-state-risk.html'" style="cursor:pointer;" title="View state SMS maturity">
+            <div class="number" id="stateSMSMaturity">--</div>
+            <div class="label">State SMS Maturity</div>
+            <div class="label" id="stateSMSMaturityTier" style="font-size:var(--font-size-sm);font-weight:600;"></div>
         </div>
     </div>
 
@@ -231,52 +231,52 @@ AUTHOR: AviaSAFE Systems
         </div>
     </div>
 
-    <!-- National Hazard Register -->
-    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-book"></i> National Hazard Register</h2>
+    <!-- State Hazard Register -->
+    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-book"></i> State Hazard Register</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
             <h3><i class="fas fa-exclamation-triangle"></i> Hazard Status Breakdown (All Tenants)</h3>
-            <div id="nationalHazardWidget" style="min-height:120px;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;" id="nationalHazardStatsGrid"></div>
+            <div id="stateHazardWidget" style="min-height:120px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;" id="stateHazardStatsGrid"></div>
             </div>
         </div>
     </div>
 
-    <!-- National CAN/CAP Summary -->
-    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-clipboard-check"></i> National CAN/CAP Summary</h2>
+    <!-- State CAN/CAP Summary -->
+    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-clipboard-check"></i> State CAN/CAP Summary</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
             <h3><i class="fas fa-clipboard-check"></i> Corrective Action Status (All Tenants)</h3>
-            <div id="nationalCanCapWidget" style="min-height:100px;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;" id="nationalCanCapGrid"></div>
+            <div id="stateCanCapWidget" style="min-height:100px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1rem;" id="stateCanCapGrid"></div>
             </div>
         </div>
     </div>
 
-    <!-- National Verification & Closure Summary -->
-    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-check-double"></i> National Verification & Closure</h2>
+    <!-- State Verification & Closure Summary -->
+    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-check-double"></i> State Verification & Closure</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
             <h3><i class="fas fa-check-double"></i> Verification Status (All Tenants)</h3>
-            <div id="nationalVerificationWidget" style="min-height:100px;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;" id="nationalVerificationGrid"></div>
+            <div id="stateVerificationWidget" style="min-height:100px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;" id="stateVerificationGrid"></div>
             </div>
         </div>
     </div>
 
-    <!-- National Flight Diversions -->
-    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-plane-slash"></i> National Flight Diversions</h2>
+    <!-- State Flight Diversions -->
+    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-plane-slash"></i> State Flight Diversions</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
             <h3><i class="fas fa-plane-slash"></i> Diversion Summary (All Tenants)</h3>
-            <div id="nationalDiversionWidget" style="min-height:80px;">
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;" id="nationalDiversionGrid"></div>
+            <div id="stateDiversionWidget" style="min-height:80px;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;" id="stateDiversionGrid"></div>
             </div>
         </div>
     </div>
 
-    <!-- National Reports -->
-    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-chart-bar"></i> National Reports</h2>
+    <!-- State Reports -->
+    <h2 style="margin-bottom:var(--spacing-md);"><i class="fas fa-chart-bar"></i> State Reports</h2>
     <div class="chart-grid">
         <div class="chart-card chart-full" style="grid-column:1/-1;">
             <h3><i class="fas fa-chart-bar"></i> Latest Industry Reports
@@ -285,8 +285,8 @@ AUTHOR: AviaSAFE Systems
                     <a href="/reports/index.html"><i class="fas fa-external-link-alt"></i> View All</a>
                 </span>
             </h3>
-            <div id="nationalReportsWidget" style="min-height:80px;">
-                <div id="nationalReportsContent"></div>
+            <div id="stateReportsWidget" style="min-height:80px;">
+                <div id="stateReportsContent"></div>
             </div>
         </div>
     </div>
@@ -469,15 +469,15 @@ async function loadIndustryData() {
         document.getElementById('highRiskCount').textContent = highRiskCount;
         document.getElementById('tenantsTableBody').innerHTML = html;
 
-        await loadNationalSmsMaturity();
+        await loadStateSmsMaturity();
 
         renderCaanHeatMap(heatMapData);
         renderCaanTopRisks(topRisks);
-        loadNationalHazardWidget();
-        loadNationalCanCapWidget();
-        loadNationalVerificationWidget();
-        loadNationalReportsWidget();
-        loadNationalDiversionWidget();
+        loadStateHazardWidget();
+        loadStateCanCapWidget();
+        loadStateVerificationWidget();
+        loadStateReportsWidget();
+        loadStateDiversionWidget();
 
     } catch (error) {
         console.error('Error loading industry data:', error);
@@ -491,12 +491,12 @@ async function loadIndustryData() {
     }
 }
 
-async function loadNationalSmsMaturity() {
-    const scoreEl = document.getElementById('nationalSMSMaturity');
-    const tierEl = document.getElementById('nationalSMSMaturityTier');
+async function loadStateSmsMaturity() {
+    const scoreEl = document.getElementById('stateSMSMaturity');
+    const tierEl = document.getElementById('stateSMSMaturityTier');
     try {
         const data = await ApiClient.get('/api/v1/dashboard/caan/survey-maturity');
-        const nat = (data && data.national) || {};
+        const nat = (data && data.state) || {};
         const v = nat.overall_sms_maturity;
         scoreEl.textContent = v != null ? v.toFixed(1) : '--';
         if (tierEl) {
@@ -510,7 +510,7 @@ async function loadNationalSmsMaturity() {
             }
         }
     } catch (err) {
-        console.error('Error loading national SMS maturity:', err);
+        console.error('Error loading state SMS maturity:', err);
         scoreEl.textContent = '--';
         if (tierEl) tierEl.textContent = '';
     }
@@ -701,12 +701,12 @@ function renderCaanTopRisks(topRisks) {
     container.innerHTML = html;
 }
 
-async function loadNationalVerificationWidget() {
-    const grid = document.getElementById('nationalVerificationGrid');
+async function loadStateVerificationWidget() {
+    const grid = document.getElementById('stateVerificationGrid');
     try {
         const stats = await VerificationAPI.getStats();
         if (!stats) {
-            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No national verification data.</p>';
+            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No state verification data.</p>';
             return;
         }
         const items = [
@@ -726,16 +726,16 @@ async function loadNationalVerificationWidget() {
         grid.innerHTML = html;
     } catch (err) {
         grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">Error loading verification data.</p>';
-        console.error('National verification error:', err);
+        console.error('State verification error:', err);
     }
 }
 
-async function loadNationalDiversionWidget() {
-    const grid = document.getElementById('nationalDiversionGrid');
+async function loadStateDiversionWidget() {
+    const grid = document.getElementById('stateDiversionGrid');
     try {
         const stats = await DiversionsAPI.getStats();
         if (!stats || stats.total_diversions === 0) {
-            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No national diversion data.</p>';
+            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No state diversion data.</p>';
             return;
         }
         const reasons = stats.by_reason || {};
@@ -768,8 +768,8 @@ async function loadNationalDiversionWidget() {
     }
 }
 
-async function loadNationalReportsWidget() {
-    const container = document.getElementById('nationalReportsContent');
+async function loadStateReportsWidget() {
+    const container = document.getElementById('stateReportsContent');
     try {
         const [quarterly, annual] = await Promise.all([
             ReportsAPI.listQuarterly(),
@@ -800,12 +800,12 @@ async function loadNationalReportsWidget() {
     }
 }
 
-async function loadNationalCanCapWidget() {
-    const grid = document.getElementById('nationalCanCapGrid');
+async function loadStateCanCapWidget() {
+    const grid = document.getElementById('stateCanCapGrid');
     try {
         const stats = await CanCapAPI.getStats();
         if (!stats || !stats.cans) {
-            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No national CAN/CAP data.</p>';
+            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No state CAN/CAP data.</p>';
             return;
         }
         const canStatuses = stats.cans.by_status || {};
@@ -833,21 +833,21 @@ async function loadNationalCanCapWidget() {
             </div>`;
         }
         html += `<div style="grid-column:1/-1;text-align:center;padding-top:0.5rem;">
-                <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> View National CAN Register</a>
+                <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> View State CAN Register</a>
             </div>`;
         grid.innerHTML = html;
     } catch (err) {
         grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">Error loading CAN/CAP data.</p>';
-        console.error('National CAN/CAP error:', err);
+        console.error('State CAN/CAP error:', err);
     }
 }
 
-async function loadNationalHazardWidget() {
-    const grid = document.getElementById('nationalHazardStatsGrid');
+async function loadStateHazardWidget() {
+    const grid = document.getElementById('stateHazardStatsGrid');
     try {
         const stats = await HazardsAPI.getStats();
         if (!stats || !stats.by_status) {
-            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No national hazard data available.</p>';
+            grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">No state hazard data available.</p>';
             return;
         }
         const statuses = stats.by_status;
@@ -872,12 +872,12 @@ async function loadNationalHazardWidget() {
             html += `<span style="font-size:0.85rem;background:#f1f5f9;padding:0.25rem 0.75rem;border-radius:999px;">${k}: <strong>${v}</strong></span>`;
         }
         html += `</div><div style="grid-column:1/-1;text-align:center;padding-top:0.5rem;">
-                <a href="/hazards/index.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> View National Hazard Register</a>
+                <a href="/hazards/index.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> View State Hazard Register</a>
             </div>`;
         grid.innerHTML = html;
     } catch (err) {
-        grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">Error loading national hazard data.</p>';
-        console.error('National hazard widget error:', err);
+        grid.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;grid-column:1/-1;">Error loading state hazard data.</p>';
+        console.error('State hazard widget error:', err);
     }
 }
 

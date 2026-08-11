@@ -692,3 +692,103 @@ async def admin_send_tenant_welcome(
     except Exception as e:
         logger.error(f"Send welcome email failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Tenant lifecycle status + demo-data seeding (production-setup.html)
+# ============================================================================
+
+class TenantStatusRequest(BaseModel):
+    setup_key: str
+    status: Optional[str] = None
+    contract_start_date: Optional[str] = None
+    contract_end_date: Optional[str] = None
+    payment_status: Optional[str] = None
+
+
+class DemoDataRequest(BaseModel):
+    setup_key: str
+    action: str = "seed"
+    all: bool = True
+    tenant_ids: Optional[List[str]] = None
+    kinds: List[str] = ["vsr", "mor", "can", "cap"]
+
+
+@router.post("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
+async def admin_update_tenant_status(
+    tenant_id: str,
+    req: TenantStatusRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Update a tenant's lifecycle status (Trial/Active/Inactive).
+
+    `status` may be set explicitly or derived from the contract dates and
+    payment status. Requires a SUPER_ADMIN token + admin setup key.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import update_tenant_status
+    try:
+        doc = update_tenant_status(
+            tenant_id,
+            user,
+            status=req.status,
+            contract_start_date=req.contract_start_date,
+            contract_end_date=req.contract_end_date,
+            payment_status=req.payment_status,
+        )
+        return {"success": True, "tenant": doc}
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(
+            status_code=404 if "not found" in msg else 400,
+            detail=msg,
+        )
+    except Exception as e:
+        logger.error(f"Update tenant status failed ({tenant_id}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/demo-data", status_code=status.HTTP_200_OK)
+async def admin_demo_data(
+    req: DemoDataRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Seed or unseed dummy operational data (VSR/MOR/CAN/CAP).
+
+    Targets one tenant (tenant_ids) or every tenant (all=True). Unseed only
+    removes documents created by this seeder (marked admin-demo-1).
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import (
+        demo_data_scope,
+        seed_tenant_demo_data,
+        unseed_tenant_demo_data,
+    )
+
+    if req.action not in ("seed", "unseed"):
+        raise HTTPException(status_code=400, detail="action must be 'seed' or 'unseed'")
+
+    tenant_ids = demo_data_scope(req.tenant_ids, all_tenants=req.all)
+    if not tenant_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="No tenants to target — create tenants first or pass tenant_ids",
+        )
+
+    fn = seed_tenant_demo_data if req.action == "seed" else unseed_tenant_demo_data
+    results = []
+    for tid in tenant_ids:
+        try:
+            results.append(fn(tid, req.kinds, user))
+        except ValueError as e:
+            results.append({"tenant_id": tid, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Demo data {req.action} failed for {tid}: {e}")
+            results.append({"tenant_id": tid, "error": str(e)})
+
+    return {
+        "success": True,
+        "action": req.action,
+        "kinds": req.kinds,
+        "results": results,
+    }

@@ -2,7 +2,7 @@
 
 Creates `state/icao_top_risks/categories/{category}` docs with the ICAO-aligned
 top safety risk taxonomy and default SSP targets. Used as the baseline that the
-aggregated national risk is measured against.
+aggregated state risk is measured against.
 
 Usage (from backend/):
     python -m seed.state_risk
