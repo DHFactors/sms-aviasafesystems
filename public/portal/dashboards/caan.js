@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 const heroUser = document.getElementById('dashHeroUser');
-                if (heroUser) heroUser.textContent = user.email;
+                if (heroUser) heroUser.textContent = 'State Aviation Safety Oversight';
                 loadDashboardUI();
                 fetchAggregatedSSPData();
             } else {

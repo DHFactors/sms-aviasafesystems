@@ -69,7 +69,7 @@
     </div>
 </nav>
 
-<!-- Uniform top section: tenant name + logged-in user email -->
+<!-- Uniform top section: tenant name + department label -->
 <section class="dash-hero">
     <h1 id="dashHeroTitle">My Tasks</h1>
     <div class="dash-hero-user" id="dashHeroUser">—</div>
@@ -142,13 +142,15 @@ firebase.auth().onAuthStateChanged(async function(user) {
     document.getElementById('userDisplay').textContent = user.email;
     const heroTitle = document.getElementById('dashHeroTitle');
     const heroUser = document.getElementById('dashHeroUser');
-    if (heroUser) heroUser.textContent = user.email;
     try {
         const tokenResult = await user.getIdTokenResult();
         myUid = user.uid;
         if (heroTitle) {
             const t = (tokenResult.claims && tokenResult.claims.tenant_id) || '';
             if (t) heroTitle.textContent = t.replace(/-/g, ' ').toUpperCase();
+        }
+        if (heroUser && typeof getDepartmentLabel === 'function') {
+            heroUser.textContent = getDepartmentLabel(tokenResult.claims) || '—';
         }
         const department = (tokenResult.claims && tokenResult.claims.department) || '';
         if (department) {
@@ -279,34 +281,9 @@ async function logout() {
 }
 </script>
 
-<!-- ========== FOOTER (landing-page style) ========== -->
-<footer class="app-footer">
-    <div class="container">
-        <div class="footer-links">
-            <a href="/">Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/survey/">Survey</a>
-            <span class="footer-divider">|</span>
-            <a href="/login.html">Login</a>
-            <span class="footer-divider">|</span>
-            <a href="#">Privacy Policy</a>
-            <span class="footer-divider">|</span>
-            <a href="#">Terms of Service</a>
-            <span class="footer-divider">|</span>
-            <a href="/contact.html">Contact</a>
-            <span class="footer-divider">|</span>
-            <a href="/admin/login.html">Developer Login</a>
-        </div>
-        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.8;">
-            A project by <strong>Ghanshyam Acharya</strong>.
-        </p>
-        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
-            &copy; 2026 AviaSAFEsystem. All rights reserved.
-        </p>
-        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
-            ICAO Annex 19 &middot; Doc 9859 &middot; Doc 10951 &mdash; Safety Intelligence Platform
-        </p>
-    </div>
+<!-- ========== FOOTER ========== -->
+<footer class="dashboard-footer text-center py-3">
+  <p class="mb-0 text-muted" style="font-size: 0.875rem;">A project by <strong>Ghanshyam Acharya</strong>.</p>
 </footer>
 
 </body>

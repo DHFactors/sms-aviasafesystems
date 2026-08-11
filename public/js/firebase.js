@@ -297,6 +297,25 @@ async function getCurrentUser() {
 }
 
 // ============================================================================
+// DEPARTMENT LABEL — maps a user's role + custom claims to the department name
+// shown in the central header banner (hero subtitle, below the tenant title).
+// The user's email stays visible ONLY in the top-right header menu next to the
+// Logout button; it is never displayed in the hero.
+// ============================================================================
+
+function getDepartmentLabel(claims) {
+    var role = (claims && claims.role) || 'USER';
+    var dept = (claims && claims.department) || '';
+    if (role === 'CAAN_SMD') return 'State Aviation Safety Oversight';
+    if (role === 'AIRLINE_ADMIN') return 'Corporate Safety Department';
+    if (dept === 'CAMO') return 'CAMO Department';
+    if (dept === 'Part-145') return 'Part-145 Maintenance Department';
+    if (dept === 'Flight Operations') return 'Flight Operations Department';
+    return dept || '';
+}
+window.getDepartmentLabel = getDepartmentLabel;
+
+// ============================================================================
 // ROLE-BASED ROUTING — where should a signed-in user land after login?
 // ============================================================================
 

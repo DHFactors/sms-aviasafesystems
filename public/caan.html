@@ -172,13 +172,14 @@ AUTHOR: AviaSAFE Systems
             <a href="/caan-state-risk.html" class="btn btn-primary btn-sm">
                 <i class="fas fa-list"></i> State Risk Register
             </a>
+            <span id="dashUserEmail" style="font-size:0.8rem;opacity:0.85;"></span>
             <button onclick="logout()" class="btn btn-danger btn-sm">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </button>
         </div>
     </div>
 
-    <!-- Uniform top section: tenant name + logged-in user email -->
+    <!-- Uniform top section: tenant name + department label -->
     <section class="dash-hero">
         <h1>CAAN SMD Regulator</h1>
         <div class="dash-hero-user" id="dashHeroUser">—</div>
@@ -362,9 +363,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    // Populate uniform hero with the signed-in user
+    // Populate the hero subtitle with the department label; keep the email
+    // only in the top-right header (next to Logout).
     const heroUser = document.getElementById('dashHeroUser');
-    if (heroUser) heroUser.textContent = user.email;
+    if (heroUser) {
+        heroUser.textContent = (typeof getDepartmentLabel === 'function' && getDepartmentLabel(user.claims)) || '—';
+    }
+    const dashUserEmail = document.getElementById('dashUserEmail');
+    if (dashUserEmail) dashUserEmail.textContent = user.email;
 
     // Load data
     await loadIndustryData();
@@ -893,34 +899,9 @@ async function logout() {
 initFeedbackWidget();
 </script>
 
-<!-- ========== FOOTER (landing-page style) ========== -->
-<footer class="app-footer">
-    <div class="container">
-        <div class="footer-links">
-            <a href="/">Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/survey/">Survey</a>
-            <span class="footer-divider">|</span>
-            <a href="/login.html">Login</a>
-            <span class="footer-divider">|</span>
-            <a href="#">Privacy Policy</a>
-            <span class="footer-divider">|</span>
-            <a href="#">Terms of Service</a>
-            <span class="footer-divider">|</span>
-            <a href="/contact.html">Contact</a>
-            <span class="footer-divider">|</span>
-            <a href="/admin/login.html">Developer Login</a>
-        </div>
-        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.8;">
-            A project by <strong>Ghanshyam Acharya</strong>.
-        </p>
-        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
-            &copy; 2026 AviaSAFEsystem. All rights reserved.
-        </p>
-        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
-            ICAO Annex 19 &middot; Doc 9859 &middot; Doc 10951 &mdash; Safety Intelligence Platform
-        </p>
-    </div>
+<!-- ========== FOOTER ========== -->
+<footer class="dashboard-footer text-center py-3">
+  <p class="mb-0 text-muted" style="font-size: 0.875rem;">A project by <strong>Ghanshyam Acharya</strong>.</p>
 </footer>
 
 </body>

@@ -205,7 +205,7 @@
     color: rgba(255,255,255,0.6);
 }
 
-/* ========== UNIFORM HERO (tenant name + user email) ========== */
+/* ========== UNIFORM HERO (tenant name + department label) ========== */
 .shell-hero {
     min-height: 300px;
     display: flex;
@@ -242,41 +242,19 @@
     margin: 0 auto;
 }
 
-.shell-footer {
+.dashboard-footer {
     background: var(--shell-navy);
     color: #fff;
-    padding: 1.5rem 0;
     text-align: center;
     border-top: 3px solid var(--shell-gold);
 }
 
-.shell-footer .footer-links {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-}
-
-.shell-footer .footer-links a {
-    color: rgba(255,255,255,0.85);
-    text-decoration: none;
-    transition: color 0.15s;
-}
-
-.shell-footer .footer-links a:hover {
-    color: #fff;
-    text-decoration: underline;
-}
-
-.shell-footer p {
+.dashboard-footer p {
     margin: 0;
-    font-size: 0.75rem;
     color: rgba(255,255,255,0.7);
 }
 
-.shell-footer p strong {
+.dashboard-footer p strong {
     color: #fff;
 }
 

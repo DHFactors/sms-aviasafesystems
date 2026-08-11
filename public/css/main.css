@@ -60,6 +60,10 @@ p { margin-bottom: var(--spacing-md); }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 
+/* ========== UTILITIES ========== */
+.py-3 { padding-top: 1rem; padding-bottom: 1rem; }
+.mb-0 { margin-bottom: 0; }
+
 /* ========== BUTTONS ========== */
 .btn {
     display: inline-flex;
@@ -275,6 +279,21 @@ select.form-control { appearance: auto; }
 }
 
 /* ========== FOOTER ========== */
+.dashboard-footer {
+    background: var(--color-primary);
+    color: var(--color-white);
+    border-top: 2px solid rgba(255,255,255,0.1);
+}
+
+.dashboard-footer p {
+    margin-bottom: 0;
+    color: rgba(255,255,255,0.7);
+}
+
+.dashboard-footer p strong {
+    color: var(--color-white);
+}
+
 .app-footer {
     background: var(--color-primary);   /* Matches header color */
     color: var(--color-white);

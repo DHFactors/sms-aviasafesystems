@@ -3,9 +3,10 @@
    PATH: public/js/shell.js
    VERSION: 1.0.0
    PURPOSE: Shared dashboard shell. Renders the fixed left sidebar navigation,
-            the top header (brand + tenant/regulator info + user + logout), a
-            landing-page style footer, and scroll-spy active states. Used by
-            all tenant dashboards and the CAAN dashboard.
+            the top header (brand + tenant info + user + logout), a hero showing
+            the tenant title + department subtitle, a clean single-line footer,
+            and scroll-spy active states. Used by all tenant dashboards and the
+            CAAN dashboard.
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
@@ -136,7 +137,8 @@
         return header;
     }
 
-    // Uniform top section: centered tenant name (title) + logged-in user email.
+    // Uniform top section: centered tenant name (title) + department label
+    // (mapped from the signed-in user's role / custom claims).
     function buildHero() {
         const hero = document.createElement('section');
         hero.className = 'shell-hero';
@@ -154,55 +156,19 @@
         return hero;
     }
 
+    // Clean single-line footer. The user's email and department live in the
+    // header; the floating "Send Feedback" widget is injected separately by
+    // feedback.js and stays untouched.
     function buildFooter() {
         const footer = document.createElement('footer');
-        footer.className = 'shell-footer';
+        footer.className = 'dashboard-footer text-center py-3';
         footer.id = 'shellFooter';
 
-        const container = document.createElement('div');
-        container.style.cssText = 'max-width:1200px;margin:0 auto;padding:0 1rem;';
-
-        const links = document.createElement('div');
-        links.className = 'footer-links';
-        const linkDefs = cfg.links || [
-            { href: '/', label: 'Home' },
-            { href: '/survey/', label: 'Survey' },
-            { href: '/login.html', label: 'Login' },
-            { href: '#', label: 'Privacy Policy' },
-            { href: '#', label: 'Terms of Service' },
-            { href: '#', label: 'Contact' },
-        ];
-        linkDefs.forEach(function (l, idx) {
-            const a = document.createElement('a');
-            a.href = l.href;
-            a.textContent = l.label;
-            links.appendChild(a);
-            if (idx < linkDefs.length - 1) {
-                const sep = document.createElement('span');
-                sep.className = 'footer-divider';
-                sep.textContent = '|';
-                sep.style.margin = '0 0.25rem';
-                links.appendChild(sep);
-            }
-        });
-        container.appendChild(links);
-
-        const p1 = document.createElement('p');
-        p1.style.margin = '0.5rem 0 0';
-        p1.innerHTML = 'A project by <strong>Ghanshyam Acharya</strong>.';
-        container.appendChild(p1);
-
-        const p2 = document.createElement('p');
-        p2.style.margin = '0.25rem 0 0';
-        p2.textContent = '© ' + new Date().getFullYear() + ' AviaSAFEsystem. All rights reserved.';
-        container.appendChild(p2);
-
-        const p3 = document.createElement('p');
-        p3.style.margin = '0.25rem 0 0';
-        p3.textContent = 'ICAO Annex 19 · Doc 9859 · Doc 10951 — Safety Intelligence Platform';
-        container.appendChild(p3);
-
-        footer.appendChild(container);
+        const p = document.createElement('p');
+        p.className = 'mb-0 text-muted';
+        p.style.fontSize = '0.875rem';
+        p.innerHTML = 'A project by <strong>Ghanshyam Acharya</strong>.';
+        footer.appendChild(p);
         return footer;
     }
 
@@ -291,19 +257,25 @@
 
         attachScrollSpy();
 
-        // Populate user email once auth is ready
+        // Populate user email (top-right header) + department (hero subtitle)
+        // once auth is ready.
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(function (user) {
                 const el = document.getElementById('shellUser');
-                if (el && user) el.textContent = user.email;
+                if (el) el.textContent = user ? user.email : '—';
                 const heroUser = document.getElementById('shellHeroUser');
-                if (heroUser) heroUser.textContent = user ? user.email : '—';
+                if (heroUser) heroUser.textContent = '—';
                 if (user && user.getIdTokenResult) {
                     user.getIdTokenResult(true).then(function (tokenResult) {
                         const claims = (tokenResult && tokenResult.claims) || {};
                         applyNavVisibility(claims.role || 'USER');
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
-                    }).catch(function () {});
+                        if (heroUser && typeof getDepartmentLabel === 'function') {
+                            heroUser.textContent = getDepartmentLabel(claims) || '—';
+                        }
+                    }).catch(function () {
+                        if (heroUser) heroUser.textContent = '—';
+                    });
                 } else {
                     applyNavVisibility('USER');
                 }

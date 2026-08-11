@@ -41,6 +41,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Maps a simplified-account email prefix to the department label shown in the
+// hero subtitle (the email itself stays out of the hero).
+function getPortalDepartment(email) {
+    const e = (email || '').toLowerCase();
+    if (e.indexOf('camo') !== -1) return 'CAMO Department';
+    if (e.indexOf('145') !== -1) return 'Part-145 Maintenance Department';
+    if (e.indexOf('ops') !== -1) return 'Flight Operations Department';
+    return 'Corporate Safety Department';
+}
+
 // ── EVENT BINDING ──
 function bindEvents(signInWithEmailAndPassword, signOut) {
     const loginBtn = document.getElementById('loginBtn');
@@ -79,7 +89,7 @@ function monitorAuthState(onAuthStateChanged, collection, getDocs, query, orderB
             else currentTenant = "unknown";
 
             const heroUser = document.getElementById('dashHeroUser');
-            if (heroUser) heroUser.textContent = user.email;
+            if (heroUser) heroUser.textContent = getPortalDepartment(user.email);
 
             loadDashboardUI();
             fetchTenantData(collection, getDocs, query, orderBy, limit);

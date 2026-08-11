@@ -8,6 +8,17 @@ function safeArray(data) {
     return Array.isArray(data) ? data : [];
 }
 
+// Maps a signed-in user (role + department) to the department label shown in
+// the header banner subtitle, below the tenant header title. The user's email
+// stays visible only in the top-right user menu.
+function getDepartmentDisplayName(user) {
+    if (user.role === 'CAAN_SMD') return 'State Aviation Safety Oversight';
+    if (user.department === 'CAMO' || user.role === 'CAMO') return 'CAMO Department';
+    if (user.department === 'Part-145' || user.role === '145') return 'Part-145 Maintenance Department';
+    if (user.department === 'Flight Operations' || user.role === 'ops') return 'Flight Operations Department';
+    return 'Corporate Safety Department'; // Default for safety / AIRLINE_ADMIN
+}
+
 function waitForFirebase() {
     return new Promise(resolve => {
         if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -50,8 +61,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('dashboardSection').style.display = 'block';
 
     const tenantName = tenantId ? tenantId.toUpperCase() : 'Cross-Tenant Safety Overview';
+    const subtitle = getDepartmentDisplayName({
+        role: session.role,
+        department: (session.claims && session.claims.department) || ''
+    });
     if (typeof window.updateShellTenant === 'function') {
-        window.updateShellTenant(tenantName, tenantId ? 'Safety Dashboard · ICAO operator' : 'State-level aggregated view');
+        window.updateShellTenant(tenantName, subtitle);
     }
 
     const logoutBtn = document.getElementById('logoutBtn');
