@@ -9,12 +9,13 @@ const CanCapAPI = {
         if (params.search) qs.set('search', params.search);
         const n = Number(params.days);
         if (n > 0) qs.set('days', n);
-        return ApiClient.get(`/api/v1/cans?${qs.toString()}`);
+        const query = qs.toString();
+        return ApiClient.get(query ? `/api/v1/cans/?${query}` : '/api/v1/cans/');
     },
 
     getCan: (canId) => ApiClient.get(`/api/v1/cans/${canId}`),
 
-    issueCan: (data) => ApiClient.post('/api/v1/cans', data),
+    issueCan: (data) => ApiClient.post('/api/v1/cans/', data),
 
     updateCanStatus: (canId, status) =>
         ApiClient._request('PATCH', `/api/v1/cans/${canId}/status?status=${status}`),
@@ -35,7 +36,8 @@ const CanCapAPI = {
         if (params.search) qs.set('search', params.search);
         const n = Number(params.days);
         if (n > 0) qs.set('days', n);
-        return ApiClient.get(`/api/v1/cans/caps?${qs.toString()}`);
+        const query = qs.toString();
+        return ApiClient.get(query ? `/api/v1/cans/caps?${query}` : '/api/v1/cans/caps');
     },
 
     getCap: (capId) => ApiClient.get(`/api/v1/cans/caps/${capId}`),
