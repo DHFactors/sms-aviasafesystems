@@ -29,13 +29,16 @@
         @media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem; }
         .chart-card h3 { font-size: 0.85rem; font-weight: 600; color: #0b2a42; margin-bottom: 1rem; }
-        .chart-wrapper { position: relative; height: 260px; }
+        .chart-wrapper { position: relative; }
         .chart-full { grid-column: 1 / -1; }
-        .chart-full .chart-wrapper { height: 280px; }
+        .chart-container { position: relative; width: 100%; max-width: 100%; height: 350px; }
+        .chart-container > canvas { display: block; width: 100% !important; height: 100% !important; max-width: 100%; }
+        .chart-full .chart-container { height: 400px; }
         .state-container { position: relative; min-height: 100px; }
         .state-loading::before { content: ''; position: absolute; inset: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 1; }
         .state-loading::after { content: 'Loading...'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.9rem; z-index: 2; }
         .state-empty, .state-error { display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
+        .state-empty canvas, .state-error canvas { display: none; }
         .state-empty .empty-msg, .state-error .error-msg { font-size: 0.9rem; color: #64748b; }
         .state-error .error-msg { color: #dc3545; }
     </style>
@@ -68,13 +71,17 @@
             <div class="chart-card">
                 <h3>Risk Distribution</h3>
                 <div id="riskChart" class="chart-wrapper state-container">
-                    <canvas id="riskChartCanvas"></canvas>
+                    <div class="chart-container" style="position: relative; width: 100%; max-width: 100%; height: 350px;">
+                        <canvas id="riskChartCanvas"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="chart-card">
                 <h3>Monthly Trends</h3>
                 <div id="trendChart" class="chart-wrapper state-container">
-                    <canvas id="trendChartCanvas"></canvas>
+                    <div class="chart-container" style="position: relative; width: 100%; max-width: 100%; height: 350px;">
+                        <canvas id="trendChartCanvas"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -152,13 +159,16 @@ async function loadRiskDistribution() {
     try {
         const data = safeArray(await DashboardAPI.getRiskDistribution(currentDays));
         if (data.length === 0) {
-            setEmpty(el, 'No risk data available');
+            destroyChart('riskChartCanvas');
+            setEmpty(el, 'No risk events recorded for the selected period');
             return;
         }
         setReady(el);
         renderRiskChart(data);
     } catch (err) {
-        setError(el, err.message);
+        destroyChart('riskChartCanvas');
+        setError(el, 'Unable to load risk distribution. Please try again.');
+        console.error('loadRiskDistribution failed:', err);
     }
 }
 
@@ -168,13 +178,16 @@ async function loadMonthlyTrends() {
     try {
         const data = safeArray(await DashboardAPI.getMonthlyTrends(currentDays * 2 > 730 ? 730 : currentDays * 2));
         if (data.length === 0) {
-            setEmpty(el, 'No trend data available');
+            destroyChart('trendChartCanvas');
+            setEmpty(el, 'No risk trends recorded for the selected period');
             return;
         }
         setReady(el);
         renderTrendChart(data);
     } catch (err) {
-        setError(el, err.message);
+        destroyChart('trendChartCanvas');
+        setError(el, 'Unable to load trend data. Please try again.');
+        console.error('loadMonthlyTrends failed:', err);
     }
 }
 
@@ -248,9 +261,16 @@ function renderTrendChart(data) {
 }
 
 function destroyChart(key) {
-    if (chartInstances[key]) {
-        chartInstances[key].destroy();
+    const inst = chartInstances[key];
+    if (inst) {
+        inst.destroy();
         delete chartInstances[key];
+        return;
+    }
+    const canvas = document.getElementById(key);
+    if (canvas && window.Chart) {
+        const orphan = Chart.getChart(canvas);
+        if (orphan) orphan.destroy();
     }
 }
 
@@ -288,7 +308,7 @@ function setError(el, msg) {
         errEl.className = 'error-msg';
         el.appendChild(errEl);
     }
-    errEl.textContent = `Error: ${msg}`;
+    errEl.textContent = msg;
 }
 </script>
 
