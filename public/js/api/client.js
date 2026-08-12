@@ -76,10 +76,25 @@ const ApiClient = {
         }
 
         let response;
-        try {
-            response = await fetch(url, opts);
-        } catch (err) {
-            const detail = `Network error while reaching the API (${method} ${path}): ${err.message}`;
+        let lastErr;
+        // Retry on transient network failures (connection reset / cold-start on
+        // the free Render tier). GET requests are idempotent so retrying is safe.
+        const maxAttempts = method === 'GET' ? 3 : 1;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                response = await fetch(url, opts);
+                lastErr = null;
+                break;
+            } catch (err) {
+                lastErr = err;
+                console.warn(`[ApiClient] network attempt ${attempt}/${maxAttempts} failed for ${method} ${path}: ${err.message}`);
+                if (attempt < maxAttempts) {
+                    await new Promise(r => setTimeout(r, 800 * attempt));
+                }
+            }
+        }
+        if (lastErr) {
+            const detail = `Network error while reaching the API (${method} ${path}): ${lastErr.message}`;
             console.error('[ApiClient]', detail);
             throw new Error('Network error. Please check your connection and try again.');
         }
