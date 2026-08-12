@@ -29,6 +29,22 @@ CODE OWNER: AviaSafeSystems
             justify-content: center;
             flex-wrap: wrap;
         }
+        .hero-cta .btn-lg {
+            padding: var(--spacing-lg) var(--spacing-2xl);
+            font-size: var(--font-size-lg);
+        }
+        .hero-cta .btn-outline-light {
+            border: 2px solid var(--color-white);
+            color: var(--color-white);
+            border-radius: var(--border-radius-md);
+            font-weight: 600;
+            transition: all var(--transition-normal);
+        }
+        .hero-cta .btn-outline-light:hover {
+            background: rgba(255,255,255,0.12);
+            color: var(--color-white);
+            transform: translateY(-2px);
+        }
         .features-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -101,8 +117,8 @@ CODE OWNER: AviaSafeSystems
                 <li><a href="/" class="active">Home</a></li>
                 <li><a href="#features">Features</a></li>
                 <li><a href="#tenants">Tenant Portal</a></li>
-                <li><a href="contact.html" class="btn btn-outline">Contact</a></li>
-                <li><a href="login.html" class="btn btn-outline">Login</a></li>
+                <li><a href="contact.html">Contact</a></li>
+                <li><a href="login.html" class="btn-login">Login</a></li>
             </ul>
         </nav>
     </div>
@@ -115,15 +131,18 @@ CODE OWNER: AviaSafeSystems
 
             <!-- Left: Text Content -->
             <div class="hero-content">
-                <span class="hero-badge">ICAO Annex 19 · Doc 9859 · Doc 10951 Aligned</span>
-                <h1 class="hero-headline">From Safety Reporting to <span class="highlight">Safety Intelligence</span></h1>
+                <span class="hero-badge">NEXT-GEN AVIATION SAFETY MANAGEMENT</span>
+                <h1 class="hero-headline">From Reactive Compliance to <span class="text-highlight">Proactive Intelligence</span></h1>
+                <p class="hero-lead">Bridge Safety-I to Safety-II with AI-assisted insights.</p>
                 <p class="hero-description">
-                    Built for the next evolution of aviation safety management, AviaSAFE SMS is
-                    founded on ICAO Annex 19, Doc 9859 (Safety Management Manual) and Doc 10951
-                    (Safety Intelligence Manual). It helps organizations measure SMS maturity,
-                    identify hazards, assess and mitigate risks, and turn safety data into safety
-                    intelligence — understanding risks before they become events.
+                    Transform compliance logging into proactive risk management. AviaSAFE SMS
+                    integrates real-time SMS maturity analytics, human performance monitoring,
+                    and automated CAP tracking to accelerate learning cycles and safeguard
+                    operational continuity.
                 </p>
+                <div class="hero-cta">
+                    <a href="contact.html" class="btn btn-primary btn-lg">Request Demo</a>
+                </div>
             </div>
 
             <!-- Right: Rotating Screenshot Gallery -->
@@ -271,6 +290,7 @@ CODE OWNER: AviaSafeSystems
                  alt="Ghanshyam Acharya, Founder of AviaSAFE Systems"
                  class="founder-photo"
                  loading="lazy">
+            <button type="button" class="bio-trigger" onclick="openBioModal()">.. about me</button>
         </div>
         <div class="founder-text">
             <h2><i class="fas fa-user-tie"></i> Meet the Founder</h2>
@@ -299,23 +319,66 @@ CODE OWNER: AviaSafeSystems
             <span class="footer-divider">|</span>
             <a href="login.html">Login</a>
             <span class="footer-divider">|</span>
-            <a href="#">Privacy Policy</a>
+            <a href="privacy.html">Privacy Policy</a>
             <span class="footer-divider">|</span>
-            <a href="#">Terms of Service</a>
+            <a href="terms.html">Terms of Service</a>
             <span class="footer-divider">|</span>
             <a href="contact.html">Contact</a>
             <span class="footer-divider">|</span>
             <a href="/admin/login.html">Developer Login</a>
         </div>
 
-        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.8;">
-            A project by <strong>Ghanshyam Acharya</strong>.
-        </p>
-        <p style="margin-top: var(--spacing-xs); font-size: var(--font-size-sm); opacity: 0.6;">
+        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.6;">
             &copy; 2026 AviaSAFEsystem. All rights reserved.
         </p>
     </div>
 </footer>
+
+<!-- ========== FOUNDER BIO MODAL ========== -->
+<div id="bioModal" class="bio-modal" role="dialog" aria-modal="true" aria-labelledby="bioModalTitle" hidden>
+    <div class="bio-modal-card">
+        <button type="button" class="bio-modal-close" id="bioModalCloseBtn" aria-label="Close bio modal">&times;</button>
+
+        <div class="bio-modal-header">
+            <h2 id="bioModalTitle">Ghanshyam Acharya<span>Founder &amp; Aviation Safety Specialist</span></h2>
+            <p class="bio-modal-tagline">Former Airline CEO | Advisor to AWS Education | Human Factors Instructor &amp; Investigator</p>
+        </div>
+
+        <div class="bio-modal-body">
+            <h3>Executive Summary</h3>
+            <p>
+                Over 45 years of executive and operational leadership in the aviation industry.
+                Former CEO of a domestic airline in Nepal, Human Factors Trainer/Instructor, and
+                Advisor to AWS Education. Dedicated to embedding proactive safety cultures across
+                High Reliability Organizations (HROs) and promoting AI education to enhance aviation
+                safety performance and accelerate learning cycles.
+            </p>
+
+            <h3>Core Expertise &amp; Specializations</h3>
+            <ul>
+                <li>
+                    <strong>Human Factors Training &amp; Curriculum Design:</strong> Aligned with
+                    ICAO Doc 9683, NCAR Part-66 Module 9, Crew Resource Management (CRM), and Fatigue
+                    Risk Management (FRMS).
+                </li>
+                <li>
+                    <strong>Incident &amp; Accident Investigation:</strong> Applied practitioner
+                    competence in HFACS, SHELL Model, Reason's Swiss Cheese, and Bow-Tie
+                    investigation methodologies.
+                </li>
+                <li>
+                    <strong>Safety Management Systems (SMS) &amp; Annex 19:</strong> End-to-end SMS
+                    design, 4-Pillar Safety Culture surveys, and continuous performance monitoring.
+                </li>
+                <li>
+                    <strong>HRO Principles &amp; AI Education:</strong> Translating operational data
+                    into actionable safety intelligence and advocating AI education to minimize
+                    safety learning curves.
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
 
 <script>
 // ============================================================================
@@ -338,6 +401,34 @@ function goToTenant() {
 
     window.location.href = 'https://' + tenantId + '.aviasafesystems.com';
 }
+
+// ============================================================================
+// FOUNDER BIO MODAL
+// ============================================================================
+
+function openBioModal() {
+    const modal = document.getElementById('bioModal');
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+}
+
+function closeBioModal() {
+    const modal = document.getElementById('bioModal');
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+}
+
+document.getElementById('bioModal').addEventListener('click', function(e) {
+    if (e.target.id === 'bioModal') closeBioModal();
+});
+
+document.getElementById('bioModalCloseBtn').addEventListener('click', closeBioModal);
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeBioModal();
+});
 
 document.getElementById('tenantInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {

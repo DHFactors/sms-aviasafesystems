@@ -166,6 +166,15 @@
         footer.className = 'dashboard-footer text-center py-3';
         footer.id = 'shellFooter';
 
+        const links = document.createElement('div');
+        links.style.fontSize = '0.875rem';
+        links.style.marginBottom = '0.5rem';
+        links.innerHTML =
+            '<a href="/privacy.html" style="color: rgba(255,255,255,0.75); text-decoration: none;">Privacy Policy</a>' +
+            '<span style="margin: 0 0.5rem; color: rgba(255,255,255,0.4);">|</span>' +
+            '<a href="/terms.html" style="color: rgba(255,255,255,0.75); text-decoration: none;">Terms of Service</a>';
+        footer.appendChild(links);
+
         const p = document.createElement('p');
         p.className = 'mb-0 text-muted';
         p.style.fontSize = '0.875rem';

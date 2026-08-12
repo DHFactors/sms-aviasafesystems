@@ -114,6 +114,15 @@ p { margin-bottom: var(--spacing-md); }
     background: var(--color-primary);
     color: var(--color-white);
 }
+.btn-outline-primary {
+    background: transparent;
+    color: var(--color-accent);
+    border: 2px solid var(--color-accent);
+}
+.btn-outline-primary:hover {
+    background: var(--color-accent);
+    color: var(--color-white);
+}
 .btn-sm { padding: var(--spacing-sm) var(--spacing-md); font-size: var(--font-size-sm); }
 .btn-lg { padding: var(--spacing-lg) var(--spacing-2xl); font-size: var(--font-size-lg); }
 
@@ -240,15 +249,42 @@ select.form-control { appearance: auto; }
     gap: var(--spacing-md);
 }
 .app-header nav a {
-    color: var(--color-white);
+    color: var(--color-text-muted);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--border-radius-sm);
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+}
+.app-header nav a:hover {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--color-accent);
+}
+.app-header nav a.active {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--color-accent);
+}
+.app-header nav a.btn-login {
+    background: var(--color-accent-light);
+    color: var(--color-primary-dark);
+    font-weight: 600;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
     transition: all var(--transition-fast);
 }
-.app-header nav a:hover,
-.app-header nav a.active {
-    background: rgba(255,255,255,0.15);
+.app-header nav a.btn-login:hover {
+    background: var(--color-primary-dark);
+    color: var(--color-white);
     text-decoration: none;
+    transform: translateY(-1px);
 }
 
 /* ========== UNIFORM DASHBOARD HERO (tenant name + user email) ========== */
@@ -386,4 +422,119 @@ select.form-control { appearance: auto; }
     h1 { font-size: var(--font-size-3xl); }
     h2 { font-size: var(--font-size-2xl); }
     .container { padding: 0 var(--spacing-md); }
+}
+
+/* ========== FOUNDER BIO MODAL ========== */
+.bio-modal {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+.bio-modal[hidden] {
+    display: none;
+}
+.bio-modal-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.98);
+    width: 100%;
+    max-width: 680px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-xl);
+    padding: var(--spacing-2xl);
+}
+.bio-modal-close {
+    position: absolute;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-gray-100);
+    color: var(--color-gray-800);
+    font-size: var(--font-size-2xl);
+    line-height: 1;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.bio-modal-close:hover {
+    background: var(--color-danger);
+    color: var(--color-white);
+}
+.bio-modal-header {
+    margin-bottom: var(--spacing-xl);
+    padding-right: var(--spacing-2xl);
+}
+.bio-modal-header h2 {
+    color: var(--color-primary-dark);
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    margin-bottom: var(--spacing-xs);
+}
+.bio-modal-header h2 span {
+    display: block;
+    color: var(--color-accent);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    margin-top: var(--spacing-xs);
+}
+.bio-modal-tagline {
+    color: var(--color-gray-600);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+    margin-top: var(--spacing-sm);
+}
+.bio-modal-body h3 {
+    color: var(--color-primary);
+    font-size: var(--font-size-lg);
+    margin: var(--spacing-lg) 0 var(--spacing-sm);
+}
+.bio-modal-body p,
+.bio-modal-body li {
+    color: var(--color-gray-800);
+    font-size: var(--font-size-base);
+    line-height: 1.7;
+}
+.bio-modal-body ul {
+    padding-left: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+.bio-modal-body li {
+    margin-bottom: var(--spacing-sm);
+}
+@media (max-width: 480px) {
+    .bio-modal-card { padding: var(--spacing-lg); }
+    .bio-modal-header h2 { font-size: var(--font-size-xl); }
+}
+
+/* ========== FOUNDER BIO TRIGGER ========== */
+.bio-trigger {
+    display: block;
+    margin: var(--spacing-md) auto 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--color-accent);
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+}
+.bio-trigger:hover {
+    color: var(--color-primary-dark);
+    text-decoration-thickness: 2px;
 }

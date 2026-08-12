@@ -104,11 +104,22 @@ h1, h2, h3, h4, h5, h6 {
 .app-header nav a {
     color: var(--color-text-muted);
     font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease;
 }
-.app-header nav a:hover,
-.app-header nav a.active {
-    background: var(--color-primary-light);
+.app-header nav a:hover {
     color: var(--color-primary-dark);
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--color-accent);
+}
+.app-header nav a.active {
+    color: var(--color-primary-dark);
+    text-decoration: underline;
+    text-underline-offset: 6px;
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--color-accent);
 }
 
 /* ========== HERO ========== */
@@ -445,6 +456,18 @@ h1, h2, h3, h4, h5, h6 {
 
 .hero-headline .highlight {
     color: var(--color-accent-light);
+}
+.hero-headline .text-highlight {
+    color: var(--color-accent-light);
+}
+
+.hero-lead {
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--color-white);
+    margin-bottom: 0.5rem;
+    max-width: 90%;
 }
 
 .hero-description {
