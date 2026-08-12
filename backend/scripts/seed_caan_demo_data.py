@@ -31,17 +31,16 @@ REGULATOR_ID = "caan"
 COUNTRY = "NP"
 COUNTRY_NAME = "Nepal"
 
-# The operators overseen by the CAAN State Regulator. Order matters only for
-# the printed summary. Base maturity (1-5) drives the seeded SMS culture so the
-# CAAN dashboard shows a realistic spread of maturity across operators.
+# The operators overseen by the CAAN State Regulator. Matches the 5 active beta
+# provider tenants (seed/config.py OPERATOR_PROFILES). Legacy operators were
+# archived and are no longer overseen. Base maturity (1-5) drives the seeded
+# SMS culture so the CAAN dashboard shows a realistic spread of maturity.
 OPERATORS = [
-    {"id": "sita-air", "name": "Sita Air", "maturity": 3.9},
-    {"id": "yeti-airlines", "name": "Yeti Airlines", "maturity": 3.6},
-    {"id": "summit-air", "name": "Summit Air", "maturity": 3.2},
-    {"id": "simrik-air", "name": "Simrik Air", "maturity": 3.4},
     {"id": "buddha-air", "name": "Buddha Air", "maturity": 4.1},
     {"id": "air-dynasty", "name": "Air Dynasty Heli Services", "maturity": 3.0},
-    {"id": "tara-air", "name": "Tara Air", "maturity": 2.6},
+    {"id": "ktm-mro", "name": "KTM MRO Services", "maturity": 3.5},
+    {"id": "pokhara-aerodrome", "name": "Pokhara Aerodrome", "maturity": 2.8},
+    {"id": "himalaya-ground-services", "name": "Himalaya Ground Handling", "maturity": 3.3},
 ]
 
 ICAO_CATEGORIES = [

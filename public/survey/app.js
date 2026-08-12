@@ -216,28 +216,39 @@ async function loadSurveyInstructions() {
             banner.style.display = 'block';
             banner.innerHTML = '<div class="instructions-inner">' + renderMarkdown(instructions) + '</div>';
         }
-        enforceSurveyWindow(payload?.data?.surveyConfig);
+        enforceSurveyWindow(payload?.data?.surveyConfig, payload?.data?.config);
     } catch (err) {
         console.warn('Could not load survey instructions:', err);
         if (tenantNameEl) tenantNameEl.textContent = titleCaseTenant(activeTenantId);
     }
 }
 
-function enforceSurveyWindow(surveyConfig) {
-    if (!surveyConfig) return;
-    const openDate = surveyConfig.openDate || surveyConfig.open_date;
-    const closeDate = surveyConfig.closeDate || surveyConfig.close_date;
-    if (!openDate && !closeDate) return;
+function enforceSurveyWindow(surveyConfig, config) {
+    if (!surveyConfig && !config) return;
+    const cfg = surveyConfig || {};
+    const tenantConfig = config || {};
+
+    const openDate = cfg.openDate || cfg.open_date || tenantConfig.survey_open_date;
+    const closeDate = cfg.closeDate || cfg.close_date || tenantConfig.survey_close_date;
+
+    let active = cfg.isActive;
+    if (typeof active !== 'boolean') active = cfg.is_active;
+    if (typeof active !== 'boolean') active = tenantConfig.is_survey_active;
+    if (typeof active !== 'boolean') active = true;
 
     const now = new Date();
     let closed = false;
-    if (openDate && now < new Date(openDate)) closed = true;
-    if (closeDate && now > new Date(closeDate)) closed = true;
+    if (active === false) {
+        closed = true;
+    } else {
+        if (openDate && now < new Date(openDate)) closed = true;
+        if (closeDate && now > new Date(closeDate)) closed = true;
+    }
     if (!closed) return;
 
     const closedBanner = document.getElementById('surveyClosedBanner');
     if (closedBanner) {
-        const reopened = openDate && now < new Date(openDate)
+        const reopened = active !== false && openDate && now < new Date(openDate)
             ? new Date(openDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
             : null;
         closedBanner.textContent = reopened

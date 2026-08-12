@@ -20,6 +20,7 @@ on repeated runs unless --force is used.
 import sys
 import argparse
 from datetime import datetime, timezone
+from typing import Optional
 from loguru import logger
 
 from seed.config import (
@@ -66,17 +67,18 @@ def _is_stale(doc_id: str, doc_data: dict, prefixes: tuple) -> bool:
     return stored_version != SEED_VERSION
 
 
-def purge_stale_seed(db) -> dict:
+def purge_stale_seed(db, tenant_ids=None) -> dict:
     """Remove runner-owned docs left over from earlier seed versions.
 
     Runs only AFTER the whole seed has succeeded, so a failed re-seed can never
     wipe existing data (previously the clear ran first and left the database
-    empty on mid-run failures).
+    empty on mid-run failures). Scoped to `tenant_ids` when provided.
     """
     from app.core.config import settings
 
     removed = {"surveys": 0, "reports": 0, "hazards": 0, "can_cap": 0, "caps": 0}
-    for tenant_id in [p["id"] for p in OPERATOR_PROFILES]:
+    profiles = [p for p in OPERATOR_PROFILES if not tenant_ids or p["id"] in tenant_ids]
+    for tenant_id in [p["id"] for p in profiles]:
         tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
 
         for sub, prefixes in RUNNER_COLLECTION_PREFIXES.items():
@@ -116,7 +118,16 @@ def run(
     surveys_only: bool = False,
     reports_only: bool = False,
     users_only: bool = False,
+    tenant_ids: Optional[list] = None,
 ) -> dict:
+    """Seed demo data.
+
+    `tenant_ids` restricts every step to the given operator tenants (users,
+    tenant docs, surveys, reports, hazards/CANs, and the post-seed purge).
+    When scoped, the CAAN state-regulator tenant and the global state-risk
+    reference are left untouched. When None, the full 6-tenant beta model is
+    seeded (5 providers + CAAN).
+    """
     if not dry_run:
         if db is None:
             from app.firebase import get_db
@@ -145,19 +156,23 @@ def run(
         "caps": 0,
         "state_risk_categories": 0,
     }
+    if tenant_ids:
+        counts["tenant_ids"] = sorted(set(tenant_ids))
 
     if dry_run:
         from seed.hazard_can import estimate_counts
-        hc = estimate_counts()
+        hc = estimate_counts(tenant_ids)
         counts["hazards"] = hc["hazards"]
         counts["cans"] = hc["cans"]
         counts["caps"] = hc["caps"]
-        for p in OPERATOR_PROFILES:
+        profiles = [p for p in OPERATOR_PROFILES if not tenant_ids or p["id"] in tenant_ids]
+        for p in profiles:
             counts["tenants"] += 1
             counts["surveys"] += p["survey_count"]
             counts["vsr_reports"] += p["vsr_count"]
             counts["mor_reports"] += p["mor_count"]
-        logger.info(f"DRY RUN: Would seed {counts['tenants']} tenants, "
+        scope = "scoped" if tenant_ids else "6-tenant beta"
+        logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "
                      f"{counts['mor_reports']} MOR, "
@@ -170,42 +185,48 @@ def run(
     if all_doing_all or users_only:
         logger.info("=== Seeding users ===")
         from seed.users import create_all_users
-        created = create_all_users(auth)
+        created = create_all_users(auth, tenant_ids)
         counts["users"] = len(created)
 
     if all_doing_all or (not users_only and not reports_only):
         logger.info("=== Seeding tenants ===")
-        from seed.operators import create_all_tenants, create_caan_tenant
-        tenant_ids = create_all_tenants(db)
-        create_caan_tenant(db)
-        counts["tenants"] = len(tenant_ids)
+        from seed.operators import (
+            create_all_tenants,
+            create_caan_tenant,
+            create_regulator_scoping,
+        )
+        tenant_ids_created = create_all_tenants(db, tenant_ids)
+        if not tenant_ids:
+            create_caan_tenant(db)
+            create_regulator_scoping(db)
+        counts["tenants"] = len(tenant_ids_created)
 
     if all_doing_all or surveys_only:
         logger.info("=== Seeding survey responses ===")
         from seed.surveys import create_all_surveys
-        total_surveys = create_all_surveys(db)
+        total_surveys = create_all_surveys(db, tenant_ids)
         counts["surveys"] = total_surveys
 
     if all_doing_all or reports_only:
         logger.info("=== Seeding VSR reports ===")
         from seed.reports import create_all_vsr_reports
-        total_vsr = create_all_vsr_reports(db)
+        total_vsr = create_all_vsr_reports(db, tenant_ids)
         counts["vsr_reports"] = total_vsr
 
         logger.info("=== Seeding MOR reports ===")
         from seed.reports import create_all_mor_reports
-        total_mor = create_all_mor_reports(db)
+        total_mor = create_all_mor_reports(db, tenant_ids)
         counts["mor_reports"] = total_mor
 
     if all_doing_all or reports_only:
         logger.info("=== Seeding hazards + CAN/CAP ===")
         from seed.hazard_can import create_all_hazard_can_data
-        hc = create_all_hazard_can_data(db)
+        hc = create_all_hazard_can_data(db, tenant_ids)
         counts["hazards"] = hc["hazards"]
         counts["cans"] = hc["cans"]
         counts["caps"] = hc["caps"]
 
-    if all_doing_all:
+    if all_doing_all and not tenant_ids:
         logger.info("=== Seeding state risk register reference ===")
         from seed.state_risk import create_all_state_risk_reference
         counts["state_risk_categories"] = create_all_state_risk_reference(db)
@@ -214,7 +235,7 @@ def run(
         # Purge runner-owned leftovers only after the whole seed succeeded, so a
         # failed re-seed can no longer wipe existing data (non-destructive-until-success).
         if all_doing_all:
-            purge_stale_seed(db)
+            purge_stale_seed(db, tenant_ids)
         counts["seeded_at"] = datetime.now(timezone.utc).isoformat()
         set_seed_status(db, counts)
         logger.info(f"Seed complete: {counts['surveys']} surveys, "

@@ -89,11 +89,11 @@ def _base_seed(tenant_id: str) -> int:
 
 
 def _hazard_count(profile: dict) -> int:
-    return max(15, int(profile["vsr_count"] * 0.35))
+    return profile.get("hazard_count") or max(15, int(profile["vsr_count"] * 0.35))
 
 
 def _can_count(profile: dict) -> int:
-    return max(4, _hazard_count(profile) // 6)
+    return profile.get("can_count") or max(4, _hazard_count(profile) // 6)
 
 
 def _caps_per_can(base_seed: int, can_index: int) -> int:
@@ -219,10 +219,12 @@ def _cap_doc(rng: SeededRandom, can_reference: str, can_doc_id: str, index: int,
     }
 
 
-def estimate_counts() -> dict:
+def estimate_counts(tenant_ids=None) -> dict:
     """Counts for a dry run. Deterministic — matches an actual run."""
     totals = {"hazards": 0, "cans": 0, "caps": 0}
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         base_seed = _base_seed(profile["id"])
         totals["hazards"] += _hazard_count(profile)
         can_count = _can_count(profile)
@@ -232,13 +234,15 @@ def estimate_counts() -> dict:
     return totals
 
 
-def create_all_hazard_can_data(db) -> dict:
+def create_all_hazard_can_data(db, tenant_ids=None) -> dict:
     """Seed hazards + CANs (+CAPs) into every OPERATOR_PROFILES tenant."""
     from app.core.config import settings
 
     totals = {"hazards": 0, "cans": 0, "caps": 0}
 
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         tenant_id = profile["id"]
         base_seed = _base_seed(tenant_id)
         seed = base_seed

@@ -39,9 +39,9 @@ def init_admin():
 def main():
     init_admin()
 
-    # CAAN_SMD seed user from seed/config.py
-    uid = "caan-smd-001"
-    custom = admin_auth.create_custom_token(uid, {"role": "CAAN_SMD", "tenant_id": None})
+    # CAAN_SMD seed user from seed/config.py (smd@caanepal.gov.np / smd-caan-001)
+    uid = "smd-caan-001"
+    custom = admin_auth.create_custom_token(uid, {"role": "CAAN_SMD", "tenant_id": "caan"})
     custom = custom.decode() if isinstance(custom, bytes) else custom
 
     api_key = "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc"

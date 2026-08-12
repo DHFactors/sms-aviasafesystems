@@ -174,6 +174,7 @@ class _TenantRef:
 def _patch_db(monkeypatch, db):
     monkeypatch.setattr("app.routes.tenants.get_db", lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
+    monkeypatch.setattr("app.services.tenant_service.get_db", lambda: db)
 
 
 def _patch_user(monkeypatch, user):
@@ -282,6 +283,165 @@ def test_put_config_unknown_tenant(monkeypatch):
 
     resp = _put("ghost-air", {"survey_rate_limit": 10})
     assert resp.status_code == 404
+
+
+def test_put_config_full_survey_management(monkeypatch):
+    """PUT persists rate limit, instructions, dates and the active override,
+    and keeps the camelCase surveyConfig mirror in sync."""
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {"survey_rate_limit": 5}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    body = {
+        "survey_rate_limit": 50,
+        "survey_instructions": "Please answer honestly",
+        "survey_open_date": "2026-09-01",
+        "survey_close_date": "2026-09-30",
+        "is_survey_active": True,
+    }
+    resp = _put("tara-air", body)
+    assert resp.status_code == 200
+    config = resp.json()["data"]["config"]
+    assert config["survey_rate_limit"] == 50
+    assert config["survey_instructions"] == "Please answer honestly"
+    assert config["survey_open_date"] == "2026-09-01"
+    assert config["survey_close_date"] == "2026-09-30"
+    assert config["is_survey_active"] is True
+
+    stored = db._tenants["tara-air"]
+    assert stored["config"]["survey_open_date"] == "2026-09-01"
+    assert stored["config"]["survey_close_date"] == "2026-09-30"
+    assert stored["config"]["is_survey_active"] is True
+    assert stored["surveyConfig"]["openDate"] == "2026-09-01"
+    assert stored["surveyConfig"]["closeDate"] == "2026-09-30"
+    assert stored["surveyConfig"]["isActive"] is True
+
+
+def test_put_config_safety_role_allowed(monkeypatch):
+    """The 'safety' role is a valid Safety Manager role for the tenant."""
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, {
+        "uid": "u9", "email": "safety@taraair.com",
+        "role": "safety", "tenant_id": "tara-air",
+        "claims": {"role": "safety", "tenant_id": "tara-air"},
+    })
+
+    resp = _put("tara-air", {"survey_rate_limit": 10, "is_survey_active": True})
+    assert resp.status_code == 200
+    assert db._tenants["tara-air"]["config"]["is_survey_active"] is True
+
+
+def test_put_config_close_before_open_rejected(monkeypatch):
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": "2026-09-30",
+        "survey_close_date": "2026-09-01",
+    })
+    assert resp.status_code == 422
+
+
+def test_put_config_invalid_date_rejected(monkeypatch):
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": "not-a-date",
+        "survey_close_date": "2026-09-30",
+    })
+    assert resp.status_code == 422
+
+
+def test_put_config_clears_dates_and_closes(monkeypatch):
+    """Explicit empty dates remove the survey window and close the survey."""
+    db = _FakeDB()
+    db._tenants["tara-air"] = {
+        "config": {
+            "survey_rate_limit": 10,
+            "survey_open_date": "2026-08-01",
+            "survey_close_date": "2026-08-31",
+            "is_survey_active": True,
+        },
+        "surveyConfig": {"openDate": "2026-08-01", "closeDate": "2026-08-31", "isActive": True},
+    }
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": "",
+        "survey_close_date": "",
+        "is_survey_active": False,
+    })
+    assert resp.status_code == 200
+    config = db._tenants["tara-air"]["config"]
+    assert "survey_open_date" not in config
+    assert "survey_close_date" not in config
+    assert config["is_survey_active"] is False
+
+    survey_config = db._tenants["tara-air"]["surveyConfig"]
+    assert "openDate" not in survey_config
+    assert "closeDate" not in survey_config
+    assert survey_config["isActive"] is False
+
+
+def test_put_config_preserves_legacy_survey_window(monkeypatch):
+    """A PUT that only touches the rate limit leaves the legacy surveyConfig
+    window (openDate/closeDate) intact."""
+    db = _FakeDB()
+    db._tenants["tara-air"] = {
+        "config": {"survey_rate_limit": 5},
+        "surveyConfig": {"openDate": "2026-08-01T00:00:00Z", "closeDate": "2026-08-31T23:59:59Z"},
+    }
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {"survey_rate_limit": 25})
+    assert resp.status_code == 200
+    survey_config = db._tenants["tara-air"]["surveyConfig"]
+    assert survey_config["openDate"] == "2026-08-01T00:00:00Z"
+    assert survey_config["closeDate"] == "2026-08-31T23:59:59Z"
+
+
+def test_put_config_buddha_air_manager_tenant_isolation(monkeypatch):
+    """A buddha-air Safety Manager can open/close their own survey but must not
+    affect other tenants (verification scenario)."""
+    db = _FakeDB()
+    db._tenants["buddha-air"] = {"tenant_id": "buddha-air", "config": {"survey_rate_limit": 5}}
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {"survey_rate_limit": 5}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, {
+        "uid": "u-buddha", "email": "safety@buddha-air.com",
+        "role": "AIRLINE_ADMIN", "tenant_id": "buddha-air",
+        "claims": {"role": "AIRLINE_ADMIN", "tenant_id": "buddha-air"},
+    })
+
+    # Opens their own survey.
+    resp = _put("buddha-air", {
+        "survey_rate_limit": 25,
+        "survey_open_date": "2026-09-01",
+        "survey_close_date": "2026-09-30",
+        "is_survey_active": True,
+    })
+    assert resp.status_code == 200
+    buddha = db._tenants["buddha-air"]
+    assert buddha["config"]["is_survey_active"] is True
+    assert buddha["surveyConfig"]["openDate"] == "2026-09-01"
+
+    # Cannot touch another tenant.
+    resp = _put("tara-air", {"survey_rate_limit": 25})
+    assert resp.status_code == 403
+    assert db._tenants["tara-air"]["config"]["survey_rate_limit"] == 5
 
 
 # ============================================================================

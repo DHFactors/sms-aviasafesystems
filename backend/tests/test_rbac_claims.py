@@ -49,7 +49,7 @@ def test_simplified_role_accounts_match_security_domain():
 
 def test_every_operator_has_all_role_accounts():
     assert set(CREDENTIAL_EMAIL_DOMAINS) == {op["id"] for op in OPERATOR_PROFILES}
-    assert len(OPERATOR_PROFILES) == 7
+    assert len(OPERATOR_PROFILES) == 5
     plan = build_simplified_role_plan()
     assert len(plan) == len(OPERATOR_PROFILES) * len(SIMPLIFIED_ROLE_ACCOUNTS)
     for op in OPERATOR_PROFILES:
@@ -59,9 +59,9 @@ def test_every_operator_has_all_role_accounts():
 
 
 def test_example_accounts_from_scheme_doc():
-    assert simplified_email("safety", "tara-air") == "safety@tara-air.com"
-    assert simplified_email("camo", "tara-air") == "camo@tara-air.com"
-    assert simplified_email("145", "yeti-airlines") == "145@yeti-airlines.com"
+    assert simplified_email("safety", "buddha-air") == "safety@buddha-air.com"
+    assert simplified_email("camo", "ktm-mro") == "camo@ktm-mro.com"
+    assert simplified_email("145", "ktm-mro") == "145@ktm-mro.com"
     assert simplified_email("ops", "air-dynasty") == "ops@air-dynasty.com"
 
 
@@ -91,8 +91,8 @@ def test_safety_routes_to_full_dashboard():
 
 
 @pytest.mark.parametrize("token,op_id,expected_email", [
-    ("camo", "tara-air", "camo@tara-air.com"),
-    ("145", "yeti-airlines", "145@yeti-airlines.com"),
+    ("camo", "ktm-mro", "camo@ktm-mro.com"),
+    ("145", "ktm-mro", "145@ktm-mro.com"),
     ("ops", "air-dynasty", "ops@air-dynasty.com"),
 ])
 def test_department_roles_route_to_responsible_manager(token, op_id, expected_email):

@@ -12,29 +12,42 @@
 # Usage:
 #   python scripts/seed_flight_diversions.py            # beta (sms-db-beta)
 #   python scripts/seed_flight_diversions.py sms-db-beta
+#   python -m scripts.seed_flight_diversions --tenants buddha-air,air-dynasty
 #   SEED_DB=sms-db-beta python scripts/seed_flight_diversions.py
 # ============================================================================
 
+import argparse
 import os
 import random
 import sys
 from datetime import datetime, timedelta, timezone
 
-DB_ID = os.environ.get("SEED_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db-beta")
+DB_ID = os.environ.get("SEED_DB", "sms-db-beta")
 os.environ["FIREBASE_DATABASE_ID"] = DB_ID
 
-SEED_VERSION = "flight-diversion-demo-1"
+SEED_VERSION = "flight-diversion-demo-2"
 SEED_CREATOR = "seed-flight-diversions"
 HAZARD_SEQ_BASE = 8000
 
+from seed.config import OPERATOR_PROFILES, FLIGHT_OPERATOR_TYPES
+
+
+def _operator_code(iata: str, tenant_id: str) -> str:
+    """Fall back to a readable code when the profile has no IATA (non-airline)."""
+    if iata and iata.isalnum():
+        return iata.upper()
+    return "".join(part[0] for part in tenant_id.split("-") if part)[:2].upper()
+
+
 OPERATORS = [
-    {"id": "sita-air", "iata": "ST", "kind": "STOL"},
-    {"id": "yeti-airlines", "iata": "YT", "kind": "Scheduled"},
-    {"id": "summit-air", "iata": "SM", "kind": "STOL"},
-    {"id": "simrik-air", "iata": "RK", "kind": "Helicopter"},
-    {"id": "buddha-air", "iata": "U4", "kind": "Scheduled"},
-    {"id": "air-dynasty", "iata": "DN", "kind": "Helicopter"},
-    {"id": "tara-air", "iata": "TB", "kind": "STOL"},
+    {
+        "id": p["id"],
+        "iata": _operator_code(p.get("iata", ""), p["id"]),
+        "kind": "Scheduled" if p["tenant_type"] == "airline" else "Helicopter",
+        "count": p["flight_diversion_count"],
+    }
+    for p in OPERATOR_PROFILES
+    if p["tenant_type"] in FLIGHT_OPERATOR_TYPES and p["flight_diversion_count"]
 ]
 
 AIRPORTS = {
@@ -172,17 +185,20 @@ def count_docs(tid: str, sub: str) -> int:
 # Seed
 # ============================================================================
 
-def seed_diversions() -> tuple:
+def seed_diversions(tenant_ids=None) -> tuple:
     now = datetime.now(timezone.utc)
     d_total = h_total = 0
-    for op in OPERATORS:
+    ops = [o for o in OPERATORS if not tenant_ids or o["id"] in tenant_ids]
+    for op in ops:
         tid = op["id"]
         clear_seeded(tid)
         ref = db.collection("tenants").document(tid)
         diversions = ref.collection("flight_diversions")
         hazards = ref.collection("hazards")
 
-        times = sorted(now - timedelta(days=random.uniform(0, 180)) for _ in range(5))
+        times = sorted(
+            now - timedelta(days=random.uniform(0, 180)) for _ in range(op["count"])
+        )
         for seq, when in enumerate(times, start=1):
             year = when.year
             diversion_doc = make_diversion_doc(tid, op, seq, year, when)
@@ -199,6 +215,19 @@ def seed_diversions() -> tuple:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Seed demo flight diversions into operator tenants (beta by default).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("db", nargs="?", default=DB_ID,
+                        help="Firestore database id (default: sms-db-beta).")
+    parser.add_argument("--tenants", default=None,
+                        help="Comma-separated operator tenant ids to restrict seeding to "
+                             "(default: all flight operators).")
+    args = parser.parse_args()
+    DB_ID = args.db
+    os.environ["FIREBASE_DATABASE_ID"] = DB_ID
+
     random.seed(20240810)
     BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, BACKEND)
@@ -222,6 +251,14 @@ if __name__ == "__main__":
     app = firebase_admin.get_app()
     db = firestore.client(app=app, database_id=DB_ID)
 
+    tenant_filter = None
+    if args.tenants:
+        tenant_filter = [t.strip() for t in args.tenants.split(",") if t.strip()]
+        unknown = [t for t in tenant_filter if t not in {o["id"] for o in OPERATORS}]
+        if unknown:
+            print(f"WARNING: requested tenants are not flight operators (skipped): {unknown}")
+
     print(f"Seeding flight diversions -> database={DB_ID}\n")
-    d_total, h_total = seed_diversions()
-    print(f"\nDone. Seeded {d_total} flight diversions and {h_total} linked hazards across {len(OPERATORS)} operators.")
+    d_total, h_total = seed_diversions(tenant_filter)
+    print(f"\nDone. Seeded {d_total} flight diversions and {h_total} linked hazards across "
+          f"{len(tenant_filter) if tenant_filter else len(OPERATORS)} operators.")

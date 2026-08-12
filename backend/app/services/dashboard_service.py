@@ -10,6 +10,7 @@
 # ============================================================================
 
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
@@ -17,6 +18,9 @@ from app.core.config import settings
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
 from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
+from seed.config import FLIGHT_OPERATOR_TYPES
+
+DIVERSION_COLLECTION = "flight_diversions"
 
 SURVEY_PILLARS = ["safety_policy", "safety_risk_management", "safety_assurance", "safety_promotion"]
 SMS_MATURITY_CACHE_TTL = 6 * 3600  # seconds
@@ -308,7 +312,68 @@ class DashboardService:
     def get_monthly_trends(self, **overrides) -> List[Dict[str, Any]]:
         f = self._base_filter(**overrides)
         reports = self.repo.get_all_in_range(f)
-        return MetricsService.calculate_monthly_trends(reports)
+        trends = MetricsService.calculate_monthly_trends(reports)
+        self._merge_diversion_trends(trends, overrides.get("days", self.DEFAULT_DAYS))
+        return trends
+
+    def _tenant_type(self) -> Optional[str]:
+        """Resolve the authenticated tenant's `type` from its tenant doc."""
+        if not self.tenant_id:
+            return None
+        try:
+            from app.firebase import get_db
+            doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).get()
+            if doc.exists:
+                return (doc.to_dict() or {}).get("type")
+        except Exception as e:
+            logger.warning(f"Failed to resolve tenant type for {self.tenant_id}: {e}")
+        return None
+
+    def _merge_diversion_trends(self, trends: List[Dict[str, Any]], days: int) -> None:
+        """Attach a `diversions` count to each monthly trend row for flight
+        operators (airline / helicopter-operator). Additive only — MRO,
+        aerodrome and ground-handling tenants keep their existing rows and get
+        no diversion key."""
+        if self._tenant_type() not in FLIGHT_OPERATOR_TYPES:
+            return
+        if not self.tenant_id or not days:
+            return
+        try:
+            from app.firebase import get_db
+            db = get_db()
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+            docs = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).collection(DIVERSION_COLLECTION).get()
+        except Exception as e:
+            logger.warning(f"Failed to load diversion trends for {self.tenant_id}: {e}")
+            return
+
+        month_counts = defaultdict(int)
+        for doc in docs:
+            raw = (doc.to_dict() or {}).get("date")
+            if not raw:
+                continue
+            if isinstance(raw, str):
+                try:
+                    raw = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+            if raw.tzinfo is None:
+                raw = raw.replace(tzinfo=timezone.utc)
+            if raw < cutoff:
+                continue
+            month_counts[f"{raw.year}-{raw.month:02d}"] += 1
+
+        for row in trends:
+            key = f"{row['year']}-{int(row['month']):02d}"
+            row["diversions"] = month_counts.get(key, 0)
+        row_keys = {f"{r['year']}-{int(r['month']):02d}" for r in trends}
+        for key, count in month_counts.items():
+            if key not in row_keys:
+                year, month = key.split("-")
+                trends.append({"month": str(int(month)), "year": int(year),
+                               "total": 0, "voluntary": 0, "mandatory": 0,
+                               "high_risk": 0, "prediction": None, "diversions": count})
+        trends.sort(key=lambda r: (r["year"], int(r["month"])))
 
     def get_hazard_frequency(self, **overrides) -> List[Dict[str, Any]]:
         f = self._base_filter(**overrides)

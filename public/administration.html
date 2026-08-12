@@ -23,6 +23,22 @@
         .config-card p.note { font-size: 0.85rem; color: #64748b; margin-bottom: 1rem; }
         .btn-refresh { background: #1a6b8a; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.15s; }
         .btn-refresh:hover { background: #0b2a42; }
+        .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* Survey status toggle switch */
+        .survey-toggle-row { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 0; border-bottom: 1px solid #e2e8f0; }
+        .survey-toggle-row .toggle-copy { flex: 1; }
+        .survey-toggle-row .toggle-copy strong { font-size: 0.95rem; color: #0b2a42; }
+        .survey-toggle-row .toggle-copy small { display: block; font-size: 0.8rem; color: #64748b; margin-top: 0.15rem; }
+        .switch { position: relative; display: inline-block; width: 52px; height: 28px; flex: 0 0 auto; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch .slider { position: absolute; cursor: pointer; inset: 0; background: #cbd5e1; border-radius: 28px; transition: background 0.2s; }
+        .switch .slider::before { content: ''; position: absolute; height: 22px; width: 22px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+        .switch input:checked + .slider { background: #34a853; }
+        .switch input:checked + .slider::before { transform: translateX(24px); }
+        #surveyStatusLabel { font-weight: 700; font-size: 0.85rem; min-width: 3.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
+        #surveyFormRow { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+        @media (max-width: 640px) { #surveyFormRow { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -74,6 +90,59 @@
             </div>
         </div>
 
+        <div class="section-title" style="margin-top:2rem;"><i class="fas fa-clipboard-check"></i> SMS Survey Management</div>
+        <div class="config-card" id="surveyManagementCard">
+            <p class="note">
+                Control the ICAO-aligned SMS survey for your airline: open or close the survey,
+                set the survey window dates, the daily respondent cap, and the intro message
+                shown to respondents. Changes apply to your organization only.
+            </p>
+
+            <div class="survey-toggle-row">
+                <div class="toggle-copy">
+                    <strong>Survey Status</strong>
+                    <small>Toggle to open or close the survey for your respondents.</small>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="surveyActiveToggle">
+                    <span class="slider"></span>
+                </label>
+                <span id="surveyStatusLabel">Closed</span>
+            </div>
+
+            <div id="surveyFormRow">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Survey Start Date</label>
+                    <input type="date" id="surveyOpenDate" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Survey Expiry Date</label>
+                    <input type="date" id="surveyCloseDate" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top:1rem;max-width:280px;">
+                <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Respondent Rate Limit / Cap (per day)</label>
+                <select id="surveyRateLimit" style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;background:#fff;">
+                    <option value="5">5 responses / day</option>
+                    <option value="10">10 responses / day</option>
+                    <option value="25">25 responses / day</option>
+                    <option value="50">50 responses / day</option>
+                    <option value="100">100 responses / day</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-top:1rem;">
+                <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.25rem;">Survey Instructions / Intro Message</label>
+                <textarea id="surveyInstructions" rows="4" placeholder="e.g. Please answer each question honestly. Your responses support our Safety Management System." style="width:100%;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.9rem;resize:vertical;"></textarea>
+            </div>
+
+            <div style="margin-top:1.25rem;">
+                <button type="button" class="btn-refresh" id="surveySaveBtn"><i class="fas fa-save"></i> Save Survey Settings</button>
+                <span id="surveySaveStatus" style="margin-left:0.75rem;font-size:0.85rem;display:none;"></span>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -91,7 +160,7 @@ window.SHELL_CONFIG = {
         { href: '/dashboard/index.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
         { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
         { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
-        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN'] },
+        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'safety'] },
     ],
 };
 </script>
@@ -102,7 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await waitForFirebase();
     const session = await getCurrentUser();
     if (!session) { window.location.href = '/login.html'; return; }
-    if (session.role !== 'AIRLINE_ADMIN') {
+    if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'safety') {
         document.getElementById('pageContent').innerHTML = `
             <div style="text-align:center;padding:3rem;">
                 <i class="fas fa-lock" style="font-size:2.5rem;color:#dc3545;"></i>
@@ -120,6 +189,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('pageContent').style.display = 'block';
     await loadRiskMatrixConfig();
     setupRiskMatrixForm();
+    await loadSurveyManagement(session);
+    setupSurveyManagementForm(session);
 });
 
 async function loadRiskMatrixConfig() {
@@ -247,6 +318,97 @@ function setupRiskMatrixForm() {
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-save"></i> Save Thresholds';
+        }
+    });
+}
+
+// ============================================================================
+// SMS SURVEY MANAGEMENT (tenant Safety Manager)
+// ============================================================================
+
+async function loadSurveyManagement(session) {
+    const card = document.getElementById('surveyManagementCard');
+    const tenantId = session.tenantId;
+    if (!tenantId) {
+        card.style.display = 'block';
+        setSurveySaveStatus('No tenant assigned to this account.', 'error');
+        return;
+    }
+    try {
+        const data = await ApiClient.get('/api/v1/tenants/' + encodeURIComponent(tenantId) + '/config');
+        const config = (data && data.config) || {};
+        const surveyConfig = (data && data.surveyConfig) || {};
+
+        const openDate = config.survey_open_date || surveyConfig.openDate || surveyConfig.open_date || '';
+        const closeDate = config.survey_close_date || surveyConfig.closeDate || surveyConfig.close_date || '';
+
+        let isActive = config.is_survey_active;
+        if (typeof isActive !== 'boolean' && typeof surveyConfig.isActive === 'boolean') isActive = surveyConfig.isActive;
+        if (typeof isActive !== 'boolean') isActive = true;
+
+        document.getElementById('surveyOpenDate').value = String(openDate).substring(0, 10);
+        document.getElementById('surveyCloseDate').value = String(closeDate).substring(0, 10);
+        document.getElementById('surveyActiveToggle').checked = isActive;
+        document.getElementById('surveyRateLimit').value = String(config.survey_rate_limit || 5);
+        document.getElementById('surveyInstructions').value = config.survey_instructions || '';
+        updateSurveyStatusLabel();
+        card.style.display = 'block';
+    } catch (error) {
+        console.error('Error loading survey management:', error);
+        card.style.display = 'block';
+        setSurveySaveStatus('Failed to load survey settings: ' + error.message, 'error');
+    }
+}
+
+function updateSurveyStatusLabel() {
+    const active = document.getElementById('surveyActiveToggle').checked;
+    const label = document.getElementById('surveyStatusLabel');
+    label.textContent = active ? 'Open' : 'Closed';
+    label.style.color = active ? '#2e7d32' : '#dc3545';
+}
+
+function setSurveySaveStatus(text, type) {
+    const el = document.getElementById('surveySaveStatus');
+    el.innerHTML = (type === 'error' ? '<i class="fas fa-exclamation-circle"></i> ' : '<i class="fas fa-check-circle"></i> ') + text;
+    el.style.color = type === 'error' ? '#dc3545' : '#2e7d32';
+    el.style.display = 'inline';
+    clearTimeout(window.__surveyStatusTimer);
+    window.__surveyStatusTimer = setTimeout(function () { el.style.display = 'none'; }, 5000);
+}
+
+function setupSurveyManagementForm(session) {
+    document.getElementById('surveyActiveToggle').addEventListener('change', updateSurveyStatusLabel);
+
+    document.getElementById('surveySaveBtn').addEventListener('click', async function () {
+        const btn = document.getElementById('surveySaveBtn');
+        const openDate = document.getElementById('surveyOpenDate').value;
+        const closeDate = document.getElementById('surveyCloseDate').value;
+        const active = document.getElementById('surveyActiveToggle').checked;
+
+        if (openDate && closeDate && new Date(closeDate) <= new Date(openDate)) {
+            setSurveySaveStatus('Expiry date must be after the start date.', 'error');
+            return;
+        }
+
+        const body = {
+            is_survey_active: active,
+            survey_open_date: openDate || '',
+            survey_close_date: closeDate || '',
+            survey_rate_limit: parseInt(document.getElementById('surveyRateLimit').value, 10) || 5,
+            survey_instructions: document.getElementById('surveyInstructions').value.trim(),
+        };
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        try {
+            await ApiClient.put('/api/v1/tenants/' + encodeURIComponent(session.tenantId) + '/config', body);
+            setSurveySaveStatus('Survey settings saved.', 'success');
+        } catch (error) {
+            console.error('Error saving survey settings:', error);
+            setSurveySaveStatus('Error: ' + error.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save Survey Settings';
         }
     });
 }

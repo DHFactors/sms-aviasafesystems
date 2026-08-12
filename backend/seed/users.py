@@ -45,7 +45,7 @@ def create_user(auth, user_spec: dict) -> dict:
     }
 
 
-def create_all_users(auth) -> list:
+def create_all_users(auth, tenant_ids=None) -> list:
     rng = SeededRandom(seed=42)
     created_users = []
 
@@ -54,6 +54,8 @@ def create_all_users(auth) -> list:
         created_users.append(result)
 
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         op_id = profile["id"]
         domain = profile["email_domain"]
         op_name = profile["name"]

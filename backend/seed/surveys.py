@@ -48,7 +48,7 @@ def generate_survey_batch(
 
         dept = SURVEY_DEPARTMENTS[i % dep_count]
         year_exp = rng.choice(["<1", "1-3", "3-5", "5-10", "10+"])
-        timestamp = generate_timestamp(rng, days_back_min=1, days_back_max=730)
+        timestamp = generate_timestamp(rng, days_back_min=1, days_back_max=180)
         doc_id = _make_id("svy", tenant_id, i)
 
         surveys.append({
@@ -57,6 +57,7 @@ def generate_survey_batch(
             **elements,
             **pillar_scores,
             "overall_sms_maturity": overall,
+            "status": "completed",
             "department": dept,
             "years_of_experience": year_exp,
             "respondent_name": rng.choice(NEPALI_NAMES) if rng.random() > 0.3 else None,
@@ -87,11 +88,13 @@ def write_surveys(db, surveys: list):
     return written
 
 
-def create_all_surveys(db) -> int:
+def create_all_surveys(db, tenant_ids=None) -> int:
     base_seed = 10000
     total = 0
 
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         tenant_id = profile["id"]
         rng = SeededRandom(seed=base_seed + hash(tenant_id) % 10000)
 

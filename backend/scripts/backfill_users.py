@@ -51,7 +51,7 @@ from app.services.users import backfill_users_from_auth, list_tenant_users
 count = backfill_users_from_auth()
 print(f"\nusers synced: {count} (database={DB_ID})")
 
-for tid in ["tara-air", "buddha-air"]:
+for tid in ["buddha-air", "air-dynasty", "ktm-mro", "pokhara-aerodrome", "himalaya-ground-services"]:
     users = list_tenant_users(tid)
     print(f"\n[{tid}] {len(users)} authorized users:")
     for u in users:

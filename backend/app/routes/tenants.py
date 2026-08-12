@@ -18,6 +18,10 @@ from app.core.config import settings
 from app.firebase import get_db
 from app.middleware.auth import get_current_user
 from app.services.audit_service import log_audit, request_context
+from app.services.tenant_service import (
+    SURVEY_RATE_LIMIT_OPTIONS,
+    save_tenant_config,
+)
 from app.services.users import list_tenant_users
 
 router = APIRouter()
@@ -37,7 +41,7 @@ async def get_optional_user(
         return None
     return await get_current_user(credentials)
 
-SURVEY_RATE_LIMIT_OPTIONS = (5, 10, 25, 50, 100)
+SURVEY_MANAGER_ROLES = ("AIRLINE_ADMIN", "safety")
 
 
 def _envelope(data: Any) -> Dict[str, Any]:
@@ -49,16 +53,20 @@ def _envelope(data: Any) -> Dict[str, Any]:
 
 
 class TenantConfigUpdate(BaseModel):
-    survey_rate_limit: int = Field(..., description="Max daily survey submissions for this tenant")
-    survey_instructions: str = Field(None, description="Optional instructions shown at the top of the survey")
+    survey_rate_limit: Optional[int] = Field(None, description="Max daily survey submissions for this tenant")
+    survey_instructions: Optional[str] = Field(None, description="Optional instructions shown at the top of the survey")
+    survey_open_date: Optional[str] = Field(None, description="Survey start date (ISO string / YYYY-MM-DD)")
+    survey_close_date: Optional[str] = Field(None, description="Survey expiry date (ISO string / YYYY-MM-DD)")
+    is_survey_active: Optional[bool] = Field(None, description="Manual override to open/close the tenant survey")
 
 
 def _require_tenant_admin(user: Dict[str, Any], tenant_id: str) -> None:
-    """Phase 1: only the AIRLINE_ADMIN of the target tenant may edit its config."""
-    if user.get("role") != "AIRLINE_ADMIN":
+    """Only the Safety Manager (AIRLINE_ADMIN / safety) of the target tenant
+    may update its config. SUPER_ADMIN / CAAN_SMD cannot edit tenant settings."""
+    if user.get("role") not in SURVEY_MANAGER_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the AIRLINE_ADMIN of this tenant can update its config",
+            detail="Only the Safety Manager of this tenant can update its config",
         )
     if user.get("tenant_id") != tenant_id:
         raise HTTPException(
@@ -108,7 +116,15 @@ async def get_tenant_config(
 
     tenant_data = tenant_snap.to_dict() or {}
     config = tenant_data.get("config") or {}
-    survey_config = tenant_data.get("surveyConfig") or {}
+    survey_config = dict(tenant_data.get("surveyConfig") or {})
+    # Fall back to the canonical config map so dates/active set via PUT are
+    # exposed to the public survey page even before the camelCase mirror exists.
+    if "survey_open_date" in config and "openDate" not in survey_config:
+        survey_config["openDate"] = config["survey_open_date"]
+    if "survey_close_date" in config and "closeDate" not in survey_config:
+        survey_config["closeDate"] = config["survey_close_date"]
+    if "is_survey_active" in config and "isActive" not in survey_config:
+        survey_config["isActive"] = config["is_survey_active"]
     return _envelope({
         "tenant_id": tenant_id,
         "name": tenant_data.get("name"),
@@ -144,19 +160,19 @@ async def update_tenant_config(
     request: Request,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Update per-tenant configuration (survey rate limit, survey instructions).
+    """Update per-tenant survey management configuration.
 
-    AIRLINE_ADMIN of the target tenant only. The survey_rate_limit must be one
-    of the operator-selectable options (5, 10, 25, 50, 100).
+    Accepts the survey activation dates, the manual open/close override, the
+    daily respondent rate limit and the survey instructions. Only the Safety
+    Manager (AIRLINE_ADMIN / safety role) of the target tenant may edit it.
     """
     tenant_id = tenant_id.strip()
-    if config.survey_rate_limit not in SURVEY_RATE_LIMIT_OPTIONS:
+    _require_tenant_admin(user, tenant_id)
+    if config.survey_rate_limit is not None and config.survey_rate_limit not in SURVEY_RATE_LIMIT_OPTIONS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"survey_rate_limit must be one of {', '.join(str(o) for o in SURVEY_RATE_LIMIT_OPTIONS)}",
         )
-
-    _require_tenant_admin(user, tenant_id)
 
     db = get_db()
     tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
@@ -168,18 +184,22 @@ async def update_tenant_config(
     if not tenant_snap.exists:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown tenant: {tenant_id}")
 
-    existing = (tenant_snap.to_dict() or {}).get("config") or {}
-    updated = dict(existing)
-    updated["survey_rate_limit"] = config.survey_rate_limit
-    if config.survey_instructions is not None:
-        updated["survey_instructions"] = config.survey_instructions
+    tenant_data = tenant_snap.to_dict() or {}
+    existing_config = tenant_data.get("config") or {}
+    existing_survey_config = tenant_data.get("surveyConfig") or {}
 
-    now = datetime.now()
+    fields = config.model_dump()
     try:
-        tenant_ref.update({"config": updated})
-    except Exception as e:
-        logger.error(f"Failed to persist config for tenant {tenant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to persist tenant config")
+        updated = save_tenant_config(
+            tenant_id,
+            fields,
+            existing_config,
+            existing_survey_config,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     ip, request_id = request_context(request)
     log_audit(
@@ -190,7 +210,12 @@ async def update_tenant_config(
         target_id=tenant_id,
         ip=ip,
         request_id=request_id,
-        metadata={"survey_rate_limit": config.survey_rate_limit},
+        metadata={
+            "survey_rate_limit": updated.get("survey_rate_limit"),
+            "survey_open_date": updated.get("survey_open_date"),
+            "survey_close_date": updated.get("survey_close_date"),
+            "is_survey_active": updated.get("is_survey_active"),
+        },
     )
 
     return _envelope({"tenant_id": tenant_id, "config": updated})

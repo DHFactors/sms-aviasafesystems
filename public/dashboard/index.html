@@ -500,11 +500,9 @@ async function saveSurveyPeriod() {
     }
 
     try {
-        await firebase.firestore().collection('tenants').doc(selectedTenantId).update({
-            surveyConfig: {
-                openDate: new Date(openDate).toISOString(),
-                closeDate: new Date(closeDate).toISOString()
-            }
+        await ApiClient.put('/api/v1/tenants/' + selectedTenantId + '/config', {
+            survey_open_date: openDate,
+            survey_close_date: closeDate
         });
 
         showMessage('Survey period saved successfully!', 'success');
@@ -520,8 +518,10 @@ async function clearSurveyPeriod() {
     if (!confirm('Clear survey dates for this tenant?')) return;
 
     try {
-        await firebase.firestore().collection('tenants').doc(selectedTenantId).update({
-            surveyConfig: firebase.firestore.FieldValue.delete()
+        await ApiClient.put('/api/v1/tenants/' + selectedTenantId + '/config', {
+            survey_open_date: '',
+            survey_close_date: '',
+            is_survey_active: false
         });
 
         showMessage('Survey dates cleared.', 'success');

@@ -282,7 +282,7 @@ def test_preview_seed(monkeypatch):
     plan = preview_seed(actor=_admin_user())
     assert plan["regulator"]["id"] == "caan"
     assert plan["regulator"]["exists"] is False
-    assert len(plan["operators"]) == 7
+    assert len(plan["operators"]) == 5
     assert all(o["surveys_existing"] == 0 for o in plan["operators"])
 
 
@@ -290,28 +290,28 @@ def test_deploy_seed(monkeypatch):
     db = _patch_db(monkeypatch)
     from app.services.production_seed import deploy_seed
     result = deploy_seed(force=False, actor=_admin_user())
-    assert result["operators"] == 7
+    assert result["operators"] == 5
     assert db._stores["regulators"]["caan"]["id"] == "caan"
     assert db._stores["regulators"]["caan"]["operator_tenant_ids"]
     # Every operator tagged + has seeded data
     for op in db._stores["tenants"].values():
         assert op.get("regulator_id") == "caan"
-    assert db._subs.get(("tara-air", "surveys"))
-    assert db._subs.get(("tara-air", "hazards"))
-    assert db._subs.get(("tara-air", "reports"))
-    assert db._subs.get(("tara-air", "responses"))
+    assert db._subs.get(("buddha-air", "surveys"))
+    assert db._subs.get(("buddha-air", "hazards"))
+    assert db._subs.get(("buddha-air", "reports"))
+    assert db._subs.get(("buddha-air", "responses"))
     assert any(l["action"] == "SEED_DEPLOY" for l in db._stores["audit_logs"].values())
 
 
 def test_deploy_seed_skips_existing_surveys(monkeypatch):
     db = _patch_db(monkeypatch)
-    db._subs[("tara-air", "surveys")] = [{"tenant_id": "tara-air", "seed_version": "x"}]
+    db._subs[("buddha-air", "surveys")] = [{"tenant_id": "buddha-air", "seed_version": "x"}]
     from app.services.production_seed import deploy_seed
     result = deploy_seed(force=False, actor=_admin_user())
-    # tara-air's existing surveys are not replaced (other operators are seeded)
-    assert "tara-air: surveys exist, skipped" in result["details"]
-    assert len(db._subs[("tara-air", "surveys")]) == 1
-    assert db._subs[("tara-air", "surveys")][0]["seed_version"] == "x"
+    # buddha-air's existing surveys are not replaced (other operators are seeded)
+    assert "buddha-air: surveys exist, skipped" in result["details"]
+    assert len(db._subs[("buddha-air", "surveys")]) == 1
+    assert db._subs[("buddha-air", "surveys")][0]["seed_version"] == "x"
 
 
 def test_list_audit_logs(monkeypatch):
@@ -386,7 +386,7 @@ def test_admin_seed_preview_route(monkeypatch):
     resp = _client().get("/api/v1/admin/seed/preview")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
-    assert len(resp.json()["operators"]) == 7
+    assert len(resp.json()["operators"]) == 5
 
 
 def test_admin_seed_deploy_route(monkeypatch):
@@ -394,7 +394,7 @@ def test_admin_seed_deploy_route(monkeypatch):
     _patch_secret(monkeypatch)
     resp = _client().post("/api/v1/admin/seed/deploy", json={"setup_key": "test-setup-key", "force": False})
     assert resp.status_code == 200
-    assert resp.json()["result"]["operators"] == 7
+    assert resp.json()["result"]["operators"] == 5
     assert "caan" in db._stores["regulators"]
 
 

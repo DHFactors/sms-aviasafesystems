@@ -216,9 +216,11 @@ def write_report(db, doc_id: str, doc: dict):
     doc_ref.set(doc)
 
 
-def create_all_vsr_reports(db) -> int:
+def create_all_vsr_reports(db, tenant_ids=None) -> int:
     total = 0
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         tenant_id = profile["id"]
         base_seed = 20000 + hash(tenant_id) % 10000
         rng = SeededRandom(seed=base_seed)
@@ -235,9 +237,11 @@ def create_all_vsr_reports(db) -> int:
     return total
 
 
-def create_all_mor_reports(db) -> int:
+def create_all_mor_reports(db, tenant_ids=None) -> int:
     total = 0
     for profile in OPERATOR_PROFILES:
+        if tenant_ids and profile["id"] not in tenant_ids:
+            continue
         tenant_id = profile["id"]
         base_seed = 30000 + hash(tenant_id) % 10000
         rng = SeededRandom(seed=base_seed)
