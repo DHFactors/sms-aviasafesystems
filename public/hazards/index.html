@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hazard Register - AviaSAFE</title>
+    <title>Master Hazard Register - AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -68,7 +68,7 @@
 <body>
 
 <nav class="nav">
-    <h1><i class="fas fa-exclamation-triangle"></i> Hazard Register</h1>
+    <h1><i class="fas fa-exclamation-triangle"></i> Master Hazard Register</h1>
     <div class="nav-actions">
         <span id="userDisplay"></span>
         <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -77,22 +77,15 @@
 
 <div class="page">
     <div class="header-bar">
-        <h2><i class="fas fa-list"></i> All Hazards</h2>
+        <h2><i class="fas fa-list"></i> Master Hazard Register</h2>
         <div>
             <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+            <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-clipboard-check"></i> View All CANs</a>
             <a href="/hazards/create.html" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Hazard</a>
         </div>
     </div>
 
     <div id="statsRow" class="stats-row"></div>
-
-    <div class="header-bar" style="margin-top:2rem;">
-        <h2><i class="fas fa-clipboard-check"></i> Corrective Action Progress</h2>
-        <div>
-            <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> View All CANs</a>
-        </div>
-    </div>
-    <div id="capStatsRow" class="stats-row"></div>
 
     <div class="filter-bar">
         <label>Status:</label>
@@ -148,7 +141,6 @@
 <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
 <script src="/js/hazards.js"></script>
-<script src="/js/can_cap.js"></script>
 <script>
 let currentUser = null;
 let allHazards = [];
@@ -165,7 +157,6 @@ firebase.auth().onAuthStateChanged(function(user) {
     initSortableHeaders();
     loadHazards();
     loadStats();
-    loadCapStats();
 });
 
 function populateFilters() {
@@ -369,44 +360,19 @@ function updateSortIndicators() {
     });
 }
 
+const HAZARD_STATUS_CARD_ORDER = ['Open', 'Processing', 'Under Review', 'Closed', 'Reopened'];
+
 async function loadStats() {
     try {
         const stats = await HazardsAPI.getStats();
         const container = document.getElementById('statsRow');
         const statuses = stats.by_status || {};
-        container.innerHTML = Object.entries(statuses).map(([key, val]) =>
-            `<div class="stat-card"><div class="num">${val}</div><div class="lbl">${key}</div></div>`
+        container.innerHTML = HAZARD_STATUS_CARD_ORDER.map((status) =>
+            `<div class="stat-card"><div class="num">${statuses[status] || 0}</div><div class="lbl">${status.toUpperCase()}</div></div>`
         ).join('') +
-            `<div class="stat-card"><div class="num">${stats.total || 0}</div><div class="lbl">Total</div></div>`;
+            `<div class="stat-card"><div class="num">${stats.total || 0}</div><div class="lbl">Total Hazards</div></div>`;
     } catch (e) {
         console.error('Stats error:', e);
-    }
-}
-
-async function loadCapStats() {
-    const container = document.getElementById('capStatsRow');
-    if (!container) return;
-    try {
-        const stats = await CanCapAPI.getStats();
-        const canStatuses = (stats.cans && stats.cans.by_status) || {};
-        const canTotal = (stats.cans && stats.cans.total) || 0;
-        const capTotal = (stats.caps && stats.caps.total) || 0;
-        if (canTotal === 0 && capTotal === 0) {
-            container.innerHTML = `
-                <div class="stat-card" style="grid-column:1/-1;">
-                    <div class="lbl" style="font-size:0.85rem;text-transform:none;letter-spacing:0;">No corrective actions (CANs/CAPs) yet. Hazards flagged for correction will appear here.</div>
-                </div>`;
-            return;
-        }
-        const statusCards = Object.entries(canStatuses).map(([key, val]) =>
-            `<div class="stat-card"><div class="num">${val}</div><div class="lbl">CAN ${key}</div></div>`
-        ).join('');
-        container.innerHTML = statusCards +
-            `<div class="stat-card" style="background:#0b2a42;"><div class="num" style="color:#fff;">${canTotal}</div><div class="lbl" style="color:#cbd5e1;">Total CANs</div></div>` +
-            `<div class="stat-card" style="background:#1a6b8a;"><div class="num" style="color:#fff;">${capTotal}</div><div class="lbl" style="color:#e0f2fe;">CAPs</div></div>`;
-    } catch (e) {
-        container.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:1rem;">Error loading CAN/CAP data.</p>';
-        console.error('Cap stats error:', e);
     }
 }
 
