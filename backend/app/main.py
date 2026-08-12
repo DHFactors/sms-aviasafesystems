@@ -77,6 +77,29 @@ def _req_id(request: Request) -> str:
     return getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
 
 
+def _cors_headers(request: Request) -> dict:
+    """Mirror ManualCORSMiddleware so error responses stay CORS-visible.
+
+    Without this, an unhandled exception returns a 500 with no
+    Access-Control-Allow-Origin, and the browser hides the body behind a
+    generic "Network error" instead of surfacing the real message.
+    """
+    try:
+        from app.core.cors import _allowed_origins
+        origin = request.headers.get("origin")
+        if origin and origin in _allowed_origins():
+            return {
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Tenant-Id, X-Task-Key, X-Request-ID",
+                "Vary": "Origin",
+            }
+    except Exception:
+        pass
+    return {}
+
+
 def _error_body(
     request: Request,
     status_code: int,
@@ -119,7 +142,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     logger.error(f"HTTP {exc.status_code} for {request.method} {request.url.path} (request_id={request_id}): {message}")
     return JSONResponse(
         status_code=exc.status_code,
-        headers=exc.headers,
+        headers={**_cors_headers(request), **(exc.headers or {})},
         content=_error_body(request, exc.status_code, message, detail=message, errors=errors),
     )
 
@@ -136,6 +159,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     logger.error(f"Validation error for {request.method} {request.url.path} (request_id={request_id}): {errors}")
     return JSONResponse(
         status_code=422,
+        headers=_cors_headers(request),
         content=_error_body(
             request,
             422,
@@ -152,6 +176,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception (request_id={request_id}): {exc}")
     return JSONResponse(
         status_code=500,
+        headers=_cors_headers(request),
         content=_error_body(
             request,
             500,
