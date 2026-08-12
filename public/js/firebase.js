@@ -13,14 +13,32 @@
 // FIREBASE CONFIGURATION
 // ============================================================================
 
-// Environment resolution: a hostname containing "beta" routes to the isolated
-// beta backend and the sms-db-beta Firestore database; every other host (the
-// production domain, *.web.app production site, and localhost) uses production.
-// This keeps both deployment paths correct so beta traffic can never touch
-// production data.
-const IS_BETA_ENV =
-    typeof window !== 'undefined' &&
-    window.location.hostname.indexOf('beta') !== -1;
+// Environment resolution.
+// Beta routes to the isolated beta backend (sms-aviasafesystems-beta.onrender.com)
+// and the sms-db-beta Firestore database; everything else uses production
+// (aviasafe-unified-platform.onrender.com + sms-db). This keeps both deployment
+// paths correct so beta traffic can never touch production data.
+//
+// Detection order (first match wins):
+//   1. ?env=beta  or  ?beta=1                 (manual/temporary override)
+//   2. localStorage "aviasafe_env" === "beta" (persisted override for testing)
+//   3. window.__APP_ENV__ === "beta"          (deploy-time injected flag)
+//   4. hostname contains "beta"               (e.g. sms-beta.web.app, *-beta.onrender.com)
+//   5. hostname === "sms.aviasafesystems.com" (the operator's beta site domain)
+function detectBetaEnvironment() {
+    if (typeof window === 'undefined') return false;
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('env') === 'beta' || params.get('beta') === '1') return true;
+        if (window.localStorage && window.localStorage.getItem('aviasafe_env') === 'beta') return true;
+    } catch (e) { /* ignore */ }
+    if (window.__APP_ENV__ === 'beta') return true;
+    const h = window.location.hostname;
+    if (h.indexOf('beta') !== -1) return true;
+    if (h === 'sms.aviasafesystems.com' || h === 'www.sms.aviasafesystems.com') return true;
+    return false;
+}
+const IS_BETA_ENV = detectBetaEnvironment();
 
 const firebaseConfig = {
     apiKey: "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc",
