@@ -7,7 +7,7 @@ from app.models.can_cap import (
     CANCreate, CANUpdate, CANResponse, CANListItem,
     CAPCreate, CAPUpdate, CAPReview, CAPResponse, CANStatus, CAPStatus
 )
-from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager, get_responsible_manager
+from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager, get_responsible_manager, get_department_scope
 from app.services.can_cap_service import CanCapService
 from app.services.audit_service import log_audit, request_context
 
@@ -70,6 +70,11 @@ async def list_cans(
     if days:
         filters["days"] = days
 
+    # 145 / CAMO accounts are restricted to their own department.
+    scope = get_department_scope(user)
+    if scope:
+        filters["department"] = scope
+
     docs = service.list_cans(user, filters)
     return [_to_can_list_item(d) for d in docs]
 
@@ -79,8 +84,10 @@ async def get_can_stats(
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     service = CanCapService(user.get("tenant_id", "default"))
-    can_stats = service.get_can_stats(user)
-    cap_stats = service.get_cap_stats(user)
+    # 145 / CAMO accounts are restricted to their own department.
+    scope = get_department_scope(user)
+    can_stats = service.get_can_stats(user, department=scope)
+    cap_stats = service.get_cap_stats(user, department=scope)
     return {"cans": can_stats, "caps": cap_stats}
 
 
@@ -108,6 +115,12 @@ async def list_all_caps(
         filters["search"] = search
     if days:
         filters["days"] = days
+
+    # 145 / CAMO accounts are restricted to their own department.
+    scope = get_department_scope(user)
+    if scope:
+        filters["department"] = scope
+
     docs = service.list_all_caps(user, filters)
     return [_to_cap_list_item(d) for d in docs]
 

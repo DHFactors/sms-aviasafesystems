@@ -144,6 +144,28 @@ async def get_safety_manager(
     return user
 
 
+# Department accounts (email prefix) -> the single department they are scoped to.
+# Used to restrict 145 / CAMO users to only their own department's CANs & CAPs.
+DEPARTMENT_SCOPE_PREFIXES = {
+    "145": "Part-145",
+    "camo": "CAMO",
+}
+
+
+def get_department_scope(user: Dict[str, Any]) -> Optional[str]:
+    """Return the department a user is restricted to based on their email prefix.
+
+    Emails starting with ``145`` or ``camo`` belong to the Part-145 / CAMO
+    departments and should only ever see CANs and CAPs for that department.
+    Returns ``None`` for all other users (no restriction).
+    """
+    email = (user.get("email") or "").lower()
+    for prefix, department in DEPARTMENT_SCOPE_PREFIXES.items():
+        if email.startswith(prefix):
+            return department
+    return None
+
+
 async def get_responsible_manager(
     user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:

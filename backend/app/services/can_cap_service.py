@@ -554,7 +554,7 @@ class CanCapService:
 
     # ── Stats ──
 
-    def get_can_stats(self, user: dict) -> Dict[str, Any]:
+    def get_can_stats(self, user: dict, department: Optional[str] = None) -> Dict[str, Any]:
         try:
             if user.get("role") in settings.CROSS_TENANT_ROLES:
                 docs = get_cross_tenant_collection(CAN_COLLECTION).get()
@@ -567,6 +567,8 @@ class CanCapService:
 
             for doc in docs:
                 data = doc.to_dict()
+                if department and (data.get("department") or "") != department:
+                    continue
                 status = data.get("status", "Open")
                 if status in stats:
                     stats[status] += 1
@@ -584,7 +586,7 @@ class CanCapService:
             logger.error(f"Failed to get CAN stats: {e}")
             raise
 
-    def get_cap_stats(self, user: dict) -> Dict[str, Any]:
+    def get_cap_stats(self, user: dict, department: Optional[str] = None) -> Dict[str, Any]:
         try:
             if user.get("role") in settings.CROSS_TENANT_ROLES:
                 cans = get_cross_tenant_collection(CAN_COLLECTION).get()
@@ -595,6 +597,9 @@ class CanCapService:
             total = 0
 
             for can_doc in cans:
+                can_data = can_doc.to_dict()
+                if department and (can_data.get("department") or "") != department:
+                    continue
                 caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
                 for cap in caps:
                     data = cap.to_dict()

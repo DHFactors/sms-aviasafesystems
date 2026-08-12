@@ -176,6 +176,16 @@ async def get_master_register(
     tenant user (their own tenant) and to CAAN/SUPER_ADMIN (all tenants).
     """
     from app.services.master_register import build_master_register
+    from app.middleware.auth import get_department_scope
+
+    # 145 / CAMO accounts are restricted to their own department. Force the
+    # department scope and ignore any personal assignee filter so they see the
+    # whole department's CANs/CAPs rather than only items assigned to them.
+    scope = get_department_scope(user)
+    if scope:
+        department = scope
+        assigned_to_uid = None
+
     data = build_master_register(user, department=department, assigned_to_uid=assigned_to_uid)
     return _envelope(data)
 
