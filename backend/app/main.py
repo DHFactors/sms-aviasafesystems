@@ -182,7 +182,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             request,
             500,
             "Internal server error",
-            detail=f"{type(exc).__name__}: {exc}",
+            detail=str(exc) if settings.DEBUG else None,
         ),
     )
 

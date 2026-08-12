@@ -1,7 +1,43 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date, time
 from enum import Enum
+
+
+def _coerce_date_string(value):
+    """Normalise date-only / common date strings to a datetime.
+
+    HTML date inputs and legacy records store e.g. '2026-08-25' (no time
+    component). Pydantic datetime fields require a separator + time, so
+    convert these to midnight UTC; otherwise return the value untouched so
+    other (valid) inputs still parse normally.
+    """
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    if len(value) == 10 and value[4] == "-" and value[7] == "-":
+        try:
+            return datetime.combine(date.fromisoformat(value), time.min)
+        except ValueError:
+            pass
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return value
+
+
+def _coerce_datetime_fields(cls, data):
+    if isinstance(data, dict):
+        for name, field in cls.model_fields.items():
+            ann = field.annotation
+            args = getattr(ann, "__args__", None)
+            if ann is datetime or (args and datetime in args):
+                val = data.get(name)
+                if isinstance(val, str):
+                    data[name] = _coerce_date_string(val)
+    return data
 
 
 class CANStatus(str, Enum):
@@ -40,6 +76,11 @@ class CANFormFields(BaseModel):
     classification_type: Optional[str] = None
     classification_level: Optional[str] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_can_dates(cls, data):
+        return _coerce_datetime_fields(cls, data)
+
 
 class CAPFormFields(BaseModel):
     """Optional corrective action / closure block (FORM SMSM 8.8.2).
@@ -48,6 +89,11 @@ class CAPFormFields(BaseModel):
     Section 5.1 analysis items (1)-(5) plus identification header and the
     managerial / CAA sign-off blocks.
     """
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_cap_dates(cls, data):
+        return _coerce_datetime_fields(cls, data)
+
     # ── Identification header ──
     company_name: Optional[str] = None
     base_location: Optional[str] = None
