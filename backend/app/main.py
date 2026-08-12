@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging, RequestLoggingMiddleware
 from app.core.metrics import router as metrics_router
 from app.core.security import SecurityHeadersMiddleware, RateLimitMiddleware
+from app.core.cors import ManualCORSMiddleware
 from app.firebase import initialize_firebase, is_firebase_ready
 from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, tenants, regulators, contact, feedback
 
@@ -62,6 +63,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Guarantees Access-Control-Allow-Origin on actual (non-preflight) responses.
+# See app/core/cors.py for why this is needed in addition to CORSMiddleware.
+app.add_middleware(ManualCORSMiddleware)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
