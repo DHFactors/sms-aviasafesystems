@@ -44,6 +44,7 @@
         .stat-card { background: #fff; padding: 1rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
         .stat-card .num { font-size: 1.5rem; font-weight: 700; color: #0b2a42; }
         .stat-card .lbl { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 0.25rem; }
+        .stat-card .sub { font-size: 0.7rem; color: #94a3b8; margin-top: 0.15rem; }
         .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
         .loading-state i { font-size: 1.5rem; margin-right: 0.5rem; }
         .empty-state { text-align: center; padding: 3rem; color: #64748b; }
@@ -202,7 +203,7 @@ async function loadStats() {
         container.innerHTML = Object.entries(canStatuses).map(([k, v]) =>
             `<div class="stat-card"><div class="num">${v}</div><div class="lbl">CAN ${k}</div></div>`
         ).join('') +
-            `<div class="stat-card"><div class="num">${capTotal}</div><div class="lbl">CAPs Total</div></div>` +
+            `<div class="stat-card"><div class="num">${capTotal}</div><div class="lbl">CAP ACTIONS (${capTotal})</div><div class="sub">Linked across ${canTotal} CANs</div></div>` +
             `<div class="stat-card"><div class="num">${canTotal}</div><div class="lbl">Total CANs</div></div>`;
     } catch (e) { console.error('Stats error:', e); }
 }

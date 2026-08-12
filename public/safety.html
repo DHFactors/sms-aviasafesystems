@@ -272,59 +272,92 @@
 <div class="app-shell">
     <div id="dashboardSection">
 
-        <!-- Filters -->
-        <div class="filter-bar">
-            <label for="daysFilter"><i class="fas fa-calendar-alt"></i> Period:</label>
-            <select id="daysFilter">
-                <option value="0">All Time</option>
-                <option value="30">Last 30 Days</option>
-                <option value="90" selected>Last 90 Days</option>
-                <option value="180">Last 180 Days</option>
-                <option value="365">Last 365 Days</option>
-            </select>
-            <button id="refreshBtn" class="btn-refresh"><i class="fas fa-rotate"></i> Refresh</button>
+        <!-- ==================== VIEW: KEY INDICATORS (default) ==================== -->
+        <div id="key-indicators-section" class="dashboard-view" data-dashboard-view>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <label for="daysFilter"><i class="fas fa-calendar-alt"></i> Period:</label>
+                <select id="daysFilter">
+                    <option value="0">All Time</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90" selected>Last 90 Days</option>
+                    <option value="180">Last 180 Days</option>
+                    <option value="365">Last 365 Days</option>
+                </select>
+                <button id="refreshBtn" class="btn-refresh"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+
+            <!-- Section 1: KPI Cards -->
+            <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
+            <div id="kpiGrid" class="kpi-grid state-container"></div>
+
         </div>
 
-        <!-- Section 1: KPI Cards -->
-        <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
-        <div id="kpiGrid" class="kpi-grid state-container"></div>
+        <!-- ==================== VIEW: RISK & TRENDS (secondary) ==================== -->
+        <div id="risk-trends-section" class="dashboard-view" data-dashboard-view style="display:none;">
 
-        <!-- Section 2: Risk & Trends -->
-        <div class="section-title shell-scroll-spy" id="risk-trends"><i class="fas fa-chart-bar"></i> Risk & Trends</div>
-        <div class="chart-grid">
-            <div class="chart-card">
-                <h3>Risk Distribution</h3>
-                <div id="riskChart" class="chart-wrapper state-container">
-                    <canvas id="riskChartCanvas"></canvas>
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-chart-bar"></i> Risk &amp; Trends</h2>
+                <a href="/risk-trends.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Open Full View</a>
+            </div>
+
+            <!-- Section 2: Risk & Trends -->
+            <div class="section-title shell-scroll-spy" id="risk-trends"><i class="fas fa-chart-bar"></i> Risk & Trends</div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Risk Distribution</h3>
+                    <div id="riskChart" class="chart-wrapper state-container">
+                        <canvas id="riskChartCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Monthly Trends</h3>
+                    <div id="trendChart" class="chart-wrapper state-container">
+                        <canvas id="trendChartCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-full">
+                    <h3>SSM Risk Trend (Avg Risk Index by SSP Category)</h3>
+                    <div id="ssmRiskChart" class="chart-wrapper state-container">
+                        <canvas id="ssmRiskChartCanvas"></canvas>
+                    </div>
                 </div>
             </div>
-            <div class="chart-card">
-                <h3>Monthly Trends</h3>
-                <div id="trendChart" class="chart-wrapper state-container">
-                    <canvas id="trendChartCanvas"></canvas>
-                </div>
-            </div>
-            <div class="chart-card chart-full">
-                <h3>SSM Risk Trend (Avg Risk Index by SSP Category)</h3>
-                <div id="ssmRiskChart" class="chart-wrapper state-container">
-                    <canvas id="ssmRiskChartCanvas"></canvas>
-                </div>
-            </div>
+
         </div>
 
-        <!-- Section 3: Top Hazards -->
-        <div class="section-title shell-scroll-spy" id="hazards"><i class="fas fa-triangle-exclamation"></i> Top Hazards</div>
-        <div class="chart-grid">
-            <div class="chart-card chart-full">
-                <h3>Hazard Occurrence Frequency <a href="/top-hazards.html" class="btn btn-outline btn-sm" style="float:right;font-size:0.8rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Top Hazards</a></h3>
-                <div id="hazardChart" class="chart-wrapper state-container">
-                    <canvas id="hazardChartCanvas"></canvas>
+        <!-- ==================== VIEW: TOP HAZARDS (secondary) ==================== -->
+        <div id="top-hazards-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-triangle-exclamation"></i> Top Hazards</h2>
+                <a href="/top-hazards.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Open Full View</a>
+            </div>
+
+            <!-- Section 3: Top Hazards -->
+            <div class="section-title shell-scroll-spy" id="hazards"><i class="fas fa-triangle-exclamation"></i> Top Hazards</div>
+            <div class="chart-grid">
+                <div class="chart-card chart-full">
+                    <h3>Hazard Occurrence Frequency <a href="/top-hazards.html" class="btn btn-outline btn-sm" style="float:right;font-size:0.8rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Top Hazards</a></h3>
+                    <div id="hazardChart" class="chart-wrapper state-container">
+                        <canvas id="hazardChartCanvas"></canvas>
+                    </div>
                 </div>
             </div>
+
         </div>
 
-        <!-- Section 4: Corrective Action (CAN/CAP) Register -->
-        <div class="section-title shell-scroll-spy" id="corrective-actions"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</div>
+        <!-- ==================== VIEW: CORRECTIVE ACTION NOTICES (secondary) ==================== -->
+        <div id="corrective-actions-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</h2>
+                <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Full CAN Register</a>
+            </div>
+
+            <!-- Section 4: Corrective Action (CAN/CAP) Register -->
+            <div class="section-title shell-scroll-spy" id="corrective-actions"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</div>
         <div id="canCapTable" class="table-card state-container">
             <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
                 <span style="font-size:0.85rem;color:#475569;"><i class="fas fa-clipboard-check"></i> CAN Register — <strong id="canCapCount">0</strong> notices</span>
@@ -349,8 +382,18 @@
             <div id="cansTableState" class="state-empty" style="display:none;padding:1rem;"></div>
         </div>
 
-        <!-- Section 5: Latest Reports -->
-        <div class="section-title shell-scroll-spy" id="reports"><i class="fas fa-chart-bar"></i> Latest Reports</div>
+        </div>
+
+        <!-- ==================== VIEW: LATEST REPORTS (secondary) ==================== -->
+        <div id="reports-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-chart-bar"></i> Latest Reports</h2>
+                <a href="/reports/index.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> View All Reports</a>
+            </div>
+
+            <!-- Section 5: Latest Reports -->
+            <div class="section-title shell-scroll-spy" id="reports"><i class="fas fa-chart-bar"></i> Latest Reports</div>
         <div id="reportsTable" class="table-card state-container">
             <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
                 <label for="recentRange"><i class="fas fa-calendar-alt"></i> Timeline:</label>
@@ -379,6 +422,8 @@
             <div id="pagination" class="pagination"></div>
         </div>
 
+        </div>
+
     </div>
 </div>
 
@@ -389,7 +434,9 @@
     <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
 <script src="/js/shell.js"></script>
+<script src="/js/dashboard-nav.js"></script>
 <script>
+window.DEFAULT_DASHBOARD_VIEW = 'key-indicators-section';
 window.SHELL_CONFIG = {
     brand: 'AviaSAFE',
     roleLabel: 'Operator Safety Dashboard',

@@ -9,24 +9,24 @@ const CanCapAPI = {
         if (params.search) qs.set('search', params.search);
         const n = Number(params.days);
         if (n > 0) qs.set('days', n);
-        return ApiClient.get(`/api/cans?${qs.toString()}`);
+        return ApiClient.get(`/api/v1/cans?${qs.toString()}`);
     },
 
-    getCan: (canId) => ApiClient.get(`/api/cans/${canId}`),
+    getCan: (canId) => ApiClient.get(`/api/v1/cans/${canId}`),
 
-    issueCan: (data) => ApiClient.post('/api/cans', data),
+    issueCan: (data) => ApiClient.post('/api/v1/cans', data),
 
     updateCanStatus: (canId, status) =>
-        ApiClient._request('PATCH', `/api/cans/${canId}/status?status=${status}`),
+        ApiClient._request('PATCH', `/api/v1/cans/${canId}/status?status=${status}`),
 
-    deleteCan: (canId) => ApiClient.del(`/api/cans/${canId}`),
+    deleteCan: (canId) => ApiClient.del(`/api/v1/cans/${canId}`),
 
-    getStats: () => ApiClient.get('/api/cans/stats'),
+    getStats: () => ApiClient.get('/api/v1/cans/stats'),
 
     // CAP
-    submitCap: (canId, data) => ApiClient.post(`/api/cans/${canId}/caps`, data),
+    submitCap: (canId, data) => ApiClient.post(`/api/v1/cans/${canId}/caps`, data),
 
-    listCaps: (canId) => ApiClient.get(`/api/cans/${canId}/caps`),
+    listCaps: (canId) => ApiClient.get(`/api/v1/cans/${canId}/caps`),
 
     listAllCaps: (params = {}) => {
         const qs = new URLSearchParams();
@@ -35,17 +35,17 @@ const CanCapAPI = {
         if (params.search) qs.set('search', params.search);
         const n = Number(params.days);
         if (n > 0) qs.set('days', n);
-        return ApiClient.get(`/api/cans/caps?${qs.toString()}`);
+        return ApiClient.get(`/api/v1/cans/caps?${qs.toString()}`);
     },
 
-    getCap: (capId) => ApiClient.get(`/api/cans/caps/${capId}`),
+    getCap: (capId) => ApiClient.get(`/api/v1/cans/caps/${capId}`),
 
-    updateCap: (capId, data) => ApiClient.patch ? ApiClient._request('PATCH', `/api/cans/caps/${capId}`, data) : ApiClient.put(`/api/cans/caps/${capId}`, data),
+    updateCap: (capId, data) => ApiClient.patch ? ApiClient._request('PATCH', `/api/v1/cans/caps/${capId}`, data) : ApiClient.put(`/api/v1/cans/caps/${capId}`, data),
 
-    reviewCap: (capId, data) => ApiClient._request('PATCH', `/api/cans/caps/${capId}/review`, data),
+    reviewCap: (capId, data) => ApiClient._request('PATCH', `/api/v1/cans/caps/${capId}/review`, data),
 
     updateCapStatus: (capId, status) =>
-        ApiClient._request('PATCH', `/api/cans/caps/${capId}/status?status=${status}`),
+        ApiClient._request('PATCH', `/api/v1/cans/caps/${capId}/status?status=${status}`),
 };
 
 const CAN_STATUSES = ['Open', 'Under Review', 'Closed', 'Escalated'];
