@@ -114,6 +114,8 @@ def _custodian(tenant_id: str, pick: int) -> dict:
         ("ups", f"ops@{tenant_id}.com", f"ops-{tenant_id}-001", "Flight Operations"),
         ("safety", f"safety.{tenant_id}@{domain}", f"sm-{tenant_id}-001", ""),
         ("manager", f"manager.{tenant_id}@{domain}", f"mgr-{tenant_id}-001", ""),
+        ("camo", f"camo.{tenant_id}@{domain}", f"camo-{tenant_id}-001", "CAMO"),
+        ("maint145", f"145.{tenant_id}@{domain}", f"145-{tenant_id}-001", "Part-145"),
     ]
     token, email, uid, department = roles[pick % len(roles)]
     return {"assigned_to": email, "assigned_to_uid": uid, "department": department, "role": token}
