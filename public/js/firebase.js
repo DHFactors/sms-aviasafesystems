@@ -160,8 +160,11 @@ function initServices() {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
         try {
             auth = firebase.auth();
-            db = firebase.firestore(firebase.app(), firebaseConfig.databaseId);
-            
+            if (typeof firebase.firestore === 'function') {
+                db = firebase.firestore(firebase.app(), firebaseConfig.databaseId);
+            } else {
+                console.warn("Firestore SDK not available on this page.");
+            }
             console.log('✅ Firebase services initialized');
         } catch (error) {
             console.warn('Error initializing Firebase services:', error);
