@@ -48,9 +48,19 @@ const ApiClient = {
         }
     },
 
+    _getTenantId: async () => {
+        try {
+            const session = await getCurrentUser();
+            return (session && session.tenantId) || null;
+        } catch {
+            return null;
+        }
+    },
+
     _request: async (method, path, body) => {
         const token = await ApiClient._getToken();
         if (!token) return null;
+        const tenantId = await ApiClient._getTenantId();
 
         const url = `${ApiClient._baseUrl()}${path}`;
         const opts = {
@@ -58,6 +68,7 @@ const ApiClient = {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
+                ...(tenantId ? { 'X-Tenant-Id': tenantId } : {}),
             },
         };
         if (body && method !== 'GET') {
@@ -68,17 +79,22 @@ const ApiClient = {
         try {
             response = await fetch(url, opts);
         } catch (err) {
-            throw new Error(`Network error: ${err.message}`);
+            const detail = `Network error while reaching the API (${method} ${path}): ${err.message}`;
+            console.error('[ApiClient]', detail);
+            throw new Error('Network error. Please check your connection and try again.');
         }
 
         if (response.status === 401) {
+            console.error(`[ApiClient] Authorization failed (401) for ${method} ${path}`);
             window.location.href = '/login.html';
             return null;
         }
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
-            throw new Error(err.detail || `Request failed: ${response.status}`);
+            const detail = err.detail || `Request failed: ${response.status}`;
+            console.error(`[ApiClient] ${method} ${path} failed (${response.status}):`, detail);
+            throw new Error(detail);
         }
 
         const json = await response.json();

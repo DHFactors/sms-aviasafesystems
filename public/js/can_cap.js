@@ -138,6 +138,7 @@ async function fetchCans(days) {
         return cans;
     } catch (err) {
         if (stateEl) stateEl.style.display = 'none';
+        console.error('fetchCans failed:', err);
         tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error loading CANs: ${err.message}</td></tr>`;
         return [];
     }

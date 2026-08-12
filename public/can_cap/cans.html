@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Corrective Action Notices - AviaSAFE</title>
+    <title>Master CAN Register - AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -57,7 +57,7 @@
 <body>
 
 <nav class="nav">
-    <h1><i class="fas fa-clipboard-check"></i> Corrective Action Notices</h1>
+    <h1><i class="fas fa-clipboard-check"></i> Master CAN Register</h1>
     <div class="nav-actions">
         <span id="userDisplay"></span>
         <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -66,10 +66,10 @@
 
 <div class="page">
     <div class="header-bar">
-        <h2><i class="fas fa-list"></i> All CANs</h2>
+        <h2><i class="fas fa-list"></i> Master CAN Register</h2>
         <div>
             <a href="/hazards/index.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Master Hazard Register</a>
-            <a href="/can_cap/caps.html" class="btn btn-outline btn-sm"><i class="fas fa-tasks"></i> View CAPs</a>
+            <a href="/can_cap/caps.html" class="btn btn-outline btn-sm"><i class="fas fa-tasks"></i> View Master CAP Register</a>
         </div>
     </div>
 
@@ -188,7 +188,9 @@ async function loadCans() {
         });
     } catch (err) {
         loading.style.display = 'none';
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;
+        const message = (err && err.message) || 'Unable to load the CAN register. Please try again.';
+        console.error('loadCans failed:', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> ${message}</td></tr>`;
     }
 }
 
