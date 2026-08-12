@@ -39,6 +39,10 @@
         #surveyStatusLabel { font-weight: 700; font-size: 0.85rem; min-width: 3.5rem; text-transform: uppercase; letter-spacing: 0.04em; }
         #surveyFormRow { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
         @media (max-width: 640px) { #surveyFormRow { grid-template-columns: 1fr; } }
+        .distro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; margin-top: 1rem; }
+        #surveyQrPreview { display: inline-block; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+        #surveyQrPreview canvas { display: block; max-width: 100%; height: auto; }
+        @media (max-width: 640px) { .distro-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -143,6 +147,32 @@
                 <button type="button" class="btn-refresh" id="surveySaveBtn"><i class="fas fa-save"></i> Save Survey Settings</button>
                 <span id="surveySaveStatus" style="margin-left:0.75rem;font-size:0.85rem;display:none;"></span>
             </div>
+
+            <div id="surveyDistributionSection" style="display:none;margin-top:1.5rem;border-top:2px solid #34a853;padding-top:1.25rem;">
+                <div class="section-title" style="font-size:1.05rem;margin-top:0;"><i class="fas fa-bullhorn"></i> Survey Distribution &amp; Launch Controls</div>
+                <p style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">
+                    Share the direct survey link with respondents, or download the QR code to print on company notice boards.
+                </p>
+                <div class="distro-grid">
+                    <div>
+                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.4rem;">Shortened Direct URL</label>
+                        <div style="display:flex;gap:0.5rem;">
+                            <input type="text" id="surveyShortUrl" readonly style="flex:1;min-width:0;padding:0.5rem;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;background:#f8fafc;color:#0b2a42;">
+                            <button type="button" class="btn-refresh" id="copySurveyLinkBtn"><i class="fas fa-copy"></i> Copy Link</button>
+                        </div>
+                        <div style="margin-top:0.6rem;">
+                            <button type="button" class="btn-refresh" id="copyEmailBtn"><i class="fas fa-envelope"></i> Copy Email Announcement</button>
+                        </div>
+                    </div>
+                    <div style="text-align:center;">
+                        <label style="display:block;font-size:0.8rem;font-weight:600;color:#475569;margin-bottom:0.4rem;">QR Code — Notice Board Poster</label>
+                        <div id="surveyQrPreview"></div>
+                        <div style="margin-top:0.6rem;">
+                            <button type="button" class="btn-refresh" id="downloadQrBtn"><i class="fas fa-download"></i> Download QR Code (PNG)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         </div>
@@ -171,6 +201,7 @@ window.SHELL_CONFIG = {
 </script>
 <script src="/js/dashboard-utils.js"></script>
 <script src="/js/report.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
     await waitForFirebase();
@@ -417,7 +448,73 @@ function setupSurveyManagementForm(session) {
         }
     });
 }
-</script>
+function generateSurveyQrCode(session) {
+    const tenantId = session.tenantId;
+    if (!tenantId) return;
+
+    const qrPreview = document.getElementById('surveyQrPreview');
+    const downloadQrBtn = document.getElementById('downloadQrBtn');
+    const surveyShortUrl = document.getElementById('surveyShortUrl');
+    const copySurveyLinkBtn = document.getElementById('copySurveyLinkBtn');
+
+    if (!qrPreview || !downloadQrBtn || !surveyShortUrl || !copySurveyLinkBtn) return;
+
+    const surveyUrl = window.location.origin + '/survey?tenant=' + tenantId;
+
+    surveyShortUrl.value = surveyUrl;
+
+    new QRCode(qrPreview, {
+        text: surveyUrl,
+        width: 128,
+        height: 128,
+        colorDark: '#000000',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H,
+    });
+
+    downloadQrBtn.onclick = function () {
+        const qrCanvas = qrPreview.querySelector('canvas');
+        if (qrCanvas) {
+            const link = document.createElement('a');
+            link.download = 'survey-qr-code.png';
+            link.href = qrCanvas.toDataURL('image/png');
+            link.click();
+        }
+    };
+
+    copySurveyLinkBtn.onclick = function () {
+        surveyShortUrl.select();
+        document.execCommand('copy');
+        surveyShortUrl.setSelectionRange(0, 0);
+    };
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await waitForFirebase();
+    const session = await getCurrentUser();
+    if (!session) { window.location.href = '/login.html'; return; }
+    if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'safety') {
+        document.getElementById('pageContent').innerHTML = `
+            <div style="text-align:center;padding:3rem;">
+                <i class="fas fa-lock" style="font-size:2.5rem;color:#dc3545;"></i>
+                <h2 style="color:#dc3545;margin-top:1rem;">Access Denied</h2>
+                <p style="color:#64748b;">The Administration section is available to Safety Managers only.</p>
+                <a href="/safety.html" class="btn btn-outline btn-sm" style="margin-top:1rem;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+            </div>`;
+        document.getElementById('pageContent').style.display = 'block';
+        return;
+    }
+    if (typeof window.updateShellTenant === 'function') {
+        const tenantName = session.tenantId ? session.tenantId.toUpperCase() : 'Safety Overview';
+        window.updateShellTenant(tenantName, 'Administration · Safety Manager');
+    }
+    document.getElementById('pageContent').style.display = 'block';
+    await loadRiskMatrixConfig();
+    setupRiskMatrixForm();
+    await loadSurveyManagement(session);
+    setupSurveyManagementForm(session);
+    generateSurveyQrCode(session);
+});
 
 </body>
 </html>

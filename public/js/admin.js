@@ -101,7 +101,54 @@
         return d.toLocaleString();
     }
 
-    global.AdminUI = {
+    function initSurveyQrCode(tenantSlug) {
+    const qrPreview = document.getElementById('surveyQrPreview');
+    const downloadQrBtn = document.getElementById('downloadQrBtn');
+    const surveyLinkInput = document.getElementById('surveyLinkInput');
+    const copySurveyLinkBtn = document.getElementById('copySurveyLinkBtn');
+    const copyEmailBtn = document.getElementById('copyEmailBtn');
+
+    if (!qrPreview || !downloadQrBtn || !surveyLinkInput || !copySurveyLinkBtn || !copyEmailBtn) return;
+
+    const surveyUrl = `${window.location.origin}/survey/index.html?tenant=${tenantSlug}`;
+
+    surveyLinkInput.value = surveyUrl;
+
+    new QRCode(qrPreview, {
+        text: surveyUrl,
+        width: 160,
+        height: 160,
+        colorDark: '#0c334d',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H,
+    });
+
+    downloadQrBtn.onclick = function () {
+        const qrCanvas = qrPreview.querySelector('canvas');
+        if (qrCanvas) {
+            const link = document.createElement('a');
+            link.download = `${tenantSlug}-safety-survey-qr.png`;
+            link.href = qrCanvas.toDataURL('image/png');
+            link.click();
+        }
+    };
+
+    copySurveyLinkBtn.onclick = function () {
+        surveyLinkInput.select();
+        document.execCommand('copy');
+        toast('Link copied to clipboard!', 'success');
+    };
+
+    copyEmailBtn.onclick = function () {
+        const emailText = `Please participate in our SMS Maturity Assessment survey:\n${surveyUrl}\n\nYour responses support our Safety Management System. Thank you!`;
+        surveyLinkInput.value = emailText;
+        surveyLinkInput.select();
+        document.execCommand('copy');
+        toast('Email announcement copied!', 'success');
+    };
+}
+
+global.AdminUI = {
         requireAdmin: requireAdmin,
         apiGet: apiGet,
         apiPost: apiPost,
@@ -111,5 +158,6 @@
         esc: esc,
         toast: toast,
         fmtDate: fmtDate,
+        initSurveyQrCode: initSurveyQrCode,
     };
 })(window);
