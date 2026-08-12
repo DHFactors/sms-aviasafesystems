@@ -1,5 +1,5 @@
 const ApiClient = {
-    _baseUrl: () => (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || '',
+    _baseUrl: () => (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'https://aviasafe-unified-platform.onrender.com',
 
     _waitForFirebase: () => {
         return new Promise(resolve => {

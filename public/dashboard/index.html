@@ -110,9 +110,10 @@
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                     <select id="maturityDays" class="form-control" style="width:auto;" onchange="onMaturityDaysChange()">
                         <option value="30">Last 30 days</option>
+                        <option value="60" selected>Last 60 days</option>
                         <option value="90">Last 90 days</option>
                         <option value="180">Last 180 days</option>
-                        <option value="365" selected>Last 365 days</option>
+                        <option value="365">Last 365 days</option>
                         <option value="730">Last 730 days</option>
                     </select>
                     <button class="btn btn-outline btn-sm" onclick="loadSmsDashboard()"><i class="fas fa-rotate"></i> Refresh</button>
