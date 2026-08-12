@@ -175,9 +175,6 @@ AUTHOR: AviaSAFE Systems
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
 <script src="/js/firebase.js"></script>
-<script src="/js/api/client.js"></script>
-<script src="/js/shell.js"></script>
-<script src="/js/feedback.js"></script>
 <script>
 // ============================================================================
 // CAAN SMD — STATE SMS MATURITY (STATE-SCOPED)
@@ -199,7 +196,11 @@ window.SHELL_CONFIG = {
         { id: 'assessment', label: 'AI Assessment', icon: 'fa-robot' },
     ],
 };
-
+</script>
+<script src="/js/api/client.js"></script>
+<script src="/js/shell.js"></script>
+<script src="/js/feedback.js"></script>
+<script>
 const PILLAR_META = [
     { key: 'safety_policy', label: 'Safety Policy', color: '#1a6b8a' },
     { key: 'safety_risk_management', label: 'Safety Risk Management', color: '#d97706' },
