@@ -204,29 +204,36 @@ window.SHELL_CONFIG = {
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
-    await waitForFirebase();
+await waitForFirebase();
     const session = await getCurrentUser();
     if (!session) { window.location.href = '/login.html'; return; }
     if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'safety') {
-        document.getElementById('pageContent').innerHTML = `
-            <div style="text-align:center;padding:3rem;">
-                <i class="fas fa-lock" style="font-size:2.5rem;color:#dc3545;"></i>
-                <h2 style="color:#dc3545;margin-top:1rem;">Access Denied</h2>
-                <p style="color:#64748b;">The Administration section is available to Safety Managers only.</p>
-                <a href="/safety.html" class="btn btn-outline btn-sm" style="margin-top:1rem;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-            </div>`;
-        document.getElementById('pageContent').style.display = 'block';
+        const pageContent = document.getElementById('pageContent');
+        if (pageContent) {
+            pageContent.innerHTML = `
+                <div style="text-align:center;padding:3rem;">
+                    <i class="fas fa-lock" style="font-size:2.5rem;color:#dc3545;"></i>
+                    <h2 style="color:#dc3545;margin-top:1rem;">Access Denied</h2>
+                    <p style="color:#64748b;">The Administration section is available to Safety Managers only.</p>
+                    <a href="/safety.html" class="btn btn-outline btn-sm" style="margin-top:1rem;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                </div>`;
+            pageContent.style.display = 'block';
+        }
         return;
+    }
+    const pageContent = document.getElementById('pageContent');
+    if (pageContent) {
+        pageContent.style.display = 'block';
     }
     if (typeof window.updateShellTenant === 'function') {
         const tenantName = session.tenantId ? session.tenantId.toUpperCase() : 'Safety Overview';
         window.updateShellTenant(tenantName, 'Administration · Safety Manager');
     }
-    document.getElementById('pageContent').style.display = 'block';
     await loadRiskMatrixConfig();
     setupRiskMatrixForm();
     await loadSurveyManagement(session);
     setupSurveyManagementForm(session);
+    generateSurveyQrCode(session);
 });
 
 async function loadRiskMatrixConfig() {
@@ -508,13 +515,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const tenantName = session.tenantId ? session.tenantId.toUpperCase() : 'Safety Overview';
         window.updateShellTenant(tenantName, 'Administration · Safety Manager');
     }
-    document.getElementById('pageContent').style.display = 'block';
-    await loadRiskMatrixConfig();
-    setupRiskMatrixForm();
-    await loadSurveyManagement(session);
-    setupSurveyManagementForm(session);
-    generateSurveyQrCode(session);
-});
+    try {
+        await loadRiskMatrixConfig();
+        setupRiskMatrixForm();
+        await loadSurveyManagement(session);
+        setupSurveyManagementForm(session);
+        generateSurveyQrCode(session);
+    } catch (error) {
+        console.error('Administration panel error:', error);
+    }
+}
 
 </body>
 </html>

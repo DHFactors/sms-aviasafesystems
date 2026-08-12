@@ -1,6 +1,6 @@
 let chartInstances = {};
 let currentPage = 1;
-let currentDays = 90;
+let currentDays = 60;
 let recentDays = 30;
 const PAGE_SIZE = 10;
 
