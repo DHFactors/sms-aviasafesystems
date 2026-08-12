@@ -174,6 +174,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def unhandled_exception_handler(request: Request, exc: Exception):
     request_id = _req_id(request)
     logger.error(f"Unhandled exception (request_id={request_id}): {exc}")
+    logger.exception("Unhandled exception traceback:")
     return JSONResponse(
         status_code=500,
         headers=_cors_headers(request),
@@ -181,7 +182,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             request,
             500,
             "Internal server error",
-            detail=str(exc) if settings.DEBUG else None,
+            detail=f"{type(exc).__name__}: {exc}",
         ),
     )
 
