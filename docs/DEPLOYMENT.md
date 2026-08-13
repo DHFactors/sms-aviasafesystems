@@ -80,14 +80,27 @@ Set the same env vars as §2 via `gcloud run services update ... --set-env-vars`
 
 ## 5. Frontend — Firebase Hosting
 
+The same `public/` folder is deployed to **both** hosting sites so beta and production never drift.
+The two sites live in **different Firebase projects**, so each must be deployed explicitly:
+
 ```bash
-firebase use aerosafety-sms-prod
-firebase deploy --only hosting
+# Production — site aerosafety-sms-prod (project aerosafety-sms-prod)
+firebase deploy --project aerosafety-sms-prod --only hosting:aerosafety-sms-prod
+
+# Beta — site sms-beta (project gap-analysis-ssp → https://sms-beta.web.app)
+firebase deploy --project gap-analysis-ssp --only hosting:sms-beta
 ```
 
+> **Important:** do **not** run `firebase deploy --only hosting` (without a site target). `firebase.json`
+> declares both hosting sites, but `sms-beta` lives in project `gap-analysis-ssp`, so the CLI fails with
+> `could not find site "sms-beta"`. Always target the site + project explicitly, and deploy **both** so
+> beta and prod stay consistent.
+
+- Hosting DB/API selection is automatic from the hostname in `public/js/firebase.js`: hostnames
+  containing `beta` use `sms-db-beta` + the beta Render API; everything else uses `sms-db` + prod API.
+- No build step: `public/` is served as-is.
 - `firebase.json` routes all requests to `index.html` (SPA rewrite) and caches static assets
   aggressively.
-- No build step: `public/` is served as-is.
 
 **Rollback:** `firebase hosting:channel:deploy` for staging channels; for production rollback use the
 Hosting console "Release history" and promote a previous version.
