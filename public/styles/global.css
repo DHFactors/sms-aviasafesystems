@@ -291,18 +291,6 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.3px;
 }
 
-/* ========== TENANT PORTAL ========== */
-.tenant-portal-section {
-    background: var(--color-primary-light);
-    padding: var(--spacing-2xl) 0;
-    text-align: center;
-}
-.tenant-portal-section h2 {
-    color: var(--color-primary-dark);
-}
-.tenant-portal-section p {
-    color: var(--color-text-muted);
-}
 .tenant-input-group input {
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-md);
@@ -317,14 +305,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .tenant-input-group .btn:hover {
     background: var(--color-primary-dark);
-}
-.tenant-hint {
-    color: var(--color-text-muted);
-}
-.tenant-hint code {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    color: var(--color-accent);
 }
 
 /* ========== FOOTER ========== */
@@ -724,6 +704,107 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
 }
 
+/* ========== WORKFLOW ========== */
+.workflow-section {
+    padding: var(--spacing-3xl) 0;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    text-align: center;
+}
+.workflow-section h2 {
+    color: var(--color-primary-dark);
+    margin-bottom: var(--spacing-md);
+}
+.workflow-sub {
+    max-width: 640px;
+    margin: 0 auto var(--spacing-2xl);
+    font-size: var(--font-size-lg);
+    line-height: 1.7;
+    color: var(--color-text-muted);
+}
+.workflow-flow {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    flex-wrap: nowrap;
+    max-width: 1100px;
+    margin: 0 auto var(--spacing-2xl);
+}
+.workflow-step {
+    flex: 1 1 0;
+    max-width: 230px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl) var(--spacing-lg);
+    text-align: center;
+}
+.workflow-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius-full);
+    background: var(--color-primary-light);
+    color: var(--color-accent);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    margin-bottom: var(--spacing-md);
+}
+.workflow-label {
+    display: block;
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    color: var(--color-primary-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: var(--spacing-sm);
+}
+.workflow-step p {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+    margin: 0;
+}
+.workflow-arrow {
+    align-self: center;
+    color: var(--color-accent);
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    flex-shrink: 0;
+    padding: 0 var(--spacing-xs);
+}
+.workflow-closing {
+    max-width: 620px;
+    margin: 0 auto;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-primary-dark);
+}
+
+/* ========== CUSTOMER ACCESS (existing customers) ========== */
+.customer-access-section {
+    background: var(--color-bg);
+    padding: var(--spacing-xl) 0;
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+}
+.customer-access-label {
+    margin: 0 0 var(--spacing-md);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+.customer-access-label a {
+    color: var(--color-accent);
+    font-weight: 600;
+}
+.customer-access-section .tenant-input-group {
+    max-width: 400px;
+}
+
 /* ========== HERO / GALLERY RESPONSIVE ========== */
 @media (max-width: 992px) {
     .hero-grid {
@@ -756,6 +837,17 @@ h1, h2, h3, h4, h5, h6 {
         margin-left: auto;
         margin-right: auto;
     }
+
+    .workflow-flow {
+        flex-wrap: wrap;
+    }
+    .workflow-step {
+        flex: 1 1 40%;
+        max-width: none;
+    }
+    .workflow-arrow {
+        display: none;
+    }
 }
 
 @media (max-width: 480px) {
@@ -786,5 +878,15 @@ h1, h2, h3, h4, h5, h6 {
     .why-flow-arrow {
         transform: rotate(90deg);
         padding: var(--spacing-xs) 0;
+    }
+
+    .workflow-flow {
+        flex-direction: column;
+        gap: var(--spacing-lg);
+        align-items: center;
+    }
+    .workflow-step {
+        width: 100%;
+        max-width: 340px;
     }
 }
