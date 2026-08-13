@@ -74,7 +74,7 @@ This document contains the comprehensive manual verification checklist for the A
 ### Survey Display Verification
 - [ ] Tenant name displayed in extra large, centered font
 - [ ] Title reads "SMS Maturity Assessment"
-- [ ] Subtitle reads: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10951 and state requirements."
+- [ ] Subtitle reads: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10159 and state requirements."
 - [ ] Bilingual support (English/Nepali) works
 - [ ] Anonymous option is available
 - [ ] Rate limiting (5/day/tenant) is enforced
@@ -144,10 +144,10 @@ This document contains the comprehensive manual verification checklist for the A
 | 7 | Footer | Includes "Developer Login" link | ✅ |
 
 ### Landing Page Detailed Checks
-- [ ] Compliance badge shows "ICAO Annex 19 · Doc 9859 · Doc 10951 Aligned"
-- [ ] Features section shows 6 cards (Gap Analysis Survey, Voluntary Safety Report, Mandatory Occurrence Report, Safety Dashboard, Regulator Oversight, System Administration)
+- [ ] Compliance badge shows "ICAO Annex 19 · Doc 9859 · Doc 10159 Aligned"
+- [ ] Features section shows grouped ecosystem (Capture: Gap Analysis Survey, Voluntary Safety Reporting; Assess & Manage: Hazard Identification & Risk Assessment, Mandatory Occurrence Reporting; Assure & Decide: Safety Dashboard, Regulatory & Industry Intelligence; Govern: System Administration)
 - [ ] Why It Matters section displays
-- [ ] Standards/Trust section shows ICAO Annex 19, Doc 9859, Doc 10951
+- [ ] Standards/Trust section shows ICAO Annex 19, Doc 9859, Doc 10159
 - [ ] Tenant Portal section has input field for Tenant ID
 - [ ] Footer has project credit: "A project by Ghanshyam Acharya" (no external link)
 

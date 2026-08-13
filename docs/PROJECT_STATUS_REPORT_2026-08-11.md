@@ -36,7 +36,7 @@
 
 ## 2. System Overview
 
-- **Application Purpose**: ICAO Annex 19, Doc 9859 (Safety Management Manual) and Doc 10951 (Safety Intelligence Manual) aligned SMS platform for airlines, regulators, and aviation organizations. Measures SMS maturity, identifies hazards, assesses/mitigates risks, and turns safety data into safety intelligence.
+- **Application Purpose**: ICAO Annex 19, Doc 9859 (Safety Management Manual) and Doc 10159 (Safety Intelligence Manual) aligned SMS platform for airlines, regulators, and aviation organizations. Measures SMS maturity, identifies hazards, assesses/mitigates risks, and turns safety data into safety intelligence.
 - **Current Phase**: Beta Testing / Pre-Production
 - **Target Audience**: Airlines (7 operators), Regulators (CAAN), MROs, Aerodromes
 

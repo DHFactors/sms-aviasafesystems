@@ -15,7 +15,15 @@ CODE OWNER: AviaSafeSystems
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AviaSAFEsystem - Aviation Safety Management Platform</title>
+    <title>AviaSAFESMS — Aviation Safety Management Platform | Safety Data to Safety Intelligence</title>
+    <meta name="description" content="AviaSAFESMS connects safety reporting, hazard and risk management, safety assurance, and performance monitoring in one environment — turning SMS data into safer decisions.">
+    <meta name="keywords" content="aviation safety management system, SMS, ICAO Annex 19, hazard management, safety intelligence, aviation SMS software">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AviaSAFESMS — From Safety Data to Safety Intelligence">
+    <meta property="og:description" content="One connected safety intelligence ecosystem for airlines, operators and regulators — ICAO Annex 19, Doc 9859 and Doc 10159 aligned.">
+    <meta property="og:url" content="https://sms.aviasafesystems.com/">
+    <meta property="og:image" content="/images/screenshots/screenshot-1.png">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/tenant-overrides.css">
@@ -45,9 +53,54 @@ CODE OWNER: AviaSafeSystems
             color: var(--color-white);
             transform: translateY(-2px);
         }
-        .features-grid {
+        .features-sub {
+            max-width: 680px;
+            margin: 0 auto var(--spacing-2xl);
+            color: var(--color-gray-700);
+            font-size: var(--font-size-lg);
+            line-height: 1.6;
+        }
+        .feature-group {
+            margin-bottom: var(--spacing-3xl);
+        }
+        .feature-group:last-child {
+            margin-bottom: 0;
+        }
+        .feature-group-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            justify-content: center;
+            text-align: center;
+        }
+        .feature-group-header .feature-group-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            border-radius: var(--border-radius-md);
+            background: var(--color-primary-light);
+            color: var(--color-accent);
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .feature-group-header h3 {
+            margin: 0;
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .feature-group-header p {
+            margin: 0;
+            font-size: var(--font-size-sm);
+            color: var(--color-gray-600);
+        }
+        .feature-group-cards {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: var(--spacing-xl);
         }
         .feature-card .badge {
@@ -65,10 +118,21 @@ CODE OWNER: AviaSafeSystems
             gap: var(--spacing-2xl);
             flex-wrap: wrap;
         }
-        .trust-logos span {
+        .trust-logo {
+            text-align: center;
+        }
+        .trust-logo span {
+            display: block;
             font-size: var(--font-size-xl);
             font-weight: 700;
             letter-spacing: 1px;
+        }
+        .trust-logo small {
+            display: block;
+            margin-top: var(--spacing-xs);
+            font-size: var(--font-size-sm);
+            color: var(--color-gray-600);
+            letter-spacing: 0.3px;
         }
         .tenant-input-group {
             display: flex;
@@ -88,15 +152,49 @@ CODE OWNER: AviaSafeSystems
             margin-top: var(--spacing-md);
             font-size: var(--font-size-sm);
         }
+        .final-cta-section {
+            text-align: center;
+            padding: var(--spacing-3xl) 0;
+        }
+        .final-cta-section h2 {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            max-width: 700px;
+            margin: 0 auto var(--spacing-md);
+        }
+        .final-cta-section > .container > p {
+            max-width: 640px;
+            margin: 0 auto var(--spacing-xl);
+            font-size: var(--font-size-lg);
+            line-height: 1.7;
+        }
+        .final-cta-actions {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+        .final-cta-secondary {
+            margin-top: var(--spacing-lg);
+            font-size: var(--font-size-sm) !important;
+            color: var(--color-gray-700);
+        }
         section {
             scroll-margin-top: 80px;
         }
         @media (max-width: 992px) {
-            .features-grid { grid-template-columns: repeat(2, 1fr); }
+            .feature-group-header {
+                flex-wrap: wrap;
+            }
+            .feature-group-header p {
+                flex-basis: 100%;
+            }
+            .feature-group-cards { grid-template-columns: repeat(2, 1fr); }
         }
         @media (max-width: 600px) {
-            .features-grid { grid-template-columns: 1fr; }
+            .feature-group-cards { grid-template-columns: 1fr; }
             .tenant-input-group { flex-direction: column; }
+            .trust-logos { flex-direction: column; align-items: center; }
         }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,16 +230,17 @@ CODE OWNER: AviaSafeSystems
             <!-- Left: Text Content -->
             <div class="hero-content">
                 <span class="hero-badge">NEXT-GEN AVIATION SAFETY MANAGEMENT</span>
-                <h1 class="hero-headline">From Reactive Compliance to <span class="text-highlight">Proactive Intelligence</span></h1>
-                <p class="hero-lead">Bridge Safety-I to Safety-II with AI-assisted insights.</p>
+                <h1 class="hero-headline">From Safety Data to <span class="text-highlight">Safety Intelligence</span></h1>
+                <p class="hero-lead">Turn your SMS data into better safety decisions.</p>
                 <p class="hero-description">
-                    Transform compliance logging into proactive risk management. AviaSAFE SMS
-                    integrates real-time SMS maturity analytics, human performance monitoring,
-                    and automated CAP tracking to accelerate learning cycles and safeguard
-                    operational continuity.
+                    AviaSAFESMS connects safety reporting, hazard and risk management,
+                    safety assurance, and performance monitoring in one environment —
+                    helping leadership identify emerging risks, understand safety
+                    performance, and prioritize improvement.
                 </p>
                 <div class="hero-cta">
-                    <a href="contact.html" class="btn btn-primary btn-lg">Request Demo</a>
+                    <a href="contact.html" class="btn btn-primary btn-lg">Request a Demo</a>
+                    <a href="#features" class="btn btn-outline-light btn-lg">Explore AviaSAFESMS</a>
                 </div>
             </div>
 
@@ -176,9 +275,50 @@ CODE OWNER: AviaSafeSystems
     <div class="container">
         <div class="why-matters-content">
             <span class="why-tag">Why It Matters</span>
+
+            <div class="why-flow" aria-label="From safety data to safer decisions">
+                <div class="why-flow-step">
+                    <span class="why-flow-num">1</span>
+                    <span class="why-flow-label">SAFETY DATA</span>
+                </div>
+                <span class="why-flow-arrow" aria-hidden="true">&#8594;</span>
+                <div class="why-flow-step">
+                    <span class="why-flow-num">2</span>
+                    <span class="why-flow-label">SAFETY INTELLIGENCE</span>
+                </div>
+                <span class="why-flow-arrow" aria-hidden="true">&#8594;</span>
+                <div class="why-flow-step">
+                    <span class="why-flow-num">3</span>
+                    <span class="why-flow-label">SAFER DECISIONS</span>
+                </div>
+            </div>
+
             <blockquote class="why-quote">
                 <p>Collecting safety data is not the goal.<br>Turning safety data into safer decisions <strong>is</strong>.</p>
             </blockquote>
+
+            <p class="why-support">
+                Modern SMS generates large amounts of safety information. The challenge is connecting that
+                information, identifying meaningful patterns, and turning them into timely management action.
+            </p>
+
+            <div class="why-concepts">
+                <div class="why-concept">
+                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-link"></i></div>
+                    <h3>Connect</h3>
+                    <p>Bring reporting, hazards, risks, assurance and performance information together.</p>
+                </div>
+                <div class="why-concept">
+                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-eye"></i></div>
+                    <h3>Understand</h3>
+                    <p>Identify patterns, emerging risks and safety performance trends.</p>
+                </div>
+                <div class="why-concept">
+                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-check"></i></div>
+                    <h3>Act</h3>
+                    <p>Turn intelligence into informed decisions, corrective actions and continuous improvement.</p>
+                </div>
+            </div>
         </div>
     </div>
 </section>
@@ -186,64 +326,108 @@ CODE OWNER: AviaSafeSystems
 <!-- ========== FEATURES ========== -->
 <section class="features-section" id="features">
     <div class="container">
-        <h2>Complete Safety Management Solution</h2>
-        <div class="features-grid">
+        <h2>One Connected Safety Intelligence Ecosystem</h2>
+        <p class="features-sub">
+            From reporting and risk assessment to assurance and leadership insight, AviaSAFESMS
+            connects the essential elements of an effective Safety Management System.
+        </p>
 
-            <!-- 1. Survey -->
-            <div class="feature-card">
-                <i class="fas fa-thermometer-half"></i>
-                <h3>Gap Analysis Survey</h3>
-                <div class="tagline">Your Safety Thermometer</div>
-                <p>Measure your SMS maturity in 15 minutes. Bilingual support (English/Nepali).</p>
-                <span class="badge badge-thermometer">Take the Pulse</span>
+        <!-- CAPTURE -->
+        <div class="feature-group">
+            <div class="feature-group-header">
+                <span class="feature-group-icon"><i class="fas fa-inbox" aria-hidden="true"></i></span>
+                <h3>Capture</h3>
+                <p>Bring safety information into one place.</p>
             </div>
+            <div class="feature-group-cards">
+                <div class="feature-card">
+                    <i class="fas fa-thermometer-half"></i>
+                    <h4>Gap Analysis Survey</h4>
+                    <div class="tagline">Measure SMS maturity</div>
+                    <p>Assess organizational safety maturity, identify gaps, and establish improvement priorities.</p>
+                    <span class="badge badge-thermometer">Take the Pulse</span>
+                </div>
 
-            <!-- 2. VSR -->
-            <div class="feature-card">
-                <i class="fas fa-comment-dots"></i>
-                <h3>Voluntary Safety Report</h3>
-                <div class="tagline">Speak Up, Stay Safe</div>
-                <p>Anonymous reporting. Just Culture protected. Your voice matters.</p>
-                <span class="badge badge-speakup">Always Open</span>
+                <div class="feature-card">
+                    <i class="fas fa-comment-dots"></i>
+                    <h4>Voluntary Safety Reporting</h4>
+                    <div class="tagline">Speak up. Learn faster.</div>
+                    <p>Capture safety concerns and hazards through a structured reporting process that supports a positive reporting culture.</p>
+                    <span class="badge badge-speakup">Always Open</span>
+                </div>
             </div>
-
-            <!-- 3. MOR -->
-            <div class="feature-card">
-                <i class="fas fa-gavel"></i>
-                <h3>Mandatory Occurrence Report</h3>
-                <div class="tagline">Regulatory-Ready Reporting</div>
-                <p>ICAO/EASA compliant. 72-hour submission window. Audit-ready.</p>
-                <span class="badge badge-regulatory">Compliant</span>
-            </div>
-
-            <!-- 4. Dashboard -->
-            <div class="feature-card">
-                <i class="fas fa-cockpit"></i>
-                <h3>Safety Dashboard</h3>
-                <div class="tagline">Your Safety Cockpit</div>
-                <p>Real-time visibility. Actionable insights. Risk at a glance.</p>
-                <span class="badge badge-cockpit">Command Center</span>
-            </div>
-
-            <!-- 5. Regulator Oversight -->
-            <div class="feature-card">
-                <i class="fas fa-heart-pulse"></i>
-                <h3>Regulator Oversight</h3>
-                <div class="tagline">State Safety Programme</div>
-                <p>Aggregated intelligence. Zero identity exposure. Industry-wide view.</p>
-                <span class="badge badge-pulse">Regulator Access</span>
-            </div>
-
-            <!-- 6. Admin -->
-            <div class="feature-card">
-                <i class="fas fa-sliders-h"></i>
-                <h3>System Administration</h3>
-                <div class="tagline">Command Center</div>
-                <p>Full control. Total visibility. Tenant and user management.</p>
-                <span class="badge badge-command">Admin Only</span>
-            </div>
-
         </div>
+
+        <!-- ASSESS & MANAGE -->
+        <div class="feature-group">
+            <div class="feature-group-header">
+                <span class="feature-group-icon"><i class="fas fa-clipboard-check" aria-hidden="true"></i></span>
+                <h3>Assess &amp; Manage</h3>
+                <p>Analyze and respond to risk.</p>
+            </div>
+            <div class="feature-group-cards">
+                <div class="feature-card">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <h4>Hazard Identification &amp; Risk Assessment</h4>
+                    <div class="tagline">From report to managed risk</div>
+                    <p>Register hazards, assess likelihood and severity, and monitor risk across the Master Register.</p>
+                    <span class="badge badge-pulse">Core Capability</span>
+                </div>
+
+                <div class="feature-card">
+                    <i class="fas fa-gavel"></i>
+                    <h4>Mandatory Occurrence Reporting</h4>
+                    <div class="tagline">Structured regulatory reporting</div>
+                    <p>Manage occurrence information, required reporting workflows, and audit-ready records.</p>
+                    <span class="badge badge-regulatory">Regulatory-Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ASSURE & DECIDE -->
+        <div class="feature-group">
+            <div class="feature-group-header">
+                <span class="feature-group-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></span>
+                <h3>Assure &amp; Decide</h3>
+                <p>Turn analysis into action.</p>
+            </div>
+            <div class="feature-group-cards">
+                <div class="feature-card">
+                    <i class="fas fa-cockpit"></i>
+                    <h4>Safety Dashboard</h4>
+                    <div class="tagline">Your Safety Cockpit</div>
+                    <p>Monitor safety performance, risk distribution, trends, and key indicators through an executive-level safety view.</p>
+                    <span class="badge badge-cockpit">Command Center</span>
+                </div>
+
+                <div class="feature-card">
+                    <i class="fas fa-heart-pulse"></i>
+                    <h4>Regulatory &amp; Industry Intelligence</h4>
+                    <div class="tagline">Connect SMS with oversight</div>
+                    <p>Enable secure, aggregated safety intelligence for regulatory oversight and industry-level risk understanding.</p>
+                    <span class="badge badge-pulse">Regulator Access</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- GOVERN -->
+        <div class="feature-group">
+            <div class="feature-group-header">
+                <span class="feature-group-icon"><i class="fas fa-sliders-h" aria-hidden="true"></i></span>
+                <h3>Govern</h3>
+                <p>Administer the platform.</p>
+            </div>
+            <div class="feature-group-cards">
+                <div class="feature-card">
+                    <i class="fas fa-user-shield"></i>
+                    <h4>System Administration</h4>
+                    <div class="tagline">Control and governance</div>
+                    <p>Manage organizations, users, roles, permissions, configuration, and system-level controls.</p>
+                    <span class="badge badge-command">Admin Only</span>
+                </div>
+            </div>
+        </div>
+
     </div>
 </section>
 
@@ -252,33 +436,43 @@ CODE OWNER: AviaSafeSystems
     <div class="container">
         <h2><i class="fas fa-search-plus"></i> Built on Three ICAO Foundations</h2>
         <p style="color: var(--color-gray-700); max-width: 640px; margin: 0 auto var(--spacing-lg);">
-            From standards to intelligence — ICAO Annex 19, Doc 9859 and Doc 10951
-            are the framework that turns safety data into safer decisions.
+            From standards to intelligence — ICAO Annex 19, Doc 9859 and Doc 10159
+            provide the foundation for turning safety information into safer decisions.
         </p>
         <div class="trust-logos">
-            <span>ICAO Annex 19</span>
-            <span>Doc 9859</span>
-            <span>Doc 10951</span>
+            <div class="trust-logo">
+                <span>ICAO Annex 19</span>
+                <small>Safety Management Standards</small>
+            </div>
+            <div class="trust-logo">
+                <span>Doc 9859</span>
+                <small>Safety Management Manual</small>
+            </div>
+            <div class="trust-logo">
+                <span>Doc 10159</span>
+                <small>Safety Intelligence Manual</small>
+            </div>
         </div>
-        <p class="trust-sub">
-            Safety Management Standards · Safety Management Manual · Safety Intelligence Manual
-        </p>
     </div>
 </section>
 
 <!-- ========== TENANT PORTAL ========== -->
 <section class="tenant-portal-section" id="tenants">
     <div class="container">
-        <h2><i class="fas fa-building"></i> Tenant Portal</h2>
+        <h2><i class="fas fa-building"></i> Your Organization. Your Safety Intelligence.</h2>
         <p>
-            Enter your organization's name to access your dedicated safety portal.
+            Each organization operates within its own secure safety environment, with role-based
+            access to reporting, analysis, assurance and management information.
         </p>
         <div class="tenant-input-group">
-            <input type="text" id="tenantInput" placeholder="Enter Your Organization Name" aria-label="Organization name">
+            <input type="text" id="tenantInput" placeholder="Enter your organization name" aria-label="Organization name">
             <button class="btn" onclick="goToTenant()">
                 <i class="fas fa-arrow-right"></i> Go
             </button>
         </div>
+        <p class="tenant-hint">
+            Already have an AviaSAFESMS organization portal? <a href="login.html">Access it here</a>.
+        </p>
     </div>
 </section>
 
@@ -293,19 +487,34 @@ CODE OWNER: AviaSafeSystems
             <button type="button" class="bio-trigger" onclick="openBioModal()">.. about me</button>
         </div>
         <div class="founder-text">
-            <h2><i class="fas fa-user-tie"></i> Meet the Founder</h2>
+            <h2><i class="fas fa-user-tie"></i> Built by Aviation. Designed for Safety Intelligence.</h2>
             <p>
-                <strong>Ghanshyam Acharya</strong> built AviaSAFE to give airlines and
-                regulators an affordable, ICAO Annex 19, Doc 9859 &amp; Doc 10951 aligned safety
-                management platform — turning complex safety data into clear, actionable
-                intelligence for the whole industry.
+                AviaSAFESMS was built by <strong>Ghanshyam Acharya</strong>, an aviation professional
+                with leadership and operational experience, with a focus on Human Factors, Safety
+                Management and Safety Intelligence.
             </p>
-            <div class="trust-logos founder-cred">
-                <span>ICAO Annex 19</span>
-                <span>Doc 9859</span>
-                <span>Doc 10951</span>
-            </div>
+            <p>
+                His objective is simple: make safety information more connected, more useful, and
+                more actionable for airlines and regulators.
+            </p>
         </div>
+    </div>
+</section>
+
+<!-- ========== FINAL EXECUTIVE CTA ========== -->
+<section class="final-cta-section" id="demo">
+    <div class="container">
+        <h2>Ready to Turn Safety Data into Safety Intelligence?</h2>
+        <p>
+            See how AviaSAFESMS can connect your SMS information, strengthen safety assurance,
+            and give leadership a clearer view of emerging risks and safety performance.
+        </p>
+        <div class="final-cta-actions">
+            <a href="contact.html" class="btn btn-primary btn-lg">Request a 15-Minute Demo</a>
+        </div>
+        <p class="final-cta-secondary">
+            Prefer to explore first? <a href="#features">Take a brief look at the platform</a>.
+        </p>
     </div>
 </section>
 

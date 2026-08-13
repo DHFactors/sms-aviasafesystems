@@ -88,7 +88,7 @@
 
         const foot = document.createElement('div');
         foot.className = 'sidebar-footer';
-        foot.textContent = 'ICAO Annex 19 · Doc 9859 · Doc 10951';
+        foot.textContent = 'ICAO Annex 19 · Doc 9859 · Doc 10159';
         aside.appendChild(foot);
 
         return aside;

@@ -28,7 +28,7 @@ const i18n = {
         successTitle: "Submission Successful",
         successBody: "Your response has been recorded anonymously within the tenant safety system.",
         surveyTitle: "SMS Maturity Assessment",
-        surveySubtitle: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10951 and state requirements."
+        surveySubtitle: "Based on Safety Management System's 4 pillars and 12 elements. This survey is conducted aligning Annex 19, Doc 9859, Doc 10159 and state requirements."
     },
     ne: {
         aware: "जानकार", unaware: "अजानकार",
@@ -40,7 +40,7 @@ const i18n = {
         successTitle: "सफलतापूर्वक पेश भयो",
         successBody: "तपाईंको जवाफ प्रणालीमा अज्ञात रूपमा सुरक्षित गरिएको छ।",
         surveyTitle: "SMS स्वास्थ्य मूल्याङ्कन",
-        surveySubtitle: "सुरक्षा व्यवस्थापन प्रणालीका ४ स्तम्भ र १२ तत्वहरूमा आधारित। यो सर्वेक्षण Annex 19, Doc 9859, Doc 10951 र राज्यका आवश्यकताहरूसँग मिलाएर सञ्चालन गरिएको छ।"
+        surveySubtitle: "सुरक्षा व्यवस्थापन प्रणालीका ४ स्तम्भ र १२ तत्वहरूमा आधारित। यो सर्वेक्षण Annex 19, Doc 9859, Doc 10159 र राज्यका आवश्यकताहरूसँग मिलाएर सञ्चालन गरिएको छ।"
     }
 };
 
