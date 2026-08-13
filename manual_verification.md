@@ -145,7 +145,7 @@ This document contains the comprehensive manual verification checklist for the A
 
 ### Landing Page Detailed Checks
 - [ ] Compliance badge shows "ICAO Annex 19 · Doc 9859 · Doc 10159 Aligned"
-- [ ] Features section shows grouped ecosystem (Capture: Gap Analysis Survey, Voluntary Safety Reporting; Assess & Manage: Hazard Identification & Risk Assessment, Mandatory Occurrence Reporting; Assure & Decide: Safety Dashboard, Regulatory & Industry Intelligence; Govern: System Administration)
+- [ ] Features section shows grouped ecosystem (Capture: Gap Analysis Survey, Voluntary Safety Reporting; Assess & Manage: Hazard Identification & Risk Assessment, Mandatory Occurrence Reporting; Assure & Decide: Safety Dashboard, Regulatory & Industry Intelligence)
 - [ ] Why It Matters section displays
 - [ ] Standards/Trust section shows ICAO Annex 19, Doc 9859, Doc 10159
 - [ ] Tenant Portal section has input field for Tenant ID
