@@ -103,6 +103,7 @@ Live endpoints:
 | Deployment guide | [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) |
 | Operations manual | [docs/OPERATIONS.md](./docs/OPERATIONS.md) |
 | Administrator guide | [docs/ADMIN_GUIDE.md](./docs/ADMIN_GUIDE.md) |
+| User glossary & dashboard reference | [docs/GLOSSARY.md](./docs/GLOSSARY.md) |
 | API reference | [docs/API.md](./docs/API.md) |
 | Security | [docs/SECURITY.md](./docs/SECURITY.md) |
 | Testing | [tests/README.md](./tests/README.md) |
