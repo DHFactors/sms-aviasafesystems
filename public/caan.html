@@ -292,104 +292,44 @@ function withinPeriod(ts, cutoff) {
 
 // ============================================================================
 // STATE-SCOPED DATA LOADING
-// Every Firestore query is a collectionGroup (cross-tenant / State scope) and
-// every API call uses the State regulator scope (regulator_id) or the CAAN
-// aggregate endpoints. The survey maturity endpoint returns data.state.
+// All figures come from the backend aggregation endpoint
+// (/api/v1/dashboard/caan/state) which computes the state view server-side
+// from the cross-tenant reports/hazards/responses collections. The client
+// performs no direct Firestore queries, so the State Regulator (CAAN_SMD)
+// role always sees consolidated, anonymized data regardless of client-side
+// Firestore rules.
 // ============================================================================
 async function loadStateData(days) {
-    let cutoff = null;
-    const n = parseInt(days, 10);
-    if (n > 0) cutoff = new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+    const n = parseInt(days, 10) || 0;
 
-    const [tenantsSnap, reportsSnap, responsesSnap, hazardsSnap, maturityData] = await Promise.all([
-        safeFirestore(db.collection('tenants').get()),
-        safeFirestore(db.collectionGroup('reports').get()),
-        safeFirestore(db.collectionGroup('responses').get()),
-        safeFirestore(db.collectionGroup('hazards').get()),
-        ApiClient.get(`/api/v1/dashboard/caan/survey-maturity?regulator_id=${STATE_REGULATOR_ID}`)
-            .catch(err => {
-                console.error('State SMS maturity load failed:', err);
-                return null;
-            }),
-    ]);
-
-    const maturityState = (maturityData && maturityData.state) || {};
-    const maturityOps = (maturityData && Array.isArray(maturityData.operators)) ? maturityData.operators : [];
-    const maturityByTenant = {};
-    maturityOps.forEach(o => { maturityByTenant[o.tenant_id] = o; });
-
-    // ---- Tenant map (State regulator scope) ----
-    const tenantMap = {};
-    let activeOperators = 0;
-    if (tenantsSnap) {
-        tenantsSnap.forEach(doc => {
-            const d = doc.data();
-            const active = d.active !== false;
-            if (active) activeOperators++;
-            tenantMap[doc.id] = { ...d, id: doc.id, active };
+    const state = await ApiClient.get(`/api/v1/dashboard/caan/state?days=${n}&regulator_id=${STATE_REGULATOR_ID}`)
+        .catch(err => {
+            console.error('State overview load failed:', err);
+            return null;
         });
+
+    if (!state) {
+        document.getElementById('kpiMors').textContent = '—';
+        document.getElementById('kpiHighRiskHazards').textContent = '—';
+        document.getElementById('kpiOperators').textContent = '—';
+        renderSmsMaturityKpi(null);
+        renderHazardWidget(null);
+        renderOperatorGrid([]);
+        renderStateSpiTrend(null);
+        return;
     }
 
-    // ---- Cross-tenant aggregation of reports / hazards / responses ----
-    const perTenant = {};
-    const ensure = (tid) => {
-        if (!perTenant[tid]) {
-            perTenant[tid] = {
-                reports: 0, mors: 0, highReports: 0, veryHighReports: 0,
-                highRiskHazards: 0, responses: 0,
-            };
-        }
-        return perTenant[tid];
-    };
+    const kpis = state.kpis || {};
+    document.getElementById('kpiMors').textContent = (kpis.mors != null ? kpis.mors : 0) || '0';
+    document.getElementById('kpiHighRiskHazards').textContent = (kpis.high_risk_hazards != null ? kpis.high_risk_hazards : 0) || '0';
+    document.getElementById('kpiOperators').textContent = (kpis.active_operators != null ? kpis.active_operators : 0) || '0';
 
-    const allReports = [];
-    if (reportsSnap) {
-        reportsSnap.forEach(doc => {
-            const data = doc.data();
-            if (!withinPeriod(data.created_at, cutoff)) return;
-            allReports.push(data);
-            const tid = doc.ref.path.split('/')[1];
-            const t = ensure(tid);
-            t.reports++;
-            if ((data.report_type || '').toLowerCase() === 'mandatory') t.mors++;
-            let rl = data.risk_level || data.riskLevel || '';
-            if (rl === 'Critical') rl = 'Very High';
-            if (rl === 'High') t.highReports++;
-            if (rl === 'Very High') t.veryHighReports++;
-        });
-    }
-
-    if (hazardsSnap) {
-        hazardsSnap.forEach(doc => {
-            const data = doc.data();
-            if (!withinPeriod(data.created_at, cutoff)) return;
-            const tid = doc.ref.path.split('/')[1];
-            const t = ensure(tid);
-            const rl = data.risk_level || '';
-            if (rl === 'High' || rl === 'Very High') t.highRiskHazards++;
-        });
-    }
-
-    if (responsesSnap) {
-        responsesSnap.forEach(doc => {
-            const data = doc.data();
-            if (!withinPeriod(data.submitted_at || data.created_at, cutoff)) return;
-            const tid = doc.ref.path.split('/')[1];
-            ensure(tid).responses++;
-        });
-    }
-
-    // ---- KPIs ----
-    const totalMors = Object.values(perTenant).reduce((s, t) => s + t.mors, 0);
-    document.getElementById('kpiMors').textContent = totalMors || '0';
-    document.getElementById('kpiOperators').textContent = activeOperators || '0';
-
+    const maturityState = (state.sms_maturity && state.sms_maturity.state) || {};
     renderSmsMaturityKpi(maturityState);
 
-    // ---- Widgets ----
-    renderHazardWidget(hazardsSnap);
-    renderOperatorGrid(tenantMap, perTenant, maturityByTenant);
-    renderStateSpiTrend(allReports);
+    renderHazardWidget(state.hazard_matrix || null);
+    renderOperatorGrid(state.operators || []);
+    renderStateSpiTrend(state.spi_trend || null);
 }
 
 // ============================================================================
@@ -412,38 +352,22 @@ async function renderSmsMaturityKpi(state) {
 
 // ============================================================================
 // STATE HAZARD MATRIX — aggregated Level III/IV distribution, no operator IDs
+// Consumes { cells: [{severity, probability, count}], level3, level4, total }
+// from the backend state endpoint.
 // ============================================================================
-function renderHazardWidget(hazardsSnap) {
+function renderHazardWidget(matrix) {
     const chipsEl = document.getElementById('hazardLevelChips');
     const container = document.getElementById('hazardMatrixContainer');
 
-    if (!hazardsSnap) {
+    if (!matrix || !Array.isArray(matrix.cells)) {
         chipsEl.innerHTML = '';
         container.innerHTML = '<div class="error"><i class="fas fa-exclamation-circle"></i> State hazard matrix unavailable.</div>';
         return;
     }
 
-    const heatMapData = [];
-    for (let s = 1; s <= 5; s++) {
-        for (let p = 1; p <= 5; p++) {
-            heatMapData.push({ severity: s, probability: p, count: 0 });
-        }
-    }
-
-    let level3 = 0, level4 = 0, total = 0;
-    hazardsSnap.forEach(doc => {
-        const d = doc.data();
-        total++;
-        const s = Number(d.severity);
-        const p = Number(d.probability);
-        if (s >= 1 && s <= 5 && p >= 1 && p <= 5) {
-            const item = heatMapData.find(h => h.severity === s && h.probability === p);
-            if (item) item.count++;
-        }
-        const rl = d.risk_level || classifyRisk(d.risk_index);
-        if (rl === 'High') level3++;
-        else if (rl === 'Very High') level4++;
-    });
+    const level3 = matrix.level3 || 0;
+    const level4 = matrix.level4 || 0;
+    const total = matrix.total || 0;
 
     chipsEl.innerHTML = `
         <span class="hazard-chip chip-iii"><strong>${level3}</strong> Level III (High)</span>
@@ -451,47 +375,50 @@ function renderHazardWidget(hazardsSnap) {
         <span class="hazard-chip"><strong>${total}</strong> Total State Hazards</span>
     `;
 
-    renderCaanHeatMap(heatMapData, 'hazardMatrixContainer', 'Severity × Probability — State-wide hazard distribution');
+    renderCaanHeatMap(matrix.cells, 'hazardMatrixContainer', 'Severity × Probability — State-wide hazard distribution');
 }
 
 // ============================================================================
 // OPERATOR PROFILE CARDS (high-level summary only)
+// Consumes the operators array from the backend state endpoint
+// [{tenant_id, name, icao, country, active, mors, high_risk_hazards,
+//   responses, sms_maturity?}]. The SMS maturity figure is merged in from the
+// survey-maturity payload server-side.
 // ============================================================================
-function renderOperatorGrid(tenantMap, perTenant, maturityByTenant) {
+function renderOperatorGrid(operators) {
     const grid = document.getElementById('operatorGrid');
-    const operators = Object.values(tenantMap)
+    const list = (operators || [])
         .filter(t => t.active)
         .sort((a, b) => {
-            const ia = OPERATOR_ORDER.indexOf(a.id);
-            const ib = OPERATOR_ORDER.indexOf(b.id);
-            if (ia === -1 && ib === -1) return (a.name || a.id).localeCompare(b.name || b.id);
+            const ia = OPERATOR_ORDER.indexOf(a.tenant_id);
+            const ib = OPERATOR_ORDER.indexOf(b.tenant_id);
+            if (ia === -1 && ib === -1) return (a.name || a.tenant_id).localeCompare(b.name || b.tenant_id);
             if (ia === -1) return 1;
             if (ib === -1) return -1;
             return ia - ib;
         });
 
-    if (!operators.length) {
+    if (!list.length) {
         grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><i class="fas fa-inbox"></i> No active operators found.</div>';
         return;
     }
 
-    grid.innerHTML = operators.map(t => {
-        const stats = perTenant[t.id] || {};
-        const mat = maturityByTenant[t.id];
-        const matScore = mat && mat.overall_sms_maturity != null ? mat.overall_sms_maturity : null;
+    grid.innerHTML = list.map(t => {
+        const mat = t.sms_maturity;
+        const matScore = mat != null ? mat : null;
         return `
             <div class="op-card">
                 <div class="op-card-head">
                     <div>
-                        <div class="op-name">${t.name || t.id}</div>
+                        <div class="op-name">${t.name || t.tenant_id}</div>
                         <div class="op-meta">${t.icao || '—'} · ${t.country || 'Nepal'}</div>
                     </div>
-                    <span class="badge ${t.active ? 'badge-success' : 'badge-secondary'}">Active</span>
+                    <span class="badge badge-success">Active</span>
                 </div>
-                <div class="op-row"><span>SMS Status</span><strong>${t.active ? 'Active' : 'Inactive'}</strong></div>
-                <div class="op-row"><span>SMS Maturity</span><strong>${matScore != null ? matScore.toFixed(1) + ' / 5' : '—'}</strong></div>
-                <div class="op-row"><span>Active High-Risk Hazards</span><strong>${stats.highRiskHazards || 0}</strong></div>
-                <div class="op-row"><span>Survey Participation</span><strong>${stats.responses || 0}</strong></div>
+                <div class="op-row"><span>SMS Status</span><strong>Active</strong></div>
+                <div class="op-row"><span>SMS Maturity</span><strong>${matScore != null ? Number(matScore).toFixed(1) + ' / 5' : '—'}</strong></div>
+                <div class="op-row"><span>Active High-Risk Hazards</span><strong>${t.high_risk_hazards || 0}</strong></div>
+                <div class="op-row"><span>Survey Participation</span><strong>${t.responses || 0}</strong></div>
             </div>`;
     }).join('');
 }
@@ -543,73 +470,18 @@ function renderCaanHeatMap(data, containerId, caption) {
 
 // ============================================================================
 // MACRO TREND — STATE SAFETY PERFORMANCE INDICATORS (SPIs) OVER TIME
+// Consumes the precomputed trend from the backend state endpoint:
+// { categories, quarters, labels, series: [{category, points:[{quarter,
+//   label, avg_risk_index}]}] }
 // ============================================================================
-const ICAO_TO_TAXONOMY = {
-    LOCI: 'Organizational-Facilities',
-    CFIT: 'Organizational-Facilities',
-    RE: 'Organizational-Facilities',
-    RI: 'Organizational-Facilities',
-    GCOL: 'Organizational-Facilities',
-    MAC: 'Technical',
-    ENG: 'Technical',
-    SYS: 'Technical',
-    FIRE: 'Technical',
-    BIRD: 'Wildlife',
-    CABIN: 'Human Factors',
-    ARC: 'Organizational-Documentation, Processes and Procedures',
-    PRO: 'Organizational-Documentation, Processes and Procedures',
-    WX: 'Environmental',
-    OTHER: 'Other'
-};
-
-function sspCategoryFor(report) {
-    const taxonomy = report.taxonomy || ICAO_TO_TAXONOMY[report.occurrence_category] || 'Other';
-    if (taxonomy === 'Technical') return 'Technical';
-    if (taxonomy === 'Wildlife' || taxonomy === 'Environmental') return 'External';
-    if (taxonomy === 'Human Factors') return 'Human Factors';
-    if (taxonomy.indexOf('Organizational') === 0) return 'Organizational';
-    return 'Operational';
-}
-
-function reportQuarter(report) {
-    const raw = report.created_at || report.createdAt || report.occurrence_date;
-    if (!raw) return null;
-    let d = null;
-    if (raw instanceof Date) d = raw;
-    else if (typeof raw === 'object' && typeof raw.toDate === 'function') d = raw.toDate();
-    else if (typeof raw === 'object' && typeof raw.seconds === 'number') d = new Date(raw.seconds * 1000);
-    else d = new Date(raw);
-    if (isNaN(d.getTime())) return null;
-    const q = Math.floor(d.getMonth() / 3) + 1;
-    return `${d.getFullYear()}-Q${q}`;
-}
-
-function renderStateSpiTrend(reports) {
+function renderStateSpiTrend(trend) {
     destroyCaanChart('caanSSPRiskChart');
     if (typeof Chart === 'undefined') return;
     const ctx = document.getElementById('caanSSPRiskChart');
     if (!ctx) return;
+    if (!trend || !Array.isArray(trend.series) || !trend.series.length) return;
 
-    const categories = ['Operational', 'Technical', 'Human Factors', 'Organizational', 'External'];
-    const quarters = new Set();
-    const byQuarterCategory = {};
-
-    reports.forEach(r => {
-        const quarter = reportQuarter(r);
-        if (!quarter) return;
-        quarters.add(quarter);
-        const cat = sspCategoryFor(r);
-        const key = `${quarter}|${cat}`;
-        if (!byQuarterCategory[key]) byQuarterCategory[key] = { sum: 0, count: 0 };
-        const ri = r.risk_index != null ? Number(r.risk_index) : NaN;
-        const riskScore = !isNaN(ri) ? ri * 4 : null;
-        if (riskScore == null) return;
-        byQuarterCategory[key].sum += riskScore;
-        byQuarterCategory[key].count++;
-    });
-
-    const sortedQuarters = Array.from(quarters).sort();
-    const labels = sortedQuarters.map(q => q.replace('-Q', ' Q'));
+    const labels = trend.labels || [];
 
     const colors = {
         Operational: '#1a73e8',
@@ -619,15 +491,11 @@ function renderStateSpiTrend(reports) {
         External: '#c5221f',
     };
 
-    const datasets = categories.map(cat => ({
-        label: cat,
-        data: sortedQuarters.map(q => {
-            const agg = byQuarterCategory[`${q}|${cat}`];
-            if (!agg || !agg.count) return null;
-            return Math.round((agg.sum / agg.count) * 10) / 10;
-        }),
-        borderColor: colors[cat],
-        backgroundColor: colors[cat] + '1a',
+    const datasets = trend.series.map(s => ({
+        label: s.category,
+        data: (s.points || []).map(p => p.avg_risk_index),
+        borderColor: colors[s.category] || '#64748b',
+        backgroundColor: (colors[s.category] || '#64748b') + '1a',
         borderWidth: 2,
         pointRadius: 3,
         pointHoverRadius: 5,

@@ -174,12 +174,57 @@ function initializeFirebase() {
 let auth = null;
 let db = null;
 
+// ============================================================================
+// NAMED DATABASE BINDING
+// ============================================================================
+// The compat SDK's firebase.firestore() always resolves to the "(default)"
+// database and silently ignores a databaseId argument, so it can never reach
+// the sms-db / sms-db-beta named databases this project uses. To fix that we
+// pull the modular Firestore from the app container using the database
+// identifier, wrap it in the compat Firestore class, and route the namespace
+// factory — and therefore every page's firebase.firestore() call — to it.
+// This keeps db.collection(...), collectionGroup(...) and all compat firestore
+// calls working against the correct database.
+
+var _compatFirestoreFactory = null;
+var _namedDbCache = {};
+
+function getNamedFirestore(appCompat, databaseId) {
+    if (_namedDbCache.hasOwnProperty(databaseId)) return _namedDbCache[databaseId];
+    var container = appCompat._delegate.container;
+    var modDb = container.getProvider('firestore').getImmediate({ identifier: databaseId });
+    // Borrow a real persistence provider from a default compat instance so
+    // enablePersistence() keeps working on the wrapped instance.
+    var defaultCompat = _compatFirestoreFactory(appCompat);
+    var compatDb = new _compatFirestoreFactory.Firestore(appCompat, modDb, defaultCompat._persistenceProvider);
+    _namedDbCache[databaseId] = compatDb;
+    return compatDb;
+}
+
+function patchFirestoreFactory() {
+    if (_compatFirestoreFactory) return; // already patched
+    _compatFirestoreFactory = firebase.firestore;
+    var originalFactory = _compatFirestoreFactory;
+    function factory(appArg, databaseIdArg) {
+        var app = appArg || firebase.app();
+        var dbId = databaseIdArg || firebaseConfig.databaseId;
+        return getNamedFirestore(app, dbId);
+    }
+    for (var key in originalFactory) {
+        if (typeof originalFactory[key] !== 'undefined') {
+            factory[key] = originalFactory[key];
+        }
+    }
+    firebase.firestore = factory;
+}
+
 function initServices() {
     if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
         try {
             auth = firebase.auth();
             if (typeof firebase.firestore === 'function') {
-                db = firebase.firestore(firebase.app(), firebaseConfig.databaseId);
+                patchFirestoreFactory();
+                db = getNamedFirestore(firebase.app(), firebaseConfig.databaseId);
             } else {
                 console.warn("Firestore SDK not available on this page.");
             }

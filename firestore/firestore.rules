@@ -160,10 +160,40 @@ service cloud.firestore {
     // ANALYTICS — CAAN_SMD + SUPER_ADMIN only
     // ========================================================================
 
-    match /analytics/{document=**} {
-      allow read: if isAuthenticated() &&
-        (isCaanSMD() || isSuperAdmin());
-      allow write: if isSuperAdmin();
+    // ========================================================================
+    // COLLECTION GROUP READ ACCESS — State-scope dashboards (caan.html,
+    // caan-sms-maturity.html) read these subcollections cross-tenant via
+    // collectionGroup(). Firestore rules only match collection-group queries
+    // when the rule uses the recursive wildcard `{path=**}`. Only State
+    // regulators (CAAN_SMD) and SUPER_ADMIN may read across tenants.
+    // ========================================================================
+
+    match /{path=**}/responses/{responseId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/surveys/{surveyId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/reports/{reportId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/hazards/{hazardId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/can_cap/{canId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/flight_diversions/{divId} {
+      allow read: if isAdminOrCaan();
+    }
+
+    match /{path=**}/verification/{verificationId} {
+      allow read: if isAdminOrCaan();
     }
 
     // ========================================================================

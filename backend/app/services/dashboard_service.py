@@ -459,6 +459,193 @@ class DashboardService:
                 docs = [d for d in docs if (d.to_dict().get("tenant_id") or None) in allowed]
         return self._aggregate_surveys(docs)
 
+    def get_caan_state(self, **overrides) -> Dict[str, Any]:
+        """Full CAAN executive-summary payload, aggregated server-side.
+
+        Computes every figure the State Oversight dashboard renders — the four
+        KPI cards, the State Hazard Matrix (severity x probability heatmap),
+        the Operator Profiles grid and the SSP risk trend — directly from the
+        cross-tenant reports/hazards/responses collections. No client-side
+        Firestore queries are needed: the API is the only data source.
+
+        `days` (0 = all time) filters by the doc created_at / submitted_at.
+        `regulator_id` scopes the figures to one State Regulator's operators.
+        """
+        days = int(overrides.get("days") or 0)
+        regulator_id = overrides.get("regulator_id")
+
+        def _doc_time(doc):
+            return (doc.get("created_at") or doc.get("submitted_at") or
+                    doc.get("occurrence_date"))
+
+        def _to_dt(value):
+            if value is None:
+                return None
+            if isinstance(value, datetime):
+                return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            if isinstance(value, str):
+                try:
+                    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    return None
+            return None
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+
+        # ---- Tenants (operator profiles) ----
+        from app.firebase import get_db
+        tenant_ids = None
+        if regulator_id:
+            from app.services.regulator_service import operator_tenant_ids_for_regulator
+            tenant_ids = set(operator_tenant_ids_for_regulator(regulator_id))
+        tenant_map: Dict[str, Dict[str, Any]] = {}
+        try:
+            tenants = list(get_db().collection("tenants").stream())
+            for snap in tenants:
+                d = snap.to_dict() or {}
+                if tenant_ids is not None and snap.id not in tenant_ids:
+                    continue
+                tenant_map[snap.id] = {
+                    "tenant_id": snap.id,
+                    "name": d.get("name") or snap.id,
+                    "icao": d.get("icao") or "",
+                    "country": d.get("country") or "",
+                    "active": d.get("active", True),
+                }
+        except Exception as e:
+            logger.warning(f"CAAN state tenants query failed: {e}")
+
+        # ---- Cross-tenant hazards ----
+        hazards: List[Dict[str, Any]] = []
+        try:
+            for snap in get_db().collection_group("hazards").stream():
+                d = snap.to_dict() or {}
+                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
+                    continue
+                t = _to_dt(_doc_time(d))
+                if cutoff and (t is None or t < cutoff):
+                    continue
+                hazards.append(d)
+        except Exception as e:
+            logger.warning(f"CAAN state hazards query failed: {e}")
+
+        # ---- Cross-tenant responses (survey participation) ----
+        responses: List[Dict[str, Any]] = []
+        try:
+            for snap in get_db().collection_group("responses").stream():
+                d = snap.to_dict() or {}
+                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
+                    continue
+                t = _to_dt(_doc_time(d))
+                if cutoff and (t is None or t < cutoff):
+                    continue
+                responses.append(d)
+        except Exception as e:
+            logger.warning(f"CAAN state responses query failed: {e}")
+
+        # ---- Cross-tenant reports (MORs + SPI trend) ----
+        reports: List[Dict[str, Any]] = []
+        try:
+            from app.firebase import get_cross_tenant_collection
+            for snap in get_cross_tenant_collection("reports").limit(5000).stream():
+                d = snap.to_dict() or {}
+                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
+                    continue
+                t = _to_dt(_doc_time(d))
+                if cutoff and (t is None or t < cutoff):
+                    continue
+                d["created_at"] = t.isoformat() if isinstance(t, datetime) else d.get("created_at")
+                occ = d.get("occurrence_type") or d.get("occurrence_category")
+                d["occurrence_category"] = occ
+                d["taxonomy"] = d.get("taxonomy") or self._seed_taxonomy(occ)
+                reports.append(d)
+        except Exception as e:
+            logger.warning(f"CAAN state reports query failed: {e}")
+
+        # ---- Per-tenant aggregation ----
+        per_tenant: Dict[str, Dict[str, Any]] = {}
+        for tid in tenant_map:
+            per_tenant[tid] = {"mors": 0, "high_risk_hazards": 0, "responses": 0}
+        total_mors = 0
+        for r in reports:
+            tid = r.get("tenant_id") or "unknown"
+            if tid not in per_tenant:
+                per_tenant[tid] = {"mors": 0, "high_risk_hazards": 0, "responses": 0}
+            if (r.get("report_type") or "").lower() == "mandatory":
+                per_tenant[tid]["mors"] += 1
+                total_mors += 1
+        for h in hazards:
+            tid = h.get("tenant_id") or "unknown"
+            if tid not in per_tenant:
+                per_tenant[tid] = {"mors": 0, "high_risk_hazards": 0, "responses": 0}
+            if h.get("risk_level") in ("High", "Very High", "Critical"):
+                per_tenant[tid]["high_risk_hazards"] += 1
+        for res in responses:
+            tid = res.get("tenant_id") or "unknown"
+            if tid not in per_tenant:
+                per_tenant[tid] = {"mors": 0, "high_risk_hazards": 0, "responses": 0}
+            per_tenant[tid]["responses"] += 1
+
+        total_high_risk_hazards = sum(v["high_risk_hazards"] for v in per_tenant.values())
+        active_operators = sum(1 for t in tenant_map.values() if t["active"])
+
+        # ---- Hazard matrix heatmap (severity x probability) ----
+        heat_map = [{"severity": s, "probability": p, "count": 0} for s in range(1, 6) for p in range(1, 6)]
+        level3 = level4 = 0
+        for h in hazards:
+            s = h.get("severity")
+            p = h.get("probability")
+            if isinstance(s, int) and isinstance(p, int) and 1 <= s <= 5 and 1 <= p <= 5:
+                cell = next((c for c in heat_map if c["severity"] == s and c["probability"] == p), None)
+                if cell:
+                    cell["count"] += 1
+            rl = h.get("risk_level")
+            if rl == "High":
+                level3 += 1
+            elif rl == "Very High":
+                level4 += 1
+
+        # ---- Operator grid (merge tenant meta + per-tenant stats + maturity) ----
+        maturity = self.get_caan_survey_maturity(regulator_id=regulator_id)
+        maturity_by_tenant = {o["tenant_id"]: o for o in (maturity.get("operators") or [])}
+        operators = []
+        for tid, meta in tenant_map.items():
+            stats = per_tenant.get(tid, {"mors": 0, "high_risk_hazards": 0, "responses": 0})
+            mat = maturity_by_tenant.get(tid) or {}
+            operators.append({
+                "tenant_id": tid,
+                "name": meta["name"],
+                "icao": meta["icao"],
+                "country": meta["country"],
+                "active": meta["active"],
+                "mors": stats["mors"],
+                "high_risk_hazards": stats["high_risk_hazards"],
+                "responses": stats["responses"],
+                "sms_maturity": mat.get("overall_sms_maturity"),
+                "pillars": mat.get("pillars"),
+            })
+
+        # ---- SSP risk trend (quarterly avg risk index by category) ----
+        trend = MetricsService.calculate_ssp_risk_trends(reports)
+
+        return {
+            "kpis": {
+                "mors": total_mors,
+                "high_risk_hazards": total_high_risk_hazards,
+                "active_operators": active_operators,
+                "responses": sum(v["responses"] for v in per_tenant.values()),
+            },
+            "operators": operators,
+            "hazard_matrix": {
+                "cells": heat_map,
+                "level3": level3,
+                "level4": level4,
+                "total": len(hazards),
+            },
+            "spi_trend": trend,
+            "sms_maturity": maturity,
+        }
+
     def get_caan_sms_maturity_assessment(self, **overrides) -> Dict[str, Any]:
         """Aggregate period SMS maturity and generate an AI SMS maturity assessment
         with recommended actions for every pillar scoring below 70%
@@ -808,6 +995,39 @@ class DashboardService:
         )
         params.update(overrides)
         return ReportFilter(**params)
+
+    _SEED_TAXONOMY = {
+        "bird strike": "Wildlife",
+        "bird activity": "Wildlife",
+        "runway incursion": "Organizational-Facilities",
+        "runway excursion": "Organizational-Facilities",
+        "abnormal runway contact": "Organizational-Facilities",
+        "ground collision": "Organizational-Facilities",
+        "airborne conflict": "Organizational-Facilities",
+        "atc operational incident": "Organizational-Documentation, Processes and Procedures",
+        "procedural deviation": "Organizational-Documentation, Processes and Procedures",
+        "sop deviation": "Organizational-Documentation, Processes and Procedures",
+        "system/component failure": "Technical",
+        "powerplant failure": "Technical",
+        "maintenance hazard": "Technical",
+        "weather encounter": "Environmental",
+        "weather": "Environmental",
+        "cabin safety event": "Human Factors",
+        "cabin safety": "Human Factors",
+        "human factors": "Human Factors",
+        "fatigue": "Human Factors",
+        "crm": "Human Factors",
+        "communication": "Human Factors",
+        "training": "Human Factors",
+    }
+
+    @staticmethod
+    def _seed_taxonomy(occurrence: Optional[str]) -> Optional[str]:
+        """Map a descriptive seed occurrence type to its SMS taxonomy so the
+        state SPI trend classifies reports into the five SSP categories."""
+        if not occurrence:
+            return None
+        return DashboardService._SEED_TAXONOMY.get(str(occurrence).strip().lower())
 
     @staticmethod
     def _tenant_report_counts(reports: List[dict]) -> List[Dict[str, Any]]:

@@ -123,7 +123,7 @@
             html += '<div class="success-banner" style="background:#e6f4ea;color:#1e7e34;padding:12px 16px;border-radius:8px;font-weight:600;">All pillars scored ≥70% in the selected period — no improvement actions required.</div>';
         } else {
             html += '<h4 style="color:#0b2a42;margin:0 0 8px;"><i class="fas fa-wand-magic-sparkles"></i> Priority Improvement Actions</h4>';
-            html += '<div class="section-sub" style="margin-bottom:12px;">ICAO-aligned actions targeting pillars scoring below 70% (Gemini).</div>';
+            html += '<div class="section-sub" style="margin-bottom:12px;">ICAO-aligned actions targeting pillars scoring below 70%.</div>';
             html += recs.map(function (r) {
                 var tierBadgeHtml = r.tier === 'critical'
                     ? '<span class="badge b-intolerable">CRITICAL</span>'

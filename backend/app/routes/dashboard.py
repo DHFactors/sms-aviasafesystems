@@ -275,6 +275,17 @@ async def get_caan_survey_maturity(
     return _envelope(data)
 
 
+@router.get("/caan/state")
+async def get_caan_state(
+    days: int = Query(0, ge=0, description="Lookback window in days; 0 = all time"),
+    regulator_id: Optional[str] = Query(None, description="State Regulator id (e.g. caan) to scope the state view"),
+    user: Dict[str, Any] = Depends(get_caan_user),
+):
+    svc = DashboardService(user)
+    data = svc.get_caan_state(days=days, regulator_id=regulator_id)
+    return _envelope(data)
+
+
 @router.get("/caan/sms-maturity-assessment")
 async def get_caan_sms_maturity_assessment(
     days: int = Query(90, ge=30, le=365),
