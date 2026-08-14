@@ -284,6 +284,7 @@ window.SHELL_CONFIG = {
 <script src="/js/api/client.js"></script>
 <script src="/js/shell.js"></script>
 
+<script>
 // ============================================================================
 // STATE REGULATOR META
 // ============================================================================
@@ -324,31 +325,39 @@ function regQuery() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await waitForFirebase();
-    currentUser = await getCurrentUser();
-    if (!currentUser) {
-        window.location.href = '/login.html?tenant=caan';
-        return;
+    try {
+        await waitForFirebase();
+        currentUser = await getCurrentUser();
+        if (!currentUser) {
+            window.location.href = '/login.html?tenant=caan';
+            return;
+        }
+        if (currentUser.role !== 'CAAN_SMD' && currentUser.role !== 'SUPER_ADMIN') {
+            alert('Access denied. CAAN_SMD or SUPER_ADMIN role required.');
+            window.location.href = '/';
+            return;
+        }
+        isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+        document.getElementById('authGate').style.display = 'none';
+        await loadRegulatorMeta();
+        ['sms-maturity', 'risk-register', 'aggregation'].forEach(id => {
+            document.getElementById(id).style.display = 'block';
+        });
+        const regShort = regulatorMeta?.short_name || 'State Regulator';
+        window.updateShellTenant(
+            regShort + ' — State Safety Programme',
+            'Safety Management Division · ' + (isSuperAdmin ? 'SUPER_ADMIN' : 'CAAN_SMD')
+        );
+        populateYearSelects();
+        document.getElementById('recDays').addEventListener('change', () => loadSmsMaturityAssessment(false));
+        await Promise.all([loadSmsMaturity(), loadSmsMaturityAssessment(false), loadRegister(), loadAggregation()]);
+    } catch (err) {
+        console.error('State risk dashboard init failed:', err);
+        const gate = document.getElementById('authGate');
+        if (gate) {
+            gate.innerHTML = '<i class="fas fa-exclamation-circle" style="font-size:1.5rem;color:#c5221f;"></i><p style="color:#c5221f;">Failed to initialize the State dashboard. <a href="/login.html?tenant=caan" style="color:#1a6b8a;">Return to sign in</a></p>';
+        }
     }
-    if (currentUser.role !== 'CAAN_SMD' && currentUser.role !== 'SUPER_ADMIN') {
-        alert('Access denied. CAAN_SMD or SUPER_ADMIN role required.');
-        window.location.href = '/';
-        return;
-    }
-    isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
-    document.getElementById('authGate').style.display = 'none';
-    await loadRegulatorMeta();
-    ['sms-maturity', 'risk-register', 'aggregation'].forEach(id => {
-        document.getElementById(id).style.display = 'block';
-    });
-    const regShort = regulatorMeta?.short_name || 'State Regulator';
-    window.updateShellTenant(
-        regShort + ' — State Safety Programme',
-        'Safety Management Division · ' + (isSuperAdmin ? 'SUPER_ADMIN' : 'CAAN_SMD')
-    );
-    populateYearSelects();
-document.getElementById('recDays').addEventListener('change', () => loadSmsMaturityAssessment(false));
-await Promise.all([loadSmsMaturity(), loadSmsMaturityAssessment(false), loadRegister(), loadAggregation()]);
 });
 
 function populateYearSelects() {

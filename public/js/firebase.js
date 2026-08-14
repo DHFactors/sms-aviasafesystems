@@ -332,33 +332,49 @@ function waitForFirebase() {
 async function getCurrentUser() {
     await waitForFirebase();
     return new Promise(function(resolve) {
-        var resolved = false;
-        var unsubscribe = firebase.auth().onAuthStateChanged(async function(user) {
-            if (resolved) return;
-            if (!user) return;
-            resolved = true;
-            unsubscribe();
-            try {
-                var tokenResult = await user.getIdTokenResult(true);
-                var claims = tokenResult.claims || {};
-                resolve({
-                    uid: user.uid,
-                    email: user.email,
-                    role: claims.role || 'USER',
-                    tenantId: claims.tenant_id || null,
-                    claims: claims
-                });
-            } catch (error) {
-                resolve(null);
+        var settled = false;
+        var unsubscribe = null;
+        var settle = function(value) {
+            if (settled) return;
+            settled = true;
+            if (unsubscribe) {
+                try { unsubscribe(); } catch (e) { /* ignore */ }
             }
-        });
+            resolve(value);
+        };
+        try {
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                settle(null);
+                return;
+            }
+            unsubscribe = firebase.auth().onAuthStateChanged(async function(user) {
+                if (settled) return;
+                if (!user) return; // not signed in — let the timeout settle(null)
+                try {
+                    // Forced refresh can stall on App Check / reCAPTCHA or a
+                    // cold network. Never block here: `settle` is guarded by a
+                    // hard timeout below so the page can never hang on the
+                    // "Checking ... access" gate.
+                    var tokenResult = await user.getIdTokenResult(true);
+                    var claims = (tokenResult && tokenResult.claims) || {};
+                    settle({
+                        uid: user.uid,
+                        email: user.email,
+                        role: claims.role || 'USER',
+                        tenantId: claims.tenant_id || null,
+                        claims: claims
+                    });
+                } catch (error) {
+                    settle(null);
+                }
+            });
+        } catch (error) {
+            settle(null);
+            return;
+        }
         setTimeout(function() {
-            if (!resolved) {
-                resolved = true;
-                unsubscribe();
-                resolve(null);
-            }
-        }, 5000);
+            settle(null);
+        }, 8000);
     });
 }
 
