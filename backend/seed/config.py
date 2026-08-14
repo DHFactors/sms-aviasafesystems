@@ -1,4 +1,4 @@
-SEED_VERSION = "2.0.0"
+SEED_VERSION = "2.1.0"
 SEED_DOC_PATH = "seed_metadata/seed"
 
 SURVEY_COLLECTION = "surveys"
@@ -80,15 +80,18 @@ SURVEY_DEPARTMENTS = [
 ]
 
 # ============================================================================
-# Lightweight 6-Tenant Beta configuration (2026-08-12)
+# 10-Tenant Beta configuration (2026-08-14)
 #
-# OPERATOR_PROFILES holds exactly ONE service provider of each tenant type:
-# the 5 operational tenants of the beta set. The legacy seed operators
-# (yeti-airlines, summit-air, sita-air, simrik-air, tara-air) are archived in
-# LEGACY_OPERATOR_PROFILES below and are never written by the runner.
+# OPERATOR_PROFILES holds the 10 active service-provider tenants of the beta
+# set, covering every tenant type (airline, helicopter-operator, mro, aerodrome,
+# ground-handling). The former legacy seed operators (yeti-airlines, summit-air,
+# sita-air, simrik-air, tara-air) were re-activated and moved into
+# OPERATOR_PROFILES; LEGACY_OPERATOR_PROFILES is now empty.
 #
-# Type-specific seeding rule - 10 records per domain per provider:
-#   vsr_count / mor_count / hazard_count / can_count  = 10 for every provider
+# Seeding rules - randomized realistic volumes per provider:
+#   vsr_count + mor_count in [25, 40] with ~70% VSR / 30% MOR
+#   anonymous_rate in [0.25, 0.35] -> ~22% overall Anon Rate (VSR-only)
+#   survey_count in [15, 25]
 #   flight_diversion_count = 10 for airline + helicopter-operator,
 #                            0 for mro / aerodrome / ground-handling
 # ============================================================================
@@ -116,11 +119,11 @@ OPERATOR_PROFILES = [
         "base": "Kathmandu (KTM/VNKT)",
         "fleet_size": 18,
         "employees": 1200,
-        "survey_count": 20,
-        "vsr_count": 10,
+        "survey_count": 22,
+        "vsr_count": 24,
         "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "hazard_count": 16,
+        "can_count": 11,
         "flight_diversion_count": 10,
         "element_scores": {
             "management_commitment": 4.3,
@@ -142,7 +145,7 @@ OPERATOR_PROFILES = [
         "vsr_risk_std": 0.18,
         "mor_risk_mean": 0.55,
         "mor_risk_std": 0.20,
-        "anonymous_rate": 0.18,
+        "anonymous_rate": 0.30,
         "aircraft_types": ["Beechcraft 1900D", "ATR 42-320", "ATR 72-500"],
         "flight_number_prefixes": ["U4-", "BHA-"],
         "routes": ["KTM-PKR", "KTM-SDR", "KTM-BWA", "KTM-JKR", "KTM-BHR", "KTM-TPN", "KTM-DP"],
@@ -160,9 +163,9 @@ OPERATOR_PROFILES = [
         "fleet_size": 10,
         "employees": 200,
         "survey_count": 18,
-        "vsr_count": 10,
+        "vsr_count": 22,
         "mor_count": 10,
-        "hazard_count": 10,
+        "hazard_count": 14,
         "can_count": 10,
         "flight_diversion_count": 10,
         "element_scores": {
@@ -185,7 +188,7 @@ OPERATOR_PROFILES = [
         "vsr_risk_std": 0.20,
         "mor_risk_mean": 0.62,
         "mor_risk_std": 0.18,
-        "anonymous_rate": 0.20,
+        "anonymous_rate": 0.32,
         "aircraft_types": ["Airbus AS350 Écureuil", "Bell 407", "Bell 429 GlobalRanger", "Eurocopter EC135"],
         "flight_number_prefixes": ["ADH-"],
         "routes": ["KTM-SYX", "KTM-OGU", "KTM-LUA", "KTM-EBO", "KTM-KEP", "KTM-DP"],
@@ -203,9 +206,9 @@ OPERATOR_PROFILES = [
         "fleet_size": 0,
         "employees": 180,
         "survey_count": 16,
-        "vsr_count": 10,
+        "vsr_count": 23,
         "mor_count": 10,
-        "hazard_count": 10,
+        "hazard_count": 15,
         "can_count": 10,
         "flight_diversion_count": 0,
         "element_scores": {
@@ -228,7 +231,7 @@ OPERATOR_PROFILES = [
         "vsr_risk_std": 0.19,
         "mor_risk_mean": 0.58,
         "mor_risk_std": 0.20,
-        "anonymous_rate": 0.20,
+        "anonymous_rate": 0.31,
         "aircraft_types": ["Airbus A320 family", "ATR 72", "DHC-6 Twin Otter", "AS350 B3"],
         "flight_number_prefixes": [],
         "routes": ["KTM-VNKT"],
@@ -246,10 +249,10 @@ OPERATOR_PROFILES = [
         "fleet_size": 0,
         "employees": 90,
         "survey_count": 15,
-        "vsr_count": 10,
-        "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "vsr_count": 18,
+        "mor_count": 8,
+        "hazard_count": 13,
+        "can_count": 9,
         "flight_diversion_count": 0,
         "element_scores": {
             "management_commitment": 3.4,
@@ -271,7 +274,7 @@ OPERATOR_PROFILES = [
         "vsr_risk_std": 0.19,
         "mor_risk_mean": 0.57,
         "mor_risk_std": 0.20,
-        "anonymous_rate": 0.25,
+        "anonymous_rate": 0.35,
         "aircraft_types": [],
         "flight_number_prefixes": [],
         "routes": ["PKR-VNPK"],
@@ -289,10 +292,10 @@ OPERATOR_PROFILES = [
         "fleet_size": 0,
         "employees": 120,
         "survey_count": 15,
-        "vsr_count": 10,
-        "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "vsr_count": 18,
+        "mor_count": 8,
+        "hazard_count": 13,
+        "can_count": 9,
         "flight_diversion_count": 0,
         "element_scores": {
             "management_commitment": 3.1,
@@ -314,19 +317,12 @@ OPERATOR_PROFILES = [
         "vsr_risk_std": 0.20,
         "mor_risk_mean": 0.61,
         "mor_risk_std": 0.19,
-        "anonymous_rate": 0.25,
+        "anonymous_rate": 0.33,
         "aircraft_types": [],
         "flight_number_prefixes": [],
         "routes": ["KTM-VNKT"],
         "email_domain": "himalaya-ground-services.com",
     },
-]
-
-# ---------------------------------------------------------------------------
-# Archived legacy seed operators. Kept for reference / potential re-enablement;
-# the runner never writes these to the database.
-# ---------------------------------------------------------------------------
-LEGACY_OPERATOR_PROFILES = [
     {
         "id": "yeti-airlines",
         "name": "Yeti Airlines",
@@ -338,11 +334,11 @@ LEGACY_OPERATOR_PROFILES = [
         "base": "Kathmandu (KTM/VNKT)",
         "fleet_size": 12,
         "employees": 850,
-        "survey_count": 250,
-        "vsr_count": 10,
-        "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "survey_count": 24,
+        "vsr_count": 26,
+        "mor_count": 11,
+        "hazard_count": 16,
+        "can_count": 11,
         "flight_diversion_count": 10,
         "element_scores": {
             "management_commitment": 3.8,
@@ -364,12 +360,11 @@ LEGACY_OPERATOR_PROFILES = [
         "vsr_risk_std": 0.20,
         "mor_risk_mean": 0.52,
         "mor_risk_std": 0.22,
-        "anonymous_rate": 0.25,
+        "anonymous_rate": 0.32,
         "aircraft_types": ["ATR 72-500", "ATR 42-320", "de Havilland DHC-6 Twin Otter"],
         "flight_number_prefixes": ["YT-", "NYT-"],
         "routes": ["KTM-PKR", "KTM-BWA", "KTM-JKR", "KTM-DP", "KTM-SIF", "KTM-TPN", "KTM-LUA"],
         "email_domain": "yetiairlines.com",
-        "archived": True,
     },
     {
         "id": "summit-air",
@@ -382,10 +377,10 @@ LEGACY_OPERATOR_PROFILES = [
         "base": "Kathmandu (KTM/VNKT)",
         "fleet_size": 8,
         "employees": 350,
-        "survey_count": 120,
-        "vsr_count": 10,
+        "survey_count": 20,
+        "vsr_count": 22,
         "mor_count": 10,
-        "hazard_count": 10,
+        "hazard_count": 14,
         "can_count": 10,
         "flight_diversion_count": 10,
         "element_scores": {
@@ -408,12 +403,11 @@ LEGACY_OPERATOR_PROFILES = [
         "vsr_risk_std": 0.22,
         "mor_risk_mean": 0.60,
         "mor_risk_std": 0.18,
-        "anonymous_rate": 0.30,
+        "anonymous_rate": 0.31,
         "aircraft_types": ["Dornier Do 228", "Let L-410 Turbolet", "de Havilland DHC-6 Twin Otter"],
         "flight_number_prefixes": ["SMM-"],
         "routes": ["KTM-SIF", "KTM-DP", "KTM-LUA", "KTM-TPN", "KTM-BJP"],
         "email_domain": "summitair.com.np",
-        "archived": True,
     },
     {
         "id": "sita-air",
@@ -426,11 +420,11 @@ LEGACY_OPERATOR_PROFILES = [
         "base": "Kathmandu (KTM/VNKT)",
         "fleet_size": 6,
         "employees": 280,
-        "survey_count": 90,
-        "vsr_count": 10,
+        "survey_count": 18,
+        "vsr_count": 24,
         "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "hazard_count": 15,
+        "can_count": 11,
         "flight_diversion_count": 10,
         "element_scores": {
             "management_commitment": 3.8,
@@ -452,12 +446,11 @@ LEGACY_OPERATOR_PROFILES = [
         "vsr_risk_std": 0.20,
         "mor_risk_mean": 0.58,
         "mor_risk_std": 0.19,
-        "anonymous_rate": 0.22,
+        "anonymous_rate": 0.28,
         "aircraft_types": ["de Havilland DHC-6 Twin Otter", "Dornier Do 228"],
         "flight_number_prefixes": ["ST-", "SAA-"],
         "routes": ["KTM-PKR", "KTM-SIF", "KTM-DP", "KTM-LUA", "KTM-TPN"],
         "email_domain": "sitaair.com.np",
-        "archived": True,
     },
     {
         "id": "simrik-air",
@@ -470,10 +463,10 @@ LEGACY_OPERATOR_PROFILES = [
         "base": "Pokhara (PKR/VNPK)",
         "fleet_size": 7,
         "employees": 150,
-        "survey_count": 70,
-        "vsr_count": 10,
-        "mor_count": 10,
-        "hazard_count": 10,
+        "survey_count": 17,
+        "vsr_count": 21,
+        "mor_count": 9,
+        "hazard_count": 14,
         "can_count": 10,
         "flight_diversion_count": 10,
         "element_scores": {
@@ -496,12 +489,11 @@ LEGACY_OPERATOR_PROFILES = [
         "vsr_risk_std": 0.21,
         "mor_risk_mean": 0.59,
         "mor_risk_std": 0.20,
-        "anonymous_rate": 0.25,
+        "anonymous_rate": 0.30,
         "aircraft_types": ["Airbus AS350 Écureuil", "Bell 407"],
         "flight_number_prefixes": ["RMK-"],
         "routes": ["PKR-JMO", "PKR-KEP", "PKR-DP", "PKR-SYX", "PKR-MUG"],
         "email_domain": "simrikair.com",
-        "archived": True,
     },
     {
         "id": "tara-air",
@@ -514,11 +506,11 @@ LEGACY_OPERATOR_PROFILES = [
         "base": "Kathmandu (KTM/VNKT)",
         "fleet_size": 5,
         "employees": 180,
-        "survey_count": 100,
-        "vsr_count": 10,
+        "survey_count": 19,
+        "vsr_count": 23,
         "mor_count": 10,
-        "hazard_count": 10,
-        "can_count": 10,
+        "hazard_count": 15,
+        "can_count": 11,
         "flight_diversion_count": 10,
         "element_scores": {
             "management_commitment": 3.7,
@@ -540,14 +532,20 @@ LEGACY_OPERATOR_PROFILES = [
         "vsr_risk_std": 0.21,
         "mor_risk_mean": 0.60,
         "mor_risk_std": 0.19,
-        "anonymous_rate": 0.22,
+        "anonymous_rate": 0.29,
         "aircraft_types": ["de Havilland DHC-6 Twin Otter", "Dornier 228"],
         "flight_number_prefixes": ["TP-", "THR-"],
         "routes": ["KTM-LUA", "KTM-IMK", "KTM-JUM", "KTM-DPR", "KTM-TPJ", "KTM-KEP"],
         "email_domain": "taraair.com",
-        "archived": True,
     },
 ]
+
+# ---------------------------------------------------------------------------
+# Archived legacy seed operators. All former legacy operators (yeti-airlines,
+# summit-air, sita-air, simrik-air, tara-air) were re-activated and moved into
+# OPERATOR_PROFILES on 2026-08-14. The runner now seeds all 10 tenants.
+# ---------------------------------------------------------------------------
+LEGACY_OPERATOR_PROFILES = []
 
 NEPAL_AIRPORTS = [
     "Kathmandu (VNKT)",
@@ -899,26 +897,7 @@ CAAN_TENANT = {
     "email_domain": "caanepal.gov.np",
 }
 
-OPERATOR_USER_TEMPLATES = {
-    "safety_manager": {
-        "email": "safety.{op_id}@{email_domain}",
-        "password": DEMO_USER_PASSWORD,
-        "full_name": "{name}",
-        "role": "AIRLINE_ADMIN",
-    },
-    "accountable_executive": {
-        "email": "ae.{op_id}@{email_domain}",
-        "password": DEMO_USER_PASSWORD,
-        "full_name": "{name}",
-        "role": "AIRLINE_ADMIN",
-    },
-    "department_manager": {
-        "email": "manager.{op_id}@{email_domain}",
-        "password": DEMO_USER_PASSWORD,
-        "full_name": "{name}",
-        "role": "USER",
-    },
-}
+OPERATOR_USER_TEMPLATES = {}
 
 # ============================================================================
 # Simplified credential scheme (2026-08)
@@ -926,9 +905,9 @@ OPERATOR_USER_TEMPLATES = {
 # Email:   {role}@{tenant}.com          e.g. safety@buddha-air.com
 # Password: {TENANT_CODE}-{ROLE}-2026   e.g. BHA-Safety-2026
 #
-# Applied to the four functional role accounts added per operator (in addition
-# to the legacy Safety Manager / Accountable Executive / Department Manager
-# accounts above).
+# The ONLY accounts provisioned per operator are the four functional role
+# accounts below (legacy Safety Manager / Accountable Executive / Department
+# Manager accounts were removed 2026-08-14).
 # ============================================================================
 
 CREDENTIAL_TENANT_CODES = {
@@ -937,6 +916,11 @@ CREDENTIAL_TENANT_CODES = {
     "ktm-mro": "KTM",
     "pokhara-aerodrome": "PKR",
     "himalaya-ground-services": "HGS",
+    "yeti-airlines": "YETI",
+    "summit-air": "SUMMIT",
+    "sita-air": "SITA",
+    "simrik-air": "SIMRIK",
+    "tara-air": "TARA",
 }
 
 CREDENTIAL_EMAIL_DOMAINS = {
@@ -945,6 +929,11 @@ CREDENTIAL_EMAIL_DOMAINS = {
     "ktm-mro": "ktm-mro.com",
     "pokhara-aerodrome": "pokhara-aerodrome.com",
     "himalaya-ground-services": "himalaya-ground-services.com",
+    "yeti-airlines": "yeti-airlines.com",
+    "summit-air": "summit-air.com",
+    "sita-air": "sita-air.com",
+    "simrik-air": "simrik-air.com",
+    "tara-air": "tara-air.com",
 }
 
 SIMPLIFIED_ROLE_ACCOUNTS = [

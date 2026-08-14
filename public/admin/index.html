@@ -22,6 +22,8 @@ PURPOSE: Super Admin Portal - NO AUTO-REDIRECTS
 
     <!-- Shared Firebase Config -->
     <script src="/js/firebase.js"></script>
+    <!-- API Client (backend calls) -->
+    <script src="/js/api/client.js"></script>
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; margin: 0; padding: 20px; }
@@ -118,6 +120,12 @@ PURPOSE: Super Admin Portal - NO AUTO-REDIRECTS
         <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div>
     </div>
 
+    <!-- FEEDBACK REVIEW -->
+    <h3 style="margin-top: 40px;"><i class="fas fa-comment-dots"></i> User Feedback</h3>
+    <div id="feedbackContainer">
+        <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading feedback...</div>
+    </div>
+
 </div>
 
 <!-- MODAL -->
@@ -178,6 +186,7 @@ firebase.auth().onAuthStateChanged(function(user) {
             statusBox.className = 'status-box success';
             statusText.textContent = '✅ SUPER_ADMIN - You have full access.';
             loadTenants();
+            loadFeedback();
         } else {
             statusBox.className = 'status-box error';
             statusText.textContent = '⚠️ Access Denied. SUPER_ADMIN role required. Your role: ' + claims.role;
@@ -407,6 +416,66 @@ async function generateDummyResponses(tenantId) {
     } catch (error) {
         console.error('Error generating dummy responses:', error);
         showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// ============================================================================
+// FEEDBACK REVIEW
+// ============================================================================
+
+function formatFeedbackDate(iso) {
+    if (!iso) return 'N/A';
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function ratingStars(rating) {
+    if (!rating) return '-';
+    var stars = '';
+    for (var i = 0; i < rating; i++) stars += '★';
+    return stars + ' (' + rating + '/5)';
+}
+
+function renderFeedback(items) {
+    var container = document.getElementById('feedbackContainer');
+
+    if (!items || items.length === 0) {
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-comment-slash"></i><p>No feedback submissions yet.</p></div>';
+        return;
+    }
+
+    var html = '<table><thead><tr><th>Date</th><th>Submitter</th><th>Tenant</th><th>Subject</th><th>Message</th><th>Rating</th><th>Page</th><th>Status</th></tr></thead><tbody>';
+
+    items.forEach(function(f) {
+        var tenant = f.tenant_id ? '<code>' + f.tenant_id + '</code>' : '<span class="badge badge-active">CAAN</span>';
+        var status = '<span class="badge ' + (f.status === 'new' ? 'badge-inactive' : 'badge-active') + '">' + (f.status || 'new') + '</span>';
+        html += '<tr>';
+        html += '<td style="white-space:nowrap;">' + formatFeedbackDate(f.created_at) + '</td>';
+        html += '<td>' + (f.email || f.uid || '-') + '<br><small style="color:#5f6368;">' + (f.role || '') + '</small></td>';
+        html += '<td>' + tenant + '</td>';
+        html += '<td><strong>' + (f.subject || '-') + '</strong></td>';
+        html += '<td style="max-width:360px;">' + (f.message || '-') + '</td>';
+        html += '<td>' + ratingStars(f.rating) + '</td>';
+        html += '<td><code>' + (f.page || '-') + '</code></td>';
+        html += '<td>' + status + '</td>';
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    html += '<p style="color:#5f6368; font-size:13px;">Showing ' + items.length + ' most recent submissions.</p>';
+    container.innerHTML = html;
+}
+
+async function loadFeedback() {
+    var container = document.getElementById('feedbackContainer');
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading feedback...</div>';
+
+    try {
+        var data = await ApiClient.get('/api/v1/admin/feedback?limit=50');
+        renderFeedback(data && data.feedback ? data.feedback : []);
+    } catch (error) {
+        console.error('Error loading feedback:', error);
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle" style="color:#ea4335;"></i><p>Error loading feedback: ' + (error.message || 'unknown error') + '</p></div>';
     }
 }
 

@@ -3,13 +3,13 @@
 Locks the behaviour added for the beta verification run:
 
   * seed.runner.run(dry_run=True, tenant_ids=[...]) only counts the requested
-    tenants; a full (unscoped) dry run counts the whole 5-provider set.
+    tenants; a full (unscoped) dry run counts the whole 10-provider set.
   * Every generated survey is a "completed" record with all four SMS pillars and
     a submitted_at inside the default 90-day assessment window (max 180 days),
     so the CAAN SMS-maturity overview has data.
   * The CAAN state-regulator account is a single smd@caanepal.gov.np identity
     and is always protected from automated unseed runs.
-  * production_seed.SEED_OPERATORS matches the 5 active beta providers.
+  * production_seed.SEED_OPERATORS matches the 10 active beta providers.
 """
 
 from datetime import datetime, timezone
@@ -28,15 +28,17 @@ from seed.runner import run
 
 def test_dry_run_full_plan_counts():
     counts = run(dry_run=True)
-    assert counts["tenants"] == 5
+    assert counts["tenants"] == len(OPERATOR_PROFILES) == 10
     assert counts["users"] == 0
     total_surveys = sum(p["survey_count"] for p in OPERATOR_PROFILES)
     assert counts["surveys"] == total_surveys
-    assert counts["vsr_reports"] == 5 * 10 == 50
-    assert counts["mor_reports"] == 5 * 10 == 50
-    assert counts["hazards"] == 50
-    assert counts["cans"] == 50
-    assert counts["caps"] == 92
+    assert counts["vsr_reports"] == sum(p["vsr_count"] for p in OPERATOR_PROFILES)
+    assert counts["mor_reports"] == sum(p["mor_count"] for p in OPERATOR_PROFILES)
+    from seed.hazard_can import estimate_counts
+    hc = estimate_counts()
+    assert counts["hazards"] == hc["hazards"]
+    assert counts["cans"] == hc["cans"]
+    assert counts["caps"] == hc["caps"]
 
 
 def test_dry_run_scoped_to_tenant_ids():
@@ -47,8 +49,12 @@ def test_dry_run_scoped_to_tenant_ids():
         sum(p["survey_count"] for p in OPERATOR_PROFILES if p["id"] in {"buddha-air", "ktm-mro"})
     )
     assert counts["surveys"] == expected_surveys
-    assert counts["vsr_reports"] == 20
-    assert counts["mor_reports"] == 20
+    assert counts["vsr_reports"] == sum(
+        p["vsr_count"] for p in OPERATOR_PROFILES if p["id"] in {"buddha-air", "ktm-mro"}
+    )
+    assert counts["mor_reports"] == sum(
+        p["mor_count"] for p in OPERATOR_PROFILES if p["id"] in {"buddha-air", "ktm-mro"}
+    )
 
 
 def test_dry_run_single_tenant_excludes_others():
@@ -56,8 +62,8 @@ def test_dry_run_single_tenant_excludes_others():
     assert counts["tenants"] == 1
     pokhara = next(p for p in OPERATOR_PROFILES if p["id"] == "pokhara-aerodrome")
     assert counts["surveys"] == pokhara["survey_count"]
-    assert counts["vsr_reports"] == 10
-    assert counts["mor_reports"] == 10
+    assert counts["vsr_reports"] == pokhara["vsr_count"]
+    assert counts["mor_reports"] == pokhara["mor_count"]
 
 
 def test_generated_surveys_are_completed_with_all_pillars():
@@ -65,7 +71,7 @@ def test_generated_surveys_are_completed_with_all_pillars():
         rng = SeededRandom(seed=10000)
         surveys = generate_survey_batch(rng, profile, 10000)
         assert len(surveys) == profile["survey_count"]
-        assert 15 <= len(surveys) <= 20
+        assert 15 <= len(surveys) <= 25
         for s in surveys:
             assert s["status"] == "completed"
             assert s["seed_version"] == SEED_VERSION
@@ -77,9 +83,9 @@ def test_generated_surveys_are_completed_with_all_pillars():
                 assert 0 <= age_days <= 180
 
 
-def test_survey_counts_per_provider_within_15_20():
+def test_survey_counts_per_provider_within_15_25():
     for p in OPERATOR_PROFILES:
-        assert 15 <= p["survey_count"] <= 20, p["id"]
+        assert 15 <= p["survey_count"] <= 25, p["id"]
 
 
 def test_caan_regulator_account_single_identity():

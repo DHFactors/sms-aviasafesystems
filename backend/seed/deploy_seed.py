@@ -85,7 +85,7 @@ def main(argv=None) -> int:
     if args.tenant_id:
         print(f"Tenant scope    : {', '.join(sorted(set(args.tenant_id)))}")
     else:
-        print("Tenant scope    : ALL (5 providers + CAAN state regulator)")
+        print("Tenant scope    : ALL (10 providers + CAAN state regulator)")
     if args.dry_run:
         print("Mode            : DRY RUN (no writes)")
 

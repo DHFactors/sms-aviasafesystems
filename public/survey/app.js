@@ -70,9 +70,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeTenantId = resolveTenantContext();
 
     // No tenant context (no ?tenant= and no recognized hostname route):
-    // show the informational popup and redirect home after the countdown.
+    // show the informational popup and let the visitor go home on their own.
     if (activeTenantId === 'unknown-tenant') {
-        showTenantPopup();
+        showTenantPopup(true);
         return;
     }
 
@@ -80,17 +80,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── POPUP FOR VISITORS WITHOUT A TENANT CONTEXT ──
-function showTenantPopup() {
+// Only the no-tenant visitor path (or a genuinely closed/expired campaign)
+// ever enables the auto-redirect timer. Active respondents get a purely
+// informational welcome popup they dismiss with "Begin Survey".
+let popupRedirectsHome = false;
+
+function showTenantPopup(redirectHome = false) {
+    popupRedirectsHome = redirectHome;
     document.getElementById('loadingScreen')?.classList.add('hidden');
     const notFound = document.getElementById('notFoundScreen');
     if (notFound) notFound.style.display = 'none';
     const popup = document.getElementById('surveyPopup');
     if (!popup) {
-        window.location.href = '/';
+        if (redirectHome) window.location.href = '/';
         return;
     }
+    const timer = popup.querySelector('.popup-timer');
+    const closeBtn = document.getElementById('popupCloseBtn');
+    if (timer) timer.style.display = redirectHome ? 'block' : 'none';
+    if (closeBtn) closeBtn.textContent = redirectHome ? 'Go to Home Page' : 'Begin Survey';
     popup.style.display = 'flex';
-    startPopupCountdown();
+    if (redirectHome) startPopupCountdown();
 }
 
 function startPopupCountdown() {
@@ -107,9 +117,18 @@ function startPopupCountdown() {
     }, 1000);
 }
 
-function closePopupAndRedirect() {
+function dismissPopup() {
     const popup = document.getElementById('surveyPopup');
     if (popup) popup.style.display = 'none';
+}
+
+function handlePopupAction() {
+    dismissPopup();
+    if (popupRedirectsHome) window.location.href = '/';
+}
+
+function closePopupAndRedirect() {
+    dismissPopup();
     window.location.href = '/';
 }
 
@@ -127,10 +146,10 @@ function initInterfaceHooks() {
     document.getElementById('btn-ne')?.addEventListener('click', () => switchLanguage('ne'));
     document.getElementById('surveyForm')?.addEventListener('submit', (e) => executeSubmission(e));
     const popupCloseBtn = document.getElementById('popupCloseBtn');
-    if (popupCloseBtn) popupCloseBtn.addEventListener('click', closePopupAndRedirect);
+    if (popupCloseBtn) popupCloseBtn.addEventListener('click', handlePopupAction);
     const popup = document.getElementById('surveyPopup');
     if (popup) popup.addEventListener('click', function (e) {
-        if (e.target === popup) closePopupAndRedirect();
+        if (e.target === popup) handlePopupAction();
     });
 }
 
@@ -203,7 +222,10 @@ async function loadSurveyInstructions() {
     try {
         const response = await fetch(getApiBaseUrl() + '/api/v1/tenants/' + encodeURIComponent(activeTenantId) + '/config');
         if (!response.ok) {
-            showTenantPopup();
+            // Config endpoint unreachable (e.g. cold start) — never redirect an
+            // active respondent home. Just show the informational welcome popup.
+            console.warn('Survey config fetch failed', response.status);
+            showTenantPopup(false);
             return;
         }
         const payload = await response.json();

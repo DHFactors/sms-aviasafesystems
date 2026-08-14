@@ -3,13 +3,10 @@ from loguru import logger
 from seed.config import (
     DEMO_USERS,
     OPERATOR_PROFILES,
-    NEPALI_NAMES,
-    DEMO_USER_PASSWORD,
     SIMPLIFIED_ROLE_ACCOUNTS,
     simplified_email,
     simplified_password,
 )
-from seed.generator import SeededRandom
 
 
 def create_user(auth, user_spec: dict) -> dict:
@@ -46,7 +43,6 @@ def create_user(auth, user_spec: dict) -> dict:
 
 
 def create_all_users(auth, tenant_ids=None) -> list:
-    rng = SeededRandom(seed=42)
     created_users = []
 
     for user_spec in DEMO_USERS:
@@ -57,47 +53,7 @@ def create_all_users(auth, tenant_ids=None) -> list:
         if tenant_ids and profile["id"] not in tenant_ids:
             continue
         op_id = profile["id"]
-        domain = profile["email_domain"]
         op_name = profile["name"]
-
-        sm_name = f"{rng.choice(NEPALI_NAMES)}"
-        sm_uid = f"sm-{op_id}-001"
-        sm_user = {
-            "uid": sm_uid,
-            "email": f"safety.{op_id}@{domain}",
-            "password": DEMO_USER_PASSWORD,
-            "full_name": sm_name,
-            "organization": profile["name"],
-            "role": "AIRLINE_ADMIN",
-            "tenant_id": op_id,
-        }
-        created_users.append(create_user(auth, sm_user))
-
-        ae_name = f"{rng.choice(NEPALI_NAMES)}"
-        ae_uid = f"ae-{op_id}-001"
-        ae_user = {
-            "uid": ae_uid,
-            "email": f"ae.{op_id}@{domain}",
-            "password": DEMO_USER_PASSWORD,
-            "full_name": ae_name,
-            "organization": profile["name"],
-            "role": "AIRLINE_ADMIN",
-            "tenant_id": op_id,
-        }
-        created_users.append(create_user(auth, ae_user))
-
-        mgr_name = f"{rng.choice(NEPALI_NAMES)}"
-        mgr_uid = f"mgr-{op_id}-001"
-        mgr_user = {
-            "uid": mgr_uid,
-            "email": f"manager.{op_id}@{domain}",
-            "password": DEMO_USER_PASSWORD,
-            "full_name": mgr_name,
-            "organization": profile["name"],
-            "role": "USER",
-            "tenant_id": op_id,
-        }
-        created_users.append(create_user(auth, mgr_user))
 
         # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
         for role in SIMPLIFIED_ROLE_ACCOUNTS:

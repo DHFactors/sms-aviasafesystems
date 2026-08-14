@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from loguru import logger
 
+from app.services.survey_scoring import SURVEY_VERSION
+
 from seed.config import (
     OPERATOR_PROFILES,
     SURVEY_COLLECTION,
@@ -69,6 +71,25 @@ def generate_survey_batch(
     return surveys
 
 
+def _response_doc(survey: dict) -> dict:
+    """Mirror of the production_seed `responses` subcollection shape, so the
+    CAAN dashboard's cross-tenant `responses` KPI counts survey participation."""
+    tenant_id = survey["tenant_id"]
+    elements = {k: survey[k] for k in ALL_ICAO_ELEMENTS if k in survey}
+    return {
+        "tenant_id": tenant_id,
+        "tenantId": tenant_id,
+        "respondent_id": f"seed-{tenant_id}-{survey['seed_index']}",
+        "respondentId": f"seed-{tenant_id}-{survey['seed_index']}",
+        "answers": elements,
+        "department": survey["department"],
+        "submitted_at": survey["submitted_at"],
+        "submittedAt": survey["submitted_at"],
+        "survey_version": SURVEY_VERSION,
+        "seed_version": SEED_VERSION,
+    }
+
+
 def write_surveys(db, surveys: list):
     from app.core.config import settings
 
@@ -84,6 +105,9 @@ def write_surveys(db, surveys: list):
             .document(doc_id)
         )
         doc_ref.set(data)
+        db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id).collection(
+            "responses"
+        ).document(doc_id).set(_response_doc(s))
         written += 1
     return written
 

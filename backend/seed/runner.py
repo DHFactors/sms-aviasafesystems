@@ -51,6 +51,7 @@ def set_seed_status(db, status: dict):
 # submissions, admin/CAAN demo seeders) is left untouched.
 RUNNER_COLLECTION_PREFIXES = {
     "surveys": ("svy_",),
+    "responses": ("svy_",),
     "reports": ("vsr_", "mor_"),
     "hazards": ("haz_",),
     "can_cap": ("can_",),
@@ -76,7 +77,7 @@ def purge_stale_seed(db, tenant_ids=None) -> dict:
     """
     from app.core.config import settings
 
-    removed = {"surveys": 0, "reports": 0, "hazards": 0, "can_cap": 0, "caps": 0}
+    removed = {"surveys": 0, "responses": 0, "reports": 0, "hazards": 0, "can_cap": 0, "caps": 0}
     profiles = [p for p in OPERATOR_PROFILES if not tenant_ids or p["id"] in tenant_ids]
     for tenant_id in [p["id"] for p in profiles]:
         tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
@@ -125,8 +126,8 @@ def run(
     `tenant_ids` restricts every step to the given operator tenants (users,
     tenant docs, surveys, reports, hazards/CANs, and the post-seed purge).
     When scoped, the CAAN state-regulator tenant and the global state-risk
-    reference are left untouched. When None, the full 6-tenant beta model is
-    seeded (5 providers + CAAN).
+    reference are left untouched. When None, the full 11-tenant beta model is
+    seeded (10 providers + CAAN).
     """
     if not dry_run:
         if db is None:
@@ -171,7 +172,7 @@ def run(
             counts["surveys"] += p["survey_count"]
             counts["vsr_reports"] += p["vsr_count"]
             counts["mor_reports"] += p["mor_count"]
-        scope = "scoped" if tenant_ids else "6-tenant beta"
+        scope = "scoped" if tenant_ids else "10-tenant beta"
         logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "

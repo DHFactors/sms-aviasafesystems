@@ -4,8 +4,8 @@ Reset per-user passwords for beta testing and write a credentials document.
 
 Applies the simplified 2026-08 credential scheme to the four functional role
 accounts per operator (password `{TENANT_CODE}-{ROLE}-2026`), and generates a
-unique, strong random password for the remaining seeded Auth accounts, then
-updates Firebase Auth and writes:
+unique, strong random password for the CAAN regulator account, then updates
+Firebase Auth and writes:
 
     <project_root>/BETA_CREDENTIALS_YYYY-MM-DD.md   (Markdown table)
     <project_root>/beta-testing-credentials.csv     (flat CSV backup)
@@ -89,33 +89,7 @@ def build_user_specs():
 
     for profile in OPERATOR_PROFILES:
         op_id = profile["id"]
-        domain = profile["email_domain"]
         tenant_name = profile["name"]
-        specs.extend(
-            [
-                {
-                    "uid": f"sm-{op_id}-001",
-                    "email": f"safety.{op_id}@{domain}",
-                    "role": "AIRLINE_ADMIN",
-                    "role_label": "Admin (Safety Manager)",
-                    "tenant": tenant_name,
-                },
-                {
-                    "uid": f"ae-{op_id}-001",
-                    "email": f"ae.{op_id}@{domain}",
-                    "role": "AIRLINE_ADMIN",
-                    "role_label": "Reporter (Accountable Executive)",
-                    "tenant": tenant_name,
-                },
-                {
-                    "uid": f"mgr-{op_id}-001",
-                    "email": f"manager.{op_id}@{domain}",
-                    "role": "USER",
-                    "role_label": "User (Department Manager)",
-                    "tenant": tenant_name,
-                },
-            ]
-        )
         # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
         for role in SIMPLIFIED_ROLE_ACCOUNTS:
             token = role["token"]

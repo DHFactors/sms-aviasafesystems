@@ -13,7 +13,7 @@ render the seeded rows natively.
 from datetime import timedelta
 from loguru import logger
 
-from seed.config import OPERATOR_PROFILES, SEED_VERSION
+from seed.config import OPERATOR_PROFILES, SEED_VERSION, CREDENTIAL_EMAIL_DOMAINS
 from seed.generator import SeededRandom, generate_timestamp, _make_id
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.hazard_service import generate_hazard_id
@@ -103,19 +103,17 @@ def _caps_per_can(base_seed: int, can_index: int) -> int:
 
 
 def _custodian(tenant_id: str, pick: int) -> dict:
-    """Deterministic seeded custodian (email/uid/department) for a seeded doc."""
-    profile = None
-    for op in OPERATOR_PROFILES:
-        if op["id"] == tenant_id:
-            profile = op
-            break
-    domain = profile["email_domain"] if profile else "aviasafesystems.com"
+    """Deterministic seeded custodian (email/uid/department) for a seeded doc.
+
+    References only the four simplified role accounts (safety@, ops@, camo@,
+    145@) — legacy safety.* / ae.* / manager.* accounts were removed 2026-08-14.
+    """
+    domain = CREDENTIAL_EMAIL_DOMAINS.get(tenant_id, f"{tenant_id}.com")
     roles = [
-        ("ups", f"ops@{tenant_id}.com", f"ops-{tenant_id}-001", "Flight Operations"),
-        ("safety", f"safety.{tenant_id}@{domain}", f"sm-{tenant_id}-001", ""),
-        ("manager", f"manager.{tenant_id}@{domain}", f"mgr-{tenant_id}-001", ""),
-        ("camo", f"camo.{tenant_id}@{domain}", f"camo-{tenant_id}-001", "CAMO"),
-        ("maint145", f"145.{tenant_id}@{domain}", f"145-{tenant_id}-001", "Part-145"),
+        ("safety", f"safety@{domain}", f"safety-{tenant_id}-001", "Safety"),
+        ("ops", f"ops@{domain}", f"ops-{tenant_id}-001", "Flight Operations"),
+        ("camo", f"camo@{domain}", f"camo-{tenant_id}-001", "CAMO"),
+        ("maint145", f"145@{domain}", f"145-{tenant_id}-001", "Part-145"),
     ]
     token, email, uid, department = roles[pick % len(roles)]
     return {"assigned_to": email, "assigned_to_uid": uid, "department": department, "role": token}

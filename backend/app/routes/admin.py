@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.firebase import get_auth, get_db, verify_firebase_token
-from app.middleware.auth import get_safety_manager, get_admin_user
+from app.middleware.auth import get_current_user, get_safety_manager, get_admin_user
 from app.services.risk_matrix import (
     get_risk_matrix_config,
     set_risk_matrix_config,
@@ -792,3 +792,61 @@ async def admin_demo_data(
         "kinds": req.kinds,
         "results": results,
     }
+
+
+@router.get("/feedback")
+async def list_feedback(
+    limit: int = Query(default=50, ge=1, le=200),
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """List in-product feedback submissions for review.
+
+    Restricted to CROSS-TENANT (SUPER_ADMIN / CAAN_SMD) roles. Returns the most
+    recent feedback first, with the submitter's email, role, tenant, page
+    context, optional 1-5 rating, and message body.
+    """
+    if user.get("role") not in settings.CROSS_TENANT_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SUPER_ADMIN or CAAN_SMD role required to review feedback",
+        )
+
+    try:
+        db = get_db()
+        query = db.collection("feedback")
+        if status_filter:
+            query = query.where("status", "==", status_filter)
+        docs = sorted(
+            query.limit(limit).stream(),
+            key=lambda d: (d.to_dict() or {}).get("created_at"),
+            reverse=True,
+        )
+    except Exception as e:
+        logger.error(f"Failed to list feedback for {user.get('email')}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve feedback at this time.",
+        )
+
+    items = []
+    for d in docs:
+        x = d.to_dict() or {}
+        ts = x.get("created_at")
+        items.append(
+            {
+                "id": d.id,
+                "uid": x.get("uid"),
+                "email": x.get("email"),
+                "role": x.get("role"),
+                "tenant_id": x.get("tenant_id"),
+                "subject": x.get("subject"),
+                "message": x.get("message"),
+                "rating": x.get("rating"),
+                "page": x.get("page"),
+                "created_at": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+                "status": x.get("status", "new"),
+            }
+        )
+
+    return {"feedback": items, "count": len(items)}

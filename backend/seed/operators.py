@@ -103,7 +103,7 @@ def create_all_tenants(db, tenant_ids=None) -> list:
     if not tenant_ids:
         if len({p["tenant_type"] for p in profiles}) != len(BETA_SERVICE_PROVIDER_TYPES):
             raise RuntimeError(
-                "OPERATOR_PROFILES must contain exactly one provider per tenant type"
+                "OPERATOR_PROFILES must cover every service-provider tenant type"
             )
         purge_legacy_tenants(db)
     return tenant_ids_out

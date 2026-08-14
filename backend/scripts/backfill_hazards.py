@@ -110,7 +110,7 @@ def main():
                 "occurrence_category": d.get("occurrence_category"),
                 "occurrence_type": d.get("occurrence_type"),
             }
-            user = {"uid": d.get("created_by") or f"sm-{tid}-001"}
+            user = {"uid": d.get("created_by") or f"safety-{tid}-001"}
             try:
                 _auto_create_hazard_from_report(stored, user)
                 created += 1
