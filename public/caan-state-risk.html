@@ -105,54 +105,6 @@ AUTHOR: AviaSAFE Systems
         <p>Checking state safety access...</p>
     </div>
 
-    <!-- ==================== SMS MATURITY ==================== -->
-    <section id="sms-maturity" class="shell-scroll-spy" style="display:none;">
-        <div class="section-head">
-            <div>
-                <h2><i class="fas fa-heart-pulse" style="color:#1a6b8a;"></i> State SMS Maturity</h2>
-                <div class="section-sub" id="smsMaturitySub">Aggregated ICAO Annex 19 survey culture across all operators</div>
-            </div>
-            <button class="btn btn-outline btn-sm" onclick="loadSmsMaturity(); loadSmsMaturityAssessment(false);"><i class="fas fa-rotate"></i> Refresh</button>
-        </div>
-        <div style="background:#fff8e1;border:1px solid #ffca28;border-radius:8px;padding:10px 14px;font-size:13px;color:#8a6d00;margin-bottom:16px;line-height:1.5;">
-            <strong>[BETA NOTICE]</strong> Survey pillar scores are computed live from submitted responses. SMS Maturity Assessment targets pillars scoring below 70%.
-        </div>
-        <div id="smsMaturityStats" class="stat-grid"></div>
-        <div class="card">
-            <h3>Operator SMS Maturity vs State Average</h3>
-            <div style="overflow-x:auto;"><table>
-                <thead><tr>
-                    <th>Operator</th>
-                    <th>Safety Policy</th>
-                    <th>Risk Mgmt</th>
-                    <th>Safety Assurance</th>
-                    <th>Safety Promotion</th>
-                    <th>Overall SMS Maturity</th>
-                    <th>Responses</th>
-                </tr></thead>
-                <tbody id="smsMaturityBody"></tbody>
-            </table></div>
-        </div>
-        <div class="card">
-            <div class="section-head">
-                <div>
-                    <h3><i class="fas fa-robot" style="color:#1a6b8a;"></i> SMS Maturity Assessment</h3>
-                    <div class="section-sub">ICAO-aligned assessment of each operator's SMS maturity, with improvement actions for pillars scoring below 70% (Gemini). Aggregated over the selected period.</div>
-                </div>
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <select id="recDays" class="form-control" style="width:auto;">
-                        <option value="30">Last 30 days</option>
-                        <option value="90" selected>Last 90 days</option>
-                        <option value="180">Last 180 days</option>
-                        <option value="365">Last 365 days</option>
-                    </select>
-                    <button class="btn btn-outline btn-sm" onclick="loadSmsMaturityAssessment(true)"><i class="fas fa-wand-magic-sparkles"></i> Regenerate</button>
-                </div>
-            </div>
-            <div id="smsMaturityRecs" style="margin-top:4px;"><p style="color:#64748b;">Loading SMS maturity assessment...</p></div>
-        </div>
-    </section>
-
     <!-- ==================== STATE RISK REGISTER ==================== -->
     <section id="risk-register" class="shell-scroll-spy" style="display:none;">
         <div class="section-head">
@@ -315,7 +267,6 @@ function applyRegulatorBranding() {
         const el = document.getElementById(id);
         if (el) el.textContent = `${base} — ${name}${country ? ` (${country})` : ''}${opCount ? ` · ${opCount} operators` : ''}`;
     };
-    setSub('smsMaturitySub', 'Aggregated ICAO Annex 19 survey culture across all operators');
     setSub('registerSub', 'ICAO top-risk categories measured against state SSP targets');
     setSub('aggregationSub', 'Live recomputation of state risk from tenant hazards and reports');
 }
@@ -340,7 +291,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
         document.getElementById('authGate').style.display = 'none';
         await loadRegulatorMeta();
-        ['sms-maturity', 'risk-register', 'aggregation'].forEach(id => {
+        ['risk-register', 'aggregation'].forEach(id => {
             document.getElementById(id).style.display = 'block';
         });
         const regShort = regulatorMeta?.short_name || 'State Regulator';
@@ -349,8 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             'Safety Management Division · ' + (isSuperAdmin ? 'SUPER_ADMIN' : 'CAAN_SMD')
         );
         populateYearSelects();
-        document.getElementById('recDays').addEventListener('change', () => loadSmsMaturityAssessment(false));
-        await Promise.all([loadSmsMaturity(), loadSmsMaturityAssessment(false), loadRegister(), loadAggregation()]);
+        await Promise.all([loadRegister(), loadAggregation()]);
     } catch (err) {
         console.error('State risk dashboard init failed:', err);
         const gate = document.getElementById('authGate');
@@ -387,107 +337,6 @@ function currentPeriod(prefix) {
         year: parseInt(document.getElementById(prefix + 'Year').value, 10),
         quarter: parseInt(document.getElementById(prefix + 'Quarter').value, 10),
     };
-}
-
-// ============================================================================
-// SMS MATURITY
-// ============================================================================
-async function loadSmsMaturity() {
-    const statsEl = document.getElementById('smsMaturityStats');
-    const body = document.getElementById('smsMaturityBody');
-    statsEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-    try {
-        const data = await ApiClient.get(`/api/v1/dashboard/caan/survey-maturity?${regQuery()}`);
-        const nat = data.state || {};
-        const ops = data.operators || [];
-
-        statsEl.innerHTML = `
-            <div class="stat-card gold"><div class="num">${nat.overall_sms_maturity ?? '—'}</div><div class="lbl">State SMS Maturity (1-5)</div></div>
-            <div class="stat-card"><div class="num">${nat.pillars?.safety_policy ?? '—'}</div><div class="lbl">Safety Policy</div></div>
-            <div class="stat-card"><div class="num">${nat.pillars?.safety_risk_management ?? '—'}</div><div class="lbl">Risk Management</div></div>
-            <div class="stat-card"><div class="num">${nat.pillars?.safety_assurance ?? '—'}</div><div class="lbl">Safety Assurance</div></div>
-            <div class="stat-card"><div class="num">${nat.pillars?.safety_promotion ?? '—'}</div><div class="lbl">Safety Promotion</div></div>
-            <div class="stat-card green"><div class="num">${nat.response_count ?? 0}</div><div class="lbl">Survey Responses</div></div>
-        `;
-
-        if (!ops.length) {
-            body.innerHTML = '<tr><td colspan="7" class="empty">No survey data available.</td></tr>';
-            return;
-        }
-        body.innerHTML = ops.map(o => {
-            const overall = o.overall_sms_maturity;
-            const cls = overall >= 4 ? 'b-acceptable' : overall >= 3 ? 'b-tolerable' : 'b-intolerable';
-            return `<tr>
-                <td><strong>${o.tenant_id}</strong></td>
-                <td>${o.pillars?.safety_policy ?? '—'}</td>
-                <td>${o.pillars?.safety_risk_management ?? '—'}</td>
-                <td>${o.pillars?.safety_assurance ?? '—'}</td>
-                <td>${o.pillars?.safety_promotion ?? '—'}</td>
-                <td><span class="badge ${cls}">${overall ?? '—'}</span></td>
-                <td>${o.response_count}</td>
-            </tr>`;
-        }).join('');
-    } catch (err) {
-        statsEl.innerHTML = '<div class="error">Failed to load SMS maturity: ' + err.message + '</div>';
-        body.innerHTML = '';
-    }
-}
-
-// ============================================================================
-// SMS MATURITY ASSESSMENT
-// ============================================================================
-async function loadSmsMaturityAssessment(refresh) {
-    const el = document.getElementById('smsMaturityRecs');
-    if (!el) return;
-    const days = document.getElementById('recDays').value;
-    el.innerHTML = '<p style="color:#64748b;"><i class="fas fa-spinner fa-spin"></i> Generating SMS maturity assessment (aggregating survey responses)...</p>';
-    try {
-        const data = await ApiClient.get(`/api/v1/dashboard/caan/sms-maturity-assessment?days=${days}&refresh=${refresh ? 'true' : 'false'}&${regQuery()}`);
-        const ops = data.operators || [];
-        if (!ops.length) {
-            el.innerHTML = '<p class="empty">No survey data in the selected period.</p>';
-            return;
-        }
-        const withLow = ops.filter(o => (o.low_pillars || []).length > 0);
-        if (!withLow.length) {
-            el.innerHTML = '<div class="success-banner" style="background:#e6f4ea;color:#1e7e34;padding:12px 16px;border-radius:8px;font-weight:600;">All operators scored ≥70% on every pillar for the selected period — no actions required.</div>';
-            return;
-        }
-        el.innerHTML = withLow.map(op => {
-            const recs = op.recommendations || [];
-            const cards = recs.map(r => {
-                const tierBadge = r.tier === 'critical'
-                    ? '<span class="badge b-intolerable">CRITICAL</span>'
-                    : '<span class="badge b-tolerable">ACTION</span>';
-                const actions = (r.actions || []).map(a => `
-                    <li style="margin-bottom:8px;">
-                        <strong>${a.action}</strong>
-                        <div style="color:#475569;font-size:12px;margin-top:2px;">
-                            <span class="badge ${a.priority === 'high' ? 'b-intolerable' : a.priority === 'medium' ? 'b-tolerable' : 'b-acceptable'}" style="text-transform:uppercase;">${a.priority || '—'}</span>
-                            ${a.icao_reference || ''} · Owner: ${a.owner || '—'} · ${a.timeframe || ''}
-                        </div>
-                        <div style="color:#64748b;font-size:12px;margin-top:2px;">Success metric: ${a.success_metric || '—'}</div>
-                    </li>`).join('');
-                return `<div style="border:1px solid #e2e8f0;border-left:4px solid ${r.tier === 'critical' ? '#dc3545' : '#f57c00'};border-radius:8px;padding:14px 16px;margin-bottom:12px;background:#fff;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                        <strong style="font-size:15px;color:#0b2a42;">${r.pillar_name} — ${r.score_pct}%</strong>
-                        ${tierBadge}
-                    </div>
-                    <p style="margin:8px 0;color:#475569;font-size:13px;">${r.summary || ''}</p>
-                    ${r.root_causes && r.root_causes.length ? `<div style="font-size:12px;color:#64748b;margin-bottom:8px;"><strong>Root causes:</strong> ${r.root_causes.join('; ')}</div>` : ''}
-                    <ul style="margin:0;padding-left:18px;list-style:disc;font-size:13px;">${actions}</ul>
-                    ${r.kpi_target ? `<div style="margin-top:8px;font-size:12px;color:#1a6b8a;"><strong>Target:</strong> raise to ≥${r.kpi_target}%</div>` : ''}
-                </div>`;
-            }).join('');
-            const opName = op.tenant_id;
-            return `<div style="margin-bottom:20px;">
-                <h4 style="color:#0b2a42;margin:0 0 8px;"><i class="fas fa-building"></i> ${opName} <span style="font-weight:400;color:#64748b;font-size:12px;">(${op.response_count} responses · overall ${op.overall_sms_maturity ?? '—'}/5)</span></h4>
-                ${cards}
-            </div>`;
-        }).join('');
-    } catch (err) {
-        el.innerHTML = '<div class="error">Failed to load SMS maturity assessment: ' + err.message + '</div>';
-    }
 }
 
 // ============================================================================
