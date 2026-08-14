@@ -318,6 +318,114 @@ def test_put_config_full_survey_management(monkeypatch):
     assert stored["surveyConfig"]["isActive"] is True
 
 
+def test_put_config_auto_opens_for_current_window(monkeypatch):
+    """Dates straddling today auto-derive is_survey_active=True (no override)."""
+    from datetime import date, timedelta
+    today = date.today()
+    open_d = (today - timedelta(days=5)).isoformat()
+    close_d = (today + timedelta(days=5)).isoformat()
+
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {"survey_rate_limit": 5}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": open_d,
+        "survey_close_date": close_d,
+    })
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["config"]["is_survey_active"] is True
+    assert body["surveyConfig"]["is_active"] is True
+    assert body["surveyConfig"]["open_date"] == open_d
+    assert body["surveyConfig"]["close_date"] == close_d
+    stored = db._tenants["tara-air"]
+    assert stored["config"]["is_survey_active"] is True
+    assert stored["surveyConfig"]["isActive"] is True
+    assert stored["surveyConfig"]["openDate"] == open_d
+    assert stored["surveyConfig"]["closeDate"] == close_d
+
+
+def test_put_config_auto_closes_when_close_date_passed(monkeypatch):
+    """A close date in the past auto-derives is_survey_active=False."""
+    from datetime import date, timedelta
+    today = date.today()
+    open_d = (today - timedelta(days=20)).isoformat()
+    close_d = (today - timedelta(days=1)).isoformat()
+
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {"survey_rate_limit": 5}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": open_d,
+        "survey_close_date": close_d,
+    })
+    assert resp.status_code == 200
+    config = resp.json()["data"]["config"]
+    assert config["is_survey_active"] is False
+    assert resp.json()["data"]["surveyConfig"]["is_active"] is False
+    assert db._tenants["tara-air"]["config"]["is_survey_active"] is False
+
+
+def test_put_config_auto_waits_when_open_date_future(monkeypatch):
+    """An open date in the future auto-derives is_survey_active=False."""
+    from datetime import date, timedelta
+    today = date.today()
+    open_d = (today + timedelta(days=7)).isoformat()
+    close_d = (today + timedelta(days=20)).isoformat()
+
+    db = _FakeDB()
+    db._tenants["tara-air"] = {"tenant_id": "tara-air", "config": {"survey_rate_limit": 5}}
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": open_d,
+        "survey_close_date": close_d,
+    })
+    assert resp.status_code == 200
+    config = resp.json()["data"]["config"]
+    assert config["is_survey_active"] is False
+    assert db._tenants["tara-air"]["config"]["is_survey_active"] is False
+
+
+def test_put_config_auto_opens_when_dates_cleared(monkeypatch):
+    """Clearing both dates with no override re-opens the survey (unconfigured)."""
+    db = _FakeDB()
+    db._tenants["tara-air"] = {
+        "config": {
+            "survey_rate_limit": 10,
+            "survey_open_date": "2020-01-01",
+            "survey_close_date": "2020-12-31",
+            "is_survey_active": False,
+        },
+        "surveyConfig": {"openDate": "2020-01-01", "closeDate": "2020-12-31", "isActive": False},
+    }
+    _patch_db(monkeypatch, db)
+    _patch_user(monkeypatch, _admin())
+
+    resp = _put("tara-air", {
+        "survey_rate_limit": 10,
+        "survey_open_date": "",
+        "survey_close_date": "",
+    })
+    assert resp.status_code == 200
+    config = db._tenants["tara-air"]["config"]
+    assert "survey_open_date" not in config
+    assert "survey_close_date" not in config
+    assert config["is_survey_active"] is True
+    survey_config = db._tenants["tara-air"]["surveyConfig"]
+    assert "openDate" not in survey_config
+    assert "closeDate" not in survey_config
+    assert survey_config["isActive"] is True
+
+
 def test_put_config_safety_role_allowed(monkeypatch):
     """The 'safety' role is a valid Safety Manager role for the tenant."""
     db = _FakeDB()

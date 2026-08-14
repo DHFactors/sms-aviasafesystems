@@ -15,7 +15,7 @@
 # SMS maturity dashboard) keep working unchanged.
 # ============================================================================
 
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Optional, Set
 
 from loguru import logger
@@ -24,6 +24,25 @@ from app.core.config import settings
 from app.firebase import get_db
 
 SURVEY_RATE_LIMIT_OPTIONS = (5, 10, 25, 50, 100)
+
+
+def _auto_survey_active(open_date: Optional[str], close_date: Optional[str]) -> bool:
+    """Derive the survey active flag from the configured dates vs today (UTC).
+
+    Policy:
+      - both dates set: active while today is inside [open, close]
+      - only open date set: active once today >= open
+      - only close date set: active while today <= close
+      - no dates (unconfigured / cleared): open by default
+    """
+    today = datetime.now(timezone.utc).date().isoformat()
+    if open_date and close_date:
+        return open_date <= today <= close_date
+    if open_date:
+        return today >= open_date
+    if close_date:
+        return today <= close_date
+    return True
 
 
 def _normalize_date(value: Any) -> Optional[str]:
@@ -106,6 +125,14 @@ def build_config_update(
     active_field = fields.get("is_survey_active")
     if active_field is not None:
         updated["is_survey_active"] = bool(active_field)
+    elif open_field is not None or close_field is not None:
+        # No manual override: derive the active flag from the configured window
+        # so that saving a past/future close date immediately opens/closes the
+        # public survey portal for this tenant.
+        updated["is_survey_active"] = _auto_survey_active(
+            updated.get("survey_open_date"),
+            updated.get("survey_close_date"),
+        )
 
     survey_config = _derive_survey_config(updated, legacy, cleared)
     return updated, survey_config
@@ -147,6 +174,16 @@ def _derive_survey_config(
             if legacy_active is not None:
                 survey_config["isActive"] = legacy_active
 
+    # snake_case aliases kept in sync with the camelCase mirror so callers can
+    # read either open_date/close_date/is_active or openDate/closeDate/isActive.
+    for camel, snake in (
+        ("openDate", "open_date"),
+        ("closeDate", "close_date"),
+        ("isActive", "is_active"),
+    ):
+        if camel in survey_config:
+            survey_config[snake] = survey_config[camel]
+
     return survey_config
 
 
@@ -172,4 +209,4 @@ def save_tenant_config(
     except Exception as e:
         logger.error(f"Failed to persist config for tenant {tenant_id}: {e}")
         raise RuntimeError("Failed to persist tenant config")
-    return updated
+    return updated, survey_config

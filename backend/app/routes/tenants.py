@@ -125,6 +125,13 @@ async def get_tenant_config(
         survey_config["closeDate"] = config["survey_close_date"]
     if "is_survey_active" in config and "isActive" not in survey_config:
         survey_config["isActive"] = config["is_survey_active"]
+    for camel, snake in (
+        ("openDate", "open_date"),
+        ("closeDate", "close_date"),
+        ("isActive", "is_active"),
+    ):
+        if camel in survey_config and snake not in survey_config:
+            survey_config[snake] = survey_config[camel]
     return _envelope({
         "tenant_id": tenant_id,
         "name": tenant_data.get("name"),
@@ -190,7 +197,7 @@ async def update_tenant_config(
 
     fields = config.model_dump()
     try:
-        updated = save_tenant_config(
+        updated, survey_config = save_tenant_config(
             tenant_id,
             fields,
             existing_config,
@@ -218,4 +225,8 @@ async def update_tenant_config(
         },
     )
 
-    return _envelope({"tenant_id": tenant_id, "config": updated})
+    return _envelope({
+        "tenant_id": tenant_id,
+        "config": updated,
+        "surveyConfig": survey_config,
+    })

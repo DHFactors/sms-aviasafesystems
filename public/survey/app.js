@@ -224,7 +224,6 @@ async function loadSurveyInstructions() {
 }
 
 function enforceSurveyWindow(surveyConfig, config) {
-    if (!surveyConfig && !config) return;
     const cfg = surveyConfig || {};
     const tenantConfig = config || {};
 
@@ -234,32 +233,62 @@ function enforceSurveyWindow(surveyConfig, config) {
     let active = cfg.isActive;
     if (typeof active !== 'boolean') active = cfg.is_active;
     if (typeof active !== 'boolean') active = tenantConfig.is_survey_active;
-    if (typeof active !== 'boolean') active = true;
 
     const now = new Date();
-    let closed = false;
-    if (active === false) {
-        closed = true;
-    } else {
-        if (openDate && now < new Date(openDate)) closed = true;
-        if (closeDate && now > new Date(closeDate)) closed = true;
-    }
-    if (!closed) return;
+    const hasOpen = !!openDate;
+    const hasClose = !!closeDate;
+    const parsedOpen = hasOpen ? new Date(openDate) : null;
+    const parsedClose = hasClose ? new Date(closeDate) : null;
+    const validOpen = hasOpen && !isNaN(parsedOpen.getTime());
+    const validClose = hasClose && !isNaN(parsedClose.getTime());
 
-    const closedBanner = document.getElementById('surveyClosedBanner');
-    if (closedBanner) {
-        const reopened = active !== false && openDate && now < new Date(openDate)
-            ? new Date(openDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-            : null;
-        closedBanner.textContent = reopened
-            ? 'This survey is currently closed. It will reopen on ' + reopened + '.'
-            : 'This survey is currently closed.';
-        closedBanner.style.display = 'block';
+    // Resolve the survey window state.
+    //   1. Explicit manual override (is_survey_active) always wins.
+    //   2. Otherwise evaluate the configured dates against today.
+    let state = 'open'; // 'open' | 'scheduled' | 'closed'
+    if (active === false) {
+        state = 'closed';
+    } else {
+        if (validOpen && now < parsedOpen) {
+            state = 'scheduled';
+        } else if (validClose && now > parsedClose) {
+            state = 'closed';
+        }
     }
+
     const form = document.getElementById('surveyForm');
-    if (form) form.style.display = 'none';
+    const closedBanner = document.getElementById('surveyClosedBanner');
+    const submitBtn = document.getElementById('submitBtn');
     const progress = document.querySelector('.progress-wrap');
-    if (progress) progress.style.display = 'none';
+
+    const fmtDate = (d) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    if (state === 'scheduled' && validOpen) {
+        closedBanner.textContent = 'This safety survey is scheduled to open on ' + fmtDate(parsedOpen) + '.';
+        closedBanner.style.display = 'block';
+        if (form) form.style.display = 'none';
+        if (progress) progress.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    if (state === 'closed') {
+        closedBanner.textContent = validClose
+            ? 'This safety survey closed on ' + fmtDate(parsedClose) + '. Thank you for your participation.'
+            : 'This safety survey is currently closed.';
+        closedBanner.style.display = 'block';
+        if (form) form.style.display = 'none';
+        if (progress) progress.style.display = 'none';
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    // Open (dates configured and today is within range, or not configured):
+    // ensure the survey form is visible and interactive.
+    if (closedBanner) closedBanner.style.display = 'none';
+    if (form) form.style.display = 'block';
+    if (progress) progress.style.display = '';
+    if (submitBtn) submitBtn.disabled = false;
 }
 
 function getApiBaseUrl() {
