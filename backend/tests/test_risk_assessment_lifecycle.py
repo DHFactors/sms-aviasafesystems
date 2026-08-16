@@ -792,3 +792,178 @@ class TestCrossTenantAndAuthorization:
         else:
             # Placeholder path still returns bytes with a PDF header
             assert len(body) > 0
+
+
+# ============================================================================
+# SRA (5x5 matrix) + Fishbone RCA integration tests
+# ============================================================================
+
+class TestSraAndFishboneIntegration:
+    """Verify the CAAN/ICAO-aligned structured SRA (initial/residual) and
+    Fishbone (5M + Management) RCA fields flow through CAN/CAP end-to-end."""
+
+    def _create_can(self, client, **overrides):
+        body = {
+            "hazard_id": "haz-sra-1",
+            "title": "Repeated brake-pedal anomalies during taxi",
+            "description": "Brake pressure anomalies observed during repeated taxi movements.",
+            "required_action": "Inspect braking system per maintenance manual.",
+            "target_completion_date": "2026-12-31T00:00:00Z",
+            "assigned_to": "Maintenance Lead",
+            "assigned_to_uid": "user-1",
+            "priority": "High",
+            "initial_severity": 3,
+            "initial_probability": 3,
+            "initial_risk_index": 9,
+            "initial_sra": {
+                "severity": 3,
+                "severity_letter": "C",
+                "probability": 3,
+                "risk_index": 9,
+                "risk_level": "Medium",
+                "risk_outcome": "Tolerable",
+            },
+        }
+        body.update(overrides)
+        return client.post("/api/v1/cans/", json=body, headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
+
+    def test_can_issue_persists_structured_initial_sra(self, client):
+        resp = self._create_can(client)
+        assert resp.status_code == 201, resp.text
+        can = resp.json()
+
+        # Server-side canonical SRA block is stored and echoed.
+        assert can["initial_sra"]["severity"] == 3
+        assert can["initial_sra"]["severity_letter"] == "C"
+        assert can["initial_sra"]["risk_index"] == 9
+        assert can["initial_sra"]["risk_level"] == "Medium"
+        assert can["initial_sra"]["risk_outcome"] == "Tolerable"
+        # Legacy flat fields stay in sync.
+        assert can["initial_severity"] == 3
+        assert can["initial_probability"] == 3
+        assert can["initial_risk_index"] == 9
+        assert can["initial_risk_level"] == "Medium"
+
+    def test_can_issue_recomputes_risk_server_side(self, client):
+        # Client sends a wrong index/level; the server must canonicalise from
+        # the tenant's configured thresholds (S=5, P=5 -> index 25 Very High).
+        resp = self._create_can(
+            client,
+            initial_severity=5,
+            initial_probability=5,
+            initial_risk_index=9,
+            initial_risk_level="Low",
+            initial_sra={"severity": 5, "probability": 5, "risk_index": 9, "risk_level": "Low", "risk_outcome": "Acceptable"},
+        )
+        assert resp.status_code == 201, resp.text
+        can = resp.json()
+        assert can["initial_risk_index"] == 25
+        assert can["initial_risk_level"] == "Very High"
+        assert can["initial_risk_outcome"] == "Intolerable"
+        assert can["initial_sra"]["risk_index"] == 25
+        assert can["initial_sra"]["severity_letter"] == "E"
+
+    def test_can_issue_without_sra_backward_compat(self, client):
+        resp = self._create_can(client, initial_severity=None, initial_probability=None, initial_risk_index=None, initial_sra=None)
+        assert resp.status_code == 201, resp.text
+        can = resp.json()
+        assert can.get("initial_sra") is None
+        assert can.get("initial_risk_index") is None
+
+    def test_cap_submit_persists_residual_sra_and_fishbone(self, client):
+        can_resp = self._create_can(client)
+        can_id = can_resp.json()["id"]
+
+        cap_body = {
+            "can_id": can_id,
+            "action_plan": "Replace brake master cylinder and re-certify braking system.",
+            "timeline": "14 days",
+            "target_completion_date": "2026-12-31T00:00:00Z",
+            "residual_severity": 2,
+            "residual_probability": 2,
+            "residual_risk_index": 4,
+            "residual_sra": {
+                "severity": 2,
+                "severity_letter": "B",
+                "probability": 2,
+                "risk_index": 4,
+                "risk_level": "Low",
+                "risk_outcome": "Acceptable",
+            },
+            "root_causes": [
+                {"id": "rc_1", "category": "Machine", "description": "Worn brake master cylinder seals", "is_primary": True},
+                {"id": "rc_2", "category": "Method", "description": "Inspection interval too long", "is_primary": False},
+            ],
+            "action_items": [
+                {"id": "ai_1", "description": "Replace master cylinder seals", "root_cause_id": "rc_1", "owner": "Maint Lead", "target_date": "2026-12-20"},
+            ],
+        }
+        resp = client.post(f"/api/v1/cans/{can_id}/caps", json=cap_body, headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
+        assert resp.status_code == 201, resp.text
+        cap = resp.json()
+
+        # Residual SRA canonicalised + legacy fields in sync.
+        assert cap["residual_sra"]["risk_index"] == 4
+        assert cap["residual_sra"]["risk_level"] == "Low"
+        assert cap["residual_sra"]["risk_outcome"] == "Acceptable"
+        assert cap["residual_risk_level"] == "Low"
+
+        # Fishbone structure persisted.
+        assert len(cap["root_causes"]) == 2
+        assert cap["root_causes"][0]["is_primary"] is True
+        assert len(cap["action_items"]) == 1
+        assert cap["action_items"][0]["root_cause_id"] == "rc_1"
+        assert cap["action_items"][0]["root_cause_id"] in {rc["id"] for rc in cap["root_causes"]}
+
+    def test_cap_submit_without_fishbone_backward_compat(self, client):
+        can_resp = self._create_can(client)
+        can_id = can_resp.json()["id"]
+
+        cap_body = {
+            "can_id": can_id,
+            "action_plan": "Simple corrective plan.",
+            "timeline": "7 days",
+            "target_completion_date": "2026-12-31T00:00:00Z",
+        }
+        resp = client.post(f"/api/v1/cans/{can_id}/caps", json=cap_body, headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
+        assert resp.status_code == 201, resp.text
+        cap = resp.json()
+        assert cap.get("root_causes") is None
+        assert cap.get("action_items") is None
+        assert cap.get("residual_sra") is None
+
+    def test_review_cap_can_update_residual_sra(self, client):
+        can_resp = self._create_can(client)
+        can_id = can_resp.json()["id"]
+
+        cap_resp = client.post(
+            f"/api/v1/cans/{can_id}/caps",
+            json={
+                "can_id": can_id,
+                "action_plan": "Replace brake master cylinder and re-certify braking system.",
+                "timeline": "14 days",
+                "target_completion_date": "2026-12-31T00:00:00Z",
+                "residual_severity": 3,
+                "residual_probability": 3,
+                "residual_sra": {"severity": 3, "probability": 3, "risk_index": 9, "risk_level": "Medium", "risk_outcome": "Tolerable"},
+            },
+            headers=_auth_header("AIRLINE_ADMIN_TOKEN"),
+        )
+        cap_id = cap_resp.json()["id"]
+
+        # Safety Manager reviews and re-assesses residual risk lower (2x2).
+        review = {
+            "status": "Completed",
+            "comments": "Mitigation effective; residual risk acceptable.",
+            "residual_severity": 2,
+            "residual_probability": 2,
+            "residual_sra": {"severity": 2, "probability": 2, "risk_index": 4, "risk_level": "Low", "risk_outcome": "Acceptable"},
+        }
+        resp = client.patch(f"/api/v1/cans/caps/{cap_id}/review", json=review, headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
+        assert resp.status_code == 200, resp.text
+        cap = resp.json()
+        assert cap["status"] == "Completed"
+        assert cap["residual_sra"]["risk_index"] == 4
+        assert cap["residual_sra"]["risk_level"] == "Low"
+        assert cap["residual_risk_level"] == "Low"
+        assert cap["residual_risk_outcome"] == "Acceptable"

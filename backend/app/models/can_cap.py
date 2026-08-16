@@ -66,13 +66,29 @@ class CANPriority(str, Enum):
 # working unchanged; new fields only appear when provided.
 
 class CANFormFields(BaseModel):
-    """Optional issuance block of the Corrective Action Notice (FORM SMSM 8.8.2)."""
+    """Optional issuance block of the Corrective Action Notice (FORM SMSM 8.8.2).
+
+    ``initial_sra`` is the structured CAAN/ICAO 5x5 Safety Risk Assessment at
+    issuance time::
+        {
+          "severity": 1..5, "severity_letter": "A".."E",
+          "probability": 1..5, "risk_index": 1..25,
+          "risk_level": "Low"|"Medium"|"High"|"Very High",
+          "risk_outcome": "Acceptable"|"Tolerable"|"Intolerable",
+          "assessed_by": "email", "assessed_at": iso-datetime
+        }
+    Legacy flat fields (initial_severity / initial_probability / initial_risk_index)
+    remain for backward compatibility and are kept in sync server-side.
+    """
     copies_to: Optional[str] = None
     requested_function: Optional[str] = None
     addressed_function: Optional[str] = None
     initial_severity: Optional[int] = Field(None, ge=1, le=5)
     initial_probability: Optional[int] = Field(None, ge=1, le=5)
     initial_risk_index: Optional[int] = Field(None, ge=1, le=25)
+    initial_risk_level: Optional[str] = None
+    initial_risk_outcome: Optional[str] = None
+    initial_sra: Optional[dict] = None
     classification_type: Optional[str] = None
     classification_level: Optional[str] = None
 
@@ -114,6 +130,13 @@ class CAPFormFields(BaseModel):
     residual_probability: Optional[int] = Field(None, ge=1, le=5)
     residual_risk_index: Optional[int] = Field(None, ge=1, le=25)
     residual_risk_level: Optional[str] = None
+    residual_risk_outcome: Optional[str] = None
+    residual_sra: Optional[dict] = None
+    # ── Structured RCA (Fishbone / Ishikawa 5M + Management) ──
+    # root_causes: [{ id, category, description, is_primary }]
+    # action_items: [{ id, description, root_cause_id, owner, target_date }]
+    root_causes: Optional[list] = None
+    action_items: Optional[list] = None
     sag_sign: Optional[str] = None
     sag_signed_by: Optional[str] = None
     sag_signed_at: Optional[datetime] = None

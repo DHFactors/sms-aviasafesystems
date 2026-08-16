@@ -139,38 +139,14 @@
             </table>
 
             <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
-                <i class="fas fa-th"></i> Residual Risk Assessment (Severity × Probability)
+                <i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (5M + Management)
             </div>
-            <table class="cap-form">
-                <tr>
-                    <th>Residual Severity (1–5)</th>
-                    <td>
-                        <select class="form-control" id="fieldResidualSeverity">
-                            <option value="">—</option>
-                            <option value="1">1 — Negligible</option>
-                            <option value="2">2 — Minor</option>
-                            <option value="3">3 — Major</option>
-                            <option value="4">4 — Hazardous</option>
-                            <option value="5">5 — Catastrophic</option>
-                        </select>
-                    </td>
-                    <th>Residual Probability (1–5)</th>
-                    <td>
-                        <select class="form-control" id="fieldResidualProbability">
-                            <option value="">—</option>
-                            <option value="1">1 — Improbable</option>
-                            <option value="2">2 — Remote</option>
-                            <option value="3">3 — Occasional</option>
-                            <option value="4">4 — Probable</option>
-                            <option value="5">5 — Frequent</option>
-                        </select>
-                    </td>
-                </tr>
-            </table>
+            <div id="fishboneEditor"></div>
 
-            <div class="risk-preview">
-                Residual Risk Index: <strong id="residualRiskIndexValue">—</strong> &nbsp;·&nbsp; Level: <span id="residualRiskLevel" class="badge badge-default">—</span>
+            <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
+                <i class="fas fa-th"></i> Residual Safety Risk Assessment (Severity A–E × Probability 1–5)
             </div>
+            <div id="residualSraMatrix"></div>
 
             <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
                 <i class="fas fa-pen"></i> Managerial Approval
@@ -199,9 +175,13 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
+<script src="/js/risk_matrix.js"></script>
+<script src="/js/fishbone.js"></script>
 <script src="/js/can_cap.js"></script>
 <script>
 let canId = null;
+let fishboneController = null;
+let residualSraController = null;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -209,8 +189,32 @@ firebase.auth().onAuthStateChanged(function(user) {
     canId = params.get('can_id');
     if (!canId) { showMessage('No CAN ID provided', 'error'); return; }
     loadCanInfo(canId);
-    wireResidualRisk();
+    initResidualSra();
+    initFishbone();
 });
+
+function initFishbone() {
+    try {
+        fishboneController = Fishbone.renderEditor('fishboneEditor', {
+            data: { root_causes: [], action_items: [] },
+            onChange: () => {},
+        });
+    } catch (err) {
+        console.error('Fishbone init failed:', err);
+    }
+}
+
+async function initResidualSra() {
+    try {
+        residualSraController = await RiskMatrix.render('residualSraMatrix', {
+            mode: 'interactive',
+            showHeader: true,
+            showSummary: true,
+        });
+    } catch (err) {
+        console.error('RiskMatrix init failed:', err);
+    }
+}
 
 async function loadCanInfo(id) {
     try {
@@ -223,35 +227,6 @@ async function loadCanInfo(id) {
     }
 }
 
-function wireResidualRisk() {
-    const sev = document.getElementById('fieldResidualSeverity');
-    const prob = document.getElementById('fieldResidualProbability');
-    const indexEl = document.getElementById('residualRiskIndexValue');
-    const levelEl = document.getElementById('residualRiskLevel');
-
-    function update() {
-        const s = parseInt(sev.value, 10);
-        const p = parseInt(prob.value, 10);
-        if (!s || !p) {
-            indexEl.textContent = '—';
-            levelEl.textContent = '—';
-            levelEl.className = 'badge badge-default';
-            return;
-        }
-        const ri = s * p;
-        let level = 'Low', cls = 'badge-low';
-        if (ri > 15) { level = 'Very High'; cls = 'badge-critical'; }
-        else if (ri > 9) { level = 'High'; cls = 'badge-high'; }
-        else if (ri > 5) { level = 'Medium'; cls = 'badge-medium'; }
-        indexEl.textContent = ri;
-        levelEl.textContent = level;
-        levelEl.className = 'badge ' + cls;
-    }
-
-    sev.addEventListener('change', update);
-    prob.addEventListener('change', update);
-}
-
 async function submitCap() {
     const actionPlan = document.getElementById('fieldActionPlan').value.trim();
     const timeline = document.getElementById('fieldTimeline').value.trim();
@@ -261,16 +236,17 @@ async function submitCap() {
     if (!timeline) { showMessage('Timeline is required', 'error'); return; }
     if (!targetDate) { showMessage('Target completion date is required', 'error'); return; }
 
-    const rSev = parseInt(document.getElementById('fieldResidualSeverity').value, 10);
-    const rProb = parseInt(document.getElementById('fieldResidualProbability').value, 10);
-    const residualRiskIndex = (rSev && rProb) ? rSev * rProb : null;
-    let residualRiskLevel = null;
-    if (residualRiskIndex) {
-        if (residualRiskIndex > 15) residualRiskLevel = 'Very High';
-        else if (residualRiskIndex > 9) residualRiskLevel = 'High';
-        else if (residualRiskIndex > 5) residualRiskLevel = 'Medium';
-        else residualRiskLevel = 'Low';
+    const fishErrors = fishboneController ? fishboneController.validate() : ['Fishbone editor unavailable'];
+    if (fishErrors && fishErrors.length) {
+        showMessage(fishErrors.join(' '), 'error');
+        return;
     }
+    const fishData = fishboneController ? fishboneController.getData() : { root_causes: [], action_items: [] };
+
+    const rSra = residualSraController ? residualSraController.getValue() : { severity: null, probability: null, index: null, level: null, outcome: null };
+    const rSev = rSra.severity;
+    const rProb = rSra.probability;
+    const residualRiskIndex = rSra.index;
 
     const maName = document.getElementById('maName').value.trim();
     const maSignature = document.getElementById('maSignature').value.trim();
@@ -302,10 +278,21 @@ async function submitCap() {
         implementation_timeline: document.getElementById('fieldImplementationTimeline').value.trim() || null,
         process_owner: document.getElementById('fieldProcessOwner').value.trim() || null,
         managerial_approval: managerialApproval,
+        root_causes: fishData.root_causes && fishData.root_causes.length ? fishData.root_causes : null,
+        action_items: fishData.action_items && fishData.action_items.length ? fishData.action_items : null,
         residual_severity: rSev || null,
         residual_probability: rProb || null,
         residual_risk_index: residualRiskIndex,
-        residual_risk_level: residualRiskLevel,
+        residual_risk_level: rSra.level || null,
+        residual_risk_outcome: rSra.outcome || null,
+        residual_sra: (rSev && rProb) ? {
+            severity: rSev,
+            severity_letter: rSra.severity_letter || null,
+            probability: rProb,
+            risk_index: residualRiskIndex,
+            risk_level: rSra.level || null,
+            risk_outcome: rSra.outcome || null,
+        } : null,
     };
 
     const btn = document.querySelector('.btn-submit');

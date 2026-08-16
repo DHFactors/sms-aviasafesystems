@@ -120,37 +120,10 @@
             </div>
 
             <div class="section-title" style="font-size:0.95rem;font-weight:600;color:#0b2a42;margin:0.5rem 0 1rem;display:flex;align-items:center;gap:0.5rem;">
-                <i class="fas fa-th"></i> Initial Risk Assessment (Severity × Probability)
+                <i class="fas fa-th"></i> Initial Safety Risk Assessment (Severity A–E × Probability 1–5)
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Severity (1–5)</label>
-                    <select class="form-control" id="fieldSeverity">
-                        <option value="">—</option>
-                        <option value="1">1 — Negligible</option>
-                        <option value="2">2 — Minor</option>
-                        <option value="3">3 — Major</option>
-                        <option value="4">4 — Hazardous</option>
-                        <option value="5">5 — Catastrophic</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Probability (1–5)</label>
-                    <select class="form-control" id="fieldProbability">
-                        <option value="">—</option>
-                        <option value="1">1 — Improbable</option>
-                        <option value="2">2 — Remote</option>
-                        <option value="3">3 — Occasional</option>
-                        <option value="4">4 — Probable</option>
-                        <option value="5">5 — Frequent</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="risk-preview" id="initialRiskPreview">
-                Risk Index: <strong id="initialRiskIndex">—</strong> &nbsp;·&nbsp; Level: <span id="initialRiskLevel" class="badge badge-default">—</span>
-            </div>
+            <div id="initialSraMatrix"></div>
 
             <div class="form-row">
                 <div class="form-group">
@@ -188,15 +161,17 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
+<script src="/js/risk_matrix.js"></script>
 <script src="/js/can_cap.js"></script>
 <script src="/js/hazards.js"></script>
 <script>
 let hazards = [];
+let initialSraController = null;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     loadHazards();
-    wireRiskPreview();
+    initInitialSra();
 });
 
 async function loadHazards() {
@@ -217,33 +192,18 @@ async function loadHazards() {
     }
 }
 
-function wireRiskPreview() {
-    const sev = document.getElementById('fieldSeverity');
-    const prob = document.getElementById('fieldProbability');
-    const indexEl = document.getElementById('initialRiskIndex');
-    const levelEl = document.getElementById('initialRiskLevel');
-
-    function update() {
-        const s = parseInt(sev.value, 10);
-        const p = parseInt(prob.value, 10);
-        if (!s || !p) {
-            indexEl.textContent = '—';
-            levelEl.textContent = '—';
-            levelEl.className = 'badge badge-default';
-            return;
-        }
-        const ri = s * p;
-        let level = 'Low', cls = 'badge-low';
-        if (ri > 15) { level = 'Very High'; cls = 'badge-critical'; }
-        else if (ri > 9) { level = 'High'; cls = 'badge-high'; }
-        else if (ri > 5) { level = 'Medium'; cls = 'badge-medium'; }
-        indexEl.textContent = ri;
-        levelEl.textContent = level;
-        levelEl.className = 'badge ' + cls;
+async function initInitialSra() {
+    try {
+        initialSraController = await RiskMatrix.render('initialSraMatrix', {
+            mode: 'interactive',
+            showHeader: true,
+            showSummary: true,
+        });
+    } catch (err) {
+        console.error('RiskMatrix init failed:', err);
+        const el = document.getElementById('initialSraMatrix');
+        el.innerHTML = '<div class="hint">Risk matrix could not be loaded: ' + err.message + '</div>';
     }
-
-    sev.addEventListener('change', update);
-    prob.addEventListener('change', update);
 }
 
 async function submitCan() {
@@ -261,10 +221,16 @@ async function submitCan() {
     if (!requiredAction) { showMessage('Required action is required', 'error'); return; }
     if (!targetDate) { showMessage('Target completion date is required', 'error'); return; }
     if (!assignedTo) { showMessage('Assigned-to email is required', 'error'); return; }
+    const sraCheck = initialSraController ? initialSraController.getValue() : null;
+    if (!sraCheck || !sraCheck.severity || !sraCheck.probability) {
+        showMessage('Please select the Initial Safety Risk Assessment on the 5×5 matrix', 'error');
+        return;
+    }
 
-    const sev = parseInt(document.getElementById('fieldSeverity').value, 10);
-    const prob = parseInt(document.getElementById('fieldProbability').value, 10);
-    const riskIndex = (sev && prob) ? sev * prob : null;
+    const sra = initialSraController ? initialSraController.getValue() : { severity: null, probability: null, index: null, level: null, outcome: null };
+    const sev = sra.severity;
+    const prob = sra.probability;
+    const riskIndex = sra.index;
 
     const data = {
         hazard_id: hazardId,
@@ -282,6 +248,16 @@ async function submitCan() {
         initial_severity: sev || null,
         initial_probability: prob || null,
         initial_risk_index: riskIndex,
+        initial_risk_level: sra.level || null,
+        initial_risk_outcome: sra.outcome || null,
+        initial_sra: (sev && prob) ? {
+            severity: sev,
+            severity_letter: sra.severity_letter || null,
+            probability: prob,
+            risk_index: riskIndex,
+            risk_level: sra.level || null,
+            risk_outcome: sra.outcome || null,
+        } : null,
         classification_type: document.getElementById('fieldClassType').value || null,
         classification_level: document.getElementById('fieldClassLevel').value || null,
     };

@@ -167,6 +167,22 @@
                     <td colspan="3" id="fieldCaaAcceptance">-</td>
                 </tr>
             </table>
+
+            <h3 class="cap-section">Safety Risk Assessment (Initial → Residual)</h3>
+            <div class="sra-compare">
+                <div class="sra-compare-col">
+                    <div class="sra-compare-label">Initial SRA</div>
+                    <div id="initialSraView">-</div>
+                </div>
+                <div class="sra-compare-arrow"><i class="fas fa-arrow-right"></i></div>
+                <div class="sra-compare-col">
+                    <div class="sra-compare-label">Residual SRA</div>
+                    <div id="residualSraView">-</div>
+                </div>
+            </div>
+
+            <h3 class="cap-section">Root Cause Analysis — Fishbone (5M + Management)</h3>
+            <div id="fishboneView">-</div>
         </div>
 
         <!-- Review Section -->
@@ -285,6 +301,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
+<script src="/js/risk_matrix.js"></script>
+<script src="/js/fishbone.js"></script>
 <script src="/js/can_cap.js"></script>
 <script>
 let capData = null;
@@ -321,9 +339,7 @@ async function loadCap(id) {
         document.getElementById('loadingIndicator').style.display = 'none';
         showError(err.message);
     }
-}
-
-function formatApproval(d) {
+}function formatApproval(d) {
     if (!d) return '-';
     const parts = [];
     if (d.accepted !== undefined && d.accepted !== null) parts.push(d.accepted ? 'Accepted' : 'Rejected');
@@ -380,6 +396,61 @@ function renderCap() {
     } else {
         document.getElementById('reviewCompleted').style.display = 'none';
         document.getElementById('reviewForm').style.display = 'block';
+    }
+
+    renderCapSraViews(c);
+}
+
+async function renderCapSraViews(c) {
+    const initialEl = document.getElementById('initialSraView');
+    const residualEl = document.getElementById('residualSraView');
+    const fishboneEl = document.getElementById('fishboneView');
+
+    const residual = c.residual_sra || (c.residual_severity && c.residual_probability
+        ? { severity: c.residual_severity, probability: c.residual_probability, risk_index: c.residual_risk_index, risk_level: c.residual_risk_level, risk_outcome: c.residual_risk_outcome }
+        : null);
+    await renderCapSraCell(residualEl, residual);
+
+    // Initial SRA lives on the parent CAN; fetch it for the side-by-side view.
+    let initial = null;
+    if (canIdFromCap) {
+        try {
+            const can = await CanCapAPI.getCan(canIdFromCap);
+            initial = can.initial_sra || (can.initial_severity && can.initial_probability
+                ? { severity: can.initial_severity, probability: can.initial_probability, risk_index: can.initial_risk_index, risk_level: can.initial_risk_level, risk_outcome: can.initial_risk_outcome }
+                : null);
+        } catch (e) {
+            console.warn('Failed to load parent CAN for initial SRA:', e);
+        }
+    }
+    await renderCapSraCell(initialEl, initial);
+
+    if (c.root_causes && c.root_causes.length) {
+        Fishbone.renderViewer(fishboneEl, { root_causes: c.root_causes, action_items: c.action_items || [] });
+    } else {
+        fishboneEl.textContent = '-';
+    }
+}
+
+async function renderCapSraCell(containerEl, sra) {
+    if (!containerEl) return;
+    containerEl.innerHTML = '';
+    if (!sra || (!sra.severity && !sra.risk_index)) {
+        containerEl.innerHTML = '<span style="color:#94a3b8;">Not assessed.</span>';
+        return;
+    }
+    const sev = sra.severity || Math.ceil((sra.risk_index || 1) / (sra.probability || 1));
+    const prob = sra.probability || Math.ceil((sra.risk_index || 1) / sev);
+    try {
+        await RiskMatrix.render(containerEl, {
+            mode: 'readonly',
+            severity: sev,
+            probability: prob,
+            showHeader: false,
+            showSummary: true,
+        });
+    } catch (err) {
+        containerEl.innerHTML = `<span style="color:#94a3b8;">${err.message}</span>`;
     }
 }
 

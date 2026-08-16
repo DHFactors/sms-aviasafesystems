@@ -100,6 +100,28 @@
             </div>
         </div>
 
+        <!-- Safety Risk Assessment: Initial vs Residual -->
+        <div class="card" id="sraCard">
+            <h2><i class="fas fa-th"></i> Safety Risk Assessment (Initial → Residual)</h2>
+            <div class="sra-compare">
+                <div class="sra-compare-col">
+                    <div class="sra-compare-label">Initial SRA</div>
+                    <div id="initialSraView"></div>
+                </div>
+                <div class="sra-compare-arrow"><i class="fas fa-arrow-right"></i></div>
+                <div class="sra-compare-col">
+                    <div class="sra-compare-label">Residual SRA</div>
+                    <div id="residualSraView"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fishbone RCA -->
+        <div class="card" id="fishboneCard">
+            <h2><i class="fas fa-diagnoses"></i> Root Cause Analysis (Fishbone)</h2>
+            <div id="fishboneView"></div>
+        </div>
+
         <!-- CAPs Section -->
         <div id="capsSection">
             <div class="card">
@@ -120,6 +142,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js"></script>
 <script src="/js/api/client.js"></script>
+<script src="/js/risk_matrix.js"></script>
+<script src="/js/fishbone.js"></script>
 <script src="/js/can_cap.js"></script>
 <script>
 let canData = null;
@@ -195,7 +219,8 @@ function renderCan() {
     document.getElementById('fieldAssignedTo').textContent = c.assigned_to || '-';
     document.getElementById('fieldTargetDate').textContent = formatCanDate(c.target_completion_date);
 
-    // Status buttons
+    renderSraViews(c);
+
     const btnContainer = document.getElementById('statusButtons');
     const current = c.status;
     const transitions = {
@@ -235,6 +260,59 @@ async function changeCanStatus(newStatus) {
         loadCan(canData.id);
     } catch (err) {
         showMessage('Error: ' + err.message, 'error');
+    }
+}
+
+function renderSraViews(c) {
+    const initialSraEl = document.getElementById('initialSraView');
+    const residualSraEl = document.getElementById('residualSraView');
+    const fishboneEl = document.getElementById('fishboneView');
+    const sraCard = document.getElementById('sraCard');
+    const fishboneCard = document.getElementById('fishboneCard');
+
+    const initial = c.initial_sra || (c.initial_severity && c.initial_probability
+        ? { severity: c.initial_severity, probability: c.initial_probability, risk_index: c.initial_risk_index, risk_level: c.initial_risk_level, risk_outcome: c.initial_risk_outcome }
+        : null);
+    const cap = c.latest_cap || {};
+    const residual = cap.residual_sra || (cap.residual_severity && cap.residual_probability
+        ? { severity: cap.residual_severity, probability: cap.residual_probability, risk_index: cap.residual_risk_index, risk_level: cap.residual_risk_level, risk_outcome: cap.residual_risk_outcome }
+        : null);
+
+    if (!initial && !residual) {
+        sraCard.style.display = 'none';
+    } else {
+        sraCard.style.display = '';
+        renderSingleSra(initialSraEl, initial);
+        renderSingleSra(residualSraEl, residual);
+    }
+
+    const rc = cap.root_causes || null;
+    if (rc && rc.length) {
+        fishboneCard.style.display = '';
+        Fishbone.renderViewer(fishboneEl, { root_causes: rc, action_items: cap.action_items || [] });
+    } else {
+        fishboneCard.style.display = 'none';
+    }
+}
+
+async function renderSingleSra(containerEl, sra) {
+    containerEl.innerHTML = '';
+    if (!sra || (!sra.severity && !sra.risk_index)) {
+        containerEl.innerHTML = '<div class="hint">Not assessed.</div>';
+        return;
+    }
+    const sev = sra.severity || Math.ceil((sra.risk_index || 1) / (sra.probability || 1));
+    const prob = sra.probability || Math.ceil((sra.risk_index || 1) / sev);
+    try {
+        await RiskMatrix.render(containerEl, {
+            mode: 'readonly',
+            severity: sev,
+            probability: prob,
+            showHeader: false,
+            showSummary: true,
+        });
+    } catch (err) {
+        containerEl.innerHTML = `<div class="hint">${err.message}</div>`;
     }
 }
 

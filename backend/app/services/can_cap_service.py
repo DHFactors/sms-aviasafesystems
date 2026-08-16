@@ -7,6 +7,7 @@ from app.firebase import get_tenant_collection, get_cross_tenant_collection
 from app.services.hazard_service import HazardService
 from app.services.users import get_user_department
 from app.services.repository import coerce_utc_datetime
+from app.services.risk_matrix import compute_risk_index, get_risk_level, risk_outcome, get_thresholds
 
 
 CAN_COLLECTION = "can_cap"
@@ -58,6 +59,49 @@ class CanCapService:
             logger.warning(f"Failed to get next CAP sequence: {e}")
             return 1
 
+    # ── SRA (Safety Risk Assessment) helpers ──
+
+    SEVERITY_LETTERS = ["A", "B", "C", "D", "E"]
+
+    @classmethod
+    def classify_sra(cls, severity, probability, thresholds=None):
+        """Server-side canonical SRA classification (Risk Index, Level, Outcome).
+
+        Authority lives here (not the client) so stored risk states always
+        reflect the tenant's configured 5x5 matrix thresholds.
+        """
+        if severity is None or probability is None:
+            return None
+        try:
+            sev = int(severity)
+            prob = int(probability)
+        except (TypeError, ValueError):
+            return None
+        if not (1 <= sev <= 5 and 1 <= prob <= 5):
+            return None
+        index = compute_risk_index(sev, prob)
+        level = get_risk_level(index, thresholds)
+        outcome = risk_outcome(sev, prob, thresholds)
+        return {
+            "severity": sev,
+            "severity_letter": cls.SEVERITY_LETTERS[sev - 1],
+            "probability": prob,
+            "risk_index": index,
+            "risk_level": level,
+            "risk_outcome": outcome,
+        }
+
+    def _sra_block(self, severity, probability, assessed_by=None, assessed_at=None, provided=None):
+        """Merge canonical SRA classification with any provided audit fields."""
+        thresholds = get_thresholds(self.tenant_id)
+        classified = self.classify_sra(severity, probability, thresholds)
+        if classified is None:
+            return None
+        provided = provided or {}
+        classified["assessed_by"] = provided.get("assessed_by") or assessed_by
+        classified["assessed_at"] = provided.get("assessed_at") or assessed_at
+        return classified
+
     # ── CAN CRUD ──
 
     def issue_can(self, payload: dict, user: dict) -> dict:
@@ -98,9 +142,38 @@ class CanCapService:
             "initial_severity": payload.get("initial_severity"),
             "initial_probability": payload.get("initial_probability"),
             "initial_risk_index": payload.get("initial_risk_index"),
+            "initial_risk_level": payload.get("initial_risk_level"),
+            "initial_risk_outcome": payload.get("initial_risk_outcome"),
+            "initial_sra": payload.get("initial_sra"),
             "classification_type": payload.get("classification_type"),
             "classification_level": payload.get("classification_level"),
         }
+
+        # Server-side SRA canonicalisation: recompute index/level/outcome from the
+        # tenant's configured risk matrix thresholds; never trust the client.
+        initial_sra = self._sra_block(
+            payload.get("initial_severity"),
+            payload.get("initial_probability"),
+            assessed_by=user.get("email", user["uid"]),
+            assessed_at=now,
+            provided=payload.get("initial_sra"),
+        )
+        if initial_sra:
+            doc_data["initial_sra"] = initial_sra
+            doc_data["initial_severity"] = initial_sra["severity"]
+            doc_data["initial_probability"] = initial_sra["probability"]
+            doc_data["initial_risk_index"] = initial_sra["risk_index"]
+            doc_data["initial_risk_level"] = initial_sra["risk_level"]
+            doc_data["initial_risk_outcome"] = initial_sra["risk_outcome"]
+        elif payload.get("initial_risk_index"):
+            # Back-compat: legacy clients that only sent an index get a level too.
+            thresholds = get_thresholds(self.tenant_id)
+            doc_data["initial_risk_level"] = get_risk_level(payload["initial_risk_index"], thresholds)
+            doc_data["initial_risk_outcome"] = risk_outcome(
+                payload.get("initial_severity") or 1,
+                payload.get("initial_probability") or 1,
+                thresholds,
+            )
 
         try:
             ref = self._can_collection().add(doc_data)
@@ -330,8 +403,37 @@ class CanCapService:
             "residual_probability": payload.get("residual_probability"),
             "residual_risk_index": payload.get("residual_risk_index"),
             "residual_risk_level": payload.get("residual_risk_level"),
+            "residual_risk_outcome": payload.get("residual_risk_outcome"),
+            "residual_sra": payload.get("residual_sra"),
+            # Structured RCA (Fishbone / Ishikawa 5M + Management)
+            "root_causes": payload.get("root_causes") or None,
+            "action_items": payload.get("action_items") or None,
             "process_owner": payload.get("process_owner"),
         }
+
+        # Server-side Residual SRA canonicalisation.
+        residual_sra = self._sra_block(
+            payload.get("residual_severity"),
+            payload.get("residual_probability"),
+            assessed_by=user.get("email", user["uid"]),
+            assessed_at=now,
+            provided=payload.get("residual_sra"),
+        )
+        if residual_sra:
+            doc_data["residual_sra"] = residual_sra
+            doc_data["residual_severity"] = residual_sra["severity"]
+            doc_data["residual_probability"] = residual_sra["probability"]
+            doc_data["residual_risk_index"] = residual_sra["risk_index"]
+            doc_data["residual_risk_level"] = residual_sra["risk_level"]
+            doc_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
+        elif payload.get("residual_risk_index"):
+            thresholds = get_thresholds(self.tenant_id)
+            doc_data["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
+            doc_data["residual_risk_outcome"] = risk_outcome(
+                payload.get("residual_severity") or 1,
+                payload.get("residual_probability") or 1,
+                thresholds,
+            )
 
         try:
             ref = self._caps_collection(can_doc_id).add(doc_data)
@@ -513,12 +615,41 @@ class CanCapService:
                             "residual_probability": review.get("residual_probability"),
                             "residual_risk_index": review.get("residual_risk_index"),
                             "residual_risk_level": review.get("residual_risk_level"),
+                            "residual_risk_outcome": review.get("residual_risk_outcome"),
+                            "residual_sra": review.get("residual_sra"),
+                            "root_causes": review.get("root_causes"),
+                            "action_items": review.get("action_items"),
                             "ca_acceptance": review.get("ca_acceptance"),
                             "manager_approval": review.get("manager_approval"),
                             "manager_confirmation": review.get("manager_confirmation"),
                             "closing_remarks": review.get("closing_remarks"),
                             "sag_sign": review.get("sag_sign"),
                         }
+                        # Server-side Residual SRA canonicalisation on review.
+                        residual_sra = self._sra_block(
+                            review.get("residual_severity"),
+                            review.get("residual_probability"),
+                            assessed_by=user.get("email", user["uid"]),
+                            assessed_at=now,
+                            provided=review.get("residual_sra"),
+                        )
+                        if residual_sra:
+                            update_data["residual_sra"] = residual_sra
+                            update_data["residual_severity"] = residual_sra["severity"]
+                            update_data["residual_probability"] = residual_sra["probability"]
+                            update_data["residual_risk_index"] = residual_sra["risk_index"]
+                            update_data["residual_risk_level"] = residual_sra["risk_level"]
+                            update_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
+                        elif review.get("residual_risk_index"):
+                            thresholds = get_thresholds(self.tenant_id)
+                            update_data["residual_risk_level"] = get_risk_level(
+                                review["residual_risk_index"], thresholds
+                            )
+                            update_data["residual_risk_outcome"] = risk_outcome(
+                                review.get("residual_severity") or 1,
+                                review.get("residual_probability") or 1,
+                                thresholds,
+                            )
                         if review.get("sag_sign"):
                             update_data["sag_signed_by"] = review.get("sag_signed_by")
                             update_data["sag_signed_at"] = review.get("sag_signed_at") or now
