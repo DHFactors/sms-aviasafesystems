@@ -13,10 +13,32 @@ render the seeded rows natively.
 from datetime import timedelta
 from loguru import logger
 
-from seed.config import OPERATOR_PROFILES, SEED_VERSION, CREDENTIAL_EMAIL_DOMAINS
+from seed.config import (
+    OPERATOR_PROFILES,
+    SEED_VERSION,
+    CREDENTIAL_EMAIL_DOMAINS,
+    CAN_ISSUED_BY,
+    CAN_ASSIGNED_POSTHOLDERS,
+    FISHBONE_CATEGORIES,
+    FISHBONE_ROOT_CAUSE_POOL,
+    FISHBONE_ACTION_TEMPLATES,
+)
 from seed.generator import SeededRandom, generate_timestamp, _make_id
-from app.services.risk_matrix import compute_risk_index, get_risk_level
+from seed.tenant_profiles import hazard_titles_for_tenant
+from app.services.risk_matrix import compute_risk_index, get_risk_level, risk_outcome
 from app.services.hazard_service import generate_hazard_id
+
+SEVERITY_LETTERS = ["A", "B", "C", "D", "E"]
+
+# Maps each authentic postholder to the simplified role token that owns the
+# matching functional account (safety / ops / camo / 145). The department
+# label comes from CAN_ASSIGNED_POSTHOLDERS.
+POSTHOLDER_ROLE = {
+    "Head of Flight Operations": "ops",
+    "Head of Maintenance / CAMO": "camo",
+    "Ground Operations Manager": "ops",
+    "Cabin Safety Manager": "safety",
+}
 
 HAZARD_STATUSES = [
     "Open", "Open", "Open", "Processing",
@@ -119,6 +141,76 @@ def _custodian(tenant_id: str, pick: int) -> dict:
     return {"assigned_to": email, "assigned_to_uid": uid, "department": department, "role": token}
 
 
+def _postholder(tenant_id: str, pick: int) -> dict:
+    """Deterministic authentic operational postholder for a CAN/CAP.
+
+    Rotates across the four CAN_ASSIGNED_POSTHOLDERS (label, department)
+    tuples so every postholder is represented. Returns the human postholder
+    label (displayed across CAN/CAP views) plus the matching functional account
+    identity (email/uid/department) so seeded documents resolve against the
+    four simplified role accounts.
+    """
+    domain = CREDENTIAL_EMAIL_DOMAINS.get(tenant_id, f"{tenant_id}.com")
+    label, department = CAN_ASSIGNED_POSTHOLDERS[pick % len(CAN_ASSIGNED_POSTHOLDERS)]
+    token = POSTHOLDER_ROLE[label]
+    uid = f"{token}-{tenant_id}-001"
+    return {
+        "postholder": label,
+        "email": f"{token}@{domain}",
+        "uid": uid,
+        "department": department,
+        "role": token,
+    }
+
+
+def _sra_doc(severity: int, probability: int, assessed_by: str, assessed_at) -> dict:
+    """Structured 5x5 Safety Risk Assessment block matching the server-side
+    canonical shape (app/services/risk_matrix.py + CanCapService.classify_sra)."""
+    index = compute_risk_index(severity, probability)
+    return {
+        "severity": severity,
+        "severity_letter": SEVERITY_LETTERS[severity - 1],
+        "probability": probability,
+        "risk_index": index,
+        "risk_level": get_risk_level(index),
+        "risk_outcome": risk_outcome(severity, probability),
+        "assessed_by": assessed_by,
+        "assessed_at": assessed_at,
+    }
+
+
+def _fishbone_doc(rng: SeededRandom, seed: int, can_index: int, submitted_by: str) -> dict:
+    """Structured Fishbone (Ishikawa 5M + Management) RCA.
+
+    One root cause per Fishbone branch (all 6 categories), exactly one
+    designated primary cause, and structured action items mapped 1:1 to each
+    root cause via root_cause_id.
+    """
+    rng.seed(seed)
+    available = list(FISHBONE_CATEGORIES)
+    rng.shuffle(available)
+    primary_category = available[0]
+
+    root_causes = []
+    action_items = []
+    for i, category in enumerate(available):
+        rc_id = f"rc-{can_index}-{i + 1}"
+        root_causes.append({
+            "id": rc_id,
+            "category": category,
+            "description": rng.choice(FISHBONE_ROOT_CAUSE_POOL[category]),
+            "is_primary": category == primary_category,
+        })
+        action_items.append({
+            "id": f"ai-{can_index}-{i + 1}",
+            "description": rng.choice(FISHBONE_ACTION_TEMPLATES),
+            "root_cause_id": rc_id,
+            "owner": submitted_by,
+            "target_date": None,
+        })
+    return {"root_causes": root_causes, "action_items": action_items}
+
+
 def _hazard_doc(rng: SeededRandom, profile: dict, index: int) -> dict:
     tenant_id = profile["id"]
     created_at = generate_timestamp(rng, days_back_min=0, days_back_max=365)
@@ -134,11 +226,12 @@ def _hazard_doc(rng: SeededRandom, profile: dict, index: int) -> dict:
     custodian = _custodian(tenant_id, index)
 
     hazard_id = generate_hazard_id(tenant_id, taxonomy, year, index + 1)
+    title_pool = hazard_titles_for_tenant(tenant_id, HAZARD_TITLES)
 
     doc = {
         "tenant_id": tenant_id,
         "hazard_id": hazard_id,
-        "title": rng.choice(HAZARD_TITLES),
+        "title": rng.choice(title_pool),
         "description": rng.choice(HAZARD_DESCRIPTIONS),
         "source": rng.choice(SOURCES),
         "occurrence_type": category,
@@ -171,7 +264,13 @@ def _hazard_doc(rng: SeededRandom, profile: dict, index: int) -> dict:
 def _can_doc(rng: SeededRandom, profile: dict, index: int, hazard_doc_id: str, hazard_id: str) -> dict:
     tenant_id = profile["id"]
     issued_at = generate_timestamp(rng, days_back_min=0, days_back_max=200)
-    custodian = _custodian(tenant_id, index + 1)
+    assigned = _postholder(tenant_id, index)
+
+    # Realistic baseline 5x5 SRA: severity C/D (2-4), probability 2-5.
+    severity = rng.randint(2, 4)
+    probability = rng.randint(2, 5)
+    initial_sra = _sra_doc(severity, probability, CAN_ISSUED_BY, issued_at)
+
     return {
         "can_reference": f"CAN-{index + 1:03d}",
         "hazard_id": hazard_id,
@@ -180,16 +279,25 @@ def _can_doc(rng: SeededRandom, profile: dict, index: int, hazard_doc_id: str, h
         "description": f"Seeded corrective action requirement {index + 1} for {profile['name']}.",
         "required_action": rng.choice(REQUIRED_ACTIONS),
         "target_completion_date": (issued_at + timedelta(days=rng.randint(14, 60))).date().isoformat(),
-        "assigned_to": custodian["assigned_to"],
-        "assigned_to_uid": custodian["assigned_to_uid"],
-        "department": custodian["department"],
+        "assigned_to": assigned["postholder"],
+        "assigned_to_uid": assigned["uid"],
+        "department": assigned["department"],
+        "addressed_function": assigned["postholder"],
+        "requested_function": "Safety Management (SMS)",
+        "copies_to": f"safety@{CREDENTIAL_EMAIL_DOMAINS.get(tenant_id, tenant_id + '.com')}",
         "priority": rng.choice(["High", "Medium", "Low"]),
         "status": rng.choice(CAN_STATUSES),
-        "issued_by": "seed.runner",
-        "issued_by_uid": "seed-runner-001",
+        "issued_by": CAN_ISSUED_BY,
+        "issued_by_uid": f"safety-{tenant_id}-001",
         "issued_at": issued_at,
         "tenant_id": tenant_id,
-        "created_by": "seed.runner",
+        "initial_severity": initial_sra["severity"],
+        "initial_probability": initial_sra["probability"],
+        "initial_risk_index": initial_sra["risk_index"],
+        "initial_risk_level": initial_sra["risk_level"],
+        "initial_risk_outcome": initial_sra["risk_outcome"],
+        "initial_sra": initial_sra,
+        "created_by": CAN_ISSUED_BY,
         "created_at": issued_at,
         "updated_at": issued_at,
         "seed_version": SEED_VERSION,
@@ -197,8 +305,19 @@ def _can_doc(rng: SeededRandom, profile: dict, index: int, hazard_doc_id: str, h
     }
 
 
-def _cap_doc(rng: SeededRandom, can_reference: str, can_doc_id: str, index: int, department: str) -> dict:
+def _cap_doc(rng: SeededRandom, can_reference: str, can_doc_id: str, index: int, department: str, submitted_by: dict, fishbone: dict) -> dict:
     submitted_at = generate_timestamp(rng, days_back_min=0, days_back_max=60)
+    residual_severity = rng.randint(1, 3)
+    residual_probability = rng.randint(1, 2)
+    residual_sra = _sra_doc(residual_severity, residual_probability, CAN_ISSUED_BY, submitted_at)
+
+    # Realistic action-item milestones (staggered 14-90 days from submission),
+    # keeping the 1:1 linkage to each Fishbone root cause.
+    action_items = []
+    for ai in fishbone["action_items"]:
+        milestone = (submitted_at + timedelta(days=rng.randint(14, 90))).date().isoformat()
+        action_items.append({**ai, "target_date": milestone})
+
     return {
         "cap_reference": f"{can_reference}-CAP-{index + 1:03d}",
         "can_id": can_doc_id,
@@ -209,11 +328,22 @@ def _cap_doc(rng: SeededRandom, can_reference: str, can_doc_id: str, index: int,
         "implementation_plan": "Phase the work, verify effectiveness, and close out.",
         "target_completion_date": (submitted_at + timedelta(days=rng.randint(30, 90))).date().isoformat(),
         "status": rng.choice(CAP_STATUSES),
-        "submitted_by": "seed.runner",
-        "submitted_by_uid": "seed-runner-001",
+        "submitted_by": submitted_by["postholder"],
+        "submitted_by_uid": submitted_by["uid"],
         "submitted_at": submitted_at,
         "created_at": submitted_at,
         "updated_at": submitted_at,
+        # Structured RCA (Fishbone / Ishikawa 5M + Management)
+        "root_causes": fishbone["root_causes"],
+        "action_items": action_items,
+        "process_owner": submitted_by["postholder"],
+        # Residual 5x5 SRA after mitigation
+        "residual_severity": residual_sra["severity"],
+        "residual_probability": residual_sra["probability"],
+        "residual_risk_index": residual_sra["risk_index"],
+        "residual_risk_level": residual_sra["risk_level"],
+        "residual_risk_outcome": residual_sra["risk_outcome"],
+        "residual_sra": residual_sra,
         "seed_version": SEED_VERSION,
         "seed_creator": "seed.runner",
     }
@@ -273,12 +403,18 @@ def create_all_hazard_can_data(db, tenant_ids=None) -> dict:
             cap_count = _caps_per_can(base_seed, i)
             for k in range(cap_count):
                 rng.seed(seed + 9000 + i * 10 + k)
+                fishbone = _fishbone_doc(rng, seed + 9500 + i * 10 + k, i, can_doc["assigned_to"])
                 cap_doc = _cap_doc(
                     rng,
                     can_doc["can_reference"],
                     can_doc_id,
                     k,
                     can_doc["department"],
+                    submitted_by={
+                        "postholder": can_doc["assigned_to"],
+                        "uid": can_doc["assigned_to_uid"],
+                    },
+                    fishbone=fishbone,
                 )
                 cap_doc_id = _make_id("cap", tenant_id, i * 10 + k)
                 tenant_ref.collection("can_cap").document(can_doc_id).collection("caps").document(cap_doc_id).set(cap_doc)

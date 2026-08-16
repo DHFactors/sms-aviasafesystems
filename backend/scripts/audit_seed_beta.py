@@ -76,6 +76,7 @@ def main():
         vsrs = [d.to_dict() for d in sub["reports"] if (d.to_dict() or {}).get("report_type") == "voluntary"]
         anon = [r for r in vsrs if r.get("is_anonymous")]
         anon_rate = (len(anon) / len(sub["reports"])) if sub["reports"] else 0.0
+        vsr_anon_rate = (len(anon) / len(vsrs)) if vsrs else 0.0
         cans = [d.to_dict() for d in sub["can_cap"] if "can_reference" in (d.to_dict() or {})]
         caps = []
         for d in sub["can_cap"]:
@@ -85,7 +86,7 @@ def main():
         exp_total = p["vsr_count"] + p["mor_count"]
         print(f"  -- {tid}: total={len(sub['reports'])} "
               f"VSR={len(vsrs)} MOR={len(mors)} anonVSR={len(anon)} "
-              f"anonRate={anon_rate:.0%} hazards={len(sub['hazards'])} "
+              f"vsrAnon={vsr_anon_rate:.0%} hazards={len(sub['hazards'])} "
               f"CANs={len(cans)} CAPs={len(caps)} "
               f"surveys={len(sub['surveys'])} responses={len(sub['responses'])}")
         check(len(sub["reports"]) == exp_total,
@@ -95,7 +96,9 @@ def main():
               f"got {len(mors)} vs {p['mor_count']}")
         check(len(vsrs) == p["vsr_count"], f"{tid}: VSR count",
               f"got {len(vsrs)} vs {p['vsr_count']}")
-        check(anon_rate > 0, f"{tid}: Anon Rate non-zero", f"rate={anon_rate:.0%}")
+        # Strict 90:10 anonymity ratio on VSRs (10% named personas).
+        check(0.80 <= vsr_anon_rate <= 1.0, f"{tid}: VSR anon rate ~90%",
+              f"rate={vsr_anon_rate:.0%} (target ~90%)")
         check(len(sub["hazards"]) == p["hazard_count"], f"{tid}: hazard count",
               f"got {len(sub['hazards'])} vs {p['hazard_count']}")
         check(len(cans) == p["can_count"], f"{tid}: CAN count",
@@ -121,9 +124,64 @@ def main():
         check("Part-145" in haz_deps and "CAMO" in haz_deps
               and "Flight Operations" in haz_deps and "Safety" in haz_deps,
               f"{tid}: hazards cover all 4 departments", f"{haz_deps}")
-        check("Part-145" in can_deps and "CAMO" in can_deps
-              and "Flight Operations" in can_deps and "Safety" in can_deps,
-              f"{tid}: CANs cover all 4 departments", f"{can_deps}")
+        postholder_deps = {"Flight Operations", "CAMO / Engineering",
+                           "Ground Operations", "Cabin Services"}
+        check(postholder_deps.issubset(can_deps),
+              f"{tid}: CANs cover all 4 postholder departments", f"{can_deps}")
+
+    print("\n== Operational profiles (tenants/{tid}/profile) ==")
+    from seed.tenant_profiles import (
+        TENANT_OPERATIONAL_PROFILES,
+        get_aircraft_fleet,
+        get_authorized_destinations,
+        vsr_occurrence_types_for_tenant,
+        mor_occurrence_types_for_tenant,
+        hazard_titles_for_tenant,
+    )
+
+    for tid, profile in TENANT_OPERATIONAL_PROFILES.items():
+        doc_ref = (db.collection("tenants").document(tid)
+                   .collection("profile").document("operational"))
+        stored = doc_ref.get()
+        check(stored.exists, f"{tid}: profile doc stored under tenants/{tid}/profile")
+        if not stored.exists:
+            continue
+        data = stored.to_dict() or {}
+        check(data.get("category") == profile.category, f"{tid}: profile category",
+              f"{data.get('category')}")
+        check(data.get("fleet"), f"{tid}: profile fleet", f"{data.get('fleet')}")
+        check(data.get("authorized_destinations"),
+              f"{tid}: profile authorized_destinations",
+              f"{data.get('authorized_destinations')}")
+
+        # Fleet match: every seeded VSR/MOR aircraft_type comes from the fleet.
+        fleet = set(get_aircraft_fleet(tid))
+        for d in db.collection("tenants").document(tid).collection("reports").stream():
+            data = d.to_dict() or {}
+            ac_type = data.get("aircraft_type")
+            if ac_type is not None:
+                check(ac_type in fleet, f"{tid}: report aircraft in fleet", ac_type)
+
+        # Location match: every seeded report location is authorized.
+        authorized = set(get_authorized_destinations(tid))
+        for d in db.collection("tenants").document(tid).collection("reports").stream():
+            data = d.to_dict() or {}
+            check(data.get("location") in authorized, f"{tid}: report location authorized",
+                  f"{data.get('location')}")
+
+        # Occurrence realism: report occurrence types + hazard titles in-domain.
+        vsr_allowed = set(vsr_occurrence_types_for_tenant(tid, []))
+        mor_allowed = set(mor_occurrence_types_for_tenant(tid, []))
+        haz_allowed = set(hazard_titles_for_tenant(tid, []))
+        for d in db.collection("tenants").document(tid).collection("reports").stream():
+            data = d.to_dict() or {}
+            pool = vsr_allowed if data.get("report_type") == "voluntary" else mor_allowed
+            check(data.get("occurrence_type") in pool, f"{tid}: occurrence type in-domain",
+                  f"{data.get('occurrence_type')}")
+        for d in db.collection("tenants").document(tid).collection("hazards").stream():
+            data = d.to_dict() or {}
+            check(data.get("title") in haz_allowed, f"{tid}: hazard title in-domain",
+                  f"{data.get('title')}")
 
     print("\n== Role accounts ==")
     auth = __import__("app.firebase", fromlist=["get_auth"]).get_auth()
@@ -148,6 +206,8 @@ def main():
     print("\n== Aggregate Anon Rate ==")
     all_reports = []
     all_anon = 0
+    all_vsrs = 0
+    anon_vsrs = 0
     for p in OPERATOR_PROFILES:
         tid = p["id"]
         for d in db.collection("tenants").document(tid).collection("reports").stream():
@@ -155,10 +215,19 @@ def main():
             all_reports.append(data)
             if data.get("is_anonymous"):
                 all_anon += 1
+            if data.get("report_type") == "voluntary":
+                all_vsrs += 1
+                if data.get("is_anonymous"):
+                    anon_vsrs += 1
     overall = all_anon / len(all_reports) if all_reports else 0.0
+    vsr_overall = anon_vsrs / all_vsrs if all_vsrs else 0.0
     print(f"  overall: anon={all_anon}/{len(all_reports)} rate={overall:.0%}")
-    check(0.15 <= overall <= 0.35, "overall Anon Rate in ~22% band",
-          f"rate={overall:.0%} (target ~22%)")
+    print(f"  VSR-only: anon={anon_vsrs}/{all_vsrs} rate={vsr_overall:.0%}")
+    # Strict 90:10 VSR anonymity ratio (~63% overall once MORs are included).
+    check(0.80 <= vsr_overall <= 1.0, "VSR Anon Rate ~90%",
+          f"rate={vsr_overall:.0%} (target ~90%)")
+    check(overall > 0.40, "overall Anon Rate reflects 90:10 VSR ratio",
+          f"rate={overall:.0%} (expect ~63%)")
 
     print(f"\n{'FAILURES' if failures else 'ALL CHECKS PASSED'}: {failures}")
     sys.exit(1 if failures else 0)

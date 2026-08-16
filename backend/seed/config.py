@@ -90,7 +90,7 @@ SURVEY_DEPARTMENTS = [
 #
 # Seeding rules - randomized realistic volumes per provider:
 #   vsr_count + mor_count in [25, 40] with ~70% VSR / 30% MOR
-#   anonymous_rate in [0.25, 0.35] -> ~22% overall Anon Rate (VSR-only)
+#   strict 90:10 VSR anonymity ratio -> ~63% overall Anon Rate
 #   survey_count in [15, 25]
 #   flight_diversion_count = 10 for airline + helicopter-operator,
 #                            0 for mro / aerodrome / ground-handling
@@ -854,6 +854,104 @@ MOR_NARRATIVE_KEYWORDS = {
 }
 
 INVESTIGATION_STATUSES = ["NOT_INVESTIGATED", "INVESTIGATING", "INVESTIGATED", "CLOSED"]
+
+# ============================================================================
+# Operational personas (2026) — authentic aviation reporting identities
+# ============================================================================
+
+# Strict 90:10 VSR anonymity ratio: 90% of generated VSRs are anonymous
+# (originator_name "Anonymous (Confidential VSR)", is_anonymous=True,
+# contact_details=None); the remaining 10% are named operational personas.
+VSR_ANONYMOUS_RATIO = 0.90
+VSR_ANONYMOUS_LABEL = "Anonymous (Confidential VSR)"
+
+# Named VSR originators (each with its operational department). Contact details
+# are optional and generated per-report.
+VSR_ORIGINATOR_PERSONAS = [
+    {"name": "Capt. A. Sharma (Line Captain)", "department": "Flight Operations"},
+    {"name": "F/O R. Thapa (First Officer)", "department": "Flight Operations"},
+    {"name": "S. Shrestha (Ramp / Turnaround Supervisor)", "department": "Ground Operations"},
+    {"name": "K. Gurung (Lead Cabin Crew)", "department": "Cabin Services"},
+]
+
+# Mandatory Occurrence Report (MOR) originators — routed exclusively through
+# technical and compliance authorities.
+MOR_ORIGINATOR_AUTHORITIES = [
+    "Quality Assurance (QA) Department",
+    "CAMO Technical Services (Airworthiness)",
+]
+
+PERSONA_ORGANISATIONS = {
+    "buddha-air": "Buddha Air",
+    "air-dynasty": "Air Dynasty Heli Services",
+    "ktm-mro": "Kathmandu MRO Services",
+    "pokhara-aerodrome": "Pokhara Regional Aerodrome",
+    "himalaya-ground-services": "Himalaya Ground Handling",
+    "yeti-airlines": "Yeti Airlines",
+    "summit-air": "Summit Air",
+    "sita-air": "Sita Air",
+    "simrik-air": "Simrik Air",
+    "tara-air": "Tara Air",
+}
+
+# CAN issuance authority (Corporate Safety).
+CAN_ISSUED_BY = "Corporate Safety Manager (Safety Department)"
+
+# Authentic operational postholders a CAN may be addressed to, as
+# (postholder, department) tuples. Rotated across CANs so every postholder is
+# represented; also drives the CAP `submitted_by` attribution.
+CAN_ASSIGNED_POSTHOLDERS = [
+    ("Head of Flight Operations", "Flight Operations"),
+    ("Head of Maintenance / CAMO", "CAMO / Engineering"),
+    ("Ground Operations Manager", "Ground Operations"),
+    ("Cabin Safety Manager", "Cabin Services"),
+]
+
+# Fishbone (Ishikawa 5M + Management) categories and their demo root causes.
+FISHBONE_CATEGORIES = ["Man", "Machine", "Method", "Medium", "Management", "Material"]
+
+FISHBONE_ROOT_CAUSE_POOL = {
+    "Man": [
+        "Inadequate crew familiarity with the amended procedure",
+        "Fatigue-related attention lapse during night duty",
+        "Recurring skill gap on the specific task type",
+    ],
+    "Machine": [
+        "Degraded hydraulic component nearing overhaul limit",
+        "Sensor / indicating system drift outside tolerance",
+        "Aging component with intermittent uncommanded behaviour",
+    ],
+    "Method": [
+        "Task card does not capture the required inspection step",
+        "Outdated SOP inconsistent with the current revision",
+        "Missing verification step in the sign-off process",
+    ],
+    "Medium": [
+        "Poor apron lighting during low-visibility turnaround",
+        "Uncontrolled weather exposure during ramp operations",
+        "Cluttered / congested work environment at the stand",
+    ],
+    "Management": [
+        "Insufficient supervisory oversight of the shift",
+        "Inadequate resourcing of the maintenance line",
+        "Safety requirements not prioritised under schedule pressure",
+    ],
+    "Material": [
+        "Substandard spare part installed on a prior visit",
+        "Incorrect lubricant grade used during servicing",
+        "Consumable life not tracked in the inventory system",
+    ],
+}
+
+# CAP action items are generated per root cause (1:1 via root_cause_id).
+FISHBONE_ACTION_TEMPLATES = [
+    "Conduct refresher training and competency verification",
+    "Replace component and re-verify against the maintenance manual",
+    "Revise the SOP / task card and publish the amended revision",
+    "Improve the work environment controls (lighting / layout)",
+    "Reinforce supervisory oversight and shift resourcing",
+    "Review the materials / parts traceability process",
+]
 
 DEMO_USERS = [
     {

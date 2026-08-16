@@ -79,6 +79,10 @@ def create_tenant(db, profile: dict) -> dict:
     risk_matrix_config["updated_at"] = now
     risk_matrix_ref.set(risk_matrix_config, merge=True)
 
+    from seed.tenant_profiles import write_tenant_profiles
+
+    write_tenant_profiles(db, [tenant_id])
+
     return tenant_id
 
 
