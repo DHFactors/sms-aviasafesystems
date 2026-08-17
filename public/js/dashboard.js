@@ -65,6 +65,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         role: session.role,
         department: (session.claims && session.claims.department) || ''
     });
+
+    // Tenant + department context placeholders (subdomain / demo resolution +
+    // email-prefix department mapping) when the resolver modules are loaded.
+    if (typeof applyDepartmentContext === 'function') {
+        applyDepartmentContext(session.email || '');
+    }
     if (typeof window.updateShellTenant === 'function') {
         window.updateShellTenant(tenantName, subtitle);
     }

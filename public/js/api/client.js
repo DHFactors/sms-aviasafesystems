@@ -50,8 +50,28 @@ const ApiClient = {
 
     _getTenantId: async () => {
         try {
+            // Prefer the active tenant slug resolved from the subdomain / demo
+            // context (single source of truth), then fall back to the session
+            // tenant claim for signed-in users whose subdomain is absent.
+            if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
+                const active = TenantResolver.getCurrentTenant();
+                if (active) return active;
+            }
             const session = await getCurrentUser();
             return (session && session.tenantId) || null;
+        } catch {
+            return null;
+        }
+    },
+
+    _getUserDepartment: async () => {
+        try {
+            const session = await getCurrentUser();
+            const email = (session && session.email) || '';
+            if (email && typeof resolveDepartmentFromEmail === 'function') {
+                return resolveDepartmentFromEmail(email);
+            }
+            return null;
         } catch {
             return null;
         }
@@ -60,7 +80,10 @@ const ApiClient = {
     _request: async (method, path, body) => {
         const token = await ApiClient._getToken();
         if (!token) return null;
-        const tenantId = await ApiClient._getTenantId();
+        const [tenantId, department] = await Promise.all([
+            ApiClient._getTenantId(),
+            ApiClient._getUserDepartment(),
+        ]);
 
         const url = `${ApiClient._baseUrl()}${path}`;
         const opts = {
@@ -69,6 +92,7 @@ const ApiClient = {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
                 ...(tenantId ? { 'X-Tenant-Id': tenantId } : {}),
+                ...(department ? { 'X-User-Department': department } : {}),
             },
         };
         if (body && method !== 'GET') {

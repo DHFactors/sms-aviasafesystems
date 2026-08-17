@@ -139,6 +139,18 @@ AUTHOR: AviaSAFE Systems
             <span id="tenantDisplay">Loading...</span>
         </div>
 
+        <div id="demoPersonaSection" class="demo-persona" style="display:none;">
+            <label for="demoPersonaSelect" style="font-size: var(--font-size-sm); font-weight: 600; display: block; margin-bottom: var(--spacing-xs);">
+                <i class="fas fa-flask"></i> Demo Persona
+            </label>
+            <select id="demoPersonaSelect" class="form-control" onchange="onDemoPersonaChange(this.value)">
+                <option value="">— Select a demo persona —</option>
+            </select>
+            <p style="font-size: var(--font-size-xs); color: var(--color-gray-600); margin-top: var(--spacing-sm);">
+                Choose a demo persona to scope this login to its tenant &amp; department.
+            </p>
+        </div>
+
         <form id="loginForm" autocomplete="off">
             <div class="form-group">
                 <label for="email">Email Address</label>
@@ -191,6 +203,8 @@ AUTHOR: AviaSAFE Systems
 
 <!-- ===== SHARED FIREBASE CONFIG ===== -->
 <script src="/js/firebase.js"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
 
 <!-- ===== LOGIN LOGIC ===== -->
 <script>
@@ -246,6 +260,9 @@ async function signIn(email, password) {
 // ============================================================================
 
 function getTenantFromSubdomain() {
+    if (typeof TenantResolver !== 'undefined' && TenantResolver.getTenantFromSubdomain) {
+        return TenantResolver.getTenantFromSubdomain();
+    }
     var hostname = window.location.hostname;
     var parts = hostname.split('.');
     
@@ -257,6 +274,58 @@ function getTenantFromSubdomain() {
         }
     }
     return null;
+}
+
+// ============================================================================
+// DEMO PERSONA SELECTOR — beta/demo hosts only; hidden on production subdomains
+// ============================================================================
+
+function renderDemoPersonaSelector() {
+    var section = document.getElementById('demoPersonaSection');
+    var select = document.getElementById('demoPersonaSelect');
+    if (!section || !select) return;
+
+    var isDemo = (typeof TenantResolver !== 'undefined') && TenantResolver.isDemoEnvironment();
+    if (!isDemo) {
+        // Production tenant subdomains are strictly scoped — never show switching.
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    var personas = (TenantResolver.DEMO_PERSONAS || []);
+    select.innerHTML = '<option value="">— Select a demo persona —</option>' +
+        personas.map(function (p) {
+            return '<option value="' + p.tenant + '">' + p.label + '</option>';
+        }).join('');
+
+    var current = TenantResolver.getCurrentTenant();
+    var active = personas.filter(function (p) { return p.tenant === current; })[0];
+    if (active) select.value = active.tenant;
+}
+
+function onDemoPersonaChange(value) {
+    if (!value) return;
+    if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
+        TenantResolver.setDemoTenant(value);
+        updateTenantDisplay();
+    }
+}
+
+async function updateTenantDisplay() {
+    var displayEl = document.getElementById('tenantDisplay');
+    if (!displayEl) return;
+    if (typeof TenantResolver === 'undefined') {
+        displayEl.textContent = 'Unknown';
+        return;
+    }
+    var tenantId = TenantResolver.getCurrentTenant();
+    if (!tenantId) {
+        displayEl.textContent = 'AviaSAFE Platform';
+        return;
+    }
+    var title = await TenantResolver.resolveTenantTitle(tenantId);
+    displayEl.textContent = title || tenantId;
 }
 
 // ============================================================================
@@ -335,16 +404,9 @@ function onAuthStateChanged(user) {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', async function() {
-    // Resolve tenant display
-    var tenantId = getTenantFromSubdomain();
-    var displayName = tenantId ? tenantId.charAt(0).toUpperCase() + tenantId.slice(1) + ' Air' : 'Unknown';
-    document.getElementById('tenantDisplay').textContent = displayName;
-    
-    if (tenantId === 'caan') {
-        document.getElementById('tenantDisplay').textContent = 'CAAN SMD Regulator';
-    } else if (tenantId === 'admin') {
-        document.getElementById('tenantDisplay').textContent = 'System Administration';
-    }
+    // Demo persona selector (beta/demo hosts only) + tenant display resolution
+    renderDemoPersonaSelector();
+    await updateTenantDisplay();
     
     // Wait for Firebase SDK to be ready, then register persistent listener
     await waitForFirebase();

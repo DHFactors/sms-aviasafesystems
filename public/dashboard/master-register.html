@@ -134,6 +134,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
 <script src="/js/api/client.js"></script>
 <script>
 let currentUser = null;
@@ -147,6 +149,9 @@ firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
+    if (typeof applyDepartmentContext === 'function') {
+        applyDepartmentContext(user.email);
+    }
     const heroTitle = document.getElementById('dashHeroTitle');
     const heroUser = document.getElementById('dashHeroUser');
     if (heroTitle || heroUser) {
