@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ── CORS ──
-    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000"
+    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000"
 
     # ── Firebase ──
     FIREBASE_PROJECT_ID: Optional[str] = None
@@ -122,6 +122,12 @@ class Settings(BaseSettings):
     # When True (default), data-destructive endpoints (/seed-demo-data,
     # /create-seed-users) return 404. Disable only in non-production environments.
     DISABLE_DESTRUCTIVE_ENDPOINTS: bool = True
+
+    # ── Self-service onboarding ──
+    # Access key required for public tenant registration on the beta portal.
+    # A blank / missing field on the form falls back to this default; a
+    # provided key must match exactly.
+    BETA_ACCESS_KEY: str = "AVIASAFE-BETA-2026"
 
     # ── Tenant credentials / welcome email ──
     # Provider: none (log + preview only), smtp, or sendgrid.

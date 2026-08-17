@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Your Organization | AviaSAFE SMS</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/tenant-overrides.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <style>
+        .register-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+        .register-container {
+            max-width: 560px;
+            width: 100%;
+            padding: var(--spacing-2xl);
+        }
+        .register-container .logo {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+        }
+        .register-container .logo i { font-size: 3rem; }
+        .register-container .logo h1 { margin-bottom: var(--spacing-xs); }
+        .form-group .form-control {
+            width: 100%;
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            font-size: var(--font-size-base);
+        }
+        .btn-register {
+            width: 100%;
+            padding: var(--spacing-md);
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .error-message {
+            font-size: var(--font-size-sm);
+            margin-top: var(--spacing-md);
+            display: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-sm);
+        }
+        .success-box {
+            display: none;
+            padding: var(--spacing-lg);
+            border-radius: var(--border-radius-md);
+            margin-top: var(--spacing-lg);
+        }
+        .success-box .invite-code {
+            font-family: monospace;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+        }
+        .form-hint {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray-600);
+            margin-top: var(--spacing-xs);
+        }
+        .footer-links {
+            text-align: center;
+            margin-top: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+        }
+    </style>
+</head>
+<body>
+
+<div class="register-page">
+    <div class="register-container">
+        <div class="logo">
+            <i class="fas fa-shield-alt"></i>
+            <h1>AviaSAFE</h1>
+            <p>Register your organization for beta access</p>
+        </div>
+
+        <div id="registerFormWrap">
+            <form id="registerForm" autocomplete="off" novalidate>
+                <div class="form-group">
+                    <label for="organizationName">Organization Name</label>
+                    <input type="text" id="organizationName" class="form-control"
+                           placeholder="e.g. Summit Air, Yeti Airlines, Simrik Heli" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="classification">Operator Classification</label>
+                    <select id="classification" class="form-control" required>
+                        <option value="">— Select a classification —</option>
+                        <option value="AIRLINE_FIXED_WING">Fixed-Wing Airline</option>
+                        <option value="AIRLINE_ROTARY">Helicopter / Rotary Operator</option>
+                        <option value="AMO">Part-145 Maintenance Organization</option>
+                        <option value="AERODROME">Certified Airport / Aerodrome</option>
+                    </select>
+                    <p class="form-hint">Determines flight-operation scope and the departments your team can hold.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="adminFullName">Primary Administrator — Full Name</label>
+                    <input type="text" id="adminFullName" class="form-control"
+                           placeholder="e.g. Captain Anil Shrestha" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="adminTitle">Primary Administrator — Title</label>
+                    <input type="text" id="adminTitle" class="form-control"
+                           placeholder="e.g. Safety Manager / Accountable Executive" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Official Email</label>
+                    <input type="email" id="email" class="form-control"
+                           placeholder="safety@yourorganization.com" required>
+                    <p class="form-hint">Becomes your organization's initial safety / administrator login.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" class="form-control"
+                           placeholder="At least 8 characters" minlength="8" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" class="form-control"
+                           placeholder="Repeat your password" minlength="8" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="betaAccessKey">Beta Access Key <span style="font-weight:400;color:var(--color-gray-600);">(optional)</span></label>
+                    <input type="text" id="betaAccessKey" class="form-control"
+                           placeholder="AVIASAFE-BETA-2026">
+                    <p class="form-hint">Leave blank to use the default beta access key.</p>
+                </div>
+
+                <div id="errorMessage" class="error-message"></div>
+
+                <button type="submit" class="btn-register btn-primary" id="registerBtn">
+                    <i class="fas fa-rocket"></i> Register Organization
+                </button>
+            </form>
+        </div>
+
+        <div class="success-box" id="successBox">
+            <h3><i class="fas fa-check-circle"></i> Organization Registered</h3>
+            <p id="successMessage"></p>
+            <div style="margin-top: var(--spacing-md);">
+                <p><strong>Tenant ID:</strong> <code id="successTenantId"></code></p>
+                <p style="margin-top: var(--spacing-xs);"><strong>Team Invite Code:</strong>
+                    <span class="invite-code" id="successInviteCode"></span></p>
+            </div>
+            <p style="font-size: var(--font-size-sm); color: var(--color-gray-600); margin-top: var(--spacing-md);">
+                Share the invite code with department postholders (Flight Ops, CAMO, Part-145, QA, Airside) so they can
+                join your team. Sign in with your administrator email to access the full dashboard.
+            </p>
+            <div style="display:flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);">
+                <a class="btn btn-primary" id="goToJoin" href="#">
+                    <i class="fas fa-users"></i> Continue to Team Onboarding
+                </a>
+                <a class="btn btn-outline" href="/login.html"><i class="fas fa-sign-in-alt"></i> Go to Login</a>
+            </div>
+        </div>
+
+        <div class="footer-links">
+            <a href="/">← Back to Home</a>
+            <span class="footer-divider">|</span>
+            <a href="/login.html">Login</a>
+            <span class="footer-divider">|</span>
+            <a href="/privacy.html">Privacy Policy</a>
+            <span class="footer-divider">|</span>
+            <a href="/terms.html">Terms of Service</a>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// SELF-SERVICE TENANT REGISTRATION — POSTs to /api/v1/auth/register-tenant.
+// No Firebase SDK needed: the backend provisions the Auth user via Admin SDK.
+// ============================================================================
+
+function getApiBaseUrl() {
+    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
+    var host = window.location.hostname;
+    var isBeta = host.indexOf('beta') !== -1 ||
+        host === 'sms.aviasafesystems.com' ||
+        host === 'www.sms.aviasafesystems.com' ||
+        host === 'localhost' || host === '127.0.0.1';
+    return isBeta
+        ? 'https://sms-aviasafesystems-beta.onrender.com'
+        : 'https://aviasafe-unified-platform.onrender.com';
+}
+
+function showError(message) {
+    var el = document.getElementById('errorMessage');
+    el.textContent = message;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideError() {
+    document.getElementById('errorMessage').style.display = 'none';
+}
+
+// When embedded in the login-page modal, hide the standalone footer.
+if (window.self !== window.top) {
+    var footerEl = document.querySelector('.footer-links');
+    if (footerEl) footerEl.style.display = 'none';
+}
+
+document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+
+    var organizationName = document.getElementById('organizationName').value.trim();
+    var classification = document.getElementById('classification').value;
+    var adminFullName = document.getElementById('adminFullName').value.trim();
+    var adminTitle = document.getElementById('adminTitle').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    var confirmPassword = document.getElementById('confirmPassword').value;
+    var betaAccessKey = document.getElementById('betaAccessKey').value.trim();
+
+    if (!organizationName || !classification || !adminFullName || !adminTitle || !email || !password) {
+        showError('Please complete all required fields.');
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('Please enter a valid email address.');
+        return;
+    }
+    if (password.length < 8) {
+        showError('Password must be at least 8 characters.');
+        return;
+    }
+    if (password !== confirmPassword) {
+        showError('Passwords do not match.');
+        return;
+    }
+
+    var btn = document.getElementById('registerBtn');
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Registering…';
+
+    try {
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/register-tenant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                organization_name: organizationName,
+                classification: classification,
+                admin_full_name: adminFullName,
+                admin_title: adminTitle,
+                email: email,
+                password: password,
+                confirm_password: confirmPassword,
+                beta_access_key: betaAccessKey
+            })
+        });
+        var data = await resp.json().catch(function () { return {}; });
+
+        if (resp.ok && data.success) {
+            document.getElementById('successMessage').textContent =
+                'Your organization "' + (data.tenant_name || organizationName) + '" is ready on AviaSAFE SMS.';
+            document.getElementById('successTenantId').textContent = data.tenant_id;
+            document.getElementById('successInviteCode').textContent = data.team_invite_code;
+            document.getElementById('goToJoin').href = '/join.html?tenant=' +
+                encodeURIComponent(data.tenant_id) + '&code=' + encodeURIComponent(data.team_invite_code);
+            document.getElementById('registerFormWrap').style.display = 'none';
+            document.getElementById('successBox').style.display = 'block';
+            document.getElementById('successBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            showError((data && data.detail) || 'Registration failed. Please check the beta access key and try again.');
+        }
+    } catch (err) {
+        showError('Network error — could not reach the server. Please try again later.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+});
+</script>
+
+</body>
+</html>

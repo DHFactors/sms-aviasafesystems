@@ -22,6 +22,14 @@
       ],
       "rewrites": [
         {
+          "source": "/register.html",
+          "destination": "/register.html"
+        },
+        {
+          "source": "/join.html",
+          "destination": "/join.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }
@@ -42,6 +50,15 @@
             {
               "key": "Cache-Control",
               "value": "public, max-age=86400, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/register.html",
+          "headers": [
+            {
+              "key": "X-Frame-Options",
+              "value": "SAMEORIGIN"
             }
           ]
         },
@@ -78,6 +95,14 @@
       ],
       "rewrites": [
         {
+          "source": "/register.html",
+          "destination": "/register.html"
+        },
+        {
+          "source": "/join.html",
+          "destination": "/join.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }
@@ -98,6 +123,15 @@
             {
               "key": "Cache-Control",
               "value": "public, max-age=86400, immutable"
+            }
+          ]
+        },
+        {
+          "source": "/register.html",
+          "headers": [
+            {
+              "key": "X-Frame-Options",
+              "value": "SAMEORIGIN"
             }
           ]
         },

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Your Team | AviaSAFE SMS</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/tenant-overrides.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <style>
+        .join-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+        .join-container {
+            max-width: 520px;
+            width: 100%;
+            padding: var(--spacing-2xl);
+        }
+        .join-container .logo {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+        }
+        .join-container .logo i { font-size: 3rem; }
+        .join-container .logo h1 { margin-bottom: var(--spacing-xs); }
+        .form-group .form-control {
+            width: 100%;
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            font-size: var(--font-size-base);
+        }
+        .btn-join {
+            width: 100%;
+            padding: var(--spacing-md);
+            font-size: var(--font-size-base);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .error-message {
+            font-size: var(--font-size-sm);
+            margin-top: var(--spacing-md);
+            display: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-sm);
+        }
+        .tenant-banner {
+            display: none;
+            padding: var(--spacing-md);
+            border-radius: var(--border-radius-md);
+            margin-bottom: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+        }
+        .tenant-banner i { margin-right: var(--spacing-sm); }
+        .form-hint {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray-600);
+            margin-top: var(--spacing-xs);
+        }
+        .footer-links {
+            text-align: center;
+            margin-top: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+        }
+    </style>
+</head>
+<body>
+
+<div class="join-page">
+    <div class="join-container">
+        <div class="logo">
+            <i class="fas fa-users"></i>
+            <h1>AviaSAFE</h1>
+            <p>Join your organization's safety team</p>
+        </div>
+
+        <div class="tenant-banner" id="tenantBanner">
+            <i class="fas fa-building"></i>
+            <span id="tenantBannerText">Loading organization…</span>
+        </div>
+
+        <div id="joinFormWrap">
+            <form id="joinForm" autocomplete="off" novalidate>
+                <div class="form-group">
+                    <label for="inviteCode">Team Invite Code</label>
+                    <input type="text" id="inviteCode" class="form-control"
+                           placeholder="e.g. A7K2M9" maxlength="6" required>
+                    <p class="form-hint">Provided by your organization's administrator, or use the shared link.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" class="form-control"
+                           placeholder="e.g. Rajesh Thapa" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" class="form-control"
+                           placeholder="you@yourorganization.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">Department</label>
+                    <select id="department" class="form-control" disabled required>
+                        <option value="">— Enter the invite code to load departments —</option>
+                    </select>
+                    <p class="form-hint">Only departments applicable to your organization's classification are shown.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" class="form-control"
+                           placeholder="At least 8 characters" minlength="8" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" class="form-control"
+                           placeholder="Repeat your password" minlength="8" required>
+                </div>
+
+                <div id="errorMessage" class="error-message"></div>
+
+                <button type="submit" class="btn-join btn-primary" id="joinBtn">
+                    <i class="fas fa-user-plus"></i> Join Team
+                </button>
+            </form>
+        </div>
+
+        <div id="joinSuccess" class="success-box" style="display:none; padding: var(--spacing-lg); border-radius: var(--border-radius-md);">
+            <h3><i class="fas fa-check-circle"></i> Welcome Aboard</h3>
+            <p id="joinSuccessMessage"></p>
+            <div style="display:flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);">
+                <a class="btn btn-primary" href="/login.html"><i class="fas fa-sign-in-alt"></i> Go to Login</a>
+            </div>
+        </div>
+
+        <div class="footer-links">
+            <a href="/">← Back to Home</a>
+            <span class="footer-divider">|</span>
+            <a href="/register.html">Register an Organization</a>
+            <span class="footer-divider">|</span>
+            <a href="/login.html">Login</a>
+            <span class="footer-divider">|</span>
+            <a href="/privacy.html">Privacy Policy</a>
+            <span class="footer-divider">|</span>
+            <a href="/terms.html">Terms of Service</a>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// TEAM ONBOARDING — resolves the tenant from the invite code (or ?tenant= id),
+// loads only its applicable departments, and POSTs /api/v1/auth/join-team.
+// ============================================================================
+
+function getApiBaseUrl() {
+    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
+    var host = window.location.hostname;
+    var isBeta = host.indexOf('beta') !== -1 ||
+        host === 'sms.aviasafesystems.com' ||
+        host === 'www.sms.aviasafesystems.com' ||
+        host === 'localhost' || host === '127.0.0.1';
+    return isBeta
+        ? 'https://sms-aviasafesystems-beta.onrender.com'
+        : 'https://aviasafe-unified-platform.onrender.com';
+}
+
+function getQueryParam(name) {
+    try {
+        return new URLSearchParams(window.location.search).get(name);
+    } catch (e) {
+        return null;
+    }
+}
+
+function showError(message) {
+    var el = document.getElementById('errorMessage');
+    el.textContent = message;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideError() {
+    document.getElementById('errorMessage').style.display = 'none';
+}
+
+function renderTenantBanner(tenantName, classification) {
+    var banner = document.getElementById('tenantBanner');
+    var text = document.getElementById('tenantBannerText');
+    banner.style.display = 'block';
+    text.textContent = tenantName ? tenantName + (classification ? ' (' + classification + ')' : '') : 'Organization';
+}
+
+// Load tenant departments for a given code / tenant id and populate the dropdown.
+async function loadDepartments(code, tenantId) {
+    var deptSelect = document.getElementById('department');
+    var inviteInput = document.getElementById('inviteCode');
+    var params = new URLSearchParams();
+    if (code) params.set('code', code.toUpperCase());
+    if (tenantId) params.set('tenant_id', tenantId);
+
+    try {
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/tenant-lookup?' + params.toString());
+        var data = await resp.json().catch(function () { return {}; });
+
+        if (!resp.ok || !data.success) {
+            deptSelect.innerHTML = '<option value="">— Invite code not found —</option>';
+            deptSelect.disabled = true;
+            renderTenantBanner(null, null);
+            return null;
+        }
+
+        renderTenantBanner(data.tenant_name, data.classification);
+        var depts = data.applicable_departments || [];
+        var options = '<option value="">— Select your department —</option>';
+        depts.forEach(function (d) {
+            options += '<option value="' + d.code + '">' + d.label + '</option>';
+        });
+        deptSelect.innerHTML = options;
+        deptSelect.disabled = depts.length === 0;
+
+        // Remember the resolved tenant for the submit step.
+        deptSelect.setAttribute('data-tenant-id', data.tenant_id);
+        deptSelect.setAttribute('data-tenant-name', data.tenant_name || '');
+        if (inviteInput && data.tenant_id && !inviteInput.value && tenantId) {
+            inviteInput.value = tenantId;
+        }
+        return data;
+    } catch (err) {
+        deptSelect.innerHTML = '<option value="">— Unable to reach server —</option>';
+        deptSelect.disabled = true;
+        return null;
+    }
+}
+
+// Auto-resolve from the shared link (e.g. /join.html?tenant=X&code=YYYYYY).
+(function initFromQuery() {
+    var code = getQueryParam('code');
+    var tenantId = getQueryParam('tenant');
+    if (code) {
+        document.getElementById('inviteCode').value = code.toUpperCase();
+        loadDepartments(code, tenantId || null);
+    } else if (tenantId) {
+        loadDepartments(null, tenantId);
+    }
+})();
+
+// Resolve departments as the invite code changes.
+var inviteDebounce = null;
+document.getElementById('inviteCode').addEventListener('input', function () {
+    hideError();
+    clearTimeout(inviteDebounce);
+    var value = this.value.trim().toUpperCase();
+    if (value.length < 4) return;
+    inviteDebounce = setTimeout(function () {
+        loadDepartments(value, null);
+    }, 400);
+});
+
+document.getElementById('joinForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+
+    var inviteCode = document.getElementById('inviteCode').value.trim().toUpperCase();
+    var fullName = document.getElementById('fullName').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var deptSelect = document.getElementById('department');
+    var department = deptSelect.value;
+    var password = document.getElementById('password').value;
+    var confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!inviteCode || !fullName || !email || !department || !password) {
+        showError('Please complete all required fields, including your department.');
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showError('Please enter a valid email address.');
+        return;
+    }
+    if (password.length < 8) {
+        showError('Password must be at least 8 characters.');
+        return;
+    }
+    if (password !== confirmPassword) {
+        showError('Passwords do not match.');
+        return;
+    }
+
+    var payload = {
+        invite_code: inviteCode,
+        full_name: fullName,
+        email: email,
+        password: password,
+        confirm_password: confirmPassword,
+        department: department
+    };
+    var tenantId = deptSelect.getAttribute('data-tenant-id');
+    if (tenantId) payload.tenant_id = tenantId;
+
+    var btn = document.getElementById('joinBtn');
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Joining…';
+
+    try {
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/join-team', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        var data = await resp.json().catch(function () { return {}; });
+
+        if (resp.ok && data.success) {
+            document.getElementById('joinSuccessMessage').textContent =
+                'You are now part of ' + (data.tenant_name || 'your organization') +
+                ' (' + (data.department_label || data.department) + '). Sign in to access your dashboard.';
+            document.getElementById('joinFormWrap').style.display = 'none';
+            document.getElementById('joinSuccess').style.display = 'block';
+            document.getElementById('joinSuccess').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            showError((data && data.detail) || 'Unable to join. Check the invite code and try again.');
+        }
+    } catch (err) {
+        showError('Network error — could not reach the server. Please try again later.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+});
+</script>
+
+</body>
+</html>

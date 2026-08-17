@@ -22,6 +22,7 @@ from app.core.config import settings
 # browser -> API calls.
 CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
+    "https://betasms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
     "https://sms-beta.web.app",
     "https://demo.aviasafesystems.com",

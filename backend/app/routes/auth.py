@@ -9,17 +9,24 @@
 # CODE OWNER: AviaSafeSystems
 # ============================================================================
 
-from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime, timezone
 
 from app.core.config import settings
-from app.firebase import get_auth, verify_firebase_token, create_custom_claims
+from app.firebase import get_auth, get_db, verify_firebase_token, create_custom_claims
 from app.middleware.rate_limit import rate_limit
 from app.middleware.auth import resolve_user_context
+from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
+from app.services.tenant_registration import (
+    DEPARTMENT_LABELS,
+    register_tenant,
+    join_team,
+    resolve_tenant,
+)
 
 router = APIRouter()
 
@@ -132,3 +139,115 @@ async def refresh_token(request: Request):
     # Client handles token refresh using Firebase SDK
     # This endpoint just returns a success response
     return {"success": True, "message": "Token refresh handled by client"}
+
+
+class RegisterTenantRequest(BaseModel):
+    organization_name: str = Field(..., min_length=2, max_length=120)
+    classification: OperationalScope
+    admin_full_name: str = Field(..., min_length=1)
+    admin_title: str = Field(..., min_length=1)
+    email: EmailStr
+    password: str
+    confirm_password: str
+    beta_access_key: Optional[str] = None
+
+
+@router.post("/register-tenant")
+@rate_limit("auth_attempts")
+async def register_tenant_endpoint(request: Request, body: RegisterTenantRequest):
+    """Self-service tenant registration (beta portal).
+
+    Provisions the primary administrator (AIRLINE_ADMIN / safety), initialises
+    the operational profile at ``tenants/{tenant_id}/profile/operational`` and
+    issues a unique team invite code for colleague onboarding.
+    """
+    if body.password != body.confirm_password:
+        raise HTTPException(status_code=422, detail="Passwords do not match")
+    try:
+        result = register_tenant(
+            organization_name=body.organization_name,
+            classification=body.classification.value,
+            admin_full_name=body.admin_full_name,
+            admin_title=body.admin_title,
+            email=body.email,
+            password=body.password,
+            beta_access_key=body.beta_access_key,
+            request=request,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"success": True, **result}
+
+
+class JoinTeamRequest(BaseModel):
+    invite_code: Optional[str] = None
+    tenant_id: Optional[str] = None
+    full_name: str = Field(..., min_length=1)
+    email: EmailStr
+    password: str
+    confirm_password: str
+    department: str = Field(..., min_length=1)
+
+
+@router.post("/join-team")
+@rate_limit("auth_attempts")
+async def join_team_endpoint(request: Request, body: JoinTeamRequest):
+    """Self-register a department postholder under an existing tenant."""
+    if body.password != body.confirm_password:
+        raise HTTPException(status_code=422, detail="Passwords do not match")
+    try:
+        result = join_team(
+            invite_code=body.invite_code,
+            tenant_id=body.tenant_id,
+            full_name=body.full_name,
+            email=body.email,
+            password=body.password,
+            department=body.department,
+            request=request,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"success": True, **result}
+
+
+@router.get("/tenant-lookup")
+async def tenant_lookup_endpoint(
+    request: Request,
+    code: Optional[str] = Query(None, description="Team invite code"),
+    tenant_id: Optional[str] = Query(None, description="Tenant id / slug"),
+):
+    """Public tenant lookup for /join.html.
+
+    Resolves a tenant from its invite code (or a ?tenant= tenant id) so the
+    join form can render only the departments applicable to that
+    classification. Reveals only the org name + department codes — the caller
+    must already know the invite code to get this far.
+    """
+    try:
+        tid, tenant_doc = resolve_tenant(get_db(), code, tenant_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    departments = tenant_doc.get("applicable_departments") or []
+    return {
+        "success": True,
+        "tenant_id": tid,
+        "tenant_name": tenant_doc.get("name"),
+        "classification": tenant_doc.get("tenant_type") or tenant_doc.get("classification"),
+        "operates_flights": tenant_doc.get("operates_flights"),
+        "applicable_departments": [
+            {"code": d, "label": DEPARTMENT_LABELS.get(d, d)} for d in departments
+        ],
+    }
