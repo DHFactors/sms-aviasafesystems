@@ -36,7 +36,7 @@ SEED_VERSION = "caan-demo-1"
 
 # The operators overseen by the default CAAN State Regulator seed plan. Base
 # maturity (1-5) drives the seeded SMS culture so the dashboard shows a
-# realistic spread of maturity across operators. Matches the 10 active beta
+# realistic spread of maturity across operators. Matches the 12 active beta
 # provider tenants (seed/config.py OPERATOR_PROFILES).
 SEED_OPERATORS = [
     {"id": "buddha-air", "name": "Buddha Air", "maturity": 4.1},
@@ -49,6 +49,8 @@ SEED_OPERATORS = [
     {"id": "sita-air", "name": "Sita Air", "maturity": 3.6},
     {"id": "simrik-air", "name": "Simrik Air", "maturity": 3.5},
     {"id": "tara-air", "name": "Tara Air", "maturity": 3.6},
+    {"id": "caan-fssd", "name": "CAAN Flight Safety Standards Dept", "maturity": 4.0},
+    {"id": "caan-assd", "name": "CAAN Aerodrome Safety Standards Dept", "maturity": 3.9},
 ]
 
 ICAO_CATEGORIES = [

@@ -1,10 +1,12 @@
-"""10-Tenant Beta seed model (2026-08-14).
+"""12-Tenant Beta seed model (2026-08-17).
 
 Locks the invariants of the seed configuration:
 
-  * OPERATOR_PROFILES holds 10 active providers covering every service-provider
-    type (airline, helicopter-operator, mro, aerodrome, ground-handling), so a
-    seed produces exactly 10 operator tenants + the CAAN state-regulator tenant.
+  * OPERATOR_PROFILES holds 12 active providers covering every service-provider
+    type (airline, helicopter-operator, mro, aerodrome, ground-handling,
+    caan-directorate), so a seed produces exactly 12 operator tenants + the
+    CAAN state-regulator tenant. Internal CAAN directorates (caan-fssd,
+    caan-assd) are treated like any external provider for oversight scoping.
   * All tenant ids are lowercase, hyphenated (e.g. yeti-airlines).
   * Each provider seeds randomized realistic volumes: 25-40 total reports with
     ~70% VSR / 30% MOR, ~25-35% anonymous VSRs, 15-25 surveys, and flight
@@ -29,7 +31,7 @@ from seed.config import (
 def test_all_providers_cover_tenant_types():
     types = {p["tenant_type"] for p in OPERATOR_PROFILES}
     assert types == BETA_SERVICE_PROVIDER_TYPES
-    assert len(OPERATOR_PROFILES) == 10
+    assert len(OPERATOR_PROFILES) == 12
     ids = [p["id"] for p in OPERATOR_PROFILES]
     assert len(ids) == len(set(ids))
 
@@ -70,7 +72,7 @@ def test_credential_scheme_covers_active_providers_only():
     assert set(CREDENTIAL_EMAIL_DOMAINS) == active_ids
     assert set(CREDENTIAL_TENANT_CODES) == active_ids
     plan = build_simplified_role_plan()
-    assert len(plan) == 10 * len(SIMPLIFIED_ROLE_ACCOUNTS) == 40
+    assert len(plan) == 12 * len(SIMPLIFIED_ROLE_ACCOUNTS) == 48
     assert {entry["op_id"] for entry in plan} == active_ids
 
 
@@ -187,6 +189,7 @@ def test_operational_profile_categories_match_tenant_types():
         CATEGORY_AMO,
         CATEGORY_AERODROME,
         CATEGORY_GROUND_HANDLING,
+        CATEGORY_CAAN,
     )
 
     type_to_category = {
@@ -195,6 +198,7 @@ def test_operational_profile_categories_match_tenant_types():
         "mro": CATEGORY_AMO,
         "aerodrome": CATEGORY_AERODROME,
         "ground-handling": CATEGORY_GROUND_HANDLING,
+        "caan-directorate": CATEGORY_CAAN,
     }
     for p in OPERATOR_PROFILES:
         profile = TENANT_OPERATIONAL_PROFILES[p["id"]]

@@ -3,13 +3,14 @@
 Locks the behaviour added for the beta verification run:
 
   * seed.runner.run(dry_run=True, tenant_ids=[...]) only counts the requested
-    tenants; a full (unscoped) dry run counts the whole 10-provider set.
+    tenants; a full (unscoped) dry run counts the whole 12-provider set.
   * Every generated survey is a "completed" record with all four SMS pillars and
     a submitted_at inside the default 90-day assessment window (max 180 days),
     so the CAAN SMS-maturity overview has data.
   * The CAAN state-regulator account is a single smd@caanepal.gov.np identity
     and is always protected from automated unseed runs.
-  * production_seed.SEED_OPERATORS matches the 10 active beta providers.
+  * production_seed.SEED_OPERATORS matches the 12 active beta providers,
+    including the internal CAAN directorates (universal oversight).
 """
 
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ from seed.runner import run
 
 def test_dry_run_full_plan_counts():
     counts = run(dry_run=True)
-    assert counts["tenants"] == len(OPERATOR_PROFILES) == 10
+    assert counts["tenants"] == len(OPERATOR_PROFILES) == 12
     assert counts["users"] == 0
     total_surveys = sum(p["survey_count"] for p in OPERATOR_PROFILES)
     assert counts["surveys"] == total_surveys

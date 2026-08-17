@@ -66,6 +66,8 @@
         'nepal-aero-maintenance-demo': 'nepal-aero-maintenance-demo',
         'tia-kathmandu-demo': 'tia-kathmandu-demo',
         'caan': 'caan',
+        'caan-assd': 'caan-assd',
+        'caan-fssd': 'caan-fssd',
     };
 
     function getHostname() {

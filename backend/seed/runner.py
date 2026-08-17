@@ -126,8 +126,8 @@ def run(
     `tenant_ids` restricts every step to the given operator tenants (users,
     tenant docs, surveys, reports, hazards/CANs, and the post-seed purge).
     When scoped, the CAAN state-regulator tenant and the global state-risk
-    reference are left untouched. When None, the full 11-tenant beta model is
-    seeded (10 providers + CAAN).
+    reference are left untouched. When None, the full 13-tenant beta model is
+    seeded (12 providers + CAAN).
     """
     if not dry_run:
         if db is None:
@@ -172,7 +172,7 @@ def run(
             counts["surveys"] += p["survey_count"]
             counts["vsr_reports"] += p["vsr_count"]
             counts["mor_reports"] += p["mor_count"]
-        scope = "scoped" if tenant_ids else "10-tenant beta"
+        scope = "scoped" if tenant_ids else "12-tenant beta"
         logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "

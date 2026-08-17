@@ -527,6 +527,129 @@ def test_get_caan_survey_maturity_aggregates_pillars(monkeypatch):
     assert result["operators"][0]["tenant_id"] == "air2"
 
 
+def test_get_caan_survey_maturity_filters_by_days_cutoff(monkeypatch):
+    now = datetime.now(timezone.utc)
+    svc = _survey_svc(monkeypatch, surveys=[
+        {
+            "tenant_id": "air1",
+            "submitted_at": now,
+            "safety_policy": 4.0, "safety_risk_management": 3.0,
+            "safety_assurance": 5.0, "safety_promotion": 4.0,
+            "overall_sms_maturity": 4.0,
+        },
+        {
+            "tenant_id": "air1",
+            "submitted_at": now - timedelta(days=120),
+            "safety_policy": 2.0, "safety_risk_management": 3.0,
+            "safety_assurance": 3.0, "safety_promotion": 4.0,
+            "overall_sms_maturity": 3.0,
+        },
+        {
+            "tenant_id": "air2",
+            "submitted_at": now - timedelta(days=400),
+            "safety_policy": 5.0, "safety_risk_management": 5.0,
+            "safety_assurance": 5.0, "safety_promotion": 5.0,
+            "overall_sms_maturity": 5.0,
+        },
+    ])
+    result = svc.get_caan_survey_maturity(days=90)
+    assert result["state"]["response_count"] == 1
+    by_id = {op["tenant_id"]: op for op in result["operators"]}
+    assert by_id["air1"]["response_count"] == 1
+    assert by_id["air1"]["overall_sms_maturity"] == 4.0
+    assert "air2" not in by_id
+
+    all_time = svc.get_caan_survey_maturity()
+    assert all_time["state"]["response_count"] == 3
+
+
+def test_universal_oversight_includes_all_tenant_types(monkeypatch):
+    """CAAN SMD aggregation must treat internal CAAN directorates (caan-directorate
+    tenant type) exactly like external service providers — no tenant type is
+    excluded from the state payload."""
+    from app.services.dashboard_service import DashboardService
+
+    now = datetime.now(timezone.utc)
+
+    class _Snap:
+        def __init__(self, doc_id, data):
+            self.id = doc_id
+            self._data = data
+
+        def to_dict(self):
+            return self._data
+
+    tenant_ids = ["air1", "hel1", "mro1", "aerodrome1", "ground1", "caan-fssd", "caan-assd"]
+    tenant_docs = [
+        _Snap("air1", {"name": "Air One", "icao": "AO1", "country": "Nepal", "active": True}),
+        _Snap("hel1", {"name": "Heli Co", "icao": "HC1", "country": "Nepal", "active": True}),
+        _Snap("mro1", {"name": "MRO One", "icao": "MO1", "country": "Nepal", "active": True}),
+        _Snap("aerodrome1", {"name": "Aero One", "icao": "AE1", "country": "Nepal", "active": True}),
+        _Snap("ground1", {"name": "Ground One", "icao": "G1", "country": "Nepal", "active": True}),
+        _Snap("caan-fssd", {"name": "CAAN FSSD", "icao": "FSSD", "country": "Nepal", "active": True}),
+        _Snap("caan-assd", {"name": "CAAN ASSD", "icao": "ASSD", "country": "Nepal", "active": True}),
+    ]
+
+    hazards = [
+        {"tenant_id": tid, "severity": 4, "probability": 3, "risk_level": "High",
+         "created_at": now} for tid in tenant_ids
+    ]
+    responses = [
+        {"tenant_id": tid, "submitted_at": now} for tid in tenant_ids
+    ]
+    reports = [
+        {"tenant_id": tid, "report_type": "mandatory", "occurrence_type": "Bird Strike",
+         "risk_index": 6, "created_at": now} for tid in tenant_ids
+    ]
+    surveys = [
+        {"tenant_id": tid, "safety_policy": 4.0, "safety_risk_management": 4.0,
+         "safety_assurance": 4.0, "safety_promotion": 4.0,
+         "overall_sms_maturity": 4.0, "submitted_at": now} for tid in tenant_ids
+    ]
+
+    class _DB:
+        def collection(self, name):
+            assert name == "tenants"
+            return _FakeCollection([_Snap(t.id, t.to_dict()) for t in tenant_docs])
+
+        def collection_group(self, name):
+            mapping = {
+                "hazards": hazards,
+                "responses": responses,
+                "surveys": surveys,
+            }
+            return _FakeCollection([_FakeDoc(s) for s in mapping[name]])
+
+    monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
+    monkeypatch.setattr(
+        "app.firebase.get_cross_tenant_collection",
+        lambda name: _FakeCollection([_FakeDoc(s) for s in reports]),
+    )
+    monkeypatch.setattr(
+        "app.services.regulator_service.operator_tenant_ids_for_regulator",
+        lambda rid: list(tenant_ids),
+    )
+
+    svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+    result = svc.get_caan_state(days=0, regulator_id="caan")
+
+    operator_ids = {o["tenant_id"] for o in result["operators"]}
+    assert operator_ids == set(tenant_ids), operator_ids
+    assert result["kpis"]["active_operators"] == len(tenant_ids)
+    assert result["kpis"]["mors"] == len(tenant_ids)
+    assert result["kpis"]["high_risk_hazards"] == len(tenant_ids)
+    assert result["kpis"]["responses"] == len(tenant_ids)
+
+    by_id = {o["tenant_id"]: o for o in result["operators"]}
+    for tid in ("air1", "caan-fssd", "caan-assd"):
+        assert by_id[tid]["mors"] == 1, tid
+        assert by_id[tid]["high_risk_hazards"] == 1, tid
+        assert by_id[tid]["sms_maturity"] == 4.0, tid
+
+    maturity = result["sms_maturity"]
+    assert maturity["state"]["response_count"] == len(tenant_ids)
+
+
 def test_get_caan_survey_maturity_empty(monkeypatch):
     svc = _survey_svc(monkeypatch, surveys=[])
     result = svc.get_caan_survey_maturity()

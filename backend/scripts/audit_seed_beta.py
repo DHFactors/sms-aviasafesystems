@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Audit the sms-db-beta seed dataset against the 5-new-tenant task requirements:
+Audit the sms-db-beta seed dataset against the beta task requirements:
 
-  - Total tenant count (10 providers + CAAN state regulator = 11)
+  - Total tenant count (12 providers + CAAN state regulator = 13)
   - Every tenant id uses hyphens (never underscores)
   - Per-tenant report breakdown: MORs, VSRs, Anonymous VSRs
   - Anonymous VSR rate is non-zero for every provider tenant
@@ -24,7 +24,11 @@ sys.path.insert(0, BACKEND)
 os.chdir(BACKEND)
 
 from app.firebase import initialize_firebase, get_db
-from seed.config import OPERATOR_PROFILES, CREDENTIAL_TENANT_CODES
+from seed.config import (
+    OPERATOR_PROFILES,
+    CREDENTIAL_TENANT_CODES,
+    CREDENTIAL_EMAIL_DOMAINS,
+)
 
 failures = 0
 
@@ -45,10 +49,10 @@ def main():
     all_ids = sorted(tenants)
 
     print("== Tenant registry ==")
-    check(len(all_ids) == 11, f"11 total tenants", f"found {len(all_ids)}: {all_ids}")
+    check(len(all_ids) == 13, f"13 total tenants", f"found {len(all_ids)}: {all_ids}")
     expected_providers = {p["id"] for p in OPERATOR_PROFILES}
     check(expected_providers.issubset(set(all_ids)),
-          "all 10 provider tenants registered",
+          "all 12 provider tenants registered",
           f"missing {sorted(expected_providers - set(all_ids)) or 'none'}")
     check("caan" in all_ids, "CAAN regulator tenant registered")
     check(all(id == id.lower() for id in all_ids), "all tenant ids lowercase")
@@ -193,7 +197,7 @@ def main():
         check(len(uids) == 4, f"{tid}: 4 simplified role accounts",
               f"uids {uids} (code={code})")
         if code:
-            domain = f"{tid}.com"
+            domain = CREDENTIAL_EMAIL_DOMAINS.get(tid, f"{tid}.com")
             for role in ("safety", "145", "camo", "ops"):
                 email = f"{role}@{domain}"
                 check(any(users[u].email == email for u in uids),

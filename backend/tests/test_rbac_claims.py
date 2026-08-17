@@ -49,7 +49,7 @@ def test_simplified_role_accounts_match_security_domain():
 
 def test_every_operator_has_all_role_accounts():
     assert set(CREDENTIAL_EMAIL_DOMAINS) == {op["id"] for op in OPERATOR_PROFILES}
-    assert len(OPERATOR_PROFILES) == 10
+    assert len(OPERATOR_PROFILES) == 12
     plan = build_simplified_role_plan()
     assert len(plan) == len(OPERATOR_PROFILES) * len(SIMPLIFIED_ROLE_ACCOUNTS)
     for op in OPERATOR_PROFILES:

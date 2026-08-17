@@ -1,4 +1,4 @@
-SEED_VERSION = "2.1.0"
+SEED_VERSION = "2.2.0"
 SEED_DOC_PATH = "seed_metadata/seed"
 
 SURVEY_COLLECTION = "surveys"
@@ -80,20 +80,24 @@ SURVEY_DEPARTMENTS = [
 ]
 
 # ============================================================================
-# 10-Tenant Beta configuration (2026-08-14)
+# 12-Tenant Beta configuration (2026-08-17)
 #
-# OPERATOR_PROFILES holds the 10 active service-provider tenants of the beta
+# OPERATOR_PROFILES holds the 12 active service-provider tenants of the beta
 # set, covering every tenant type (airline, helicopter-operator, mro, aerodrome,
-# ground-handling). The former legacy seed operators (yeti-airlines, summit-air,
-# sita-air, simrik-air, tara-air) were re-activated and moved into
-# OPERATOR_PROFILES; LEGACY_OPERATOR_PROFILES is now empty.
+# ground-handling, caan-directorate). Universal oversight logic: internal CAAN
+# directorates (FSSD, ASSD) are treated exactly like external service providers
+# for aggregation, scoping and the regulator dashboard operator directory.
+# The former legacy seed operators (yeti-airlines, summit-air, sita-air,
+# simrik-air, tara-air) were re-activated and moved into OPERATOR_PROFILES;
+# LEGACY_OPERATOR_PROFILES is now empty.
 #
 # Seeding rules - randomized realistic volumes per provider:
 #   vsr_count + mor_count in [25, 40] with ~70% VSR / 30% MOR
 #   strict 90:10 VSR anonymity ratio -> ~63% overall Anon Rate
 #   survey_count in [15, 25]
 #   flight_diversion_count = 10 for airline + helicopter-operator,
-#                            0 for mro / aerodrome / ground-handling
+#                            0 for mro / aerodrome / ground-handling /
+#                              caan-directorate
 # ============================================================================
 
 TENANT_TYPES = {
@@ -102,6 +106,7 @@ TENANT_TYPES = {
     "mro",
     "aerodrome",
     "ground-handling",
+    "caan-directorate",
     "state-regulator",
 }
 BETA_SERVICE_PROVIDER_TYPES = TENANT_TYPES - {"state-regulator"}
@@ -538,12 +543,98 @@ OPERATOR_PROFILES = [
         "routes": ["KTM-LUA", "KTM-IMK", "KTM-JUM", "KTM-DPR", "KTM-TPJ", "KTM-KEP"],
         "email_domain": "taraair.com",
     },
+    {
+        "id": "caan-fssd",
+        "name": "CAAN Flight Safety Standards Dept",
+        "type": "caan-directorate",
+        "tenant_type": "caan-directorate",
+        "icao": "FSSD",
+        "iata": "–",
+        "country": "Nepal",
+        "base": "Kathmandu (KTM/VNKT)",
+        "fleet_size": 0,
+        "employees": 90,
+        "survey_count": 16,
+        "vsr_count": 20,
+        "mor_count": 9,
+        "hazard_count": 13,
+        "can_count": 9,
+        "flight_diversion_count": 0,
+        "element_scores": {
+            "management_commitment": 4.2,
+            "safety_accountability": 4.1,
+            "key_safety_personnel": 4.0,
+            "emergency_response_planning": 3.9,
+            "sms_documentation": 4.3,
+            "hazard_identification": 4.0,
+            "risk_assessment_and_mitigation": 4.1,
+            "safety_performance_monitoring": 3.8,
+            "management_of_change": 3.9,
+            "continuous_improvement": 4.0,
+            "training_and_education": 4.1,
+            "safety_communication": 3.9,
+        },
+        "culture_variance": 0.40,
+        "culture_description": "CAAN Flight Safety Standards directorate setting and enforcing flight operations standards across operators",
+        "vsr_risk_mean": 0.44,
+        "vsr_risk_std": 0.20,
+        "mor_risk_mean": 0.57,
+        "mor_risk_std": 0.19,
+        "anonymous_rate": 0.30,
+        "aircraft_types": [],
+        "flight_number_prefixes": [],
+        "routes": [],
+        "email_domain": "caanepal.gov.np",
+    },
+    {
+        "id": "caan-assd",
+        "name": "CAAN Aerodrome Safety Standards Dept",
+        "type": "caan-directorate",
+        "tenant_type": "caan-directorate",
+        "icao": "ASSD",
+        "iata": "–",
+        "country": "Nepal",
+        "base": "Kathmandu (KTM/VNKT)",
+        "fleet_size": 0,
+        "employees": 80,
+        "survey_count": 15,
+        "vsr_count": 20,
+        "mor_count": 9,
+        "hazard_count": 12,
+        "can_count": 8,
+        "flight_diversion_count": 0,
+        "element_scores": {
+            "management_commitment": 4.1,
+            "safety_accountability": 4.0,
+            "key_safety_personnel": 4.0,
+            "emergency_response_planning": 4.2,
+            "sms_documentation": 4.2,
+            "hazard_identification": 3.9,
+            "risk_assessment_and_mitigation": 4.0,
+            "safety_performance_monitoring": 3.7,
+            "management_of_change": 3.8,
+            "continuous_improvement": 3.9,
+            "training_and_education": 3.9,
+            "safety_communication": 3.8,
+        },
+        "culture_variance": 0.40,
+        "culture_description": "CAAN Aerodrome Safety Standards directorate overseeing aerodrome certification and ground safety across the network",
+        "vsr_risk_mean": 0.43,
+        "vsr_risk_std": 0.19,
+        "mor_risk_mean": 0.56,
+        "mor_risk_std": 0.20,
+        "anonymous_rate": 0.31,
+        "aircraft_types": [],
+        "flight_number_prefixes": [],
+        "routes": [],
+        "email_domain": "caanepal.gov.np",
+    },
 ]
 
 # ---------------------------------------------------------------------------
 # Archived legacy seed operators. All former legacy operators (yeti-airlines,
 # summit-air, sita-air, simrik-air, tara-air) were re-activated and moved into
-# OPERATOR_PROFILES on 2026-08-14. The runner now seeds all 10 tenants.
+# OPERATOR_PROFILES on 2026-08-14. The runner now seeds all 12 tenants.
 # ---------------------------------------------------------------------------
 LEGACY_OPERATOR_PROFILES = []
 
@@ -1033,6 +1124,8 @@ CREDENTIAL_TENANT_CODES = {
     "sita-air": "SITA",
     "simrik-air": "SIMRIK",
     "tara-air": "TARA",
+    "caan-fssd": "FSSD",
+    "caan-assd": "ASSD",
 }
 
 CREDENTIAL_EMAIL_DOMAINS = {
@@ -1046,6 +1139,8 @@ CREDENTIAL_EMAIL_DOMAINS = {
     "sita-air": "sita-air.com",
     "simrik-air": "simrik-air.com",
     "tara-air": "tara-air.com",
+    "caan-fssd": "fssd.caanepal.gov.np",
+    "caan-assd": "assd.caanepal.gov.np",
 }
 
 SIMPLIFIED_ROLE_ACCOUNTS = [

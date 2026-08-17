@@ -66,7 +66,7 @@ _ROUTE_CODE_TO_AIRPORT = {
     "TPJ": "Taplejung (VNTJ)",
 }
 
-# Explicit profiles for the ten active OPERATOR_PROFILES tenants. Values follow
+# Explicit profiles for the twelve active OPERATOR_PROFILES tenants. Values follow
 # each tenant's real aircraft_types / routes in seed/config.py so the registry
 # stays consistent with the credential + operator metadata already seeded.
 TENANT_OPERATIONAL_PROFILES = {
@@ -246,6 +246,42 @@ TENANT_OPERATIONAL_PROFILES = {
         hazard_domains=[
             "Box Canyon / Terrain Avoidance", "Micro-climate Fog",
             "Density Altitude", "Short Runway Braking",
+        ],
+    ),
+    "caan-fssd": TenantOperationalProfile(
+        tenant_id="caan-fssd",
+        slug="caan-fssd",
+        tenant_name="CAAN Flight Safety Standards Dept",
+        email=_operator_email("caan-fssd"),
+        category=CATEGORY_CAAN,
+        operation_type="Flight safety standards oversight",
+        fleet=["Flight Inspection Aircraft", "Audit Instrumentation Kits", "Surveillance Drones"],
+        base_hub="Kathmandu (VNKT)",
+        authorized_destinations=[
+            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Bharatpur (VNBG)",
+            "Simara (VNSI)", "Nepalgunj (VNKG)",
+        ],
+        hazard_domains=[
+            "Density Altitude", "Mountain Ridge Turbulence", "Short Runway Braking",
+            "Micro-climate Fog", "Wake Turbulence",
+        ],
+    ),
+    "caan-assd": TenantOperationalProfile(
+        tenant_id="caan-assd",
+        slug="caan-assd",
+        tenant_name="CAAN Aerodrome Safety Standards Dept",
+        email=_operator_email("caan-assd"),
+        category=CATEGORY_CAAN,
+        operation_type="Aerodrome certification & ground safety oversight",
+        fleet=["ARFF Audit Vehicles", "Runway Friction Testers", "Visual Aid Inspection Kits"],
+        base_hub="Kathmandu (VNKT)",
+        authorized_destinations=[
+            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Bharatpur (VNBG)",
+            "Simara (VNSI)", "Nepalgunj (VNKG)",
+        ],
+        hazard_domains=[
+            "Runway Incursion", "Runway Excursion", "Wildlife & Bird Control",
+            "Apron GSE", "Runway Rubber Deposition", "FOD on Apron",
         ],
     ),
 }

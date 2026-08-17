@@ -31,7 +31,14 @@ AUTHOR: AviaSAFE Systems
         .section-head h2 { margin:0; color:var(--color-primary-dark, #0b2a42); }
         .section-sub { color:#64748b; font-size:0.875rem; }
 
-        .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; }
+        .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:1.5rem; position:relative; }
+        .stat-grid .grid-loading { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(255,255,255,0.65); border-radius:10px; z-index:2; }
+        .stat-grid.loading .grid-loading { display:flex; }
+        .stat-grid.loading .stat-card { opacity:0.5; }
+        .stat-grid .grid-loading i { font-size:1.6rem; color:#1a6b8a; }
+        .state-error-banner { display:none; align-items:center; gap:0.6rem; background:#fce8e6; color:#c5221f; padding:0.75rem 1rem; border-radius:8px; border-left:4px solid #ea4335; margin-bottom:1.25rem; font-size:0.85rem; }
+        .state-error-banner.visible { display:flex; }
+        .state-error-banner button { margin-left:auto; background:transparent; border:none; color:inherit; font-weight:700; cursor:pointer; text-decoration:underline; }
         .stat-card { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.06); padding:1.25rem; text-align:center; border-top:4px solid #1a6b8a; }
         .stat-card.gold { border-top-color:#d4af37; }
         .stat-card.red { border-top-color:#ea4335; }
@@ -115,8 +122,15 @@ AUTHOR: AviaSAFE Systems
             reports, operator internal identifiers and reporter identities are never exposed.
         </div>
 
+        <div id="stateError" class="state-error-banner" role="alert">
+            <i class="fas fa-triangle-exclamation"></i>
+            <span id="stateErrorMessage"></span>
+            <button type="button" id="stateErrorRetry">Retry</button>
+        </div>
+
         <!-- KPI cards -->
-        <div class="stat-grid">
+        <div class="stat-grid" id="statGrid">
+            <div class="grid-loading"><i class="fas fa-spinner fa-spin"></i></div>
             <div class="stat-card gold">
                 <div class="num" id="kpiMors">—</div>
                 <div class="lbl">State-wide Mandatory Reports (MORs)</div>
@@ -212,6 +226,7 @@ window.SHELL_CONFIG = {
 const OPERATOR_ORDER = [
     'buddha-air', 'yeti-airlines', 'summit-air',
     'sita-air', 'air-dynasty', 'simrik-air', 'tara-air',
+    'caan-fssd', 'caan-assd',
 ];
 
 function destroyCaanChart(key) {
@@ -259,6 +274,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    const retryBtn = document.getElementById('stateErrorRetry');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', () => {
+            window.reloadDashboardData(readDaysFilter());
+        });
+    }
+
     await loadStateData(readDaysFilter());
 });
 
@@ -299,14 +321,32 @@ function withinPeriod(ts, cutoff) {
 // role always sees consolidated, anonymized data regardless of client-side
 // Firestore rules.
 // ============================================================================
+function setStateLoading(on) {
+    const grid = document.getElementById('statGrid');
+    if (grid) grid.classList.toggle('loading', !!on);
+}
+
+function setStateError(message) {
+    const banner = document.getElementById('stateError');
+    const textEl = document.getElementById('stateErrorMessage');
+    if (!banner || !textEl) return;
+    textEl.textContent = message || '';
+    banner.classList.toggle('visible', !!message);
+}
+
 async function loadStateData(days) {
     const n = parseInt(days, 10) || 0;
+
+    setStateError(null);
+    setStateLoading(true);
 
     const state = await ApiClient.get(`/api/v1/dashboard/caan/state?days=${n}&regulator_id=${STATE_REGULATOR_ID}`)
         .catch(err => {
             console.error('State overview load failed:', err);
             return null;
         });
+
+    setStateLoading(false);
 
     if (!state) {
         document.getElementById('kpiMors').textContent = '—';
@@ -316,6 +356,7 @@ async function loadStateData(days) {
         renderHazardWidget(null);
         renderOperatorGrid([]);
         renderStateSpiTrend(null);
+        setStateError('Could not load State oversight data for the selected period. Please try again.');
         return;
     }
 
