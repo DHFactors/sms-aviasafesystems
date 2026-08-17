@@ -606,7 +606,7 @@ class DashboardService:
                 level4 += 1
 
         # ---- Operator grid (merge tenant meta + per-tenant stats + maturity) ----
-        maturity = self.get_caan_survey_maturity(regulator_id=regulator_id)
+        maturity = self.get_caan_survey_maturity(days=days, regulator_id=regulator_id)
         maturity_by_tenant = {o["tenant_id"]: o for o in (maturity.get("operators") or [])}
         operators = []
         for tid, meta in tenant_map.items():
