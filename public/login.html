@@ -304,8 +304,27 @@ function renderDemoPersonaSelector() {
     if (active) select.value = active.tenant;
 }
 
+var developerPersonaActive = false;
+
 function onDemoPersonaChange(value) {
     if (!value) return;
+
+    // Developer / Super-Admin persona: cross-tenant, no tenant scoping. Autofill
+    // the developer credentials so sign-in targets Firebase Auth directly and the
+    // role-based router sends SUPER_ADMIN to the admin panel.
+    if (value === 'developer') {
+        developerPersonaActive = true;
+        if (typeof TenantResolver !== 'undefined' && TenantResolver.clearDemoTenant) {
+            TenantResolver.clearDemoTenant();
+        }
+        var emailInput = document.getElementById('email');
+        var passwordInput = document.getElementById('password');
+        if (emailInput) emailInput.value = 'ezondiza.dhf@gmail.com';
+        if (passwordInput) passwordInput.value = 'DEV-Aviasafe-2026';
+        updateTenantDisplay();
+        return;
+    }
+    developerPersonaActive = false;
     if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
         TenantResolver.setDemoTenant(value);
         updateTenantDisplay();
@@ -315,6 +334,10 @@ function onDemoPersonaChange(value) {
 async function updateTenantDisplay() {
     var displayEl = document.getElementById('tenantDisplay');
     if (!displayEl) return;
+    if (developerPersonaActive) {
+        displayEl.textContent = 'Developer Console (Super-Admin)';
+        return;
+    }
     if (typeof TenantResolver === 'undefined') {
         displayEl.textContent = 'Unknown';
         return;
@@ -438,6 +461,12 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             console.log('   Tenant:', user.tenantId || 'None');
             // The onAuthStateChanged listener will handle the redirect with fresh claims,
             // but call it directly here for immediate response
+            if (developerPersonaActive) {
+                // Developer / Super-Admin: always land on the admin panel regardless of
+                // tenant scoping (role claim SUPER_ADMIN is verified by the panel guard).
+                window.location.href = '/admin/production-setup.html';
+                return;
+            }
             redirectBasedOnRole(user);
         }
         

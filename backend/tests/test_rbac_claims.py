@@ -112,15 +112,21 @@ class _FakeAuth:
     def __init__(self):
         self.records = {}
         self.claims = {}
+        self.updates = {}
 
     def get_user(self, uid):
         if uid not in self.records:
             raise ValueError(f"no user {uid}")
-        return type("U", (), {"uid": uid})()
+        return type("U", (), {"uid": uid, "email": self.records[uid]["email"]})()
 
     def create_user(self, **kw):
         self.records[kw["uid"]] = kw
-        return type("U", (), {"uid": kw["uid"]})()
+        return type("U", (), {"uid": kw["uid"], "email": kw["email"]})()
+
+    def update_user(self, uid, password=None, **kw):
+        self.updates[uid] = kw
+        if password is not None:
+            self.records[uid]["password"] = password
 
     def set_custom_user_claims(self, uid, claims):
         self.claims[uid] = dict(claims)
@@ -161,3 +167,56 @@ def test_create_user_omits_claim_when_no_department():
     }
     create_user(auth, spec)
     assert auth.claims["safety-tara-air-001"] == {"role": "AIRLINE_ADMIN", "tenant_id": "tara-air"}
+
+
+def test_create_user_sets_is_developer_claim():
+    from seed.users import create_user
+
+    auth = _FakeAuth()
+    spec = {
+        "uid": "dev-001",
+        "email": "ezondiza.dhf@gmail.com",
+        "password": "DEV-Aviasafe-2026",
+        "full_name": "Developer",
+        "role": "SUPER_ADMIN",
+        "is_developer": True,
+    }
+    out = create_user(auth, spec)
+    assert auth.claims["dev-001"] == {"role": "SUPER_ADMIN", "is_developer": True}
+    assert out["is_developer"] is True
+
+
+def test_create_user_resyncs_password_for_existing_user():
+    from seed.users import create_user
+
+    auth = _FakeAuth()
+    spec = {
+        "uid": "dev-001",
+        "email": "ezondiza.dhf@gmail.com",
+        "password": "DEV-Aviasafe-2026",
+        "full_name": "Developer",
+        "role": "SUPER_ADMIN",
+        "is_developer": True,
+        "sync_password": True,
+    }
+    # Pre-existing user with an outdated password (no create happens).
+    auth.records["dev-001"] = {"email": "ezondiza.dhf@gmail.com", "password": "old-pass"}
+    create_user(auth, spec)
+    assert auth.updates.get("dev-001") is not None
+    assert auth.records["dev-001"]["password"] == "DEV-Aviasafe-2026"
+    assert auth.claims["dev-001"]["role"] == "SUPER_ADMIN"
+
+
+def test_create_all_users_provisions_developer_account():
+    from seed.users import create_all_users
+
+    auth = _FakeAuth()
+    created = create_all_users(auth)
+    dev = [u for u in created if u["email"] == "ezondiza.dhf@gmail.com"]
+    assert len(dev) == 1
+    assert dev[0]["role"] == "SUPER_ADMIN"
+    assert dev[0]["is_developer"] is True
+    assert auth.claims["kwxmjFjhVEVi9UuxtxrYO0lNQLE2"] == {
+        "role": "SUPER_ADMIN",
+        "is_developer": True,
+    }

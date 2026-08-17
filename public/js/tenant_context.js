@@ -26,6 +26,7 @@
     // to a seeded demo tenant (or the CAAN regulator tenant for the ASSD/FSSD
     // directorates).
     var DEMO_PERSONAS = [
+        { key: 'developer', label: 'Developer / Super-Admin', tenant: 'developer' },
         { key: 'fixed-wing', label: 'Fixed-Wing', tenant: 'himalaya-airlines-demo' },
         { key: 'rotary', label: 'Rotary', tenant: 'air-dynasty-demo' },
         { key: 'amo', label: 'AMO', tenant: 'nepal-aero-maintenance-demo' },

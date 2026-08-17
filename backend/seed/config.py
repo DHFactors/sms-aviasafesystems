@@ -965,6 +965,20 @@ DEMO_USERS = [
     },
 ]
 
+# Developer / Super-Admin bootstrap account. UID matches the live Firebase Auth
+# record, so re-running the seeder updates claims and re-syncs the password in
+# place (outdated credentials are corrected on every provisioning run).
+DEVELOPER_ACCOUNT = {
+    "uid": "kwxmjFjhVEVi9UuxtxrYO0lNQLE2",
+    "email": "ezondiza.dhf@gmail.com",
+    "password": "DEV-Aviasafe-2026",
+    "full_name": "AviaSAFE Developer (Super-Admin)",
+    "organization": "AviaSAFE Systems",
+    "role": "SUPER_ADMIN",
+    "is_developer": True,
+    "sync_password": True,
+}
+
 # The single State Regulator authority account for CAAN. `smd@caanepal.gov.np`
 # is the sole cross-tenant CAAN account (role CAAN_SMD = state-regulator
 # inspector authority, tenant caan). No multi-department CAAN accounts exist.
@@ -973,8 +987,8 @@ CAAN_REGULATOR_ACCOUNT = DEMO_USERS[0]
 # Accounts that automated reset/unseed runs must NEVER delete: the CAAN SMD
 # authority, the legacy super-admin/system identities, and any SUPER_ADMIN.
 PROTECTED_ADMIN_ACCOUNTS = {
-    "emails": {"smd@caanepal.gov.np"},
-    "uids": {"smd-caan-001", "super-admin-001", "system"},
+    "emails": {"smd@caanepal.gov.np", "ezondiza.dhf@gmail.com"},
+    "uids": {"smd-caan-001", "super-admin-001", "system", "kwxmjFjhVEVi9UuxtxrYO0lNQLE2"},
     "roles": {"SUPER_ADMIN"},
 }
 

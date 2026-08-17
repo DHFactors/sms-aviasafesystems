@@ -2,6 +2,7 @@ from loguru import logger
 
 from seed.config import (
     DEMO_USERS,
+    DEVELOPER_ACCOUNT,
     OPERATOR_PROFILES,
     SIMPLIFIED_ROLE_ACCOUNTS,
     simplified_email,
@@ -14,6 +15,12 @@ def create_user(auth, user_spec: dict) -> dict:
         existing = auth.get_user(user_spec["uid"])
         logger.info(f"User already exists: {user_spec['email']}, updating claims")
         user_record = existing
+        if user_spec.get("sync_password") and user_spec.get("password"):
+            # Provisioned bootstrap accounts (e.g. the developer super-admin)
+            # always have their password re-synced so a stale Auth password can
+            # never lock the owner out.
+            auth.update_user(user_spec["uid"], password=user_spec["password"])
+            logger.info(f"Password re-synced for existing user: {user_spec['email']}")
     except Exception:
         user_record = auth.create_user(
             uid=user_spec["uid"],
@@ -29,6 +36,8 @@ def create_user(auth, user_spec: dict) -> dict:
         claims["tenant_id"] = user_spec["tenant_id"]
     if user_spec.get("department"):
         claims["department"] = user_spec["department"]
+    if user_spec.get("is_developer"):
+        claims["is_developer"] = True
 
     auth.set_custom_user_claims(user_spec["uid"], claims)
 
@@ -38,6 +47,7 @@ def create_user(auth, user_spec: dict) -> dict:
         "role": user_spec["role"],
         "tenant_id": user_spec.get("tenant_id"),
         "department": user_spec.get("department"),
+        "is_developer": bool(user_spec.get("is_developer")),
         "full_name": user_spec["full_name"],
     }
 
@@ -48,6 +58,10 @@ def create_all_users(auth, tenant_ids=None) -> list:
     for user_spec in DEMO_USERS:
         result = create_user(auth, user_spec)
         created_users.append(result)
+
+    # Developer / Super-Admin bootstrap account — always provisioned regardless
+    # of tenant scoping (cross-tenant owner account).
+    created_users.append(create_user(auth, dict(DEVELOPER_ACCOUNT)))
 
     for profile in OPERATOR_PROFILES:
         if tenant_ids and profile["id"] not in tenant_ids:
