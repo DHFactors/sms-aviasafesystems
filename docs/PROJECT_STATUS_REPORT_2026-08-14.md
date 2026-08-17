@@ -24,6 +24,10 @@
 - **Legacy accounts purged (2026-08-14)** — the old `safety.*`, `ae.*`, `manager.*` accounts (30 in Firebase Auth, 15 mirrored in Firestore `users`) were deleted. Only the 4 simplified role accounts remain per tenant (40 operational accounts) plus CAAN SMD + SUPER_ADMIN.
 - **Seed doc updated** — `seed_metadata/seed` now reports version **2.1.0** with live counts; `collectionGroup("reports")` (317) matches the exact sum of the 10 tenant report subcollections.
 - **Cleanup of legacy demo data** — stale runner docs (v2.0.0), backfilled survey responses (85, no seed_version), and `flight-diversion-demo-2` leftovers (20 hazards + 20 `flight_diversions` docs in buddha-air/air-dynasty) were purged so hazard counts match profile exactly.
+- **Admin feedback review added** — new `GET /api/v1/admin/feedback` route (CAAN_SMD / SUPER_ADMIN) plus a "User Feedback" review table in the Super-Admin portal; 4 beta feedback entries currently visible (rating, subject, page).
+- **Survey campaigns activated** — survey windows activated for yeti-airlines and tara-air (open 2026-08-13 → close 2026-09-13, "Annual SMS Safety Culture Survey 2026"); buddha-air already active. All 11 tenants report OPEN; 3 have an explicit window.
+- **Survey intro modal redirect fixed** — active respondents are no longer auto-redirected to the landing page; the countdown/redirect only runs for closed/expired campaigns or unknown-tenant visitors. Verified live on yeti-airlines and tara-air.
+- **Pushed to `main` (15d1b97)** — triggers Render redeploy of both backends and Firebase hosting redeploy of both sites (`aerosafety-sms-prod` + `sms-beta`).
 
 **Key Risks**
 - **No SUPER_ADMIN account** — unchanged; `/api/v1/admin/*` routes still require promoting a CAAN_SMD.
@@ -48,6 +52,13 @@
 | Audit script `scripts/audit_seed_beta.py` (tenant count, hyphenation, per-tenant counts, Anon Rate, departments, role accounts, aggregate band) | Scripts | ✅ Complete | Repo |
 | Purge legacy accounts (`safety.*`, `ae.*`, `manager.*`): removed 30 Firebase Auth records + 15 Firestore `users` docs; seed now provisions only the 4 simplified role accounts per tenant | Data (`scripts/purge_legacy_accounts.py`) | ✅ Complete | ✅ Applied to `sms-db-beta` |
 | Full re-seed of `sms-db-beta` (v2.1.0) + cleanup of stale v2.0.0 / backfilled / flight-diversion demo data | Data | ✅ Complete | ✅ Applied to `sms-db-beta` |
+| Admin feedback review: `GET /api/v1/admin/feedback` (CAAN_SMD / SUPER_ADMIN) + "User Feedback" table in Super-Admin portal | `app/routes/admin.py`, `public/admin/index.html` | ✅ Complete | ✅ Applied to `sms-db-beta`; backend redeploy via push |
+| Feedback audit script (list /latest with subject, rating, page, submitter role) | Scripts (`scripts/audit_feedback.py`) | ✅ Complete | Repo |
+| Survey campaign activation for yeti-airlines + tara-air (open 2026-08-13 → close 2026-09-13, syncs `config` + `surveyConfig`) | Scripts (`scripts/activate_survey_campaigns.py`) | ✅ Complete | ✅ Applied to `sms-db-beta` |
+| Survey status audit script (per-tenant config + effective window) | Scripts (`scripts/audit_survey_status.py`) | ✅ Complete | Repo |
+| Survey intro modal auto-redirect fix — countdown/redirect only for closed/expired/unknown-tenant; active respondents get a dismissible "Begin Survey" popup | `public/survey/app.js`, `public/survey/index.html` | ✅ Complete | ✅ Deployed (`sms-beta` + `aerosafety-sms-prod`) |
+| Removed stale `safety.director@caan.gov.np` references (login placeholder → `smd@caanepal.gov.np`; fixtures → `super-admin@aviasafesystems.test`) | Tests, `public/admin/login.html` | ✅ Complete | Repo |
+| `docs/GLOSSARY.md` created (terminology, charts, hazard matrix, CAN/CAP workflow) + linked from README & status report | Docs | ✅ Complete | Committed (`28b42cb`) |
 
 ### 2.2 Prior Completed Features
 
@@ -65,7 +76,7 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-12.md` and `docs/PROJECT_STATUS_REPORT_2
 | RBAC claims registry has 10 provider tenant types | ✅ Pass |
 | Seed-scope dry-run counts computed from config + `estimate_counts` | ✅ Pass |
 | Admin seed preview/deploy/routes show 10 tenants | ✅ Pass |
-| Full backend test suite (257 tests) | ✅ Pass |
+| Full backend test suite (261 tests) | ✅ Pass |
 
 ### 3.2 Live Verification (2026-08-14)
 
@@ -83,6 +94,11 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-12.md` and `docs/PROJECT_STATUS_REPORT_2
 | `collectionGroup("reports")` (317) == sum of 10 tenant report subcollections | ✅ Confirmed |
 | `collectionGroup("responses")` == 184 | ✅ Confirmed |
 | `seed_metadata/seed` version == 2.1.0 | ✅ Confirmed |
+| Survey windows active for buddha-air, yeti-airlines, tara-air (2026-08-13 → 2026-09-13) | ✅ Confirmed (all 3) |
+| Beta config endpoint returns `isActive=True` + open/close dates for yeti-airlines & tara-air | ✅ Confirmed |
+| Survey pages (`/survey/?tenant=yeti-airlines`, `tara-air`) load 200 with live form, no countdown redirect | ✅ Confirmed |
+| Deployed `survey/app.js` on `sms.aviasafesystems.com` contains the redirect fix | ✅ Confirmed |
+| `GET /api/v1/admin/feedback` live on deployed backend | ⏳ Pending (redeploy via push) |
 
 ---
 
@@ -100,6 +116,8 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-12.md` and `docs/PROJECT_STATUS_REPORT_2
 | **Hazards** | 145 | 13–16 per tenant, 4-department spread |
 | **CAN / CAP** | 102 / 200 | 9–11 CANs per tenant + CAP subcollection |
 | **Surveys / Responses** | 184 / 184 | 15–24 per tenant, matching |
+| **Survey campaigns** | 3 active | buddha-air, yeti-airlines, tara-air (2026-08-13 → 2026-09-13); all 11 tenants OPEN |
+| **Feedback** | 4 entries | 1 SUPER_ADMIN, 2 AIRLINE_ADMIN, 1 CAAN_SMD (2026-08-09 → 2026-08-13) |
 | **Audit logs** | active | — |
 
 ### 4.2 Relevant Simplified Accounts
@@ -119,9 +137,10 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-12.md` and `docs/PROJECT_STATUS_REPORT_2
 |---|-------|----------|--------|-------|
 | 1 | **No SUPER_ADMIN account** | High | ⚠️ Action | Removed 2026-08-10; promote a CAAN_SMD to restore admin routes |
 | 2 | Per-tenant Anon Rate fluctuates (9%–37%) on small VSR samples | Low | ✅ Accepted | Overall 21% ≈ 22% target; by design |
-| 3 | Frontend hosting deploy pending (CAA form/PDF + new tenant dashboards) | Low | ⚠️ Pending | Backend/data-only this session |
+| 3 | Frontend hosting deploy pending (CAA form/PDF + new tenant dashboards) | Low | ✅ Resolved | Deployed to `sms-beta` + `aerosafety-sms-prod` (2026-08-14) |
 | 4 | Monitoring / alerting | Medium | ⚠️ Pending | Not yet configured |
 | 5 | MFA (TOTP/SMS) | Medium | ⚠️ Pending | Not yet implemented |
+| 6 | `GET /api/v1/admin/feedback` pending live verify on beta backend | Low | ⚠️ Pending | Route pushed; backend redeploy via Render in progress |
 
 ---
 
@@ -129,12 +148,13 @@ See `docs/PROJECT_STATUS_REPORT_2026-08-12.md` and `docs/PROJECT_STATUS_REPORT_2
 
 | # | Milestone | Status |
 |---|-----------|--------|
-| 1 | Deploy frontend hosting so the new tenant dashboards + CAAN view are live | ⏳ Pending |
-| 2 | Live-verify `safety@yeti-airlines.com` Anon Rate card and CAAN "Responses" KPI | ⏳ Pending |
-| 3 | Restore SUPER_ADMIN (promote a CAAN_SMD) | ⚠️ Action |
-| 4 | Invite beta testers (incl. the 5 new airlines) | ⏳ Pending |
-| 5 | Beta launch + 2-week test period | ⏳ Pending |
-| 6 | Production go-live (post-beta) | ⏳ Pending |
+| 1 | Verify `GET /api/v1/admin/feedback` live on beta backend after Render redeploy | ⏳ Pending |
+| 2 | Review feedback entries from the Super-Admin portal + respond to CAAN SMD "data not visible" report | ⏳ Pending |
+| 3 | Live-verify `safety@yeti-airlines.com` Anon Rate card and CAAN "Responses" KPI | ⏳ Pending |
+| 4 | Restore SUPER_ADMIN (promote a CAAN_SMD) | ⚠️ Action |
+| 5 | Invite beta testers (incl. the 5 new airlines) | ⏳ Pending |
+| 6 | Beta launch + 2-week test period | ⏳ Pending |
+| 7 | Production go-live (post-beta) | ⏳ Pending |
 
 ---
 

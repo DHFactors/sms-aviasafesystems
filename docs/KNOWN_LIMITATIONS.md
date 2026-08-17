@@ -14,7 +14,7 @@ Legend: ✅ **Resolved** · 🔶 **Partially resolved** · ⏳ **Open**
 | TD-3 | Open debug endpoints (`/check-data`, `/debug-verify`) | ✅ | RC-1 closed |
 | TD-4 | `PUT /risk-matrix` crash | ✅ | RC-1 fixed |
 | TD-5 | Risk-matrix thresholds not plumbed; hazards/reports disagreed | ✅ | RC-2: single canonical scheme, stored thresholds honored everywhere |
-| TD-6 | Survey not aligned to charter (4 components / 12 elements) | ⏳ | Live survey still non-compliant; Phase 6A re-alignment pending |
+| TD-6 | Survey charter re-alignment (4 components / 12 elements) | 🔶 | Survey is now aligned to the 4 ICAO components / 12 elements with a backend scoring endpoint (`survey_scoring.py` v3.0.0, `default_q.js` v3.0.0, `POST /api/v1/surveys`); formal audit of the 12-element mapping + SMS Maturity dashboard output outstanding (RC-4) |
 | TD-7 | `public/portal` mock code | ⏳ | Hygiene removal pending |
 | TD-8 | No CI/CD; two `render.yaml` configs; service-name mismatch | ⏳ | Single authoritative manifest + CI (pytest) planned |
 | TD-9 | (spare) | — | — |
@@ -58,8 +58,8 @@ Legend: ✅ **Resolved** · 🔶 **Partially resolved** · ⏳ **Open**
 
 ## 5. Planned Work (next phases)
 
-- **Phase 6A (RC-4 candidate):** Survey re-alignment to 4 components / 12 elements + backend API
-  (TD-6).
+- **Phase 6A (RC-4):** Formal compliance audit of the 4-component / 12-element survey mapping +
+  live SMS Maturity dashboard output (survey itself is already aligned at v3.0.0).
 - **Platform hygiene (RC-5):** TD-7, TD-11, TD-13 leftovers.
 - **Release tooling (RC-5):** CI (lint + pytest + deploy), single `render.yaml` (TD-8), index
   alignment (TD-10).
