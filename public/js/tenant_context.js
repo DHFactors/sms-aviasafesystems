@@ -27,6 +27,7 @@
     // directorates).
     var DEMO_PERSONAS = [
         { key: 'developer', label: 'Developer / Super-Admin', tenant: 'developer' },
+        { key: 'smd', label: 'SMD (Safety Management Dept - CAAN)', tenant: 'smd' },
         { key: 'fixed-wing', label: 'Fixed-Wing', tenant: 'himalaya-airlines-demo' },
         { key: 'rotary', label: 'Rotary', tenant: 'air-dynasty-demo' },
         { key: 'amo', label: 'AMO', tenant: 'nepal-aero-maintenance-demo' },

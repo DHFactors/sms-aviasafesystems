@@ -25,6 +25,7 @@
         'ground': 'Ground Operations Department',
         'ramp': 'Ground Operations Department',
         'cabin': 'Cabin Services Department',
+        'smd': 'CAAN - Safety Management Department (SMD)',
         'assd': 'CAAN - Aerodrome Safety Standards Dept',
         'fssd': 'CAAN - Flight Safety Standards Dept',
     };

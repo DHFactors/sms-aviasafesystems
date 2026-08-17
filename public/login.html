@@ -324,6 +324,23 @@ function onDemoPersonaChange(value) {
         updateTenantDisplay();
         return;
     }
+
+    // CAAN SMD persona: scope to the regulator tenant and autofill the State
+    // Safety Management Department account. Role-based routing lands on the
+    // State Aviation Safety Oversight dashboard (/caan.html).
+    if (value === 'smd') {
+        developerPersonaActive = false;
+        if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
+            TenantResolver.setDemoTenant('caan');
+        }
+        var smdEmail = document.getElementById('email');
+        var smdPassword = document.getElementById('password');
+        if (smdEmail) smdEmail.value = 'smd@caanepal.gov.np';
+        if (smdPassword) smdPassword.value = 'CAAN-Safety-2026';
+        updateTenantDisplay();
+        return;
+    }
+
     developerPersonaActive = false;
     if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
         TenantResolver.setDemoTenant(value);
