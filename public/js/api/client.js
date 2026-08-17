@@ -69,7 +69,12 @@ const ApiClient = {
             const session = await getCurrentUser();
             const email = (session && session.email) || '';
             if (email && typeof resolveDepartmentFromEmail === 'function') {
-                return resolveDepartmentFromEmail(email);
+                let tenantId = null;
+                if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
+                    tenantId = TenantResolver.getCurrentTenant();
+                }
+                if (!tenantId && session) tenantId = session.tenantId || null;
+                return resolveDepartmentFromEmail(email, tenantId);
             }
             return null;
         } catch {

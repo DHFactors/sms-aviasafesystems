@@ -65,6 +65,12 @@ TAXONOMY_POOL = {
 }
 ICAO_CATEGORIES = list(TAXONOMY_POOL.keys())
 
+# ICAO ADREP categories that only an aircraft in flight (or on the runway for
+# departure / arrival) can experience. Excluded from the pools of non-flying
+# tenants (AMO, aerodrome, ground handling, CAAN directorates) so occurrence
+# reporting and risk templates respect ``operates_flights``.
+FLIGHT_ONLY_ICAO_CATEGORIES = {"LOCI", "CFIT", "MAC", "ARC", "WX"}
+
 SOURCES = [
     "VSR", "MOR", "Internal Audit", "Quality Audit",
     "Safety Inspection", "Flight Diversion",
@@ -211,11 +217,26 @@ def _fishbone_doc(rng: SeededRandom, seed: int, can_index: int, submitted_by: st
     return {"root_causes": root_causes, "action_items": action_items}
 
 
+def _icao_categories_for(tenant_id: str) -> list:
+    """ICAO ADREP categories applicable to a tenant.
+
+    Flight-only categories (LOCI, CFIT, MAC, ARC, WX) populate exclusively for
+    AOC-holding airlines; AMO / aerodrome / ground-handling / regulator tenants
+    draw only from non-flight categories (e.g. GCOL, BIRD, ENG, SYS, FIRE,
+    PRO, RE, RI, CABIN, OTHER).
+    """
+    from seed.tenant_profiles import get_operates_flights
+
+    if get_operates_flights(tenant_id):
+        return list(ICAO_CATEGORIES)
+    return [c for c in ICAO_CATEGORIES if c not in FLIGHT_ONLY_ICAO_CATEGORIES]
+
+
 def _hazard_doc(rng: SeededRandom, profile: dict, index: int) -> dict:
     tenant_id = profile["id"]
     created_at = generate_timestamp(rng, days_back_min=0, days_back_max=365)
     year = created_at.year
-    category = rng.choice(ICAO_CATEGORIES)
+    category = rng.choice(_icao_categories_for(tenant_id))
     taxonomy = TAXONOMY_POOL[category]
     severity = rng.randint(2, 5)
     probability = rng.randint(1, 4)

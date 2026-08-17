@@ -19,7 +19,7 @@ fallbacks so pre-existing profiles still seed cleanly.
 
 from typing import List, Optional
 
-from app.models.tenant_profile import TenantOperationalProfile
+from app.models.tenant_profile import OperationalScope, TenantOperationalProfile
 from seed.config import CREDENTIAL_EMAIL_DOMAINS, OPERATOR_PROFILES
 
 CATEGORY_FIXED_WING = "Fixed-Wing"
@@ -28,6 +28,16 @@ CATEGORY_AMO = "Independent AMO"
 CATEGORY_AERODROME = "Certified Aerodrome"
 CATEGORY_GROUND_HANDLING = "Ground Handling Services"
 CATEGORY_CAAN = "CAAN Directorates"
+
+# Category -> formal operational scope (single source of classification).
+CATEGORY_TO_SCOPE = {
+    CATEGORY_FIXED_WING: OperationalScope.AIRLINE_FIXED_WING,
+    CATEGORY_ROTOR_WING: OperationalScope.AIRLINE_ROTARY,
+    CATEGORY_AMO: OperationalScope.AMO,
+    CATEGORY_AERODROME: OperationalScope.AERODROME,
+    CATEGORY_GROUND_HANDLING: OperationalScope.GROUND_HANDLING,
+    CATEGORY_CAAN: OperationalScope.REGULATOR,
+}
 
 # Firestore path: tenants/{tenant_id}/profile/{PROFILE_DOC_ID}
 PROFILE_COLLECTION = "profile"
@@ -76,6 +86,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Buddha Air",
         email=_operator_email("buddha-air"),
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="Scheduled domestic + regional",
         fleet=["Beechcraft 1900D", "ATR 42-320", "ATR 72-500"],
         base_hub="Kathmandu (VNKT)",
@@ -95,6 +106,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Air Dynasty Heli Services",
         email=_operator_email("air-dynasty"),
         category=CATEGORY_ROTOR_WING,
+        scope=OperationalScope.AIRLINE_ROTARY,
         operation_type="HEMS / VIP / mountain LZ",
         fleet=["Airbus AS350 Écureuil", "Bell 407", "Bell 429 GlobalRanger", "Eurocopter EC135"],
         base_hub="Kathmandu (VNKT) Helipad",
@@ -113,6 +125,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Kathmandu MRO Services",
         email=_operator_email("ktm-mro"),
         category=CATEGORY_AMO,
+        scope=OperationalScope.AMO,
         operation_type="Independent AMO (base + line)",
         fleet=["Engine Test Benches", "Avionics Calibration Rigs", "NDT Mobile Labs"],
         base_hub="TIA Hangar Complex, Kathmandu",
@@ -130,6 +143,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Pokhara Regional Aerodrome",
         email=_operator_email("pokhara-aerodrome"),
         category=CATEGORY_AERODROME,
+        scope=OperationalScope.AERODROME,
         operation_type="Certified aerodrome (Runway 05/23)",
         fleet=["ARFF Crash Tenders", "Runway Sweepers", "Friction Testers"],
         base_hub="Pokhara (VNPK)",
@@ -147,6 +161,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Himalaya Ground Handling",
         email=_operator_email("himalaya-ground-services"),
         category=CATEGORY_GROUND_HANDLING,
+        scope=OperationalScope.GROUND_HANDLING,
         operation_type="Ground handling / turnaround services",
         fleet=["Ground Power Units (GPU)", "Baggage Belt Loaders", "Pushback Tugs", "Passenger Stairs"],
         base_hub="Kathmandu (VNKT)",
@@ -163,6 +178,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Yeti Airlines",
         email=_operator_email("yeti-airlines"),
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="Scheduled + STOL mountain",
         fleet=["ATR 72-500", "ATR 42-320", "de Havilland DHC-6 Twin Otter"],
         base_hub="Kathmandu (VNKT)",
@@ -182,6 +198,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Summit Air",
         email=_operator_email("summit-air"),
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="STOL / mountain cargo + passenger",
         fleet=["Dornier Do 228", "Let L-410 Turbolet", "de Havilland DHC-6 Twin Otter"],
         base_hub="Kathmandu (VNKT)",
@@ -200,6 +217,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Sita Air",
         email=_operator_email("sita-air"),
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="Scheduled + STOL mountain",
         fleet=["de Havilland DHC-6 Twin Otter", "Dornier Do 228"],
         base_hub="Kathmandu (VNKT)",
@@ -218,6 +236,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Simrik Air",
         email=_operator_email("simrik-air"),
         category=CATEGORY_ROTOR_WING,
+        scope=OperationalScope.AIRLINE_ROTARY,
         operation_type="VFR helicopter / mountain LZ",
         fleet=["Airbus AS350 Écureuil", "Bell 407"],
         base_hub="Pokhara (VNPK) Helipad",
@@ -236,6 +255,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="Tara Air",
         email=_operator_email("tara-air"),
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="STOL mountain scheduled",
         fleet=["de Havilland DHC-6 Twin Otter", "Dornier 228"],
         base_hub="Kathmandu (VNKT)",
@@ -254,6 +274,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="CAAN Flight Safety Standards Dept",
         email=_operator_email("caan-fssd"),
         category=CATEGORY_CAAN,
+        scope=OperationalScope.REGULATOR,
         operation_type="Flight safety standards oversight",
         fleet=["Flight Inspection Aircraft", "Audit Instrumentation Kits", "Surveillance Drones"],
         base_hub="Kathmandu (VNKT)",
@@ -272,6 +293,7 @@ TENANT_OPERATIONAL_PROFILES = {
         tenant_name="CAAN Aerodrome Safety Standards Dept",
         email=_operator_email("caan-assd"),
         category=CATEGORY_CAAN,
+        scope=OperationalScope.REGULATOR,
         operation_type="Aerodrome certification & ground safety oversight",
         fleet=["ARFF Audit Vehicles", "Runway Friction Testers", "Visual Aid Inspection Kits"],
         base_hub="Kathmandu (VNKT)",
@@ -295,6 +317,7 @@ DEMO_REFERENCE_PROFILES = {
         tenant_name="Himalaya Airlines (Demo)",
         email="safety@himalaya-airlines-demo.com",
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="Scheduled international / trunk",
         fleet=["Airbus A319", "Airbus A320"],
         base_hub="Kathmandu (VNKT)",
@@ -313,6 +336,7 @@ DEMO_REFERENCE_PROFILES = {
         tenant_name="Yeti-Tara (Demo)",
         email="safety@yeti-tara-demo.com",
         category=CATEGORY_FIXED_WING,
+        scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="Scheduled + STOL mountain",
         fleet=["ATR 72-500", "de Havilland DHC-6 Twin Otter 400"],
         base_hub="Kathmandu (VNKT) / Nepalgunj (VNKG)",
@@ -330,6 +354,7 @@ DEMO_REFERENCE_PROFILES = {
         tenant_name="Air Dynasty (Demo)",
         email="safety@air-dynasty-demo.com",
         category=CATEGORY_ROTOR_WING,
+        scope=OperationalScope.AIRLINE_ROTARY,
         operation_type="HEMS / high-altitude LZ",
         fleet=["Airbus H125", "Bell 407GXi"],
         base_hub="Kathmandu (VNKT) / Pokhara (VNPK) Helipad",
@@ -349,6 +374,7 @@ DEMO_REFERENCE_PROFILES = {
         tenant_name="Nepal Aero Maintenance (Demo)",
         email="safety@nepal-aero-maintenance-demo.com",
         category=CATEGORY_AMO,
+        scope=OperationalScope.AMO,
         operation_type="Independent AMO (TIA hangar)",
         fleet=["Engine Test Benches", "Avionics Calibration Rigs", "NDT Mobile Labs"],
         base_hub="TIA Hangar, Kathmandu",
@@ -364,6 +390,7 @@ DEMO_REFERENCE_PROFILES = {
         tenant_name="TIA Kathmandu (Demo)",
         email="safety@tia-kathmandu-demo.com",
         category=CATEGORY_AERODROME,
+        scope=OperationalScope.AERODROME,
         operation_type="Certified aerodrome (RWY 02/20)",
         fleet=["ARFF Crash Tenders", "Runway Sweepers", "Friction Testers"],
         base_hub="Kathmandu (VNKT)",
@@ -411,6 +438,30 @@ def get_hazard_domains(tenant_id: str) -> List[str]:
     if profile:
         return list(profile.hazard_domains)
     return []
+
+
+def get_operates_flights(tenant_id: str) -> bool:
+    """True only for AOC-holding airlines (fixed-wing + rotary).
+
+    AMO / aerodrome / ground-handling / regulator tenants never operate
+    flights, so flight-specific hazard categories (CFIT, LOCI, Airspace/ATC,
+    In-Flight Turbulence, Altitude Deviations) are excluded from their pools.
+    """
+    profile = get_profile(tenant_id)
+    if profile is not None:
+        return bool(profile.operates_flights)
+    for p in OPERATOR_PROFILES:
+        if p["id"] == tenant_id:
+            return p.get("tenant_type") in {"airline", "helicopter-operator"}
+    return False
+
+
+def get_applicable_departments(tenant_id: str) -> List[str]:
+    """Department codes the tenant structure may hold, adapted to classification."""
+    profile = get_profile(tenant_id)
+    if profile is not None:
+        return list(profile.applicable_departments)
+    return ["safety"]
 
 
 def authorized_destinations_from_routes(routes: List[str]) -> List[str]:

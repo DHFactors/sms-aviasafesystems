@@ -389,6 +389,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
     document.getElementById('tenantName').textContent = tenantId.replace('-', ' ').toUpperCase();
 
+    // Tenant-classification-aware ICAO ADREP category filter: flight-specific
+    // categories (LOCI/CFIT/MAC/ARC/WX) only populate for AOC-holding airlines.
+    if (typeof getApplicableOccurrenceCategories === 'function') {
+        const allowed = getApplicableOccurrenceCategories(tenantId);
+        const catSelect = document.getElementById('occurrenceCategory');
+        if (catSelect) {
+            const keep = (opt) => allowed.includes(opt.value);
+            Array.from(catSelect.options).forEach((opt) => {
+                if (!keep(opt)) opt.remove();
+            });
+        }
+    }
+
     const now = new Date();
     const pad = (n) => n.toString().padStart(2, '0');
     document.getElementById('occurrenceDate').value =

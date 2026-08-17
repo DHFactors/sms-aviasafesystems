@@ -205,6 +205,102 @@ def test_operational_profile_categories_match_tenant_types():
         assert profile.category == type_to_category[p["tenant_type"]], p["id"]
 
 
+def test_operational_scope_enum_defines_all_classifications():
+    from app.models.tenant_profile import OperationalScope
+
+    assert set(OperationalScope) == {
+        OperationalScope.AIRLINE_FIXED_WING,
+        OperationalScope.AIRLINE_ROTARY,
+        OperationalScope.AMO,
+        OperationalScope.AERODROME,
+        OperationalScope.GROUND_HANDLING,
+        OperationalScope.REGULATOR,
+    }
+
+
+def test_only_airline_scopes_operate_flights():
+    from app.models.tenant_profile import OperationalScope
+
+    assert OperationalScope.AIRLINE_FIXED_WING.operates_flights is True
+    assert OperationalScope.AIRLINE_ROTARY.operates_flights is True
+    for scope in (OperationalScope.AMO, OperationalScope.AERODROME,
+                  OperationalScope.GROUND_HANDLING, OperationalScope.REGULATOR):
+        assert scope.operates_flights is False
+
+
+def test_department_applicability_adapts_to_scope():
+    from app.models.tenant_profile import OperationalScope
+
+    assert OperationalScope.AIRLINE_FIXED_WING.departments == ["safety", "flight_ops", "camo", "qa"]
+    assert OperationalScope.AIRLINE_ROTARY.departments == ["safety", "flight_ops", "camo", "qa"]
+    assert OperationalScope.AMO.departments == ["safety", "maintenance_145", "qa"]
+    assert OperationalScope.AERODROME.departments == ["safety", "airside_ops", "arff"]
+    assert OperationalScope.GROUND_HANDLING.departments == ["safety", "ground_ops", "qa"]
+    assert OperationalScope.REGULATOR.departments == ["safety", "smd", "fssd", "assd"]
+
+
+def test_operational_profiles_classify_flight_scope():
+    from seed.tenant_profiles import TENANT_OPERATIONAL_PROFILES
+
+    for p in OPERATOR_PROFILES:
+        profile = TENANT_OPERATIONAL_PROFILES[p["id"]]
+        expect_flights = p["tenant_type"] in FLIGHT_OPERATOR_TYPES
+        assert profile.operates_flights is expect_flights, p["id"]
+        assert profile.scope.operates_flights is expect_flights, p["id"]
+
+
+def test_non_flying_profiles_never_hold_flight_departments():
+    from seed.tenant_profiles import TENANT_OPERATIONAL_PROFILES
+
+    non_flying = {p["id"] for p in OPERATOR_PROFILES
+                  if p["tenant_type"] not in FLIGHT_OPERATOR_TYPES}
+    for tid in non_flying:
+        profile = TENANT_OPERATIONAL_PROFILES[tid]
+        assert "flight_ops" not in profile.applicable_departments, tid
+        assert "camo" not in profile.applicable_departments, tid
+
+
+def test_amo_and_aerodrome_department_profiles():
+    from seed.tenant_profiles import TENANT_OPERATIONAL_PROFILES
+
+    amo = TENANT_OPERATIONAL_PROFILES["ktm-mro"]
+    assert amo.scope.value == "AMO"
+    assert amo.operates_flights is False
+    assert "maintenance_145" in amo.applicable_departments
+    assert "qa" in amo.applicable_departments
+
+    aerodrome = TENANT_OPERATIONAL_PROFILES["pokhara-aerodrome"]
+    assert aerodrome.scope.value == "AERODROME"
+    assert aerodrome.operates_flights is False
+    assert "airside_ops" in aerodrome.applicable_departments
+    assert "arff" in aerodrome.applicable_departments
+    assert "maintenance_145" not in aerodrome.applicable_departments
+    assert "camo" not in aerodrome.applicable_departments
+
+
+def test_get_operates_flights_helper():
+    from seed.tenant_profiles import get_operates_flights
+
+    for p in OPERATOR_PROFILES:
+        expected = p["tenant_type"] in FLIGHT_OPERATOR_TYPES
+        assert get_operates_flights(p["id"]) is expected, p["id"]
+
+
+def test_non_flying_tenants_never_get_flight_only_hazard_categories():
+    from seed.hazard_can import (
+        _icao_categories_for,
+        FLIGHT_ONLY_ICAO_CATEGORIES,
+    )
+
+    for p in OPERATOR_PROFILES:
+        cats = set(_icao_categories_for(p["id"]))
+        if p["tenant_type"] in FLIGHT_OPERATOR_TYPES:
+            assert cats == set(_icao_categories_for("buddha-air")), p["id"]
+        else:
+            assert not (cats & FLIGHT_ONLY_ICAO_CATEGORIES), p["id"]
+            assert cats, p["id"]
+
+
 def test_rotor_wing_profiles_never_list_fixed_wing_aircraft():
     from seed.tenant_profiles import TENANT_OPERATIONAL_PROFILES, CATEGORY_ROTOR_WING
 
