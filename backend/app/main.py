@@ -24,6 +24,7 @@ CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
     "https://sms-beta.web.app",
+    "https://demo.aviasafesystems.com",
     # Public survey frontends (multi-tenant subdomains / portals)
     "https://smssurvey.gsacharya.com",
     "https://sms.nac.com.np",
@@ -85,14 +86,14 @@ def _cors_headers(request: Request) -> dict:
     generic "Network error" instead of surfacing the real message.
     """
     try:
-        from app.core.cors import _allowed_origins
+        from app.core.cors import _allowed_origins, ALLOWED_HEADERS
         origin = request.headers.get("origin")
         if origin and origin in _allowed_origins():
             return {
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Tenant-Id, X-Task-Key, X-Request-ID",
+                "Access-Control-Allow-Headers": ALLOWED_HEADERS,
                 "Vary": "Origin",
             }
     except Exception:

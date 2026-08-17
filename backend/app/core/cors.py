@@ -24,10 +24,23 @@ CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
     "https://sms-beta.web.app",
+    "https://demo.aviasafesystems.com",
     # Public survey frontends (multi-tenant subdomains / portals)
     "https://smssurvey.gsacharya.com",
     "https://sms.nac.com.np",
     "https://ssp.caanepal.gov.np",
+)
+
+# Every header the frontend (and the multi-tenant demo/routing layer) sends on
+# cross-origin calls. Must cover all case variants actually emitted by the SPA,
+# because browsers compare the request header name against this list verbatim.
+# "X-User-Department" and "X-Tenant-Id" are the tenant-routing headers added by
+# public/js/api/client.js; "X-Task-Key" / "X-Request-ID" are server-driven.
+ALLOWED_HEADERS = (
+    "Content-Type, Authorization, "
+    "X-Tenant-Id, X-Tenant-ID, x-tenant-id, "
+    "X-User-Department, x-user-department, "
+    "X-Task-Key, X-Request-ID"
 )
 
 
@@ -55,8 +68,6 @@ class ManualCORSMiddleware(BaseHTTPMiddleware):
         response.headers["Access-Control-Allow-Methods"] = (
             "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         )
-        response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Tenant-Id, X-Task-Key, X-Request-ID"
-        )
+        response.headers["Access-Control-Allow-Headers"] = ALLOWED_HEADERS
         response.headers["Vary"] = "Origin"
         return response
