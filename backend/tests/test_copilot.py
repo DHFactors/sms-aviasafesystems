@@ -341,6 +341,7 @@ def test_guest_chat_requires_valid_message(monkeypatch):
 def test_chat_without_groq_api_key_returns_graceful_200(monkeypatch):
     db = _FakeDB()
     _seed_tenant(db)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     _patch_env(monkeypatch, db=db, groq=False, api_key=None)
 
     resp = _chat({"message": "How do I start an RCA?"})
