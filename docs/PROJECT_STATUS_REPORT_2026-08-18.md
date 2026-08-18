@@ -3,7 +3,7 @@
 **Project**: AviaSAFE SMS — Safety Climate Measurement System (ICAO Annex 19 compliant)
 **Report Date**: 2026-08-18
 **Prepared by**: AviaSAFE Systems engineering (Opencode-assisted)
-**Verification**: All figures below were verified against the committed codebase (HEAD `63fc583`), the
+**Verification**: All figures below were verified against the committed codebase (HEAD `69f16dc`), the
 backend test suite (**358 passed**), the frontend Node test suite, and the live beta environment
 (`https://betasms.aviasafesystems.com`) on the report date.
 
@@ -40,6 +40,13 @@ backend test suite (**358 passed**), the frontend Node test suite, and the live 
   (resolves the `proxies` keyword error), lazy reusable Groq client keyed by `(api_key, Groq)` with
   `threading.Lock`, `asyncio.to_thread` in async routes, bottom-most exception logging, and the model
   switched to `openai/gpt-oss-120b` after discovering the key's Groq plan exposes no llama-3.x models.
+- **Landing page fixes (2026-08-18, `69f16dc`)** — fixed the theme toggle so page-authored
+  `[data-theme-toggle]` buttons get their click handler bound (`bindButton()` is now idempotent and
+  applies to both authored and auto-injected buttons); added a floating scroll-to-top button
+  (revealed after 300px, smooth-scrolls, offset above the Copilot-widget corner); slimmed the footer
+  (`mt-16/pt-8` → `mt-8/pt-4`), replaced the "Already an authorized user?" sign-in line with the
+  Ghanshyam Acharya attribution, and added `brand.300/400` to the landing Tailwind config so the
+  attribution link colors render. Deployed to `sms-beta` and verified live.
 - **Self-service onboarding + landing + login polish (2026-08-17 → 08-18)** — self-service tenant
   registration (`/register.html`), real-time invite-code verification and least-privilege team
   onboarding (`/join.html`), hybrid landing page (`index.html`), brand/deep-teal token migration for
@@ -67,6 +74,9 @@ backend test suite (**358 passed**), the frontend Node test suite, and the live 
 | Copilot widget light-mode variant | `public/css/copilot-widget.css` | ✅ Complete (`f1d66a7`) | Repo |
 | Theme toggle repositioned into right header actions | `public/index.html` | ✅ Complete (`619a671`) | Repo |
 | Login subtitle → "Safety Data to Safety Intelligence" (static + JS fallback) | `public/login.html` | ✅ Complete (`63fc583`) | Repo |
+| **Landing: bind click handler on authored theme-toggle buttons** | `public/js/theme-toggle.js` | ✅ Complete (`69f16dc`) | Repo |
+| **Landing: floating scroll-to-top button + reveal/smooth-scroll logic** | `public/index.html` | ✅ Complete (`69f16dc`) | Repo |
+| **Landing: slim footer + Ghanshyam Acharya attribution + `brand.300/400` config** | `public/index.html` | ✅ Complete (`69f16dc`) | Repo |
 | Self-service tenant registration + team onboarding | `public/register.html`, `public/join.html`, backend auth routes | ✅ Complete (`c1a4869`) | Repo |
 | Real-time invite-code verification + onboarding safeguards | `public/join.html`, backend `verify-invite` / `tenant-lookup` | ✅ Complete (`f554ef0`) | Repo |
 | Hybrid landing page (hero + capabilities + dual beta onboarding) | `public/index.html` | ✅ Complete (`9c4a0cc`, `9487c5d`) | Repo |
@@ -172,6 +182,6 @@ backend test suite (**358 passed**), the frontend Node test suite, and the live 
 
 ---
 
-*End of report. Generated 2026-08-18 from committed code (HEAD `63fc583`) + live environment data.*
+*End of report. Generated 2026-08-18 from committed code (HEAD `69f16dc`) + live environment data.*
 
 **User Reference:** For definitions of core terminology, chart legends, hazard matrices, and the CAN/CAP workflow, see [docs/GLOSSARY.md](./GLOSSARY.md).
