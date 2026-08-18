@@ -112,6 +112,9 @@ CODE OWNER: AviaSafeSystems
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
+        html {
+            scroll-behavior: smooth;
+        }
         .trust-logos {
             display: flex;
             justify-content: center;
@@ -133,20 +136,6 @@ CODE OWNER: AviaSafeSystems
             font-size: var(--font-size-sm);
             color: var(--color-gray-600);
             letter-spacing: 0.3px;
-        }
-        .tenant-input-group {
-            display: flex;
-            max-width: 400px;
-            margin: 0 auto;
-            gap: var(--spacing-sm);
-        }
-        .tenant-input-group input {
-            flex: 1;
-            padding: var(--spacing-md);
-            font-size: var(--font-size-base);
-        }
-        .tenant-input-group .btn {
-            padding: var(--spacing-md) var(--spacing-xl);
         }
         .final-cta-section {
             text-align: center;
@@ -280,7 +269,6 @@ CODE OWNER: AviaSafeSystems
         }
         @media (max-width: 600px) {
             .feature-group-cards { grid-template-columns: 1fr; }
-            .tenant-input-group { flex-direction: column; }
             .trust-logos { flex-direction: column; align-items: center; }
         }
     </style>
@@ -301,47 +289,25 @@ CODE OWNER: AviaSafeSystems
             <ul>
                 <li><a href="/" class="active">Home</a></li>
                 <li><a href="#features">Features</a></li>
-                <li><a href="#tenants">Tenant Portal</a></li>
+                <li><a href="#onboarding">Beta Access</a></li>
                 <li><a href="contact.html">Contact</a></li>
-                <li><a href="login.html" class="btn-login">Login</a></li>
+                <li><a href="login.html" class="btn-login">Sign In</a></li>
             </ul>
         </nav>
     </div>
 </header>
 
-<!-- ========== PORTAL HUB ========== -->
-<section id="hero" class="portal-hub-section">
+<!-- ========== HERO ========== -->
+<section id="hero" class="portal-hub-section hero">
     <div class="container">
         <div class="portal-hub-intro">
-            <span class="hero-badge">AVIASAFESMS BETA — SAFETY MANAGEMENT &amp; INTELLIGENCE PLATFORM</span>
-            <h1 class="hero-headline">Welcome to AviaSAFESMS</h1>
-            <p class="hero-lead">Choose a path below to get started with the beta platform.</p>
+            <span class="hero-badge">AVIASAFESMS — AVIATION SAFETY MANAGEMENT &amp; STATE OVERSIGHT</span>
+            <h1 class="hero-headline">Turn Safety Data into Safety Intelligence</h1>
+            <p class="hero-lead">Aviation Safety Management &amp; State Oversight platform engineered for ICAO Annex 19 (3rd Edition) compliance.</p>
         </div>
-        <div class="portal-hub-cards">
-            <!-- Card 1: New users -->
-            <div class="portal-card">
-                <div class="portal-card-icon"><i class="fas fa-rocket" aria-hidden="true"></i></div>
-                <h2>New to AviaSAFE Beta?</h2>
-                <p>Register your organization or join an existing team with your invite code.</p>
-                <a href="/register.html" class="btn btn-primary btn-lg portal-cta">
-                    <span class="portal-cta-icon">🏢</span>
-                    <span>Register Organization<small>Safety Manager</small></span>
-                </a>
-                <a href="/join.html" class="btn btn-outline-light btn-lg portal-cta">
-                    <span class="portal-cta-icon">👥</span>
-                    <span>Join with Invite Code<small>Team / Postholders</small></span>
-                </a>
-            </div>
-            <!-- Card 2: Existing users -->
-            <div class="portal-card portal-card-alt">
-                <div class="portal-card-icon"><i class="fas fa-user-check" aria-hidden="true"></i></div>
-                <h2>Existing Users</h2>
-                <p>Returning postholder or staff member? Sign in to your SMS dashboard.</p>
-                <a href="/login.html" class="btn btn-primary btn-lg portal-cta">
-                    <span class="portal-cta-icon">🔐</span>
-                    <span>Sign In to SMS Dashboard</span>
-                </a>
-            </div>
+        <div class="hero-cta btn-group">
+            <a href="#onboarding" class="btn btn-primary btn-lg">🚀 Get Beta Access</a>
+            <a href="/login.html" class="btn btn-outline-light btn-lg">🔐 Sign In to SMS</a>
         </div>
     </div>
 </section>
@@ -443,19 +409,19 @@ CODE OWNER: AviaSafeSystems
             </div>
             <div class="feature-group-cards">
                 <div class="feature-card">
-                    <i class="fas fa-triangle-exclamation"></i>
-                    <h4>Hazard Identification &amp; Risk Assessment</h4>
+                    <i class="fas fa-th-large"></i>
+                    <h4>Safety Risk Assessment — 5&times;5 SRA Matrix</h4>
                     <div class="tagline">From report to managed risk</div>
-                    <p>Register hazards, assess likelihood and severity, and monitor risk across the Master Register.</p>
+                    <p>Assess likelihood and severity on the classic 5&times;5 SRA matrix, classify risk, and monitor it across the Master Risk Register.</p>
                     <span class="badge badge-pulse">Core Capability</span>
                 </div>
 
                 <div class="feature-card">
-                    <i class="fas fa-gavel"></i>
-                    <h4>Mandatory Occurrence Reporting</h4>
-                    <div class="tagline">Structured regulatory reporting</div>
-                    <p>Manage occurrence information, required reporting workflows, and audit-ready records.</p>
-                    <span class="badge badge-regulatory">Regulatory-Ready</span>
+                    <i class="fas fa-dna"></i>
+                    <h4>5M+1E Fishbone Root Cause Analysis</h4>
+                    <div class="tagline">From event to root cause</div>
+                    <p>Structure investigations with the 5M+1E fishbone — Man, Machine, Medium, Mission, Management and Environment — to uncover genuine root causes.</p>
+                    <span class="badge badge-regulatory">Investigation-Ready</span>
                 </div>
             </div>
         </div>
@@ -469,19 +435,19 @@ CODE OWNER: AviaSafeSystems
             </div>
             <div class="feature-group-cards">
                 <div class="feature-card">
-                    <i class="fas fa-cockpit"></i>
-                    <h4>Safety Dashboard</h4>
-                    <div class="tagline">Your Safety Cockpit</div>
-                    <p>Monitor safety performance, risk distribution, trends, and key indicators through an executive-level safety view.</p>
+                    <i class="fas fa-tasks"></i>
+                    <h4>Corrective Action Plan (CAP) Tracking</h4>
+                    <div class="tagline">Track to closure</div>
+                    <p>Assign owners, set deadlines and follow corrective action plans through to closure so risks are controlled and safety assurance is demonstrable.</p>
                     <span class="badge badge-cockpit">Command Center</span>
                 </div>
 
                 <div class="feature-card">
-                    <i class="fas fa-heart-pulse"></i>
-                    <h4>Regulatory &amp; Industry Intelligence</h4>
-                    <div class="tagline">Connect SMS with oversight</div>
-                    <p>Enable secure, aggregated safety intelligence for regulatory oversight and industry-level risk understanding.</p>
-                    <span class="badge badge-pulse">Regulator Access</span>
+                    <i class="fas fa-robot"></i>
+                    <h4>Executive Safety Copilot</h4>
+                    <div class="tagline">Ghanshyam — AI Safety Advisor</div>
+                    <p>Ask the Executive Safety Copilot to interpret risk, guide 5M+1E investigations, and align your SMS with ICAO Annex 19 (3rd Edition) in plain language.</p>
+                    <span class="badge badge-pulse">AI-Assisted</span>
                 </div>
             </div>
         </div>
@@ -527,6 +493,39 @@ CODE OWNER: AviaSafeSystems
         <p class="workflow-closing">
             One connected safety management cycle. One clearer view of organizational safety.
         </p>
+    </div>
+</section>
+
+<!-- ========== BETA ONBOARDING ========== -->
+<section class="portal-hub-section" id="onboarding">
+    <div class="container">
+        <div class="portal-hub-intro">
+            <span class="hero-badge">BETA ONBOARDING</span>
+            <h1>Get Started with AviaSAFESMS</h1>
+            <p>Choose the path that fits you — register your organization or join an existing team with an invite code.</p>
+        </div>
+        <div class="portal-hub-cards">
+            <!-- Card 1: Safety managers & operators -->
+            <div class="portal-card">
+                <div class="portal-card-icon"><i class="fas fa-building" aria-hidden="true"></i></div>
+                <h2>Safety Managers &amp; Operators</h2>
+                <p>Register your airline, AMO, or aerodrome for full SMS workspace access.</p>
+                <a href="/register.html" class="btn btn-primary btn-lg portal-cta">
+                    <span class="portal-cta-icon">🏢</span>
+                    <span>Register Organization</span>
+                </a>
+            </div>
+            <!-- Card 2: Postholders & staff -->
+            <div class="portal-card portal-card-alt">
+                <div class="portal-card-icon"><i class="fas fa-user-plus" aria-hidden="true"></i></div>
+                <h2>Postholders &amp; Flight/Ground Staff</h2>
+                <p>Have an organization invite code from your Safety Manager?</p>
+                <a href="/join.html" class="btn btn-primary btn-lg portal-cta">
+                    <span class="portal-cta-icon">👥</span>
+                    <span>Join with Invite Code</span>
+                </a>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -594,21 +593,6 @@ CODE OWNER: AviaSafeSystems
         <p class="final-cta-secondary">
             Prefer to explore first? <a href="#features">Take a brief look at the platform</a>.
         </p>
-    </div>
-</section>
-
-<!-- ========== CUSTOMER ACCESS ========== -->
-<section class="customer-access-section" id="tenants">
-    <div class="container">
-        <p class="customer-access-label">
-            Already an AviaSAFESMS customer? <a href="login.html">Access your organization portal</a>
-        </p>
-        <div class="tenant-input-group">
-            <input type="text" id="tenantInput" placeholder="Enter your organization name" aria-label="Organization name">
-            <button class="btn" onclick="goToTenant()">
-                <i class="fas fa-arrow-right"></i> Go
-            </button>
-        </div>
     </div>
 </section>
 
@@ -685,25 +669,8 @@ CODE OWNER: AviaSafeSystems
 
 <script>
 // ============================================================================
-// INDEX PAGE - Tenant Portal
+// INDEX PAGE
 // ============================================================================
-
-function goToTenant() {
-    const input = document.getElementById('tenantInput');
-    const tenantId = input.value.trim().toLowerCase();
-
-    if (!tenantId) {
-        alert('Please enter a tenant ID.');
-        return;
-    }
-
-    if (!/^[a-z0-9-]+$/.test(tenantId)) {
-        alert('Tenant ID can only contain lowercase letters, numbers, and hyphens.');
-        return;
-    }
-
-    window.location.href = 'https://' + tenantId + '.aviasafesystems.com';
-}
 
 // ============================================================================
 // FOUNDER BIO MODAL
@@ -731,12 +698,6 @@ document.getElementById('bioModalCloseBtn').addEventListener('click', closeBioMo
 
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeBioModal();
-});
-
-document.getElementById('tenantInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-        goToTenant();
-    }
 });
 
 // Subdomain redirect
