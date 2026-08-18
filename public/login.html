@@ -38,6 +38,10 @@ AUTHOR: AviaSAFE Systems
         }
         .login-container .logo i { font-size: 3rem; }
         .login-container .logo h1 { margin-bottom: var(--spacing-xs); }
+        .login-container .logo p#tenantHeaderName.is-tenant {
+            font-weight: 600;
+            color: var(--color-accent);
+        }
         .form-group .form-control {
             width: 100%;
             padding: var(--spacing-md);
@@ -76,23 +80,6 @@ AUTHOR: AviaSAFE Systems
         .badge-admin { background: var(--color-danger-bg); color: var(--color-danger); }
         .badge-caan { background: var(--color-info-bg); color: var(--color-info); }
         .badge-airline { background: var(--color-success-bg); color: var(--color-success); }
-        /* ========== REGISTER PROMPT ========== */
-        .register-prompt {
-            margin-top: var(--spacing-lg);
-            padding: var(--spacing-md);
-            text-align: center;
-            font-size: var(--font-size-sm);
-            color: var(--color-gray-700);
-            background: var(--color-gray-100);
-            border-radius: var(--border-radius-md);
-        }
-        .register-prompt i { margin-right: var(--spacing-xs); color: var(--color-primary); }
-        .register-prompt a {
-            color: var(--color-primary);
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .register-prompt a:hover { text-decoration: underline; }
         .footer-links {
             text-align: center;
             margin-top: var(--spacing-lg);
@@ -111,7 +98,7 @@ AUTHOR: AviaSAFE Systems
         <div class="logo">
             <i class="fas fa-shield-alt"></i>
             <h1>AviaSAFE</h1>
-            <p>Safety Management &amp; Intelligence Platform</p>
+            <p id="tenantHeaderName">Safety Management &amp; Intelligence Platform</p>
         </div>
 
         <div id="demoPersonaSection" class="demo-persona" style="display:none;">
@@ -143,12 +130,6 @@ AUTHOR: AviaSAFE Systems
             </button>
         </form>
 
-        <div class="register-prompt">
-            <i class="fas fa-building" aria-hidden="true"></i>
-            Need to register an organization?
-            <a href="/register.html">Click here &rarr; Register Organization</a>
-        </div>
-
         <div class="role-hint">
             <p><strong><i class="fas fa-shield-alt"></i> Authorized Personnel Only</strong></p>
             <p style="font-size: var(--font-size-xs); color: var(--color-gray-600); margin-top: var(--spacing-sm);">
@@ -159,8 +140,6 @@ AUTHOR: AviaSAFE Systems
 
         <div class="footer-links">
             <a href="/">← Back to Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/register.html">Register Organization</a>
             <span class="footer-divider">|</span>
             <a href="/join.html">Join Your Team</a>
         </div>
@@ -320,24 +299,49 @@ function onDemoPersonaChange(value) {
     }
 }
 
+// Reserved platform keywords must never render as an active tenant scope,
+// even when passed explicitly via ?tenant=.
+var RESERVED_TENANT_KEYWORDS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+
+function prettifyTenantName(slug) {
+    if (typeof TenantResolver !== 'undefined' && TenantResolver.prettifySlug) {
+        return TenantResolver.prettifySlug(slug);
+    }
+    return String(slug || '').replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+}
+
+function getActiveTenant() {
+    var tenantId = null;
+    if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
+        tenantId = TenantResolver.getCurrentTenant();
+    } else {
+        tenantId = getTenantFromSubdomain();
+    }
+    if (tenantId && RESERVED_TENANT_KEYWORDS.indexOf(tenantId) !== -1) return null;
+    return tenantId || null;
+}
+
 async function updateTenantDisplay() {
-    var displayEl = document.getElementById('tenantDisplay');
+    var displayEl = document.getElementById('tenantHeaderName');
     if (!displayEl) return;
     if (developerPersonaActive) {
         displayEl.textContent = 'Developer Console (Super-Admin)';
+        displayEl.classList.add('is-tenant');
         return;
     }
-    if (typeof TenantResolver === 'undefined') {
-        displayEl.textContent = 'Unknown';
-        return;
-    }
-    var tenantId = TenantResolver.getCurrentTenant();
+    var tenantId = getActiveTenant();
     if (!tenantId) {
-        displayEl.textContent = 'AviaSAFE Platform';
+        // Root / default platform host — no active tenant scope.
+        displayEl.textContent = 'Safety Management & Intelligence Platform';
+        displayEl.classList.remove('is-tenant');
         return;
     }
-    var title = await TenantResolver.resolveTenantTitle(tenantId);
-    displayEl.textContent = title || tenantId;
+    var title = null;
+    if (typeof TenantResolver !== 'undefined' && TenantResolver.resolveTenantTitle) {
+        title = await TenantResolver.resolveTenantTitle(tenantId);
+    }
+    displayEl.textContent = title || prettifyTenantName(tenantId);
+    displayEl.classList.add('is-tenant');
 }
 
 // ============================================================================
