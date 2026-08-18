@@ -1,727 +1,643 @@
-<!-- ============================================================================
-FILE: index.html
-PATH: public/index.html
-VERSION: 2.3.0
-DATE CREATED: 2026-07-26
-DATE REVISED: 2026-07-26
-PURPOSE: Main landing page for AviaSAFE SSP Platform.
-         Marketing-first copy with benefit-driven messaging.
-AUTHOR: Ghanshyam Acharya
-CODE OWNER: AviaSafeSystems
-============================================================================ -->
+<!-- Chosen Palette: Deep Aviation Teal Hero Gradient (#073042 to #0A2540) with Crisp White Typography, combined with Clean Slate Neutral (#F8FAFC) & Pure White (#FFFFFF) Content Sections with Oceanic Blue (#0284C7) Accents -->
+<!-- Application Structure Plan: Hybrid structure combining the high-impact deep teal hero header of the original site with the rich, Annex 19 / Doc 9859 content sections (Trust Badges, Auto-Scrolling Live Dashboard Showcase, 3-Step Workflow Bar, Regulatory & Security Checklists, 6 Capability Cards, Ecosystem Grid, and Dual-Portal Onboarding Hub). -->
+<!-- Visualization & Content Choices: Blends atmospheric deep teal header styling with clean slate/white content sections for maximum contrast and legibility. Uses pure CSS/Tailwind, Canvas/CSS mockups, FontAwesome icons, and smooth CSS animations. Confirming NO SVG / NO Mermaid JS. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AviaSAFESMS — Aviation Safety Management Platform | Safety Data to Safety Intelligence</title>
-    <meta name="description" content="AviaSAFESMS connects safety reporting, hazard and risk management, safety assurance, and performance monitoring in one environment — turning SMS data into safer decisions.">
-    <meta name="keywords" content="aviation safety management system, SMS, ICAO Annex 19, hazard management, safety intelligence, aviation SMS software">
+    <title>AviaSAFE SMS — Aviation Safety Management & State Oversight Platform</title>
+    <meta name="description" content="AviaSAFE SMS is an aviation safety management and state oversight platform engineered for ICAO Annex 19 (3rd Edition), Doc 9859 and Doc 10159 compliance — turning safety data into safety intelligence.">
     <meta property="og:type" content="website">
     <meta property="og:title" content="AviaSAFESMS — From Safety Data to Safety Intelligence">
     <meta property="og:description" content="One connected safety intelligence ecosystem for airlines, operators and regulators — ICAO Annex 19, Doc 9859 and Doc 10159 aligned.">
-    <meta property="og:url" content="https://sms.aviasafesystems.com/">
-    <meta property="og:image" content="/images/screenshots/screenshot-1.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/tenant-overrides.css">
+    <meta property="og:url" content="https://betasms.aviasafesystems.com/">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/styles/global.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        deepTeal: {
+                            900: '#072535',
+                            800: '#0A3A50',
+                            700: '#0E4E6C',
+                            600: '#12648A',
+                        },
+                        brand: {
+                            50: '#F0F9FF',
+                            100: '#E0F2FE',
+                            500: '#0284C7',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            800: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* ========== LAYOUT ONLY — colors handled by /styles/global.css ========== */
-        .hero .btn-group {
-            display: flex;
-            gap: var(--spacing-md);
-            justify-content: center;
-            flex-wrap: wrap;
+        html { scroll-behavior: smooth; }
+
+        /* Fixed-header anchor offset: keep every section id clear of the 80px
+           sticky nav so #why-it-matters / #capabilities / #ecosystem / #onboarding
+           land correctly. */
+        section[id] { scroll-margin-top: 96px; }
+
+        /* Auto-Scrolling Gallery */
+        @keyframes scrollGallery {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
         }
-        .hero-cta .btn-lg {
-            padding: var(--spacing-lg) var(--spacing-2xl);
-            font-size: var(--font-size-lg);
+        .animated-gallery {
+            animation: scrollGallery 28s linear infinite;
         }
-        .hero-cta .btn-outline-light {
-            border: 2px solid var(--color-white);
-            color: var(--color-white);
-            border-radius: var(--border-radius-md);
-            font-weight: 600;
-            transition: all var(--transition-normal);
+        .animated-gallery:hover {
+            animation-play-state: paused;
         }
-        .hero-cta .btn-outline-light:hover {
-            background: rgba(255,255,255,0.12);
-            color: var(--color-white);
-            transform: translateY(-2px);
+
+        /* Light Card Hover Effects */
+        .light-card {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+            transition: all 0.25s ease-in-out;
         }
-        .features-sub {
-            max-width: 680px;
-            margin: 0 auto var(--spacing-2xl);
-            color: var(--color-gray-700);
-            font-size: var(--font-size-lg);
-            line-height: 1.6;
-        }
-        .feature-group {
-            margin-bottom: var(--spacing-3xl);
-        }
-        .feature-group:last-child {
-            margin-bottom: 0;
-        }
-        .feature-group-header {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-lg);
-            justify-content: center;
-            text-align: center;
-        }
-        .feature-group-header .feature-group-icon {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 44px;
-            height: 44px;
-            border-radius: var(--border-radius-md);
-            background: var(--color-primary-light);
-            color: var(--color-accent);
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-        .feature-group-header h3 {
-            margin: 0;
-            font-size: var(--font-size-2xl);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .feature-group-header p {
-            margin: 0;
-            font-size: var(--font-size-sm);
-            color: var(--color-gray-600);
-        }
-        .feature-group-cards {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: var(--spacing-xl);
-        }
-        .feature-card .badge {
-            display: inline-block;
-            padding: var(--spacing-xs) var(--spacing-md);
-            border-radius: var(--border-radius-full);
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        html {
-            scroll-behavior: smooth;
-        }
-        .trust-logos {
-            display: flex;
-            justify-content: center;
-            gap: var(--spacing-2xl);
-            flex-wrap: wrap;
-        }
-        .trust-logo {
-            text-align: center;
-        }
-        .trust-logo span {
-            display: block;
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            letter-spacing: 1px;
-        }
-        .trust-logo small {
-            display: block;
-            margin-top: var(--spacing-xs);
-            font-size: var(--font-size-sm);
-            color: var(--color-gray-600);
-            letter-spacing: 0.3px;
-        }
-        .final-cta-section {
-            text-align: center;
-            padding: var(--spacing-3xl) 0;
-        }
-        .final-cta-section h2 {
-            font-size: var(--font-size-3xl);
-            font-weight: 800;
-            max-width: 700px;
-            margin: 0 auto var(--spacing-md);
-        }
-        .final-cta-section > .container > p {
-            max-width: 640px;
-            margin: 0 auto var(--spacing-xl);
-            font-size: var(--font-size-lg);
-            line-height: 1.7;
-        }
-        .final-cta-actions {
-            display: flex;
-            justify-content: center;
-            gap: var(--spacing-md);
-            flex-wrap: wrap;
-        }
-        .final-cta-secondary {
-            margin-top: var(--spacing-lg);
-            font-size: var(--font-size-sm) !important;
-            color: var(--color-gray-700);
-        }
-        /* ========== PORTAL HUB ========== */
-        .portal-hub-section {
-            padding: var(--spacing-2xl) 0 var(--spacing-3xl);
-            background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark, #0b2a42));
-        }
-        .portal-hub-intro {
-            text-align: center;
-            max-width: 720px;
-            margin: 0 auto var(--spacing-2xl);
-        }
-        .portal-hub-intro .hero-badge {
-            display: inline-block;
-            padding: var(--spacing-xs) var(--spacing-md);
-            border-radius: var(--border-radius-full);
-            background: rgba(255, 255, 255, 0.12);
-            color: var(--color-white);
-            font-size: var(--font-size-xs);
-            font-weight: 700;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-        .portal-hub-intro h1 {
-            color: var(--color-white);
-            font-size: var(--font-size-3xl);
-            font-weight: 800;
-            margin: var(--spacing-sm) 0 var(--spacing-xs);
-        }
-        .portal-hub-intro p {
-            color: rgba(255, 255, 255, 0.85);
-            font-size: var(--font-size-lg);
-            margin: 0;
-        }
-        .portal-hub-cards {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: var(--spacing-xl);
-            max-width: 920px;
-            margin: 0 auto;
-        }
-        .portal-card {
-            background: var(--color-white);
-            border-radius: var(--border-radius-lg);
-            padding: var(--spacing-xl);
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-            text-align: center;
-        }
-        .portal-card-alt { background: var(--color-surface, #ffffff); }
-        .portal-card-icon {
-            font-size: 2rem;
-            color: var(--color-accent);
-            margin-bottom: var(--spacing-md);
-        }
-        .portal-card h2 {
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            color: var(--color-gray-900);
-            margin: 0 0 var(--spacing-sm);
-        }
-        .portal-card p {
-            font-size: var(--font-size-sm);
-            color: var(--color-gray-700);
-            margin: 0 0 var(--spacing-lg);
-            line-height: 1.6;
-        }
-        .portal-cta {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--spacing-sm);
-            width: 100%;
-            margin-bottom: var(--spacing-sm);
-            padding: var(--spacing-md) var(--spacing-lg);
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            border-radius: var(--border-radius-md);
-            transition: transform var(--transition-normal), box-shadow var(--transition-normal);
-            box-sizing: border-box;
-        }
-        .portal-cta:last-child { margin-bottom: 0; }
-        .portal-cta:hover { transform: translateY(-2px); }
-        .portal-cta .portal-cta-icon { font-size: 1.2rem; line-height: 1; }
-        .portal-cta small {
-            display: block;
-            font-size: var(--font-size-xs);
-            font-weight: 500;
-            opacity: 0.85;
-            margin-top: 2px;
-        }
-        @media (max-width: 768px) {
-            .portal-hub-cards { grid-template-columns: 1fr; }
-        }
-        section {
-            scroll-margin-top: 80px;
-        }
-        @media (max-width: 992px) {
-            .feature-group-header {
-                flex-wrap: wrap;
-            }
-            .feature-group-header p {
-                flex-basis: 100%;
-            }
-            .feature-group-cards { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (max-width: 600px) {
-            .feature-group-cards { grid-template-columns: 1fr; }
-            .trust-logos { flex-direction: column; align-items: center; }
+        .light-card:hover {
+            border-color: #0284C7;
+            box-shadow: 0 12px 24px -8px rgba(2, 132, 199, 0.15);
         }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
 
-<!-- ========== HEADER ========== -->
-<header class="app-header">
-    <div class="container header-content">
-        <div class="logo">
-            <i class="fas fa-shield-alt"></i>
-            <span>Avia<span style="color: var(--color-accent);">SAFE</span>system</span>
-        </div>
-        <nav>
-            <ul>
-                <li><a href="/" class="active">Home</a></li>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#onboarding">Beta Access</a></li>
-                <li><a href="contact.html">Contact</a></li>
-                <li><a href="login.html" class="btn-login">Sign In</a></li>
-            </ul>
-        </nav>
-    </div>
-</header>
-
-<!-- ========== HERO ========== -->
-<section id="hero" class="portal-hub-section hero">
-    <div class="container">
-        <div class="portal-hub-intro">
-            <span class="hero-badge">AVIASAFESMS — AVIATION SAFETY MANAGEMENT &amp; STATE OVERSIGHT</span>
-            <h1 class="hero-headline">Turn Safety Data into Safety Intelligence</h1>
-            <p class="hero-lead">Aviation Safety Management &amp; State Oversight platform engineered for ICAO Annex 19 (3rd Edition) compliance.</p>
-        </div>
-        <div class="hero-cta btn-group">
-            <a href="#onboarding" class="btn btn-primary btn-lg">🚀 Get Beta Access</a>
-            <a href="/login.html" class="btn btn-outline-light btn-lg">🔐 Sign In to SMS</a>
-        </div>
-    </div>
-</section>
-
-<!-- ========== WHY IT MATTERS ========== -->
-<section id="why-matters" class="why-matters-section">
-    <div class="container">
-        <div class="why-matters-content">
-            <span class="why-tag">Why It Matters</span>
-
-            <div class="why-flow" aria-label="From safety data to safer decisions">
-                <div class="why-flow-step">
-                    <span class="why-flow-num">1</span>
-                    <span class="why-flow-label">SAFETY DATA</span>
+    <!-- TOP NAVIGATION BAR (Clean & Crisp Header) -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="#" class="flex items-center gap-3 group">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-deepTeal-800 to-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid font-bold text-xl fa-shield-halved"></i>
                 </div>
-                <span class="why-flow-arrow" aria-hidden="true">&#8594;</span>
-                <div class="why-flow-step">
-                    <span class="why-flow-num">2</span>
-                    <span class="why-flow-label">SAFETY INTELLIGENCE</span>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors">
+                        Avia<span class="text-brand-600">SAFE</span><span class="text-[10px] uppercase ml-1.5 px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200 font-mono font-bold">SMS</span>
+                    </span>
+                    <span class="text-[10px] text-slate-500 font-semibold tracking-widest uppercase">Safety Intelligence Platform</span>
                 </div>
-                <span class="why-flow-arrow" aria-hidden="true">&#8594;</span>
-                <div class="why-flow-step">
-                    <span class="why-flow-num">3</span>
-                    <span class="why-flow-label">SAFER DECISIONS</span>
-                </div>
-            </div>
+            </a>
 
-            <blockquote class="why-quote">
-                <p>Collecting safety data is not the goal.<br>Turning safety data into safer decisions <strong>is</strong>.</p>
-            </blockquote>
+            <!-- Navigation Links -->
+            <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                <a href="#why-it-matters" class="hover:text-brand-600 transition-colors">Why It Matters</a>
+                <a href="#capabilities" class="hover:text-brand-600 transition-colors">Capabilities</a>
+                <a href="#ecosystem" class="hover:text-brand-600 transition-colors">Who It's For</a>
+                <a href="#onboarding" class="hover:text-brand-600 transition-colors">Beta Access</a>
+            </nav>
 
-            <p class="why-support">
-                Modern SMS generates large amounts of safety information. The challenge is connecting that
-                information, identifying meaningful patterns, and turning them into timely management action.
-            </p>
-
-            <div class="why-concepts">
-                <div class="why-concept">
-                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-link"></i></div>
-                    <h3>Connect</h3>
-                    <p>Bring reporting, hazards, risks, assurance and performance information together.</p>
-                </div>
-                <div class="why-concept">
-                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-eye"></i></div>
-                    <h3>Understand</h3>
-                    <p>Identify patterns, emerging risks and safety performance trends.</p>
-                </div>
-                <div class="why-concept">
-                    <div class="why-concept-icon" aria-hidden="true"><i class="fas fa-check"></i></div>
-                    <h3>Act</h3>
-                    <p>Turn intelligence into informed decisions, corrective actions and continuous improvement.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- ========== FEATURES ========== -->
-<section class="features-section" id="features">
-    <div class="container">
-        <h2>One Connected Safety Intelligence Ecosystem</h2>
-        <p class="features-sub">
-            From reporting and risk assessment to assurance and leadership insight, AviaSAFESMS
-            connects the essential elements of an effective Safety Management System.
-        </p>
-
-        <!-- CAPTURE -->
-        <div class="feature-group">
-            <div class="feature-group-header">
-                <span class="feature-group-icon"><i class="fas fa-inbox" aria-hidden="true"></i></span>
-                <h3>Capture</h3>
-                <p>Bring safety information into one place.</p>
-            </div>
-            <div class="feature-group-cards">
-                <div class="feature-card">
-                    <i class="fas fa-thermometer-half"></i>
-                    <h4>Gap Analysis Survey</h4>
-                    <div class="tagline">Measure SMS maturity</div>
-                    <p>Assess organizational safety maturity, identify gaps, and establish improvement priorities.</p>
-                    <span class="badge badge-thermometer">Take the Pulse</span>
-                </div>
-
-                <div class="feature-card">
-                    <i class="fas fa-comment-dots"></i>
-                    <h4>Voluntary Safety Reporting</h4>
-                    <div class="tagline">Speak up. Learn faster.</div>
-                    <p>Capture safety concerns and hazards through a structured reporting process that supports a positive reporting culture.</p>
-                    <span class="badge badge-speakup">Always Open</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- ASSESS & MANAGE -->
-        <div class="feature-group">
-            <div class="feature-group-header">
-                <span class="feature-group-icon"><i class="fas fa-clipboard-check" aria-hidden="true"></i></span>
-                <h3>Assess &amp; Manage</h3>
-                <p>Analyze and respond to risk.</p>
-            </div>
-            <div class="feature-group-cards">
-                <div class="feature-card">
-                    <i class="fas fa-th-large"></i>
-                    <h4>Safety Risk Assessment — 5&times;5 SRA Matrix</h4>
-                    <div class="tagline">From report to managed risk</div>
-                    <p>Assess likelihood and severity on the classic 5&times;5 SRA matrix, classify risk, and monitor it across the Master Risk Register.</p>
-                    <span class="badge badge-pulse">Core Capability</span>
-                </div>
-
-                <div class="feature-card">
-                    <i class="fas fa-dna"></i>
-                    <h4>5M+1E Fishbone Root Cause Analysis</h4>
-                    <div class="tagline">From event to root cause</div>
-                    <p>Structure investigations with the 5M+1E fishbone — Man, Machine, Medium, Mission, Management and Environment — to uncover genuine root causes.</p>
-                    <span class="badge badge-regulatory">Investigation-Ready</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- ASSURE & DECIDE -->
-        <div class="feature-group">
-            <div class="feature-group-header">
-                <span class="feature-group-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></span>
-                <h3>Assure &amp; Decide</h3>
-                <p>Turn analysis into action.</p>
-            </div>
-            <div class="feature-group-cards">
-                <div class="feature-card">
-                    <i class="fas fa-tasks"></i>
-                    <h4>Corrective Action Plan (CAP) Tracking</h4>
-                    <div class="tagline">Track to closure</div>
-                    <p>Assign owners, set deadlines and follow corrective action plans through to closure so risks are controlled and safety assurance is demonstrable.</p>
-                    <span class="badge badge-cockpit">Command Center</span>
-                </div>
-
-                <div class="feature-card">
-                    <i class="fas fa-robot"></i>
-                    <h4>Executive Safety Copilot</h4>
-                    <div class="tagline">Ghanshyam — AI Safety Advisor</div>
-                    <p>Ask the Executive Safety Copilot to interpret risk, guide 5M+1E investigations, and align your SMS with ICAO Annex 19 (3rd Edition) in plain language.</p>
-                    <span class="badge badge-pulse">AI-Assisted</span>
-                </div>
-            </div>
-        </div>
-
-    </div>
-</section>
-
-<!-- ========== WORKFLOW ========== -->
-<section class="workflow-section" id="workflow">
-    <div class="container">
-        <h2>From Reporting to Better Decisions</h2>
-        <p class="workflow-sub">
-            AviaSAFESMS connects the safety management cycle so that information does not remain
-            trapped in individual reports, registers, spreadsheets, or disconnected systems.
-        </p>
-
-        <div class="workflow-flow" aria-label="Report, Assess, Assure, Decide">
-            <div class="workflow-step">
-                <span class="workflow-num">01</span>
-                <span class="workflow-label">Report</span>
-                <p>Capture safety concerns, hazards and occurrences.</p>
-            </div>
-            <span class="workflow-arrow" aria-hidden="true">&#8594;</span>
-            <div class="workflow-step">
-                <span class="workflow-num">02</span>
-                <span class="workflow-label">Assess</span>
-                <p>Identify hazards, evaluate risk and prioritize action.</p>
-            </div>
-            <span class="workflow-arrow" aria-hidden="true">&#8594;</span>
-            <div class="workflow-step">
-                <span class="workflow-num">03</span>
-                <span class="workflow-label">Assure</span>
-                <p>Monitor actions, trends, performance and safety assurance.</p>
-            </div>
-            <span class="workflow-arrow" aria-hidden="true">&#8594;</span>
-            <div class="workflow-step">
-                <span class="workflow-num">04</span>
-                <span class="workflow-label">Decide</span>
-                <p>Give leadership the intelligence needed to make informed decisions.</p>
-            </div>
-        </div>
-
-        <p class="workflow-closing">
-            One connected safety management cycle. One clearer view of organizational safety.
-        </p>
-    </div>
-</section>
-
-<!-- ========== BETA ONBOARDING ========== -->
-<section class="portal-hub-section" id="onboarding">
-    <div class="container">
-        <div class="portal-hub-intro">
-            <span class="hero-badge">BETA ONBOARDING</span>
-            <h1>Get Started with AviaSAFESMS</h1>
-            <p>Choose the path that fits you — register your organization or join an existing team with an invite code.</p>
-        </div>
-        <div class="portal-hub-cards">
-            <!-- Card 1: Safety managers & operators -->
-            <div class="portal-card">
-                <div class="portal-card-icon"><i class="fas fa-building" aria-hidden="true"></i></div>
-                <h2>Safety Managers &amp; Operators</h2>
-                <p>Register your airline, AMO, or aerodrome for full SMS workspace access.</p>
-                <a href="/register.html" class="btn btn-primary btn-lg portal-cta">
-                    <span class="portal-cta-icon">🏢</span>
-                    <span>Register Organization</span>
+            <!-- Navigation Actions -->
+            <div class="flex items-center gap-3">
+                <a href="/login.html" class="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-brand-600 transition-colors">
+                    <i class="fa-solid fa-lock text-xs mr-1.5 text-brand-600"></i> Sign In
                 </a>
-            </div>
-            <!-- Card 2: Postholders & staff -->
-            <div class="portal-card portal-card-alt">
-                <div class="portal-card-icon"><i class="fas fa-user-plus" aria-hidden="true"></i></div>
-                <h2>Postholders &amp; Flight/Ground Staff</h2>
-                <p>Have an organization invite code from your Safety Manager?</p>
-                <a href="/join.html" class="btn btn-primary btn-lg portal-cta">
-                    <span class="portal-cta-icon">👥</span>
-                    <span>Join with Invite Code</span>
+                <a href="#onboarding" class="hidden sm:inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 rounded-lg shadow-md shadow-brand-600/20 transition-all hover:scale-[1.02]">
+                    <i class="fa-solid fa-rocket text-xs"></i> Request Beta
                 </a>
             </div>
         </div>
-    </div>
-</section>
+    </header>
 
-<!-- ========== TRUST ========== -->
-<section class="trust-section">
-    <div class="container">
-        <h2><i class="fas fa-search-plus"></i> Built on Three ICAO Foundations</h2>
-        <p style="color: var(--color-gray-700); max-width: 640px; margin: 0 auto var(--spacing-lg);">
-            From standards to intelligence — ICAO Annex 19, Doc 9859 and Doc 10159
-            provide the foundation for turning safety information into safer decisions.
-        </p>
-        <div class="trust-logos">
-            <div class="trust-logo">
-                <span>ICAO Annex 19</span>
-                <small>Safety Management Standards</small>
+    <main class="pt-20">
+
+        <!-- ROW 1: HYBRID HERO SECTION (Deep Oceanic Teal Header from Existing Site) -->
+        <section class="relative min-h-[85vh] flex items-center pt-10 pb-20 overflow-hidden bg-gradient-to-b from-deepTeal-900 via-deepTeal-800 to-[#0A2540] text-white border-b border-deepTeal-700">
+            <!-- Background Radial Glow -->
+            <div class="absolute top-0 right-1/3 w-[600px] h-[600px] bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
+
+                <!-- Trust Badge Bar -->
+                <div class="flex justify-center md:justify-start mb-8">
+                    <div class="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-4 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-slate-200 shadow-inner">
+                        <span class="flex items-center gap-1.5 text-emerald-400 font-bold">
+                            <i class="fa-solid fa-shield-check"></i> ICAO Annex 19 Aligned
+                        </span>
+                        <span class="text-white/20">|</span>
+                        <span class="flex items-center gap-1.5 text-sky-300">
+                            <i class="fa-solid fa-plane-departure"></i> SMS & SSP Ready
+                        </span>
+                        <span class="text-white/20 hidden sm:inline">|</span>
+                        <span class="hidden sm:flex items-center gap-1.5 text-slate-300">
+                            <i class="fa-solid fa-lock text-slate-400"></i> Secure Cloud Platform
+                        </span>
+                        <span class="text-white/20 hidden md:inline">|</span>
+                        <span class="hidden md:flex items-center gap-1.5 text-amber-300">
+                            <i class="fa-solid fa-chart-line"></i> Safety Intelligence Analytics
+                        </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+
+                    <!-- Left Hero Content -->
+                    <div class="lg:col-span-7 text-center lg:text-left">
+                        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15] mb-6 text-white">
+                            Turn Safety Data into <br class="hidden sm:block"/>
+                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-teal-300 to-emerald-300">Safety Intelligence</span>
+                        </h1>
+
+                        <p class="text-base sm:text-lg text-slate-200 mb-4 font-normal leading-relaxed">
+                            AviaSAFE SMS is an aviation safety management and state oversight platform designed to support <strong class="text-white font-semibold">ICAO Annex 19 (3rd Edition)</strong>, <strong class="text-white font-semibold">Doc 9859</strong>, and <strong class="text-white font-semibold">Doc 10159</strong> implementation.
+                        </p>
+
+                        <p class="text-sm sm:text-base text-slate-300 mb-8 leading-relaxed">
+                            Transform occurrence reports, audit findings, inspections, investigations, and risk assessments into actionable safety intelligence for better decision-making.
+                        </p>
+
+                        <!-- Hero Action Buttons -->
+                        <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                            <a href="#onboarding" class="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
+                                <i class="fa-solid fa-rocket text-lg"></i> Request Beta Access
+                            </a>
+                            <a href="/login.html" class="w-full sm:w-auto px-8 py-4 text-base font-bold text-slate-100 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl shadow-sm transition-all backdrop-blur-sm flex items-center justify-center gap-3">
+                                <i class="fa-solid fa-key text-sky-400"></i> Sign In to SMS
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Right Side: Auto-Scrolling Screenshots Gallery -->
+                    <div class="lg:col-span-5 relative h-[480px] overflow-hidden rounded-2xl border border-white/20 bg-slate-900/80 shadow-2xl backdrop-blur-md">
+                        <!-- Browser Bar Header -->
+                        <div class="absolute inset-x-0 top-0 h-11 bg-slate-800/90 border-b border-white/10 z-20 px-4 flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                <span class="ml-2 text-xs font-mono text-slate-300 font-semibold">AviaSAFE Executive Suite</span>
+                            </div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold">Live Preview</span>
+                        </div>
+
+                        <!-- Gallery Track -->
+                        <div class="pt-14 px-4 animated-gallery space-y-4">
+                            <!-- Screenshot Mock 1 -->
+                            <div class="p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-sky-400 flex items-center gap-1.5"><i class="fa-solid fa-gauge-high"></i> Executive Safety Dashboard</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">Annex 19 Compliant</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="p-2.5 rounded bg-slate-900 border border-slate-700 text-center">
+                                        <div class="text-[10px] text-slate-400 uppercase font-semibold">Active MORs</div>
+                                        <div class="text-lg font-extrabold text-amber-400">24</div>
+                                    </div>
+                                    <div class="p-2.5 rounded bg-slate-900 border border-slate-700 text-center">
+                                        <div class="text-[10px] text-slate-400 uppercase font-semibold">High Risk SRA</div>
+                                        <div class="text-lg font-extrabold text-rose-400">03</div>
+                                    </div>
+                                    <div class="p-2.5 rounded bg-slate-900 border border-slate-700 text-center">
+                                        <div class="text-[10px] text-slate-400 uppercase font-semibold">Closed CAPs</div>
+                                        <div class="text-lg font-extrabold text-emerald-400">98%</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Screenshot Mock 2 -->
+                            <div class="p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-teal-400 flex items-center gap-1.5"><i class="fa-solid fa-file-triangle"></i> Occurrence Reporting System</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">VSR / MOR Module</span>
+                                </div>
+                                <div class="p-3 rounded bg-slate-900 border border-slate-700 text-xs text-slate-200 space-y-1.5">
+                                    <div class="flex justify-between font-mono text-[11px]">
+                                        <span class="text-slate-400 font-semibold">REP-2026-0841</span>
+                                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold">5x5 SRA: 4B High Risk</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-300 line-clamp-1">Unstabilized approach below 1,000 ft AGL during severe wind shear event...</p>
+                                </div>
+                            </div>
+
+                            <!-- Screenshot Mock 3 -->
+                            <div class="p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5"><i class="fa-solid fa-table-cells"></i> Risk Register & 5x5 Matrix</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">Doc 9859 Matrix</span>
+                                </div>
+                                <div class="h-16 rounded bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-300 text-xs font-semibold">
+                                    <i class="fa-solid fa-chart-simple text-amber-400 mr-2"></i> Dynamic 5M+1E Fishbone Root Cause Diagram
+                                </div>
+                            </div>
+
+                            <!-- Screenshot Mock 4 -->
+                            <div class="p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-indigo-400 flex items-center gap-1.5"><i class="fa-solid fa-building-shield"></i> State Oversight Dashboard (CAAN SMD)</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">SSP Oversight</span>
+                                </div>
+                                <div class="p-3 rounded bg-slate-900 border border-slate-700 text-xs text-slate-200">
+                                    <div class="flex justify-between items-center text-[11px]">
+                                        <span class="font-semibold">Aggregated Operator SPI Trends</span>
+                                        <span class="text-emerald-400 font-bold bg-emerald-500/20 px-2 py-0.5 rounded border border-emerald-500/30">Target Met</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Screenshot Mock 5 (Loop Duplicate) -->
+                            <div class="p-4 rounded-xl bg-slate-800 border border-slate-700 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs font-bold text-sky-400 flex items-center gap-1.5"><i class="fa-solid fa-brain"></i> Executive Safety Copilot</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">Ghanshyam AI</span>
+                                </div>
+                                <div class="p-3 rounded bg-brand-900/40 border border-brand-500/40 text-[11px] text-sky-200 font-medium">
+                                    "5M+1E Analysis identifies Machine (sensor calibration) and Management (audit gap) as primary root drivers."
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
-            <div class="trust-logo">
-                <span>Doc 9859</span>
-                <small>Safety Management Manual</small>
+        </section>
+
+
+        <!-- WORKFLOW STEP PILL BAR (From Existing Site) -->
+        <div class="bg-white border-b border-slate-200 py-6 shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col md:flex-row items-center justify-center gap-4 sm:gap-8 text-center text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    <span class="text-slate-400 font-mono text-[10px] tracking-normal mb-1 md:mb-0">WHY IT MATTERS</span>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 border border-slate-200">
+                        <span class="w-6 h-6 rounded-full bg-deepTeal-700 text-white flex items-center justify-center text-[11px]">1</span>
+                        <span class="text-slate-900">Safety Data</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-slate-300 hidden md:inline"></i>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-brand-50 border border-brand-200 text-brand-700">
+                        <span class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[11px]">2</span>
+                        <span class="text-brand-900">Safety Intelligence</span>
+                    </div>
+                    <i class="fa-solid fa-arrow-right text-slate-300 hidden md:inline"></i>
+                    <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800">
+                        <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[11px]">3</span>
+                        <span class="text-emerald-950">Safer Decisions</span>
+                    </div>
+                </div>
             </div>
-            <div class="trust-logo">
-                <span>Doc 10159</span>
-                <small>Safety Intelligence Manual</small>
+        </div>
+
+
+        <!-- ROW 2: WHY IT MATTERS (Detailed Content & Checklists) -->
+        <section id="why-it-matters" class="py-20 bg-slate-50 border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-xs font-bold tracking-widest text-brand-600 uppercase mb-3">Foundational Architecture</h2>
+                    <p class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">From Compliance to Safety Intelligence</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+
+                    <!-- Left Column: Vision Statement -->
+                    <div class="lg:col-span-6 space-y-6 text-slate-700">
+                        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <p class="text-base sm:text-lg leading-relaxed text-slate-800 mb-4">
+                                The objective of a modern Safety Management System is not merely collecting safety data. <strong class="text-slate-900">ICAO Annex 19 (3rd Edition)</strong>, the <strong class="text-slate-900">Safety Management Manual (Doc 9859)</strong>, and the <strong class="text-slate-900">Safety Intelligence Manual (Doc 10159)</strong> emphasize the importance of transforming safety information into meaningful safety action.
+                            </p>
+
+                            <!-- Key Highlight Banner -->
+                            <div class="p-6 rounded-xl bg-gradient-to-r from-deepTeal-900 to-deepTeal-700 text-white my-6 shadow-md border-l-4 border-brand-500">
+                                <p class="text-xs text-sky-300 uppercase font-mono tracking-widest mb-1">Core Principle</p>
+                                <p class="text-lg sm:text-xl font-bold leading-snug">
+                                    "Collecting safety data is not the goal. <br/>
+                                    <span class="text-teal-300 font-extrabold">Turning safety data into safer decisions is."</span>
+                                </p>
+                            </div>
+
+                            <p class="text-sm text-slate-600 leading-relaxed">
+                                Modern SMS programs generate large volumes of occurrence reports, audit findings, hazards, inspections, investigations, and safety performance data. The challenge is connecting that information, identifying meaningful patterns, understanding emerging risks, and ensuring management can act before incidents occur.
+                            </p>
+                        </div>
+
+                        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                            <p class="text-sm text-slate-700 leading-relaxed">
+                                <strong class="text-brand-600">AviaSAFE SMS</strong> helps organizations move beyond data collection by providing a single environment for safety reporting, risk management, assurance activities, performance monitoring, and safety intelligence.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Regulatory & Platform Trust Checklists -->
+                    <div class="lg:col-span-6 space-y-6">
+
+                        <!-- Regulatory Alignment Card -->
+                        <div class="light-card p-6 rounded-2xl">
+                            <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-certificate text-emerald-600"></i> Regulatory & Compliance Alignment
+                            </h3>
+                            <ul class="space-y-4 text-sm text-slate-700">
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">ICAO Annex 19 Aligned:</strong> Supports full implementation of key Safety Management and State Safety Programme (SSP) frameworks.
+                                    </div>
+                                </li>
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">State Safety Programme Ready:</strong> Purpose-built for civil aviation authority oversight, operator audits, and national safety objectives.
+                                    </div>
+                                </li>
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">Safety Risk Management:</strong> Structured hazard identification, 5x5 SRA matrix, mitigation tracking, and continuous monitoring.
+                                    </div>
+                                </li>
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">Safety Assurance Enabled:</strong> Integrated performance monitoring, audits, inspections, investigations, and CAP verification.
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- Enterprise Trust Card -->
+                        <div class="light-card p-6 rounded-2xl">
+                            <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-shield-halved text-brand-600"></i> Enterprise Platform Security
+                            </h3>
+                            <ul class="space-y-4 text-sm text-slate-700">
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-lock text-brand-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">Secure Cloud Architecture:</strong> Enterprise-grade infrastructure, strict tenant isolation, and SOC2-ready security controls.
+                                    </div>
+                                </li>
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-user-shield text-brand-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">Role-Based Access Control (RBAC):</strong> Granular permissions tailored to regulators, safety managers, postholders, and staff.
+                                    </div>
+                                </li>
+                                <li class="flex items-start gap-3">
+                                    <i class="fa-solid fa-database text-brand-600 mt-1"></i>
+                                    <div>
+                                        <strong class="text-slate-900">Encrypted Data Protection:</strong> End-to-end encryption in transit (TLS 1.3) and at rest (AES-256) for all confidential reports.
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+
+                    </div>
+
+                </div>
+
             </div>
-        </div>
-    </div>
-</section>
+        </section>
 
-<!-- ========== FOUNDER ========== -->
-<section class="founder-section" id="founder">
-    <div class="container founder-content">
-        <div class="founder-photo-wrap">
-            <img src="/images/ghanshyam-acharya.jpg"
-                 alt="Ghanshyam Acharya, Founder of AviaSAFE Systems"
-                 class="founder-photo"
-                 loading="lazy">
-            <button type="button" class="bio-trigger" onclick="openBioModal()">.. about me</button>
-        </div>
-        <div class="founder-text">
-            <h2><i class="fas fa-user-tie"></i> Built by Aviation. Designed for Safety Intelligence.</h2>
-            <p>
-                AviaSAFESMS was built by <strong>Ghanshyam Acharya</strong>, an aviation professional
-                with leadership and operational experience, with a focus on Human Factors, Safety
-                Management and Safety Intelligence.
-            </p>
-            <p>
-                His objective is simple: make safety information more connected, more useful, and
-                more actionable for airlines and regulators.
-            </p>
-        </div>
-    </div>
-</section>
 
-<!-- ========== FINAL EXECUTIVE CTA ========== -->
-<section class="final-cta-section" id="demo">
-    <div class="container">
-        <h2>Ready to Turn Safety Data into Safety Intelligence?</h2>
-        <p>
-            See how AviaSAFESMS can connect your SMS information, strengthen safety assurance,
-            and give leadership a clearer view of emerging risks and safety performance.
-        </p>
-        <div class="final-cta-actions">
-            <a href="contact.html" class="btn btn-primary btn-lg">Request a 15-Minute Demo</a>
-        </div>
-        <p class="final-cta-secondary">
-            Prefer to explore first? <a href="#features">Take a brief look at the platform</a>.
-        </p>
-    </div>
-</section>
+        <!-- ROW 3: PLATFORM CAPABILITIES (6 Feature Cards Grid) -->
+        <section id="capabilities" class="py-20 bg-white border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-<!-- ========== FOOTER ========== -->
-<footer class="app-footer">
-    <div class="container">
-        <div class="footer-links">
-            <a href="/">Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/survey/">Survey</a>
-            <span class="footer-divider">|</span>
-            <a href="login.html">Login</a>
-            <span class="footer-divider">|</span>
-            <a href="privacy.html">Privacy Policy</a>
-            <span class="footer-divider">|</span>
-            <a href="terms.html">Terms of Service</a>
-            <span class="footer-divider">|</span>
-            <a href="contact.html">Contact</a>
-            <span class="footer-divider">|</span>
-            <a href="/admin/login.html">Developer Login</a>
-        </div>
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-xs font-bold tracking-widest text-brand-600 uppercase mb-3">Core Modules</h2>
+                    <p class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Platform Capabilities</p>
+                    <p class="text-slate-600 mt-3 text-base">Comprehensive suite of tools supporting the entire aviation safety lifecycle.</p>
+                </div>
 
-        <p style="margin-top: var(--spacing-md); font-size: var(--font-size-sm); opacity: 0.6;">
-            &copy; 2026 AviaSAFEsystem. All rights reserved.
-        </p>
-    </div>
-</footer>
+                <!-- 6 Feature Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 
-<!-- ========== FOUNDER BIO MODAL ========== -->
-<div id="bioModal" class="bio-modal" role="dialog" aria-modal="true" aria-labelledby="bioModalTitle" hidden>
-    <div class="bio-modal-card">
-        <button type="button" class="bio-modal-close" id="bioModalCloseBtn" aria-label="Close bio modal">&times;</button>
+                    <!-- Card 1 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-brand-50 border border-brand-200 text-brand-600 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-clipboard-list"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">1. Occurrence Reporting</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Capture voluntary (VSR), mandatory (MOR), confidential, and regulatory safety reports from a single streamlined platform.
+                        </p>
+                    </div>
 
-        <div class="bio-modal-header">
-            <h2 id="bioModalTitle">Ghanshyam Acharya<span>Founder &amp; Aviation Safety Specialist</span></h2>
-            <p class="bio-modal-tagline">Former Airline CEO | Advisor to AWS Education | Human Factors Instructor &amp; Investigator</p>
-        </div>
+                    <!-- Card 2 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">2. Hazard & Risk Management</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Identify operational hazards, perform 5x5 SRA risk assessments, assign mitigations, and monitor risk register effectiveness.
+                        </p>
+                    </div>
 
-        <div class="bio-modal-body">
-            <h3>Executive Summary</h3>
-            <p>
-                Over 45 years of executive and operational leadership in the aviation industry.
-                Former CEO of a domestic airline in Nepal, Human Factors Trainer/Instructor, and
-                Advisor to AWS Education. Dedicated to embedding proactive safety cultures across
-                High Reliability Organizations (HROs) and promoting AI education to enhance aviation
-                safety performance and accelerate learning cycles.
-            </p>
+                    <!-- Card 3 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-magnifying-glass-chart"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">3. Investigations & RCA</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Manage investigations from initiation through 5M+1E Fishbone root cause analysis, HFACS classification, and closed-loop CAPs.
+                        </p>
+                    </div>
 
-            <h3>Core Expertise &amp; Specializations</h3>
-            <ul>
-                <li>
-                    <strong>Human Factors Training &amp; Curriculum Design:</strong> Aligned with
-                    ICAO Doc 9683, NCAR Part-66 Module 9, Crew Resource Management (CRM), and Fatigue
-                    Risk Management (FRMS).
-                </li>
-                <li>
-                    <strong>Incident &amp; Accident Investigation:</strong> Applied practitioner
-                    competence in HFACS, SHELL Model, Reason's Swiss Cheese, and Bow-Tie
-                    investigation methodologies.
-                </li>
-                <li>
-                    <strong>Safety Management Systems (SMS) &amp; Annex 19:</strong> End-to-end SMS
-                    design, 4-Pillar Safety Culture surveys, and continuous performance monitoring.
-                </li>
-                <li>
-                    <strong>HRO Principles &amp; AI Education:</strong> Translating operational data
-                    into actionable safety intelligence and advocating AI education to minimize
-                    safety learning curves.
-                </li>
-            </ul>
-        </div>
-    </div>
-</div>
+                    <!-- Card 4 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-list-check"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">4. Safety Assurance</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Conduct internal and external audits, ramp inspections, compliance assessments, and track corrective action plans (CAN/CAP).
+                        </p>
+                    </div>
 
-<script>
-// ============================================================================
-// INDEX PAGE
-// ============================================================================
+                    <!-- Card 5 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">5. Performance Monitoring</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Track Safety Performance Indicators (SPIs), Safety Performance Targets (SPTs), trends, and alert levels in real time.
+                        </p>
+                    </div>
 
-// ============================================================================
-// FOUNDER BIO MODAL
-// ============================================================================
+                    <!-- Card 6 -->
+                    <div class="light-card p-8 rounded-2xl">
+                        <div class="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center text-xl mb-6 shadow-sm">
+                            <i class="fa-solid fa-brain"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-slate-900 mb-3">6. Safety Intelligence & Copilot</h3>
+                        <p class="text-slate-600 text-sm leading-relaxed">
+                            Convert safety data into actionable insights using AI Executive Copilot (Ghanshyam), predictive trends, and executive dashboards.
+                        </p>
+                    </div>
 
-function openBioModal() {
-    const modal = document.getElementById('bioModal');
-    if (!modal) return;
-    modal.hidden = false;
-    document.body.style.overflow = 'hidden';
-}
+                </div>
 
-function closeBioModal() {
-    const modal = document.getElementById('bioModal');
-    if (!modal) return;
-    modal.hidden = true;
-    document.body.style.overflow = '';
-}
+            </div>
+        </section>
 
-document.getElementById('bioModal').addEventListener('click', function(e) {
-    if (e.target.id === 'bioModal') closeBioModal();
-});
 
-document.getElementById('bioModalCloseBtn').addEventListener('click', closeBioModal);
+        <!-- ROW 4: WHO IT'S FOR (Aviation Ecosystem Support Grid) -->
+        <section id="ecosystem" class="py-20 bg-slate-50 border-b border-slate-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeBioModal();
-});
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-xs font-bold tracking-widest text-brand-600 uppercase mb-3">Industry Support</h2>
+                    <p class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Trusted Across the Aviation Ecosystem</p>
+                    <p class="text-slate-600 mt-3 text-base">Engineered for diverse stakeholders across the civil aviation sector.</p>
+                </div>
 
-// Subdomain redirect
-(function() {
-    const hostname = window.location.hostname;
-    const parts = hostname.split('.');
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
 
-    if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
-        const subdomain = parts[0];
-        const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-building-shield"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Civil Aviation Authorities</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">SSP Oversight</span>
+                    </div>
 
-        if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
-            const user = localStorage.getItem('user');
-            if (user) {
-                window.location.href = '/safety.html';
-            } else {
-                window.location.href = '/login.html?tenant=' + subdomain;
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-plane"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Airlines & Air Operators</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">Part 121 / 135</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-plane-arrival"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Airports & Aerodromes</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">Part 139</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-tower-observation"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Air Navigation Providers</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">ANSP / ATC</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-wrench"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Maintenance Orgs</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">Part 145 AMO</span>
+                    </div>
+
+                    <div class="p-6 rounded-2xl bg-white border border-slate-200 text-center hover:border-brand-500 transition-all hover:shadow-md group">
+                        <div class="w-12 h-12 mx-auto rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Training Orgs</h4>
+                        <span class="text-[11px] text-slate-500 font-mono">Part 141 ATO</span>
+                    </div>
+
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- ROW 5: FINAL CTA & DUAL BETA ONBOARDING HUB -->
+        <section id="onboarding" class="py-24 bg-gradient-to-b from-slate-50 via-brand-50/60 to-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+                <div class="text-center max-w-3xl mx-auto mb-16">
+                    <h2 class="text-xs font-bold tracking-widest text-brand-600 uppercase mb-3">Beta Evaluation Portal</h2>
+                    <h3 class="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight">Ready to Modernize Aviation Safety Management?</h3>
+                    <p class="text-slate-600 mt-4 text-base sm:text-lg">
+                        Support ICAO Annex 19 implementation, strengthen safety oversight, and transform safety data into meaningful safety intelligence.
+                    </p>
+                </div>
+
+                <!-- Dual-Portal Onboarding Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+
+                    <!-- Card 1: Register Organization -->
+                    <div class="p-8 rounded-2xl bg-white border border-slate-200 shadow-xl flex flex-col justify-between hover:border-brand-500 transition-all hover:-translate-y-1">
+                        <div>
+                            <div class="w-12 h-12 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center text-xl mb-6 font-bold shadow-sm">
+                                <i class="fa-solid fa-building-circle-check"></i>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mb-2">New Organization</h4>
+                            <p class="text-slate-600 text-sm leading-relaxed mb-6">
+                                Register your Airline, AMO, Aerodrome, or CAA for a full multi-tenant SMS workspace. Generate invite codes for your departmental postholders.
+                            </p>
+                        </div>
+                        <a href="/register.html" class="w-full py-4 text-center font-bold text-white bg-gradient-to-r from-brand-700 to-brand-500 hover:from-brand-800 hover:to-brand-600 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus-circle"></i> Register Organization (Safety Manager)
+                        </a>
+                    </div>
+
+                    <!-- Card 2: Join with Invite Code -->
+                    <div class="p-8 rounded-2xl bg-white border border-slate-200 shadow-xl flex flex-col justify-between hover:border-emerald-500 transition-all hover:-translate-y-1">
+                        <div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl mb-6 font-bold shadow-sm">
+                                <i class="fa-solid fa-users"></i>
+                            </div>
+                            <h4 class="text-2xl font-bold text-slate-900 mb-2">Have an Invite Code?</h4>
+                            <p class="text-slate-600 text-sm leading-relaxed mb-6">
+                                Postholders, pilots, engineers, and ground staff joining an existing organization. Enter your unique invite code to auto-connect your profile.
+                            </p>
+                        </div>
+                        <a href="/join.html" class="w-full py-4 text-center font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-ticket text-emerald-600"></i> Join Team with Invite Code
+                        </a>
+                    </div>
+
+                </div>
+
+                <!-- Footer Quick Links -->
+                <div class="mt-16 text-center text-xs text-slate-500 border-t border-slate-200 pt-8">
+                    <p class="mb-2">Already an authorized user? <a href="/login.html" class="text-brand-600 hover:underline font-bold">Sign In directly to your SMS Dashboard</a></p>
+                    <p>&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.</p>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+    // Subdomain redirect: route non-reserved tenant subdomains of
+    // *.aviasafesystems.com to their tenant login / dashboard.
+    (function() {
+        const hostname = window.location.hostname;
+        const parts = hostname.split('.');
+
+        if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
+            const subdomain = parts[0];
+            const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+
+            if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
+                const user = localStorage.getItem('user');
+                if (user) {
+                    window.location.href = '/safety.html';
+                } else {
+                    window.location.href = '/login.html?tenant=' + subdomain;
+                }
             }
         }
-    }
-})();
-</script>
-
-<script src="/js/main.js"></script>
+    })();
+    </script>
 
 </body>
 </html>
