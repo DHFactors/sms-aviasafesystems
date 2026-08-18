@@ -150,3 +150,24 @@ const ApiClient = {
     put: (path, body) => ApiClient._request('PUT', path, body),
     del: (path) => ApiClient._request('DELETE', path),
 };
+
+// ── Global Safety Copilot widget (auto-loaded on every authenticated page) ──
+// client.js is included on all dashboard pages, so wiring the widget here gives
+// a single global include point. Guarded against double-injection.
+(function injectCopilotWidget() {
+    if (window.__CopilotWidgetInjected) return;
+    window.__CopilotWidgetInjected = true;
+    try {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = '/css/copilot-widget.css';
+        (document.head || document.body).appendChild(link);
+
+        const script = document.createElement('script');
+        script.src = '/js/components/copilot-widget.js';
+        script.async = true;
+        (document.head || document.body).appendChild(script);
+    } catch (e) {
+        console.error('[CopilotWidget] failed to load:', e);
+    }
+})();

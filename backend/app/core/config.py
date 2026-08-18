@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     API_PREFIX_REGULATORS: str = "/api/v1/regulators"
     API_PREFIX_CONTACT: str = "/api/v1/contact"
     API_PREFIX_FEEDBACK: str = "/api/v1/feedback"
+    API_PREFIX_COPILOT: str = "/api/v1/copilot"
     API_PREFIX_AUTH_LEGACY: str = "/api/auth"
     API_PREFIX_REPORTS_LEGACY: str = "/api/reports"
     API_PREFIX_DASHBOARD_LEGACY: str = "/api/dashboard"
@@ -77,6 +78,14 @@ class Settings(BaseSettings):
     AI_NARRATIVE_TRUNCATE: int = 5000
     AI_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+
+    # ── AI / Groq Copilot ──
+    # Groq API key for the Safety & Compliance Copilot chat assistant. When
+    # unset the chat endpoint degrades to a helpful offline response (200).
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MAX_TOKENS: int = 900
+    GROQ_TEMPERATURE: float = 0.4
 
     # ── Repository / Pagination ──
     REPO_CACHE_TTL_SECONDS: int = 60

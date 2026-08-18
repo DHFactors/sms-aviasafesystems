@@ -45,6 +45,7 @@ RATE_LIMITS = {
     "mor_submit":    (20,  86400),   # 20/day  (beta)
     "dashboard":     (500, 3600),    # 500/hour (beta)
     "auth_attempts": (200, 3600),    # 200/hour (beta; safety net for shared login attempts)
+    "copilot":       (120, 3600),    # 120/hour (beta; AI chat assistant per tenant)
 }
 
 

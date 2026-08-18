@@ -13,7 +13,7 @@ from app.core.metrics import router as metrics_router
 from app.core.security import SecurityHeadersMiddleware, RateLimitMiddleware
 from app.core.cors import ManualCORSMiddleware
 from app.firebase import initialize_firebase, is_firebase_ready
-from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, tenants, regulators, contact, feedback
+from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, tenants, regulators, contact, feedback, copilot
 
 setup_logging()
 
@@ -225,6 +225,7 @@ app.include_router(regulators.router, prefix=settings.API_PREFIX_REGULATORS, tag
 app.include_router(contact.router, prefix=settings.API_PREFIX_CONTACT, tags=["Contact"])
 
 app.include_router(feedback.router, prefix=settings.API_PREFIX_FEEDBACK, tags=["Feedback"])
+app.include_router(copilot.router, prefix=settings.API_PREFIX_COPILOT, tags=["Copilot"])
 
 app.include_router(metrics_router, prefix="", tags=["Metrics"])
 

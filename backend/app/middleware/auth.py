@@ -79,6 +79,7 @@ async def get_current_user(
     email = decoded_token.get('email', '')
     role = decoded_token.get('role', settings.ROLE_DEFAULT)
     tenant_id = decoded_token.get('tenant_id')
+    department = decoded_token.get('department') or None
 
     resolved = resolve_user_context(email, role, tenant_id)
     role = resolved["role"]
@@ -91,7 +92,8 @@ async def get_current_user(
         "email": email,
         "role": role,
         "tenant_id": tenant_id,
-        "claims": {"role": role, "tenant_id": tenant_id}
+        "department": department,
+        "claims": {"role": role, "tenant_id": tenant_id, "department": department},
     }
 
 
