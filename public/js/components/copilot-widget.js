@@ -69,7 +69,14 @@
     // pages), then API_BASE_URL, then a hostname-based fallback so the widget
     // always talks to the correct Render backend even on standalone pages that
     // never load firebase.js (e.g. register.html).
+    //
+    // Guest (unauthenticated) mode is part of the beta self-service rollout and
+    // the /api/v1/copilot/guest/chat route only exists on the beta backend, so
+    // guest requests are pinned there unconditionally. Pinning prevents a 404
+    // when a public page is served from a host whose fallback would otherwise
+    // resolve to the production backend (which has no guest route).
     function resolveApiBase() {
+        if (isGuestPage()) return 'https://sms-aviasafesystems-beta.onrender.com';
         if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
         if (window.API_BASE_URL) return window.API_BASE_URL;
         var host = window.location.hostname || '';
