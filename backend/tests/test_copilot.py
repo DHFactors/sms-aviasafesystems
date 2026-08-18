@@ -191,6 +191,47 @@ def test_chat_unauthorized_returns_401(monkeypatch):
     assert resp.status_code in (401, 403)
 
 
+def test_guest_chat_works_without_authentication(monkeypatch):
+    _patch_env(monkeypatch, groq=True)
+
+    resp = TestClient(app).post(
+        "/api/v1/copilot/guest/chat",
+        json={"message": "How do I register my airline?", "page_context": "register.html — Organization registration"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "success"
+    assert data["model"] == "groq"
+    assert "5x5 SRA" in data["reply"]
+
+
+def test_guest_chat_injects_page_context_into_groq_payload(monkeypatch):
+    module = _FakeGroqModule()
+    monkeypatch.setitem(sys.modules, "groq", module)
+    _patch_env(monkeypatch, groq=False)
+
+    resp = TestClient(app).post(
+        "/api/v1/copilot/guest/chat",
+        json={"message": "What classification fits a helicopter operator?", "page_context": "register.html — Organization registration"},
+    )
+
+    assert resp.status_code == 200
+    kwargs = _FakeGroqCompletions.last_kwargs
+    system_content = kwargs["messages"][0]["content"]
+    # Guest chat must be strictly page-scoped (no user/tenant context).
+    assert "STRICT PAGE-SCOPE BOUNDARY" in system_content
+    assert "register.html" in system_content
+    assert "AIRLINE_ROTARY" in system_content or "Helicopter" in system_content or "Rotary" in system_content
+    assert "AIRLINE_ADMIN" not in system_content
+
+
+def test_guest_chat_requires_valid_message(monkeypatch):
+    _patch_env(monkeypatch, groq=True)
+    resp = TestClient(app).post("/api/v1/copilot/guest/chat", json={"message": ""})
+    assert resp.status_code == 422
+
+
 def test_chat_without_groq_api_key_returns_graceful_200(monkeypatch):
     db = _FakeDB()
     _seed_tenant(db)
@@ -255,6 +296,40 @@ def test_build_system_prompt_persona(monkeypatch):
     assert "QA" in prompt
     assert "qa" in prompt
     assert "Caps" in prompt
+
+
+def test_build_system_prompt_includes_strict_page_scope(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    prompt = groq_copilot.build_system_prompt(page_context="register.html — Organization registration")
+    assert "STRICT PAGE-SCOPE BOUNDARY" in prompt
+    assert "only authorized to help with the workflow" in prompt or "ONLY authorized" in prompt
+    assert "politely" in prompt.lower() or "Politely" in prompt
+    assert "register.html" in prompt
+    assert "organization self-service registration".lower() in prompt.lower()
+
+
+def test_detect_page_name_parses_filename(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    assert groq_copilot.detect_page_name("caan.html — State Safety Programme") == "caan.html"
+    assert groq_copilot.detect_page_name("Register Your Organization — register.html") == "register.html"
+    assert groq_copilot.detect_page_name("Safety Dashboard") is None
+    assert groq_copilot.detect_page_name(None) is None
+    assert groq_copilot.detect_page_name("") is None
+
+
+def test_build_page_scope_instruction_known_page(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    instruction = groq_copilot.build_page_scope_instruction("register.html — Organization registration")
+    assert "register.html" in instruction
+    assert "CURRENT PAGE SCOPE" in instruction
+    assert "Fixed-Wing Airline" in instruction
+
+
+def test_build_page_scope_instruction_unknown_page(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    instruction = groq_copilot.build_page_scope_instruction("Some Unknown Dashboard")
+    assert "CURRENT PAGE SCOPE" in instruction
+    assert "decline or redirect" in instruction
 
 
 def test_time_salutation_returns_welcome_greeting(monkeypatch):

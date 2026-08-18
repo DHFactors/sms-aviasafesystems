@@ -55,6 +55,83 @@ GROUND RULES:
 - When asked anything outside aviation safety / SMS, politely redirect back to safety topics.
 """
 
+# Strict per-page scoping: the model may only assist with the workflow of the
+# page the user currently has open. Unknown pages fall back to title inference.
+PAGE_SCOPE_BOUNDARY = """
+STRICT PAGE-SCOPE BOUNDARY (MANDATORY):
+- You are ONLY authorized to help with the workflow of the page the user currently has open (see CURRENT PAGE SCOPE below).
+- Provide guidance, clarification, and field-level support ONLY for that page's forms, fields, and workflow steps.
+- If a question asks about tasks, features, or data that belong to a DIFFERENT page, do NOT answer it directly.
+  Politely explain that the request is outside this page's scope and, when relevant, name the page the user should open for that task.
+- Never invent features, fields, or workflows that do not exist on the current page.
+- Stay concise and operational.
+"""
+
+# Human-readable scope profile per known page. Keys are the page filename as
+# sent by the frontend page_context (e.g. "register.html").
+PAGE_SCOPE_GUIDANCE = {
+    "register.html": (
+        "Organization self-service registration. Help the user complete organization setup: "
+        "organization name, operator classification (Fixed-Wing Airline, Helicopter/Rotary Operator, "
+        "Part-145 Maintenance Organization, or Certified Airport/Aerodrome), primary administrator "
+        "name/title, official email, password, optional beta access key, and explain what happens "
+        "after submission (tenant id + team invite code for onboarding postholders via the join page)."
+    ),
+    "join.html": (
+        "Team member self-onboarding with an invite code. Guide the user through entering their "
+        "organization invite code, selecting their department / operational role (flight operations, "
+        "engineering & maintenance, ground handling, etc.), and completing account setup."
+    ),
+    "login.html": (
+        "Sign-in. Assist only with logging into the platform or troubleshooting sign-in. Politely "
+        "redirect everything else to the appropriate page after sign-in."
+    ),
+    "safety.html": (
+        "Safety Management System dashboard. Support SMS reporting (VSR voluntary/confidential, MOR "
+        "mandatory), hazard & risk management, corrective actions (CAN/CAP), and safety performance monitoring."
+    ),
+    "caan.html": (
+        "State aviation safety oversight dashboard. Support State Safety Programme (SSP) activities, "
+        "state safety objectives, regulatory oversight, inspections, operator audits, and safety "
+        "performance monitoring for the civil aviation authority."
+    ),
+    "audits.html": (
+        "Safety assurance / audits workflow. Support audit planning, conducting internal and external "
+        "audits and inspections, recording findings, and closing corrective action plans (CAN/CAP)."
+    ),
+    "responsible-manager.html": (
+        "Responsible Manager dashboard. Support the responsible manager's safety responsibilities, "
+        "oversight of reports, risk review, and corrective action approval."
+    ),
+}
+
+
+def detect_page_name(page_context: Optional[str]) -> Optional[str]:
+    """Extract the page filename (e.g. 'caan.html') from the page_context string."""
+    if not page_context:
+        return None
+    match = re.search(r"([A-Za-z0-9_.-]+\.html)", page_context)
+    return match.group(1).lower() if match else None
+
+
+def build_page_scope_instruction(page_context: Optional[str]) -> str:
+    """Return the strict page-scoping directive for the system prompt."""
+    page = detect_page_name(page_context)
+    scope = PAGE_SCOPE_GUIDANCE.get(page) if page else None
+    if scope:
+        return (
+            "\nCURRENT PAGE SCOPE (the ONLY workflow you may assist with):\n"
+            f"- Page: {page}\n"
+            f"- Scope: {scope}\n"
+        )
+    return (
+        "\nCURRENT PAGE SCOPE (the ONLY workflow you may assist with):\n"
+        f"- Page: {page or 'unknown'}"
+        + (f" (context: {str(page_context)[:120]})" if page_context else "")
+        + "\n- Assist only with the workflow visible on the current page as inferred from its title. "
+        "Politely decline or redirect anything outside that scope.\n"
+    )
+
 
 def sanitize_message(text: str, limit: int = 2000) -> str:
     """Trim + neutralise obvious prompt-injection markers in user input."""
@@ -105,7 +182,13 @@ def build_system_prompt(
             + "\n"
         )
 
-    return COPILOT_SYSTEM_PROMPT + COPILOT_GUARDRAILS + context_block
+    return (
+        COPILOT_SYSTEM_PROMPT
+        + COPILOT_GUARDRAILS
+        + PAGE_SCOPE_BOUNDARY
+        + build_page_scope_instruction(page_context)
+        + context_block
+    )
 
 
 def build_messages(

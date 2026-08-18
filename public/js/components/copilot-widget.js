@@ -17,24 +17,53 @@
     var WIDGET_TITLE = 'Ghanshyam — Executive Safety Copilot';
     var WIDGET_SUBTITLE = '50 Years Aviation Leadership | ICAO Annex 19 (3rd Ed.) SMS Guide';
 
-    // Time-based salutation from the client's local clock.
-    function timeSalutation() {
-        var hour = new Date().getHours();
-        if (hour < 12) return 'Good morning and welcome aboard.';
-        if (hour < 17) return 'Good afternoon and welcome aboard.';
-        return 'Good evening and welcome aboard.';
+    // Public pages where the copilot runs WITHOUT authentication (guest mode).
+    var GUEST_PAGES = ['register.html'];
+
+    function currentPageName() {
+        var path = window.location.pathname.split('/').pop();
+        return path || '';
     }
 
-    var WELCOME_MSG =
-        timeSalutation() + ' I am **Ghanshyam** — Executive Safety & SMS Copilot.\n\n' +
-        'Ask me anything on SMS compliance, hazard reporting (VSR/MOR), 5×5 SRA risk evaluation, ' +
-        '5M+1E Fishbone RCA, Human Factors error traps, CAN issuance, or closed-loop CAP resolution.';
-    var QUICK_SUGGESTIONS = [
-        'Align SMS with ICAO Annex 19 (3rd Edition)',
-        'Guide me through a 5M+1E Fishbone RCA',
-        'How to evaluate risk in the 5x5 SRA Matrix',
-        'Identify Human Factors error traps in this occurrence'
-    ];
+    function isGuestPage() {
+        return GUEST_PAGES.indexOf(currentPageName()) !== -1;
+    }
+
+    // Greeting strictly based on the visitor's local time of day.
+    function timeGreeting() {
+        var hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 17) return 'Good afternoon';
+        return 'Good evening';
+    }
+
+    function welcomeMessage() {
+        var intro = isGuestPage()
+            ? 'I can help you register your organization: choosing the correct operator ' +
+              'classification (Fixed-Wing Airline, Helicopter/Rotary, Part-145 AMO, or Certified ' +
+              'Aerodrome), setting up your primary administrator account, and preparing your team ' +
+              'invite code.'
+            : 'Ask me anything on SMS compliance, hazard reporting (VSR/MOR), 5×5 SRA risk evaluation, ' +
+              '5M+1E Fishbone RCA, Human Factors error traps, CAN issuance, or closed-loop CAP resolution.';
+        return timeGreeting() + ' and welcome aboard. I am **Ghanshyam** — Executive Safety Copilot.\n\n' + intro;
+    }
+
+    function quickSuggestions() {
+        if (isGuestPage()) {
+            return [
+                'How do I register my organization?',
+                'Which operator classification should I choose?',
+                'What happens after I register?',
+                'How do my team members join?'
+            ];
+        }
+        return [
+            'Align SMS with ICAO Annex 19 (3rd Edition)',
+            'Guide me through a 5M+1E Fishbone RCA',
+            'How to evaluate risk in the 5x5 SRA Matrix',
+            'Identify Human Factors error traps in this occurrence'
+        ];
+    }
 
     var API_BASE =
         (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) ||
@@ -51,10 +80,15 @@
         return firebase.auth().currentUser.getIdToken().catch(function () { return null; });
     }
 
+    // Page/route detection: send the opened page filename first so the backend
+    // can enforce strict per-page scoping in the model's system prompt.
     function pageContext() {
-        var parts = [document.title || ''];
+        var parts = [];
+        var page = currentPageName();
+        if (page && page !== '/') parts.push(page);
         var meta = document.querySelector('meta[name="page-context"]');
         if (meta && meta.content) parts.push(meta.content);
+        if (document.title) parts.push(document.title);
         return parts.filter(Boolean).join(' — ').slice(0, 200);
     }
 
@@ -155,11 +189,11 @@
         var body = el('div', 'cpi-body');
         var welcome = el('div', 'cpi-welcome');
         welcome.appendChild(el('div', 'cpi-wl-title', WIDGET_TITLE));
-        welcome.appendChild(el('div', null, renderMarkdown(WELCOME_MSG)));
+        welcome.appendChild(el('div', null, renderMarkdown(welcomeMessage())));
         body.appendChild(welcome);
 
         var chips = el('div', 'cpi-chips');
-        QUICK_SUGGESTIONS.forEach(function (q) {
+        quickSuggestions().forEach(function (q) {
             var chip = el('button', 'cpi-chip', q);
             chip.setAttribute('type', 'button');
             chip.addEventListener('click', function () { sendMessage(q); });
@@ -245,6 +279,45 @@
 
             var typing = showTyping();
 
+            function handleReply(data) {
+                hideTyping(typing);
+                sending = false;
+                sendBtn.disabled = false;
+                var reply = data && (data.reply || data.data && data.data.reply);
+                if (reply) {
+                    history.push({ role: 'assistant', content: reply });
+                    appendMsg(reply, 'bot');
+                } else {
+                    appendError('The Copilot did not respond. Please try again.');
+                }
+            }
+
+            function handleError(err) {
+                hideTyping(typing);
+                sending = false;
+                sendBtn.disabled = false;
+                appendError('Could not reach the Copilot: ' + (err && err.message ? err.message : 'network error'));
+            }
+
+            var bodyPayload = JSON.stringify({
+                message: msg,
+                page_context: pageContext(),
+                history: history.slice(-8)
+            });
+
+            if (isGuestPage()) {
+                // Public onboarding pages: guest endpoint, no authentication.
+                fetch(API_BASE + '/api/v1/copilot/guest/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: bodyPayload
+                })
+                    .then(function (res) { return res.json().catch(function () { return null; }); })
+                    .then(handleReply)
+                    .catch(handleError);
+                return;
+            }
+
             getToken().then(function (token) {
                 if (!token) {
                     hideTyping(typing);
@@ -259,38 +332,21 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     },
-                    body: JSON.stringify({
-                        message: msg,
-                        page_context: pageContext(),
-                        history: history.slice(-8)
-                    })
+                    body: bodyPayload
                 })
                     .then(function (res) { return res.json().catch(function () { return null; }); })
-                    .then(function (data) {
-                        hideTyping(typing);
-                        sending = false;
-                        sendBtn.disabled = false;
-                        var reply = data && (data.reply || data.data && data.data.reply);
-                        if (reply) {
-                            history.push({ role: 'assistant', content: reply });
-                            appendMsg(reply, 'bot');
-                        } else {
-                            appendError('The Copilot did not respond. Please try again.');
-                        }
-                    });
-            }).catch(function (err) {
-                hideTyping(typing);
-                sending = false;
-                sendBtn.disabled = false;
-                appendError('Could not reach the Copilot: ' + (err && err.message ? err.message : 'network error'));
-            });
+                    .then(handleReply);
+            }).catch(handleError);
         }
 
-        /* Auto-open once when a signed-in user lands on the page (small delay). */
+        /* Show the toggle on guest pages regardless of auth; on authenticated
+           pages only when a user is signed in. */
         if (window.firebase && firebase.auth) {
             firebase.auth().onAuthStateChanged(function (u) {
-                toggle.style.display = u ? 'flex' : 'none';
+                toggle.style.display = isGuestPage() ? 'flex' : (u ? 'flex' : 'none');
             });
+        } else if (isGuestPage()) {
+            toggle.style.display = 'flex';
         }
     }
 
