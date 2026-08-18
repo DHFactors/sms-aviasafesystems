@@ -92,9 +92,10 @@ class _FakeGroqChat:
 
 class _FakeGroqClient:
     chat = _FakeGroqChat
+    last_api_key = None
 
     def __init__(self, **kwargs):
-        pass
+        _FakeGroqClient.last_api_key = kwargs.get("api_key")
 
 
 class _FakeGroqModule:
@@ -189,6 +190,111 @@ def test_chat_unauthorized_returns_401(monkeypatch):
     _patch_env(monkeypatch, groq=True)
     resp = _chat(authorized=False)
     assert resp.status_code in (401, 403)
+
+
+def test_chat_initializes_client_from_env_api_key(monkeypatch):
+    module = _FakeGroqModule()
+    monkeypatch.setitem(sys.modules, "groq", module)
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_API_KEY", None)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_from_environment")
+
+    reply = groq_copilot.chat("How do I report a near miss?", page_context="safety.html")
+
+    assert _FakeGroqClient.last_api_key == "gsk_from_environment"
+    assert "currently unavailable" not in reply
+    assert "5x5 SRA" in reply
+
+
+def test_chat_uses_explicit_model_and_params(monkeypatch):
+    module = _FakeGroqModule()
+    monkeypatch.setitem(sys.modules, "groq", module)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
+
+    groq_copilot.chat("hello", page_context="caan.html")
+
+    kwargs = _FakeGroqCompletions.last_kwargs
+    assert kwargs["model"] == "llama-3.3-70b-versatile"
+    assert kwargs["temperature"] == groq_copilot.settings.GROQ_TEMPERATURE
+    assert kwargs["max_tokens"] == groq_copilot.settings.GROQ_MAX_TOKENS
+    assert kwargs["stream"] is False
+
+
+def test_build_messages_payload_structure(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    messages = groq_copilot.build_messages(
+        "user question",
+        history=[{"role": "user", "content": "previous turn"}],
+        page_context="register.html",
+    )
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"].lstrip().startswith("You are")
+    assert messages[1] == {"role": "user", "content": "previous turn"}
+    assert messages[-1] == {"role": "user", "content": "user question"}
+
+
+def test_chat_logs_groq_error_status_code(monkeypatch):
+    class _GroqError(Exception):
+        def __init__(self, status_code=429, message="rate limit hit"):
+            super().__init__(message)
+            self.status_code = status_code
+            self.message = message
+            self.type = "rate_limit_error"
+            self.body = {"error": {"message": message}}
+
+    class _BoomCompletions:
+        @classmethod
+        def create(cls, **kwargs):
+            raise _GroqError()
+
+    class _BoomChat:
+        completions = _BoomCompletions
+
+    class _BoomClient:
+        chat = _BoomChat
+
+        def __init__(self, **kwargs):
+            pass
+
+    class _BoomModule:
+        Groq = _BoomClient
+
+    monkeypatch.setitem(sys.modules, "groq", _BoomModule())
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
+
+    from loguru import logger as loguru_logger
+
+    sink = []
+    sink_id = loguru_logger.add(sink.append, level="ERROR", format="{message}")
+    try:
+        reply = groq_copilot.chat("how to file a VSR", page_context="safety.html")
+    finally:
+        loguru_logger.remove(sink_id)
+
+    assert "currently unavailable" in reply
+    joined = "\n".join(sink)
+    assert "Groq API error encountered" in joined
+    assert "429" in joined
+    assert "rate limit hit" in joined
+
+
+def test_guest_chat_route_returns_offline_on_service_error(monkeypatch):
+    _patch_env(monkeypatch, groq=True)
+
+    def _boom(message, **kwargs):
+        raise RuntimeError("service boom")
+
+    import app.routes.copilot as copilot_route
+    monkeypatch.setattr(copilot_route, "chat", _boom)
+
+    resp = TestClient(app).post(
+        "/api/v1/copilot/guest/chat",
+        json={"message": "help me register my airline", "page_context": "register.html"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+    assert "currently unavailable" in resp.json()["reply"]
 
 
 def test_guest_chat_works_without_authentication(monkeypatch):

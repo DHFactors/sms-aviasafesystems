@@ -17,6 +17,7 @@
 # returns HTTP 200 with a helpful offline reply so the widget never hangs.
 # ============================================================================
 
+import os
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -25,6 +26,10 @@ from loguru import logger
 
 from app.core.config import settings
 from app.firebase import get_db
+
+# Explicit Groq model identifier (llama-3.3-70b-versatile). Kept as a named
+# constant so deployments can never silently drift to an invalid model name.
+GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
 
 COPILOT_SYSTEM_PROMPT = """
 You are "Ghanshyam — Executive Safety & SMS Copilot", an intelligent aviation safety, human factors, and compliance assistant embedded in AviaSAFE Systems.
@@ -252,6 +257,20 @@ def _offline_reply(message: str) -> str:
     )
 
 
+def _groq_error_detail(e: Exception) -> Dict[str, Any]:
+    """Extract the exact HTTP status code + message from a Groq SDK error.
+
+    Groq's SDK exposes ``status_code`` (e.g. 401 / 429 / 400) and ``message``
+    on its APIError subclasses; ``body`` carries the raw JSON error payload.
+    """
+    return {
+        "status_code": getattr(e, "status_code", None),
+        "message": getattr(e, "message", None) or str(e),
+        "type": getattr(e, "type", None) or type(e).__name__,
+        "body": getattr(e, "body", None),
+    }
+
+
 def chat(
     message: str,
     *,
@@ -264,10 +283,15 @@ def chat(
     """Send the user message to Groq and return the assistant's reply.
 
     Always returns a string (never raises): network/API failures degrade to the
-    offline reply so the frontend chat widget keeps working.
+    offline reply so the frontend chat widget keeps working. The exact Groq
+    HTTP status code and error message are logged on every failure.
     """
-    if not settings.GROQ_API_KEY:
-        logger.info("GROQ_API_KEY not set — copilot returning offline reply")
+    api_key = os.environ.get("GROQ_API_KEY") or settings.GROQ_API_KEY
+    if not api_key:
+        logger.warning(
+            "GROQ_API_KEY is not set in the environment — copilot returning offline reply. "
+            "Set GROQ_API_KEY in the deployment environment (Render dashboard) to enable Groq."
+        )
         return _offline_reply(message)
 
     tenant_classification = tenant_id and get_tenant_classification(tenant_id)
@@ -275,7 +299,7 @@ def chat(
     try:
         from groq import Groq
 
-        client = Groq(api_key=settings.GROQ_API_KEY)
+        client = Groq(api_key=api_key)
         messages = build_messages(
             message,
             history=history,
@@ -285,14 +309,42 @@ def chat(
             tenant_classification=tenant_classification,
             page_context=page_context,
         )
+        # Payload shape: [{"role": "system", "content": system_prompt}, ...history...,
+        #                 {"role": "user", "content": user_message}]. Log the shape
+        # (not the content) so request structure issues are immediately visible.
+        logger.debug(
+            "Groq payload: model=%s messages=%d (first=%s, last=%s) max_tokens=%s temperature=%s stream=False",
+            settings.GROQ_MODEL or GROQ_MODEL_NAME,
+            len(messages),
+            messages[0].get("role") if messages else None,
+            messages[-1].get("role") if messages else None,
+            settings.GROQ_MAX_TOKENS,
+            settings.GROQ_TEMPERATURE,
+        )
         completion = client.chat.completions.create(
-            model=settings.GROQ_MODEL,
+            model=settings.GROQ_MODEL or GROQ_MODEL_NAME,
             messages=messages,
             temperature=settings.GROQ_TEMPERATURE,
             max_tokens=settings.GROQ_MAX_TOKENS,
+            stream=False,
         )
         reply = completion.choices[0].message.content
+        if not reply:
+            logger.warning("Groq returned an empty completion — copilot returning offline reply")
         return reply.strip() if reply else _offline_reply(message)
     except Exception as e:
-        logger.error(f"Groq copilot request failed: {e}")
+        detail = _groq_error_detail(e)
+        logger.exception(
+            "Groq API error encountered: {} (status={}, message={})",
+            str(e),
+            detail["status_code"],
+            detail["message"],
+        )
+        logger.error(
+            "Groq error payload: status={} type={} message={} body={}",
+            detail["status_code"],
+            detail["type"],
+            detail["message"],
+            detail["body"],
+        )
         return _offline_reply(message)

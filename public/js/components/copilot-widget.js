@@ -65,10 +65,28 @@
         ];
     }
 
-    var API_BASE =
-        (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) ||
-        window.API_BASE_URL ||
-        'https://sms-aviasafesystems-beta.onrender.com';
+    // Backend base URL. Prefer APP_CONFIG (set by firebase.js on authenticated
+    // pages), then API_BASE_URL, then a hostname-based fallback so the widget
+    // always talks to the correct Render backend even on standalone pages that
+    // never load firebase.js (e.g. register.html).
+    function resolveApiBase() {
+        if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
+        if (window.API_BASE_URL) return window.API_BASE_URL;
+        var host = window.location.hostname || '';
+        var isBeta = host.indexOf('beta') !== -1 ||
+            host === 'localhost' || host === '127.0.0.1' ||
+            host === 'sms.aviasafesystems.com' ||
+            host === 'www.sms.aviasafesystems.com';
+        return isBeta
+            ? 'https://sms-aviasafesystems-beta.onrender.com'
+            : 'https://aviasafe-unified-platform.onrender.com';
+    }
+
+    var API_BASE = resolveApiBase();
+
+    function chatEndpoint() {
+        return API_BASE + (isGuestPage() ? '/api/v1/copilot/guest/chat' : '/api/v1/copilot/chat');
+    }
 
     var history = [];
     var sending = false;
@@ -305,9 +323,11 @@
                 history: history.slice(-8)
             });
 
+            console.debug('[Copilot] POST ' + chatEndpoint() + ' (page=' + currentPageName() + ')');
+
             if (isGuestPage()) {
                 // Public onboarding pages: guest endpoint, no authentication.
-                fetch(API_BASE + '/api/v1/copilot/guest/chat', {
+                fetch(chatEndpoint(), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: bodyPayload
@@ -326,7 +346,7 @@
                     appendError('Please sign in to use the Safety Copilot.');
                     return;
                 }
-                return fetch(API_BASE + '/api/v1/copilot/chat', {
+                return fetch(chatEndpoint(), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

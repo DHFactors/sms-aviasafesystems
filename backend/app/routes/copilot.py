@@ -18,7 +18,7 @@ from loguru import logger
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
-from app.services.groq_copilot import chat
+from app.services.groq_copilot import _offline_reply, chat
 
 router = APIRouter()
 
@@ -55,14 +55,24 @@ async def copilot_chat(
     """
     history = [item.dict() for item in (payload.history or [])]
 
-    reply = chat(
-        payload.message,
-        history=history,
-        role=user.get("role"),
-        department=user.get("department"),
-        tenant_id=user.get("tenant_id"),
-        page_context=payload.page_context,
-    )
+    try:
+        reply = chat(
+            payload.message,
+            history=history,
+            role=user.get("role"),
+            department=user.get("department"),
+            tenant_id=user.get("tenant_id"),
+            page_context=payload.page_context,
+        )
+    except Exception as e:
+        logger.exception(
+            "Copilot chat error for %s (role=%s, tenant=%s): %s",
+            user.get("email"),
+            user.get("role"),
+            user.get("tenant_id"),
+            e,
+        )
+        reply = _offline_reply(payload.message)
 
     logger.info(
         f"Copilot reply delivered to {user.get('email')} "
@@ -91,11 +101,19 @@ async def copilot_guest_chat(
     """
     history = [item.dict() for item in (payload.history or [])]
 
-    reply = chat(
-        payload.message,
-        history=history,
-        page_context=payload.page_context,
-    )
+    try:
+        reply = chat(
+            payload.message,
+            history=history,
+            page_context=payload.page_context,
+        )
+    except Exception as e:
+        logger.exception(
+            "Guest copilot chat error (page=%s): %s",
+            payload.page_context or "unknown",
+            e,
+        )
+        reply = _offline_reply(payload.message)
 
     logger.info(f"Guest copilot reply delivered (page={payload.page_context or 'unknown'})")
     return CopilotChatResponse(reply=reply, model="groq")
