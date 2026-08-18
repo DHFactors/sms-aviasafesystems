@@ -103,7 +103,7 @@ AUTHOR: AviaSAFE Systems
         <div class="logo">
             <i class="fas fa-shield-alt"></i>
             <h1>AviaSAFE</h1>
-            <p id="tenantHeaderName">Safety Management &amp; Intelligence Platform</p>
+            <p id="tenantHeaderName">Safety Data to Safety Intelligence</p>
         </div>
 
         <div id="demoPersonaSection" class="demo-persona" style="display:none;">
@@ -337,7 +337,7 @@ async function updateTenantDisplay() {
     var tenantId = getActiveTenant();
     if (!tenantId) {
         // Root / default platform host — no active tenant scope.
-        displayEl.textContent = 'Safety Management & Intelligence Platform';
+        displayEl.textContent = 'Safety Data to Safety Intelligence';
         displayEl.classList.remove('is-tenant');
         return;
     }
