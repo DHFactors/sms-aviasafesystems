@@ -38,6 +38,8 @@
                         brand: {
                             50: '#F0F9FF',
                             100: '#E0F2FE',
+                            300: '#7DD3FC',
+                            400: '#38BDF8',
                             500: '#0284C7',
                             600: '#0284C7',
                             700: '#0369A1',
@@ -616,9 +618,11 @@
                 </div>
 
                 <!-- Footer Quick Links -->
-                <div class="mt-16 text-center text-xs text-slate-500 border-t border-slate-200 pt-8 dark:text-slate-400 dark:border-slate-800">
-                    <p class="mb-2">Already an authorized user? <a href="/login.html" class="text-brand-600 hover:underline font-bold">Sign In directly to your SMS Dashboard</a></p>
-                    <p>&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.</p>
+                <div class="mt-8 text-center text-xs text-slate-500 border-t border-slate-200 pt-4 dark:text-slate-400 dark:border-slate-800">
+                    <p class="text-sm text-slate-400">
+                        A Project by <a href="https://gsacharya.com" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 font-medium underline underline-offset-2 transition-colors">Ghanshyam Acharya</a>
+                    </p>
+                    <p class="mt-2">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.</p>
                 </div>
 
             </div>
@@ -646,6 +650,29 @@
                 }
             }
         }
+    })();
+    </script>
+
+    <!-- Floating Scroll-to-Top Button (offset above the Copilot widget corner) -->
+    <button id="scrollToTopBtn" aria-label="Scroll to top" class="fixed bottom-20 right-6 z-40 hidden p-3 rounded-full bg-brand-600 hover:bg-brand-500 text-white shadow-lg transition-all duration-300 hover:scale-110 focus:outline-none">
+        <i class="fa-solid fa-arrow-up text-sm"></i>
+    </button>
+
+    <script>
+    // Scroll-to-top: reveal the button after scrolling 300px, then smooth-scroll back.
+    (function() {
+        const scrollBtn = document.getElementById('scrollToTopBtn');
+        if (!scrollBtn) return;
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollBtn.classList.remove('hidden');
+            } else {
+                scrollBtn.classList.add('hidden');
+            }
+        });
+        scrollBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
     })();
     </script>
 

@@ -134,6 +134,18 @@
 
     /* ── Toggle button injection ─────────────────────────────────────────── */
 
+    // Attach the toggle behaviour to a button (idempotent). Used both for
+    // auto-injected buttons and for buttons authored directly in page HTML
+    // (e.g. the landing-page header toggle carrying [data-theme-toggle]).
+    function bindButton(btn) {
+        if (btn.__themeBound) return;
+        btn.__themeBound = true;
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            toggleTheme();
+        });
+    }
+
     function makeButton() {
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -145,10 +157,6 @@
         sun.className = 'fa-solid fa-sun';
         btn.appendChild(moon);
         btn.appendChild(sun);
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            toggleTheme();
-        });
         return btn;
     }
 
@@ -167,9 +175,16 @@
     }
 
     function inject() {
-        if (document.querySelector('[data-theme-toggle]')) { syncButtons(); return; }
+        var existing = document.querySelector('[data-theme-toggle]');
+        if (existing) {
+            // Page-authored button: sync its icons AND bind its click handler.
+            bindButton(existing);
+            syncButtons();
+            return;
+        }
         var target = findTarget();
         var btn = makeButton();
+        bindButton(btn);
         if (target) {
             target.appendChild(btn);
         } else {
