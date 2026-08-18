@@ -38,15 +38,6 @@ AUTHOR: AviaSAFE Systems
         }
         .login-container .logo i { font-size: 3rem; }
         .login-container .logo h1 { margin-bottom: var(--spacing-xs); }
-        .tenant-context {
-            padding: var(--spacing-md);
-            border-radius: var(--border-radius-md);
-            text-align: center;
-            margin-bottom: var(--spacing-lg);
-            font-weight: 500;
-            font-size: var(--font-size-sm);
-        }
-        .tenant-context i { margin-right: var(--spacing-sm); }
         .form-group .form-control {
             width: 100%;
             padding: var(--spacing-md);
@@ -60,34 +51,6 @@ AUTHOR: AviaSAFE Systems
             font-weight: 600;
             cursor: pointer;
         }
-        .btn-google {
-            width: 100%;
-            padding: var(--spacing-md);
-            border-radius: var(--border-radius-md);
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--spacing-sm);
-        }
-        .btn-google img,
-        .btn-google i { font-size: 1.1rem; }
-        .divider {
-            display: flex;
-            align-items: center;
-            margin: var(--spacing-lg) 0;
-            color: var(--color-gray-600);
-            font-size: var(--font-size-sm);
-        }
-        .divider::before,
-        .divider::after {
-            content: "";
-            flex: 1;
-            border-top: var(--border-width) solid var(--color-gray-300);
-        }
-        .divider span { margin: 0 var(--spacing-md); }
         .error-message {
             font-size: var(--font-size-sm);
             margin-top: var(--spacing-md);
@@ -135,42 +98,6 @@ AUTHOR: AviaSAFE Systems
             margin-top: var(--spacing-lg);
             font-size: var(--font-size-sm);
         }
-        /* ========== REGISTER MODAL ========== */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(10, 12, 20, 0.62);
-            z-index: 999;
-            align-items: center;
-            justify-content: center;
-            padding: var(--spacing-lg);
-        }
-        .modal-overlay.open { display: flex; }
-        .modal-box {
-            background: var(--color-surface);
-            color: var(--color-gray-900);
-            border-radius: var(--border-radius-lg);
-            width: min(600px, 100%);
-            max-height: 92vh;
-            overflow-y: auto;
-            padding: var(--spacing-lg);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-        }
-        .modal-box iframe {
-            width: 100%;
-            height: 92vh;
-            border: none;
-            display: block;
-        }
-        .modal-close {
-            float: right;
-            border: none;
-            background: transparent;
-            font-size: 1.3rem;
-            cursor: pointer;
-            color: var(--color-gray-600);
-        }
     </style>
     <link rel="stylesheet" href="/styles/global.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -185,11 +112,6 @@ AUTHOR: AviaSAFE Systems
             <i class="fas fa-shield-alt"></i>
             <h1>AviaSAFE</h1>
             <p>Safety Management &amp; Intelligence Platform</p>
-        </div>
-
-        <div class="tenant-context" id="tenantContext">
-            <i class="fas fa-building"></i>
-            <span id="tenantDisplay">Loading...</span>
         </div>
 
         <div id="demoPersonaSection" class="demo-persona" style="display:none;">
@@ -221,13 +143,6 @@ AUTHOR: AviaSAFE Systems
             </button>
         </form>
 
-        <div class="divider"><span>or continue with</span></div>
-
-        <button type="button" class="btn-google" id="googleBtn" onclick="googleSignIn()">
-            <i class="fab fa-google" aria-hidden="true"></i> Sign in with Google
-        </button>
-        <div id="googleError" class="error-message"></div>
-
         <div class="register-prompt">
             <i class="fas fa-building" aria-hidden="true"></i>
             Need to register an organization?
@@ -245,24 +160,10 @@ AUTHOR: AviaSAFE Systems
         <div class="footer-links">
             <a href="/">← Back to Home</a>
             <span class="footer-divider">|</span>
-            <a href="#" id="registerLink">Register Organization</a>
+            <a href="/register.html">Register Organization</a>
             <span class="footer-divider">|</span>
             <a href="/join.html">Join Your Team</a>
-            <span class="footer-divider">|</span>
-            <a href="/privacy.html">Privacy Policy</a>
-            <span class="footer-divider">|</span>
-            <a href="/terms.html">Terms of Service</a>
-            <span class="footer-divider">|</span>
-            <a href="/admin/login.html">Developer Login</a>
         </div>
-    </div>
-</div>
-
-<!-- ===== REGISTER MODAL ===== -->
-<div class="modal-overlay" id="registerModal" role="dialog" aria-modal="true" aria-label="Register your organization">
-    <div class="modal-box">
-        <button type="button" class="modal-close" id="registerModalClose" aria-label="Close">&times;</button>
-        <iframe id="registerFrame" src="/register.html" title="Register your organization"></iframe>
     </div>
 </div>
 
@@ -567,103 +468,6 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     }
 });
 
-// ============================================================================
-// GOOGLE SIGN-IN
-// ============================================================================
-
-async function googleSignIn() {
-    // Block the auth-state listener from redirecting on raw claims before we
-    // resolve the real role/tenant from the backend (fresh Google accounts
-    // carry no custom claims).
-    authRedirectInProgress = true;
-
-    var googleBtn = document.getElementById('googleBtn');
-    var errorDiv = document.getElementById('googleError');
-    errorDiv.style.display = 'none';
-    googleBtn.disabled = true;
-    googleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
-
-    try {
-        var provider = new firebase.auth.GoogleAuthProvider();
-        var credential = await firebase.auth().signInWithPopup(provider);
-        var user = credential.user;
-        var token = await user.getIdToken(true);
-
-        // Resolve role/tenant via the backend, which applies the email→tenant
-        // fallback for accounts without custom claims.
-        var role = 'USER';
-        var tenantId = null;
-        try {
-            var resp = await fetch(window.API_BASE_URL + '/api/v1/auth/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id_token: token })
-            });
-            if (resp.ok) {
-                var data = await resp.json();
-                role = data.role || 'USER';
-                tenantId = data.tenant_id || null;
-            }
-        } catch (e) {
-            console.warn('Google login: backend role resolution failed, using raw claims', e);
-        }
-
-        console.log('✅ Google login as:', user.email, 'role:', role, 'tenant:', tenantId || 'None');
-        redirectBasedOnRole({ uid: user.uid, email: user.email, role: role, tenantId: tenantId, claims: {} });
-
-    } catch (error) {
-        authRedirectInProgress = false;
-        var msg = error.message || 'Google sign-in failed. Please try again.';
-        if (error.code === 'auth/popup-blocked') {
-            msg = 'Popup was blocked. Please allow popups for this site and try again.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-            msg = 'Google sign-in is not enabled. Contact your administrator.';
-        } else if (error.code === 'auth/account-exists-with-different-credential') {
-            msg = 'An account already exists with this email. Please sign in with email and password instead.';
-        }
-        errorDiv.textContent = msg;
-        errorDiv.style.display = 'block';
-        console.error('Google sign-in error:', error);
-    } finally {
-        googleBtn.disabled = false;
-        googleBtn.innerHTML = '<i class="fab fa-google" aria-hidden="true"></i> Sign in with Google';
-    }
-}
-
-// ============================================================================
-// REGISTER MODAL — opens /register.html in an overlay for self-service onboarding
-// ============================================================================
-
-function openRegisterModal() {
-    var modal = document.getElementById('registerModal');
-    if (!modal) return;
-    var frame = document.getElementById('registerFrame');
-    if (frame) frame.src = '/register.html';
-    modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeRegisterModal() {
-    var modal = document.getElementById('registerModal');
-    if (!modal) return;
-    modal.classList.remove('open');
-    document.body.style.overflow = '';
-}
-
-document.getElementById('registerLink').addEventListener('click', function (e) {
-    e.preventDefault();
-    openRegisterModal();
-});
-
-document.getElementById('registerModalClose').addEventListener('click', closeRegisterModal);
-
-document.getElementById('registerModal').addEventListener('click', function (e) {
-    if (e.target === this) closeRegisterModal();
-});
-
-document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeRegisterModal();
-});
 </script>
 
 <script src="/js/main.js"></script>
