@@ -113,56 +113,23 @@ AUTHOR: AviaSAFE Systems
         .badge-admin { background: var(--color-danger-bg); color: var(--color-danger); }
         .badge-caan { background: var(--color-info-bg); color: var(--color-info); }
         .badge-airline { background: var(--color-success-bg); color: var(--color-success); }
-        /* ========== ONBOARDING LINKS ========== */
-        .onboarding-links {
-            margin-top: var(--spacing-xl);
-            text-align: center;
-        }
-        .onboarding-title {
-            font-size: var(--font-size-sm);
-            font-weight: 600;
-            color: var(--color-gray-600);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: var(--spacing-md);
-        }
-        .onboarding-actions {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-sm);
-        }
-        .onboarding-link {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
+        /* ========== REGISTER PROMPT ========== */
+        .register-prompt {
+            margin-top: var(--spacing-lg);
             padding: var(--spacing-md);
-            border: var(--border-width) solid var(--color-gray-300);
+            text-align: center;
+            font-size: var(--font-size-sm);
+            color: var(--color-gray-700);
+            background: var(--color-gray-100);
             border-radius: var(--border-radius-md);
-            color: var(--color-gray-900);
-            text-decoration: none;
-            transition: border-color var(--transition-normal), background var(--transition-normal);
-            text-align: left;
         }
-        .onboarding-link:hover {
-            border-color: var(--color-primary);
-            background: var(--color-primary-light);
-        }
-        .onboarding-link i {
-            font-size: 1.2rem;
+        .register-prompt i { margin-right: var(--spacing-xs); color: var(--color-primary); }
+        .register-prompt a {
             color: var(--color-primary);
-            flex-shrink: 0;
+            font-weight: 600;
+            text-decoration: none;
         }
-        .onboarding-link strong {
-            display: block;
-            font-size: var(--font-size-base);
-            color: var(--color-gray-900);
-        }
-        .onboarding-link span small {
-            display: block;
-            font-size: var(--font-size-xs);
-            color: var(--color-gray-600);
-            margin-top: 2px;
-        }
+        .register-prompt a:hover { text-decoration: underline; }
         .footer-links {
             text-align: center;
             margin-top: var(--spacing-lg);
@@ -261,24 +228,10 @@ AUTHOR: AviaSAFE Systems
         </button>
         <div id="googleError" class="error-message"></div>
 
-        <div class="onboarding-links">
-            <p class="onboarding-title">Get started with the AviaSAFESMS Beta</p>
-            <div class="onboarding-actions">
-                <a href="/register.html" class="onboarding-link">
-                    <i class="fas fa-building" aria-hidden="true"></i>
-                    <span>
-                        <strong>New Organization?</strong>
-                        <small>Register for Beta Access</small>
-                    </span>
-                </a>
-                <a href="/join.html" class="onboarding-link">
-                    <i class="fas fa-user-plus" aria-hidden="true"></i>
-                    <span>
-                        <strong>Have an Invite Code?</strong>
-                        <small>Join Your Team</small>
-                    </span>
-                </a>
-            </div>
+        <div class="register-prompt">
+            <i class="fas fa-building" aria-hidden="true"></i>
+            Need to register an organization?
+            <a href="/register.html">Click here &rarr; Register Organization</a>
         </div>
 
         <div class="role-hint">

@@ -255,3 +255,23 @@ def test_build_system_prompt_persona(monkeypatch):
     assert "QA" in prompt
     assert "qa" in prompt
     assert "Caps" in prompt
+
+
+def test_time_salutation_returns_welcome_greeting(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    greeting = groq_copilot.time_salutation()
+    assert "welcome aboard" in greeting
+    assert greeting in (
+        "Good morning and welcome aboard.",
+        "Good afternoon and welcome aboard.",
+        "Good evening and welcome aboard.",
+    )
+
+
+def test_offline_reply_uses_time_salutation_and_markdown(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    reply = groq_copilot._offline_reply("how to file a VSR")
+    assert "welcome aboard" in reply
+    assert "**Ghanshyam**" in reply
+    assert "currently unavailable" in reply
+    assert "<strong>" not in reply

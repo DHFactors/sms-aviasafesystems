@@ -16,9 +16,18 @@
 
     var WIDGET_TITLE = 'Ghanshyam — Executive Safety Copilot';
     var WIDGET_SUBTITLE = '50 Years Aviation Leadership | ICAO Annex 19 (3rd Ed.) SMS Guide';
+
+    // Time-based salutation from the client's local clock.
+    function timeSalutation() {
+        var hour = new Date().getHours();
+        if (hour < 12) return 'Good morning and welcome aboard.';
+        if (hour < 17) return 'Good afternoon and welcome aboard.';
+        return 'Good evening and welcome aboard.';
+    }
+
     var WELCOME_MSG =
-        'Assalaam and welcome aboard. I am <strong>Ghanshyam</strong> — Executive Safety & SMS Copilot.\n\n' +
-        'Ask me anything on SMS compliance, hazard reporting (VSR/MOR), 5x5 SRA risk evaluation, ' +
+        timeSalutation() + ' I am **Ghanshyam** — Executive Safety & SMS Copilot.\n\n' +
+        'Ask me anything on SMS compliance, hazard reporting (VSR/MOR), 5×5 SRA risk evaluation, ' +
         '5M+1E Fishbone RCA, Human Factors error traps, CAN issuance, or closed-loop CAP resolution.';
     var QUICK_SUGGESTIONS = [
         'Align SMS with ICAO Annex 19 (3rd Edition)',
@@ -81,25 +90,34 @@
             if (/^#{1,3}\s/.test(line)) {
                 flushPara(); closeList();
                 var level = line.match(/^#{1,3}/)[0].length;
-                html += '<h' + level + '>' + line.replace(/^#{1,3}\s+/, '') + '</h' + level + '>';
+                html += '<h' + level + '>' + inlineFormat(line.replace(/^#{1,3}\s+/, '')) + '</h' + level + '>';
                 return;
             }
             if (/^[-*]\s+/.test(line)) {
                 flushPara();
                 if (inList !== 'ul') { closeList(); html += '<ul>'; inList = 'ul'; }
-                html += '<li>' + line.replace(/^[-*]\s+/, '') + '</li>';
+                html += '<li>' + inlineFormat(line.replace(/^[-*]\s+/, '')) + '</li>';
                 return;
             }
             if (/^\d+[.)]\s+/.test(line)) {
                 flushPara();
                 if (inList !== 'ol') { closeList(); html += '<ol>'; inList = 'ol'; }
-                html += '<li>' + line.replace(/^\d+[.)]\s+/, '') + '</li>';
+                html += '<li>' + inlineFormat(line.replace(/^\d+[.)]\s+/, '')) + '</li>';
                 return;
             }
             para.push(line);
         });
         flushPara(); closeList();
+
+        // Inline bold on the assembled (already HTML-escaped) output so user
+        // input like "**Ghanshyam**" formats as clean bold rather than raw tags.
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         return html;
+    }
+
+    // Escaped-text inline formatter — `**bold**` -> <strong>bold</strong>.
+    function inlineFormat(text) {
+        return text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     }
 
     /* ── DOM helpers ── */

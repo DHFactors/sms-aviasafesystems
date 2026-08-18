@@ -18,6 +18,7 @@
 # ============================================================================
 
 import re
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -141,12 +142,25 @@ def build_messages(
     return messages
 
 
+def time_salutation() -> str:
+    """Time-based greeting from the server's local clock.
+
+    Morning 00:00-11:59, afternoon 12:00-16:59, evening/night 17:00-23:59.
+    """
+    hour = datetime.now().hour
+    if hour < 12:
+        return "Good morning and welcome aboard."
+    if hour < 17:
+        return "Good afternoon and welcome aboard."
+    return "Good evening and welcome aboard."
+
+
 def _offline_reply(message: str) -> str:
     """Graceful fallback when Groq is unavailable (API key missing / error)."""
     topic = sanitize_message(message, 120)
     return (
-        "Ghanshyam (Ex-CEO & SMS/HF Specialist): "
-        "I'm standing by, but the Groq assistant service is currently unavailable — "
+        f"{time_salutation()} I am **Ghanshyam** - Executive Safety & SMS Copilot. "
+        "I'm standing by, but the Groq assistant service is currently unavailable - "
         "please try again in a moment. "
         f"(Your message was received: \"{topic or '(empty)'}\".)\n\n"
         "While offline, remember: log every hazard or occurrence through the correct "
