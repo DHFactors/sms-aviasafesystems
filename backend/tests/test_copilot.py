@@ -182,7 +182,7 @@ def test_chat_injects_context_into_groq_payload(monkeypatch):
     assert "safety" in system_content
     assert "Corrective Action Plans" in system_content
     assert messages[-1] == {"role": "user", "content": "What CAP timeline is acceptable?"}
-    assert kwargs["model"] == "llama-3.3-70b-versatile"
+    assert kwargs["model"] == "openai/gpt-oss-120b"
     assert kwargs["temperature"] == groq_copilot.settings.GROQ_TEMPERATURE
 
 
@@ -214,7 +214,7 @@ def test_chat_uses_explicit_model_and_params(monkeypatch):
     groq_copilot.chat("hello", page_context="caan.html")
 
     kwargs = _FakeGroqCompletions.last_kwargs
-    assert kwargs["model"] == "llama-3.3-70b-versatile"
+    assert kwargs["model"] == "openai/gpt-oss-120b"
     assert kwargs["temperature"] == groq_copilot.settings.GROQ_TEMPERATURE
     assert kwargs["max_tokens"] == groq_copilot.settings.GROQ_MAX_TOKENS
     assert kwargs["stream"] is False

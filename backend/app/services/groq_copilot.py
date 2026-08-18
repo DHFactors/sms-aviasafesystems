@@ -27,9 +27,11 @@ from loguru import logger
 from app.core.config import settings
 from app.firebase import get_db
 
-# Explicit Groq model identifier (llama-3.3-70b-versatile). Kept as a named
-# constant so deployments can never silently drift to an invalid model name.
-GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
+# Explicit Groq model identifier. Kept as a named constant so deployments can
+# never silently drift to an invalid model name. This key's Groq plan exposes
+# the OpenAI gpt-oss lineup (no llama-3.x); gpt-oss-120b is the strongest chat
+# model available to it.
+GROQ_MODEL_NAME = "openai/gpt-oss-120b"
 
 COPILOT_SYSTEM_PROMPT = """
 You are "Ghanshyam — Executive Safety & SMS Copilot", an intelligent aviation safety, human factors, and compliance assistant embedded in AviaSAFE Systems.
