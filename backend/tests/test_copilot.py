@@ -457,3 +457,97 @@ def test_offline_reply_uses_time_salutation_and_markdown(monkeypatch):
     assert "**Ghanshyam**" in reply
     assert "currently unavailable" in reply
     assert "<strong>" not in reply
+
+
+# ============================================================================
+# Defensive model guard
+# ============================================================================
+
+def test_resolve_groq_model_accepts_known_model(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_MODEL", "openai/gpt-oss-20b")
+    assert groq_copilot.resolve_groq_model() == "openai/gpt-oss-20b"
+
+
+def test_resolve_groq_model_falls_back_when_model_unknown(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    assert groq_copilot.resolve_groq_model() == groq_copilot.GROQ_MODEL_NAME
+
+
+def test_resolve_groq_model_defaults_when_not_configured(monkeypatch):
+    _patch_env(monkeypatch, groq=False)
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_MODEL", "")
+    assert groq_copilot.resolve_groq_model() == groq_copilot.GROQ_MODEL_NAME
+
+
+class _ModelNotFoundError(Exception):
+    def __init__(self, message="model_not_found: model does not exist"):
+        super().__init__(message)
+        self.status_code = 404
+        self.message = message
+        self.type = "invalid_request_error"
+        self.body = {"error": {"message": message}}
+
+
+def test_chat_retries_with_fallback_model_when_model_rejected(monkeypatch):
+    calls = []
+
+    class _RetryCompletions:
+        @classmethod
+        def create(cls, **kwargs):
+            calls.append(kwargs.get("model"))
+            if len(calls) == 1:
+                raise _ModelNotFoundError()
+            return _FakeGroqCompletion("Fallback model reply about VSR reporting.")
+
+    class _RetryChat:
+        completions = _RetryCompletions
+
+    class _RetryClient:
+        chat = _RetryChat
+
+        def __init__(self, **kwargs):
+            pass
+
+    class _RetryModule:
+        Groq = _RetryClient
+
+    monkeypatch.setitem(sys.modules, "groq", _RetryModule())
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
+    # Model passes the allowlist but Groq rejects it at runtime (deprecated /
+    # temporarily unavailable) — the defensive retry must fall back.
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_MODEL", "openai/gpt-oss-20b")
+
+    reply = groq_copilot.chat("how do I file a VSR", page_context="safety.html")
+
+    assert "currently unavailable" not in reply
+    assert "Fallback model reply" in reply
+    assert calls == ["openai/gpt-oss-20b", groq_copilot.GROQ_MODEL_NAME]
+
+
+def test_chat_returns_offline_when_fallback_model_also_fails(monkeypatch):
+    class _BoomCompletions:
+        @classmethod
+        def create(cls, **kwargs):
+            raise _ModelNotFoundError()
+
+    class _BoomChat:
+        completions = _BoomCompletions
+
+    class _BoomClient:
+        chat = _BoomChat
+
+        def __init__(self, **kwargs):
+            pass
+
+    class _BoomModule:
+        Groq = _BoomClient
+
+    monkeypatch.setitem(sys.modules, "groq", _BoomModule())
+    monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
+    monkeypatch.setattr(groq_copilot.settings, "GROQ_MODEL", "openai/gpt-oss-20b")
+
+    reply = groq_copilot.chat("help me sign in", page_context="login.html")
+
+    assert "currently unavailable" in reply

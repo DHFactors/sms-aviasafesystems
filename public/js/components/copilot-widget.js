@@ -18,7 +18,50 @@
     var WIDGET_SUBTITLE = '50 Years Aviation Leadership | ICAO Annex 19 (3rd Ed.) SMS Guide';
 
     // Public pages where the copilot runs WITHOUT authentication (guest mode).
-    var GUEST_PAGES = ['register.html'];
+    var GUEST_PAGES = ['register.html', 'join.html', 'login.html'];
+
+    // Per-page guest guidance: greeting intro + quick-suggestion chips served
+    // on unauthenticated pages. Keyed by page filename (from the URL path).
+    var PAGE_GUEST_GUIDANCE = {
+        'register.html': {
+            intro: 'I can help you register your organization: choosing the correct operator ' +
+                'classification (Fixed-Wing Airline, Helicopter/Rotary, Part-145 AMO, or Certified ' +
+                'Aerodrome), setting up your primary administrator account, and preparing your team ' +
+                'invite code.',
+            suggestions: [
+                'How do I register my organization?',
+                'Which operator classification should I choose?',
+                'What happens after I register?',
+                'How do my team members join?'
+            ]
+        },
+        'join.html': {
+            intro: 'I can help you join your organization\'s safety team: entering your team invite ' +
+                'code, choosing the right department and operational role, and completing your account ' +
+                'setup.',
+            suggestions: [
+                'Where do I find my invite code?',
+                'Which department should I select?',
+                'What is my operational role?',
+                'How do I create a strong password?'
+            ]
+        },
+        'login.html': {
+            intro: 'I can help you sign in: troubleshooting sign-in problems, confirming the correct ' +
+                'tenant scope, and resetting or recovering your password.',
+            suggestions: [
+                'I forgot my password',
+                'I can\'t sign in — what should I check?',
+                'Which tenant am I signing into?',
+                'Do I need an invite code first?'
+            ]
+        }
+    };
+
+    function guestGuidance() {
+        var g = PAGE_GUEST_GUIDANCE[currentPageName()];
+        return g || PAGE_GUEST_GUIDANCE['register.html'];
+    }
 
     function currentPageName() {
         var path = window.location.pathname.split('/').pop();
@@ -39,10 +82,7 @@
 
     function welcomeMessage() {
         var intro = isGuestPage()
-            ? 'I can help you register your organization: choosing the correct operator ' +
-              'classification (Fixed-Wing Airline, Helicopter/Rotary, Part-145 AMO, or Certified ' +
-              'Aerodrome), setting up your primary administrator account, and preparing your team ' +
-              'invite code.'
+            ? guestGuidance().intro
             : 'Ask me anything on SMS compliance, hazard reporting (VSR/MOR), 5×5 SRA risk evaluation, ' +
               '5M+1E Fishbone RCA, Human Factors error traps, CAN issuance, or closed-loop CAP resolution.';
         return timeGreeting() + ' and welcome aboard. I am **Ghanshyam** — Executive Safety Copilot.\n\n' + intro;
@@ -50,12 +90,7 @@
 
     function quickSuggestions() {
         if (isGuestPage()) {
-            return [
-                'How do I register my organization?',
-                'Which operator classification should I choose?',
-                'What happens after I register?',
-                'How do my team members join?'
-            ];
+            return guestGuidance().suggestions;
         }
         return [
             'Align SMS with ICAO Annex 19 (3rd Edition)',
@@ -113,6 +148,11 @@
         if (page && page !== '/') parts.push(page);
         var meta = document.querySelector('meta[name="page-context"]');
         if (meta && meta.content) parts.push(meta.content);
+        var metaPage = document.querySelector('meta[name="copilot-page-context"]');
+        if (metaPage && metaPage.content) {
+            var val = metaPage.content.trim();
+            if (val && parts.indexOf(val) === -1) parts.push(val);
+        }
         if (document.title) parts.push(document.title);
         return parts.filter(Boolean).join(' — ').slice(0, 200);
     }

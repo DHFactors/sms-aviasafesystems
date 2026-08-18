@@ -34,6 +34,37 @@ from app.firebase import get_db
 # model available to it.
 GROQ_MODEL_NAME = "openai/gpt-oss-120b"
 
+# Curated allowlist of the chat models this plan/key actually exposes. The
+# GROQ_MODEL env / setting is validated against this list before use so a stray,
+# deprecated or renamed model cannot silently break chat (see resolve_groq_model).
+GROQ_KNOWN_MODELS = {
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.6-27b",
+    "allam-2-7b",
+}
+
+
+def resolve_groq_model() -> str:
+    """Return the active Groq chat model, guarded against invalid config.
+
+    Validates ``settings.GROQ_MODEL`` (env ``GROQ_MODEL``) against
+    GROQ_KNOWN_MODELS. An unrecognised / deprecated value logs a warning and
+    falls back to GROQ_MODEL_NAME instead of failing later inside Groq.
+    """
+    configured = (settings.GROQ_MODEL or os.environ.get("GROQ_MODEL") or "").strip()
+    if configured:
+        if configured in GROQ_KNOWN_MODELS:
+            return configured
+        logger.warning(
+            "GROQ_MODEL={!r} is not in the known production model list {} — "
+            "falling back to default model {!r}",
+            configured,
+            sorted(GROQ_KNOWN_MODELS),
+            GROQ_MODEL_NAME,
+        )
+    return GROQ_MODEL_NAME
+
 COPILOT_SYSTEM_PROMPT = """
 You are "Ghanshyam — Executive Safety & SMS Copilot", an intelligent aviation safety, human factors, and compliance assistant embedded in AviaSAFE Systems.
 You represent the voice, expertise, and guidance of Ghanshyam Acharya: Former Airline Chief Executive Officer, Human Factors (HF) & SMS Specialist, and Aviation Data Analyst with 50 years of industry experience (1977–2026).
@@ -287,6 +318,33 @@ def _innermost_exception(e: Exception) -> str:
     return f"{type(e).__name__}: {e}"
 
 
+def _is_model_rejected(e: Exception) -> bool:
+    """True when Groq rejected the requested model (HTTP 400/404 'model not found').
+
+    Used by the defensive fallback: if the configured model is valid-looking but
+    Groq still rejects it (deprecated, unavailable on the plan, typo in a new
+    deployment), we retry once with GROQ_MODEL_NAME instead of dropping straight
+    into the offline reply.
+    """
+    status = getattr(e, "status_code", None)
+    if status not in (400, 404):
+        return False
+    message = str(getattr(e, "message", "") or "")
+    body = getattr(e, "body", None)
+    text = "{} {}".format(message, body if body is not None else "").lower()
+    markers = (
+        "model_not_found",
+        "model not found",
+        "unknown model",
+        "does not exist",
+        "no model found",
+        "model_id",
+        "model id",
+        "invalid model",
+    )
+    return any(marker in text for marker in markers)
+
+
 _client_lock = threading.Lock()
 # Lazily-created reusable Groq clients. Keyed by (api_key, Groq class) so the
 # same client is shared across requests (no per-request re-instantiation) while
@@ -365,9 +423,10 @@ def chat(
     # Payload shape: [{"role": "system", "content": system_prompt}, ...history...,
     #                 {"role": "user", "content": user_message}]. Log the shape
     # (not the content) so request structure issues are immediately visible.
+    model = resolve_groq_model()
     logger.debug(
         "Groq payload: model=%s messages=%d (first=%s, last=%s) max_tokens=%s temperature=%s stream=False",
-        settings.GROQ_MODEL or GROQ_MODEL_NAME,
+        model,
         len(messages),
         messages[0].get("role") if messages else None,
         messages[-1].get("role") if messages else None,
@@ -376,7 +435,7 @@ def chat(
     )
     try:
         completion = client.chat.completions.create(
-            model=settings.GROQ_MODEL or GROQ_MODEL_NAME,
+            model=model,
             messages=messages,
             temperature=settings.GROQ_TEMPERATURE,
             max_tokens=settings.GROQ_MAX_TOKENS,
@@ -402,4 +461,35 @@ def chat(
             detail["message"],
             detail["body"],
         )
+        # Defensive fallback: a valid-looking but rejected model (HTTP 400/404
+        # 'model not found' — deprecated / unavailable on the plan) retries once
+        # with the proven GROQ_MODEL_NAME before degrading to the offline reply.
+        if model != GROQ_MODEL_NAME and _is_model_rejected(e):
+            logger.warning(
+                "Groq rejected model {!r} (status={}, message={}) — retrying once with fallback model {!r}",
+                model,
+                detail["status_code"],
+                detail["message"],
+                GROQ_MODEL_NAME,
+            )
+            try:
+                completion = client.chat.completions.create(
+                    model=GROQ_MODEL_NAME,
+                    messages=messages,
+                    temperature=settings.GROQ_TEMPERATURE,
+                    max_tokens=settings.GROQ_MAX_TOKENS,
+                    stream=False,
+                )
+                reply = completion.choices[0].message.content
+                return reply.strip() if reply else _offline_reply(message)
+            except Exception as e2:
+                detail2 = _groq_error_detail(e2)
+                logger.exception(
+                    "Groq fallback model {!r} also failed: {} (status={}, message={}, bottom-most={})",
+                    GROQ_MODEL_NAME,
+                    str(e2),
+                    detail2["status_code"],
+                    detail2["message"],
+                    _innermost_exception(e2),
+                )
         return _offline_reply(message)
