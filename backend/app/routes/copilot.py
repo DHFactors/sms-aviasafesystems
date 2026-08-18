@@ -12,6 +12,8 @@
 
 from typing import Any, Dict, List, Optional
 
+import asyncio
+
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 from loguru import logger
@@ -56,7 +58,10 @@ async def copilot_chat(
     history = [item.dict() for item in (payload.history or [])]
 
     try:
-        reply = chat(
+        # The Groq SDK client is synchronous; run it in a worker thread so the
+        # blocking network call never stalls the event loop.
+        reply = await asyncio.to_thread(
+            chat,
             payload.message,
             history=history,
             role=user.get("role"),
@@ -102,7 +107,9 @@ async def copilot_guest_chat(
     history = [item.dict() for item in (payload.history or [])]
 
     try:
-        reply = chat(
+        # Run the synchronous Groq call in a worker thread (see /chat handler).
+        reply = await asyncio.to_thread(
+            chat,
             payload.message,
             history=history,
             page_context=payload.page_context,

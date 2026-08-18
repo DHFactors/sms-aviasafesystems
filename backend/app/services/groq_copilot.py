@@ -19,6 +19,7 @@
 
 import os
 import re
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -273,6 +274,56 @@ def _groq_error_detail(e: Exception) -> Dict[str, Any]:
     }
 
 
+def _innermost_exception(e: Exception) -> str:
+    """Walk the exception chain to the bottom-most underlying error.
+
+    Groq SDK errors often wrap an httpx / connection / auth failure in their
+    ``__cause__`` chain; surfacing that exact cause is what makes server logs
+    actionable instead of showing only the outer APIError.
+    """
+    cause = getattr(e, "__cause__", None) or getattr(e, "__context__", None)
+    if cause is not None and cause is not e:
+        return _innermost_exception(cause)
+    return f"{type(e).__name__}: {e}"
+
+
+_client_lock = threading.Lock()
+# Lazily-created reusable Groq clients. Keyed by (api_key, Groq class) so the
+# same client is shared across requests (no per-request re-instantiation) while
+# a swap of the groq module/class (e.g. tests, SDK upgrade) still yields a new
+# client instead of a stale cached one.
+_client_cache: Dict[tuple, Any] = {}
+
+
+def _get_groq_client(api_key: str) -> Any:
+    """Return a lazily-initialised, reusable Groq client or None on failure.
+
+    Thread-safe: concurrent requests share one client instance. Initialisation
+    errors (missing SDK, auth/transport setup failures) are logged with the
+    bottom-most cause and degrade to ``None`` so callers return the offline reply.
+    """
+    from groq import Groq
+
+    cache_key = (api_key, Groq)
+    cached = _client_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    with _client_lock:
+        cached = _client_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        try:
+            client = Groq(api_key=api_key)
+        except Exception as e:
+            logger.exception(
+                "Groq client initialization failed (bottom-most cause: {})",
+                _innermost_exception(e),
+            )
+            return None
+        _client_cache[cache_key] = client
+        return client
+
+
 def chat(
     message: str,
     *,
@@ -296,33 +347,34 @@ def chat(
         )
         return _offline_reply(message)
 
+    client = _get_groq_client(api_key)
+    if client is None:
+        logger.error("Groq client unavailable (initialization failed) — copilot returning offline reply")
+        return _offline_reply(message)
+
     tenant_classification = tenant_id and get_tenant_classification(tenant_id)
-
+    messages = build_messages(
+        message,
+        history=history,
+        role=role,
+        department=department,
+        tenant_id=tenant_id,
+        tenant_classification=tenant_classification,
+        page_context=page_context,
+    )
+    # Payload shape: [{"role": "system", "content": system_prompt}, ...history...,
+    #                 {"role": "user", "content": user_message}]. Log the shape
+    # (not the content) so request structure issues are immediately visible.
+    logger.debug(
+        "Groq payload: model=%s messages=%d (first=%s, last=%s) max_tokens=%s temperature=%s stream=False",
+        settings.GROQ_MODEL or GROQ_MODEL_NAME,
+        len(messages),
+        messages[0].get("role") if messages else None,
+        messages[-1].get("role") if messages else None,
+        settings.GROQ_MAX_TOKENS,
+        settings.GROQ_TEMPERATURE,
+    )
     try:
-        from groq import Groq
-
-        client = Groq(api_key=api_key)
-        messages = build_messages(
-            message,
-            history=history,
-            role=role,
-            department=department,
-            tenant_id=tenant_id,
-            tenant_classification=tenant_classification,
-            page_context=page_context,
-        )
-        # Payload shape: [{"role": "system", "content": system_prompt}, ...history...,
-        #                 {"role": "user", "content": user_message}]. Log the shape
-        # (not the content) so request structure issues are immediately visible.
-        logger.debug(
-            "Groq payload: model=%s messages=%d (first=%s, last=%s) max_tokens=%s temperature=%s stream=False",
-            settings.GROQ_MODEL or GROQ_MODEL_NAME,
-            len(messages),
-            messages[0].get("role") if messages else None,
-            messages[-1].get("role") if messages else None,
-            settings.GROQ_MAX_TOKENS,
-            settings.GROQ_TEMPERATURE,
-        )
         completion = client.chat.completions.create(
             model=settings.GROQ_MODEL or GROQ_MODEL_NAME,
             messages=messages,
@@ -337,10 +389,11 @@ def chat(
     except Exception as e:
         detail = _groq_error_detail(e)
         logger.exception(
-            "Groq API error encountered: {} (status={}, message={})",
+            "Groq API error encountered: {} (status={}, message={}, bottom-most={})",
             str(e),
             detail["status_code"],
             detail["message"],
+            _innermost_exception(e),
         )
         logger.error(
             "Groq error payload: status={} type={} message={} body={}",

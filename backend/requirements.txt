@@ -39,7 +39,9 @@ email-validator==2.1.0.post1
 redis[hiredis]==5.0.7
 
 # AI Chat Assistant (Groq — Safety & Compliance Copilot)
-groq==0.9.0
+# groq SDK requires httpx; keep both on modern, compatible versions.
+groq>=0.9.0
+httpx>=0.25.0
 
 # Utilities
 loguru==0.7.2
