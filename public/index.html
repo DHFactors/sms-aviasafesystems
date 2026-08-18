@@ -111,7 +111,13 @@
             </nav>
 
             <!-- Navigation Actions -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 shrink-0">
+                <!-- Theme Switcher Button -->
+                <button id="themeToggleBtn" type="button" aria-label="Toggle theme" data-theme-toggle
+                        class="p-2 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100 transition-colors focus:outline-none dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-white/10">
+                    <i id="themeIcon" class="fa-solid fa-moon text-base"></i>
+                    <i class="fa-solid fa-sun text-base"></i>
+                </button>
                 <a href="/login.html" class="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-brand-600 transition-colors dark:text-slate-200">
                     <i class="fa-solid fa-lock text-xs mr-1.5 text-brand-600"></i> Sign In
                 </a>
