@@ -1,0 +1,454 @@
+/* ============================================================================
+   FILE: theme.css
+   PATH: public/css/theme.css
+   VERSION: 1.0.0
+   DATE CREATED: 2026-08-18
+   PURPOSE: Dark/Light theme layer for the AviaSAFE platform.
+            Loaded LAST (before </head>) so it can override the design-system
+            tokens in variables.css / main.css / global.css / shell.css as well
+            as page-level inline styles. The active theme is signalled by the
+            'dark' class on <html> (managed by /js/theme-toggle.js).
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ */
+
+/* ========== THEME TOGGLE BUTTON ========== */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--border-radius-full, 9999px);
+    border: 1px solid var(--color-border, #dce6ee);
+    background: var(--color-surface, #ffffff);
+    color: var(--color-primary-dark, #0b2a42);
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+                transform 0.15s ease;
+}
+.theme-toggle:hover {
+    border-color: var(--color-accent, #1a6b8a);
+    color: var(--color-accent, #1a6b8a);
+    transform: translateY(-1px);
+}
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--color-accent, #1a6b8a);
+    outline-offset: 2px;
+}
+.theme-toggle i {
+    line-height: 1;
+}
+html.dark .theme-toggle {
+    background: var(--color-gray-100, #16213a);
+    border-color: var(--color-gray-300, #33415e);
+    color: #e2e8f0;
+}
+html.dark .theme-toggle:hover {
+    border-color: var(--color-accent, #1a6b8a);
+    color: #bae6fd;
+}
+
+/* Floating variant for headerless pages (login / register / standalone forms). */
+.theme-toggle--floating {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 2147482999;
+    box-shadow: var(--shadow-md, 0 2px 10px rgba(0,0,0,0.12));
+    background: var(--color-surface, #ffffff);
+    border: 1px solid var(--color-border, #dce6ee);
+}
+
+/* ========== DARK THEME TOKENS ========== */
+/* Flip the design-system surface/border/muted-text tokens. Tokens that double
+   as both foreground AND background (--color-primary-dark, --color-white,
+   --color-gray-800/900, accent/secondary) are intentionally left untouched so
+   headers, buttons and footers keep correct contrast. */
+html.dark {
+    --color-bg: #0b1220;
+    --color-surface: #101b2e;
+    --color-surface-2: #16233a;
+    --color-text: #e2e8f0;
+    --color-text-muted: #94a3b8;
+    --color-border: #223048;
+    --color-border-light: #1b2942;
+
+    --color-gray-50: #0f172a;
+    --color-gray-100: #16213a;
+    --color-gray-200: #223048;
+    --color-gray-300: #33415e;
+    --color-gray-400: #475569;
+    --color-gray-500: #64748b;
+    --color-gray-600: #94a3b8;
+    --color-gray-700: #cbd5e1;
+
+    --color-primary-light: #16324f;
+    --color-info-bg: #123048;
+    --color-success-bg: #0f3d2e;
+    --color-warning-bg: #3d3414;
+    --color-danger-bg: #431f1c;
+
+    --hero-gradient: linear-gradient(135deg, #0b1220 0%, #10233a 100%);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 6px 24px rgba(0, 0, 0, 0.35);
+    --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* ========== BASE ========== */
+html.dark body {
+    background: var(--color-bg);
+    color: var(--color-text);
+}
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6 {
+    color: #f1f5f9;
+}
+html.dark ::selection {
+    background: rgba(56, 189, 248, 0.3);
+    color: #ffffff;
+}
+
+/* ========== HEADER ========== */
+html.dark .app-header {
+    background: var(--color-surface);
+    border-bottom-color: var(--color-border);
+}
+html.dark .app-header .logo {
+    color: #f1f5f9;
+}
+html.dark .app-header nav a,
+html.dark .app-header nav a:not(.btn-login) {
+    color: var(--color-text-muted);
+}
+html.dark .app-header nav a:hover,
+html.dark .app-header nav a.active {
+    color: #f1f5f9;
+}
+html.dark .app-header nav a.btn-login {
+    background: var(--color-primary);
+    color: #ffffff;
+}
+
+/* ========== CARDS / SURFACES ========== */
+html.dark .card,
+html.dark .feature-card,
+html.dark .bio-modal-card,
+html.dark .light-card {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-card);
+}
+html.dark .light-card:hover {
+    border-color: var(--color-brand-600);
+}
+/* Internals of light cards / ecosystem cards on dark. */
+html.dark .light-card h3,
+html.dark .light-card h4,
+html.dark .light-card .text-slate-900 {
+    color: #f1f5f9;
+}
+html.dark .light-card p,
+html.dark .light-card .text-slate-600 {
+    color: #94a3b8;
+}
+html.dark .light-card ul,
+html.dark .light-card li,
+html.dark .light-card .text-slate-700 {
+    color: #cbd5e1;
+}
+html.dark .light-card strong,
+html.dark .light-card .text-slate-800 {
+    color: #e2e8f0;
+}
+
+/* Workflow step bar (landing). */
+html.dark .workflow-bar {
+    background: var(--color-surface);
+    border-bottom-color: var(--color-border);
+}
+html.dark .workflow-bar .wf-muted {
+    color: var(--color-gray-500);
+}
+html.dark .workflow-bar .wf-text {
+    color: #e2e8f0;
+}
+html.dark .workflow-bar .wf-pill {
+    background: var(--color-bg);
+    border-color: var(--color-gray-300);
+}
+html.dark .workflow-bar .wf-arrow {
+    color: var(--color-gray-600);
+}
+
+/* Ecosystem + onboarding icon chips on dark. */
+html.dark .ecosystem-chip,
+html.dark .onboarding-chip {
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.2);
+    color: var(--color-accent-light);
+}
+html.dark .trust-section,
+html.dark .founder-section,
+html.dark .workflow-section {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+}
+html.dark .workflow-step {
+    background: var(--color-bg);
+    border-color: var(--color-border);
+}
+html.dark .why-concept-icon,
+html.dark .workflow-num {
+    background: var(--color-primary-light);
+    color: var(--color-accent-light);
+}
+html.dark .why-quote p,
+html.dark .why-flow-label,
+html.dark .workflow-label,
+html.dark .workflow-closing,
+html.dark .trust-logos span {
+    color: #e2e8f0;
+}
+html.dark .badge-secondary {
+    background: var(--color-gray-200);
+    color: var(--color-gray-600);
+}
+
+/* ========== LOGIN / AUTH ========== */
+html.dark .login-page {
+    background: var(--hero-gradient);
+}
+html.dark .login-container {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-float);
+}
+html.dark .login-container .logo h1 {
+    color: #f1f5f9;
+}
+html.dark .login-container .logo p {
+    color: var(--color-text-muted);
+}
+html.dark .tenant-context {
+    background: var(--color-primary-light);
+    color: var(--color-accent-light);
+}
+html.dark .role-hint {
+    background: var(--color-bg);
+    border-color: var(--color-border);
+}
+html.dark .role-hint strong {
+    color: #e2e8f0;
+}
+html.dark .role-hint .hint-row {
+    border-bottom-color: var(--color-gray-200);
+}
+html.dark .error-message {
+    color: #ffb4a8;
+}
+
+/* ========== FORMS ========== */
+html.dark .form-control {
+    background: var(--color-bg);
+    border-color: var(--color-gray-300);
+    color: var(--color-text);
+}
+html.dark .form-control::placeholder {
+    color: var(--color-gray-500);
+}
+html.dark .form-control:disabled {
+    background: var(--color-gray-100);
+}
+html.dark select.form-control option {
+    background: #101b2e;
+    color: #e2e8f0;
+}
+html.dark .form-group label {
+    color: #cbd5e1;
+}
+html.dark .form-hint {
+    color: var(--color-gray-500);
+}
+html.dark .risk-preview {
+    background: var(--color-bg);
+}
+html.dark .risk-preview .rp-label {
+    color: var(--color-gray-500);
+}
+html.dark .risk-preview .rp-value {
+    color: #e2e8f0;
+}
+html.dark .back-link {
+    color: var(--color-accent-light);
+}
+
+/* ========== TABLES & DATA GRIDS ========== */
+html.dark .table th {
+    background: var(--color-gray-100);
+    color: var(--color-gray-600);
+}
+html.dark .table td {
+    border-bottom-color: var(--color-gray-200);
+}
+html.dark .table tr:hover {
+    background: var(--color-gray-50);
+}
+
+/* ========== MODALS & DIALOGS ========== */
+html.dark .bio-modal-close {
+    background: var(--color-gray-100);
+    color: #e2e8f0;
+}
+html.dark .bio-modal-header h2 {
+    color: #f1f5f9;
+}
+html.dark .bio-modal-body p,
+html.dark .bio-modal-body li {
+    color: #cbd5e1;
+}
+html.dark .modal-backdrop,
+html.dark .modal-overlay {
+    background: rgba(2, 6, 23, 0.72);
+}
+html.dark .modal,
+html.dark .modal-content,
+html.dark .modal-dialog,
+html.dark [class$="-modal-card"],
+html.dark [class*="modal-card"] {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: #e2e8f0;
+}
+html.dark .modal-header,
+html.dark .modal-footer {
+    border-color: var(--color-border);
+}
+html.dark .modal-title,
+html.dark .modal-header h2,
+html.dark .modal-header h3,
+html.dark .modal-header h4 {
+    color: #f1f5f9;
+}
+
+/* ========== MISC / SCROLLBARS ========== */
+html.dark body,
+html.dark .shell-content {
+    scrollbar-color: var(--color-gray-600) var(--color-bg);
+}
+html.dark ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+}
+html.dark ::-webkit-scrollbar-thumb {
+    background: var(--color-gray-600);
+}
+
+/* ========== FUNCTIONAL PAGES (hardcoded hex) ========== */
+/* Several data-entry / dashboard pages style themselves with inline hex
+   values instead of design-system tokens. These rules make the common
+   class names follow the active theme without touching each file. */
+html.dark .page {
+    background: transparent;
+}
+html.dark .card,
+html.dark .stat-card,
+html.dark .table-card,
+html.dark .filter-bar,
+html.dark .header-bar,
+html.dark .empty-state,
+html.dark .error-state,
+html.dark .loading-state,
+html.dark .chart-wrapper,
+html.dark .detail-grid,
+html.dark .risk-preview {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text);
+}
+html.dark .page h1,
+html.dark .page h2,
+html.dark .page h3,
+html.dark .page h4,
+html.dark .page-header,
+html.dark .header-bar h1 {
+    color: #f1f5f9;
+}
+html.dark .page-header .lbl,
+html.dark .page-header .value,
+html.dark .header-bar .lbl,
+html.dark .header-bar .value {
+    color: var(--color-text-muted);
+}
+html.dark .table-card th {
+    background: var(--color-gray-100);
+    color: var(--color-gray-600);
+}
+html.dark .table-card td,
+html.dark .detail-grid td {
+    border-bottom-color: var(--color-gray-200);
+}
+html.dark .table-card tr:hover td,
+html.dark .detail-grid tr:hover td {
+    background: var(--color-gray-50);
+}
+html.dark .detail-grid .label,
+html.dark .detail-field .label,
+html.dark .detail-grid .lbl {
+    color: var(--color-gray-500);
+}
+html.dark .detail-grid .value,
+html.dark .detail-field .value {
+    color: var(--color-text);
+}
+html.dark .filter-bar input,
+html.dark .filter-bar select,
+html.dark .filter-bar textarea,
+html.dark .form-group input,
+html.dark .form-group select,
+html.dark .form-group textarea {
+    background: var(--color-bg);
+    border-color: var(--color-gray-300);
+    color: var(--color-text);
+}
+html.dark .filter-bar select option,
+html.dark .form-group select option {
+    background: #101b2e;
+    color: #e2e8f0;
+}
+html.dark .btn-secondary,
+html.dark .btn-outline,
+html.dark .btn-search {
+    background: var(--color-gray-100);
+    border-color: var(--color-gray-300);
+    color: var(--color-gray-600);
+}
+html.dark .btn-secondary:hover,
+html.dark .btn-outline:hover,
+html.dark .btn-search:hover {
+    background: var(--color-gray-200);
+    color: var(--color-gray-700);
+}
+html.dark .empty-state,
+html.dark .loading-state,
+html.dark .error-state {
+    color: var(--color-text-muted);
+}
+html.dark .error-state .error {
+    color: #ffb4a8;
+}
+
+/* Smooth theme transitions (opt-out via reduced-motion). */
+body,
+html.dark body {
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    body,
+    html.dark body {
+        transition: none;
+    }
+}

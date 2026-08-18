@@ -236,3 +236,41 @@
     .cpi-toggle .cpi-label { display: none; }
     .cpi-toggle { padding: 12px 14px; }
 }
+
+/* ============================================================================
+   LIGHT-MODE VARIANT
+   The widget is dark by default; when the page is NOT in dark mode (no .dark
+   class on <html>), flip its tokens to a clean light palette. Added by the
+   global theme controller (/js/theme-toggle.js + /css/theme.css).
+   ============================================================================ */
+html:not(.dark) .copilot-widget-root {
+    --cpi-accent: #8a6a00;
+    --cpi-bg: #ffffff;
+    --cpi-bg-2: #f1f5f9;
+    --cpi-bg-input: #f8fafc;
+    --cpi-text: #0f172a;
+    --cpi-muted: #64748b;
+    --cpi-border: #e2e8f0;
+    --cpi-user-bubble: var(--color-brand-600);
+    --cpi-bot-bubble: #f8fafc;
+}
+html:not(.dark) .copilot-widget-root .cpi-toggle {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+html:not(.dark) .copilot-widget-root .cpi-toggle:hover {
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.2);
+}
+html:not(.dark) .copilot-widget-root .cpi-modal {
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
+html:not(.dark) .copilot-widget-root .cpi-close:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+html:not(.dark) .copilot-widget-root .cpi-error {
+    color: #b3261e;
+    background: rgba(214, 69, 65, 0.1);
+    border-color: rgba(214, 69, 65, 0.3);
+}
+html:not(.dark) .copilot-widget-root .cpi-msg.bot a {
+    color: var(--color-brand-600);
+}
