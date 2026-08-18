@@ -128,13 +128,21 @@ def _unique_tenant_id(db: Any, organization_name: str) -> str:
             raise RuntimeError("Unable to allocate a unique tenant id")
 
 
+class DuplicateEmailError(ValueError):
+    """Raised when the joining/registering email already exists in Firebase Auth."""
+
+
 def _validate_password(password: str) -> None:
     if not password or len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r"\d", password):
+        raise ValueError("Password must contain at least one digit")
 
 
 def _create_user(auth: Any, *, email: str, password: str, display_name: str) -> Any:
-    """Create a Firebase Auth user, surfacing duplicate emails as a ValueError."""
+    """Create a Firebase Auth user, surfacing duplicate emails as an error."""
     try:
         return auth.create_user(
             email=email,
@@ -147,7 +155,7 @@ def _create_user(auth: Any, *, email: str, password: str, display_name: str) -> 
             "email already" in str(e).lower() or "already in use" in str(e).lower()
         )
         if duplicate:
-            raise ValueError("An account with this email already exists")
+            raise DuplicateEmailError("An account with this email address already exists")
         raise RuntimeError(str(e))
 
 
@@ -323,6 +331,31 @@ def resolve_tenant(
     raise ValueError("An invite code or tenant id is required")
 
 
+def verify_invite(db: Any, code: Optional[str]) -> Dict[str, Any]:
+    """Real-time invite-code verification for /join.html.
+
+    Resolves the tenant by invite code and confirms it is active. Returns a
+    minimal public payload (no internal fields). Raises:
+      ValueError  -> caller supplied no / blank code
+      LookupError -> code unknown, or tenant is inactive/expired
+    """
+    if not code or not code.strip():
+        raise ValueError("An invite code is required")
+    tid, tenant_doc = resolve_tenant(db, code.strip(), None)
+
+    active = tenant_doc.get("active")
+    status = str(tenant_doc.get("status") or "").lower()
+    if active is False or status == "inactive":
+        raise LookupError("Invalid or expired invite code")
+
+    return {
+        "valid": True,
+        "organization_name": tenant_doc.get("name") or tid,
+        "tenant_id": tid,
+        "category": tenant_doc.get("tenant_type") or tenant_doc.get("classification"),
+    }
+
+
 def join_team(
     *,
     invite_code: Optional[str] = None,
@@ -331,9 +364,15 @@ def join_team(
     email: str,
     password: str,
     department: str,
+    operational_role: Optional[str] = None,
     request=None,
 ) -> Dict[str, Any]:
-    """Self-register a department postholder under an existing tenant."""
+    """Self-register a department postholder under an existing tenant.
+
+    Invitees are provisioned with the least-privilege 'USER' tier scoped to the
+    tenant_id — they can never self-elevate to AIRLINE_ADMIN / tenant_admin;
+    that requires a Safety Manager action in the admin console.
+    """
     _validate_password(password)
 
     db = get_db()
@@ -370,19 +409,19 @@ def join_team(
         {"role": "USER", "tenant_id": tid, "department": label},
     )
 
-    upsert_user_doc(
-        user.uid,
-        {
-            "uid": user.uid,
-            "email": email,
-            "display_name": full_name,
-            "role": "USER",
-            "tenant_id": tid,
-            "department": label,
-            "created_at": now,
-            "updated_at": now,
-        },
-    )
+    user_doc = {
+        "uid": user.uid,
+        "email": email,
+        "display_name": full_name,
+        "role": "USER",
+        "tenant_id": tid,
+        "department": label,
+        "created_at": now,
+        "updated_at": now,
+    }
+    if operational_role:
+        user_doc["operational_role"] = operational_role.strip()[:100]
+    upsert_user_doc(user.uid, user_doc)
 
     ip, request_id = request_context(request)
     log_audit(

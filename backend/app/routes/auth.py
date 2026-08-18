@@ -10,6 +10,7 @@
 # ============================================================================
 
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime, timezone
@@ -26,6 +27,8 @@ from app.services.tenant_registration import (
     register_tenant,
     join_team,
     resolve_tenant,
+    verify_invite,
+    DuplicateEmailError,
 )
 
 router = APIRouter()
@@ -184,6 +187,34 @@ async def register_tenant_endpoint(request: Request, body: RegisterTenantRequest
     return {"success": True, **result}
 
 
+@router.get("/verify-invite")
+@rate_limit("auth_attempts")
+async def verify_invite_endpoint(
+    request: Request,
+    code: Optional[str] = Query(None, description="Team invite code"),
+):
+    """Real-time invite-code verification for /join.html.
+
+    Confirms the code belongs to an active tenant and returns the organization
+    name, tenant id and operational category so the join form can greet the
+    invitee. Deliberately reveals nothing about the tenant when the code is
+    unknown or inactive.
+    """
+    try:
+        result = verify_invite(get_db(), code)
+    except LookupError:
+        return JSONResponse(
+            status_code=404,
+            content={"valid": False, "error": "Invalid or expired invite code"},
+        )
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"valid": False, "error": "Invalid or expired invite code"},
+        )
+    return result
+
+
 class JoinTeamRequest(BaseModel):
     invite_code: Optional[str] = None
     tenant_id: Optional[str] = None
@@ -192,6 +223,7 @@ class JoinTeamRequest(BaseModel):
     password: str
     confirm_password: str
     department: str = Field(..., min_length=1)
+    operational_role: Optional[str] = Field(None, max_length=100)
 
 
 @router.post("/join-team")
@@ -208,7 +240,13 @@ async def join_team_endpoint(request: Request, body: JoinTeamRequest):
             email=body.email,
             password=body.password,
             department=body.department,
+            operational_role=body.operational_role,
             request=request,
+        )
+    except DuplicateEmailError as e:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email address already exists.",
         )
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -48,14 +48,17 @@
             padding: var(--spacing-sm) var(--spacing-md);
             border-radius: var(--border-radius-sm);
         }
-        .tenant-banner {
+        .verify-status {
             display: none;
-            padding: var(--spacing-md);
-            border-radius: var(--border-radius-md);
-            margin-bottom: var(--spacing-lg);
+            margin-top: var(--spacing-xs);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-sm);
             font-size: var(--font-size-sm);
+            font-weight: 500;
         }
-        .tenant-banner i { margin-right: var(--spacing-sm); }
+        .verify-status.checking { background: rgba(0, 0, 0, 0.05); color: var(--color-gray-700); }
+        .verify-status.valid { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
+        .verify-status.invalid { background: rgba(217, 48, 37, 0.10); color: #d93025; }
         .form-hint {
             font-size: var(--font-size-xs);
             color: var(--color-gray-600);
@@ -66,6 +69,24 @@
             margin-top: var(--spacing-lg);
             font-size: var(--font-size-sm);
         }
+        .join-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2e7d32;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: var(--border-radius-md);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            font-weight: 600;
+            font-size: var(--font-size-base);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        .join-toast.show { opacity: 1; }
     </style>
 </head>
 <body>
@@ -78,18 +99,14 @@
             <p>Join your organization's safety team</p>
         </div>
 
-        <div class="tenant-banner" id="tenantBanner">
-            <i class="fas fa-building"></i>
-            <span id="tenantBannerText">Loading organization…</span>
-        </div>
-
         <div id="joinFormWrap">
             <form id="joinForm" autocomplete="off" novalidate>
                 <div class="form-group">
-                    <label for="inviteCode">Team Invite Code</label>
+                    <label for="inviteCode">Organization Invite Code</label>
                     <input type="text" id="inviteCode" class="form-control"
                            placeholder="e.g. A7K2M9" maxlength="6" required>
-                    <p class="form-hint">Provided by your organization's administrator, or use the shared link.</p>
+                    <div id="verifyStatus" class="verify-status" role="status"></div>
+                    <p class="form-hint">Provided by your Safety Manager, or use the shared link.</p>
                 </div>
 
                 <div class="form-group">
@@ -99,23 +116,37 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="email">Email Address</label>
+                    <label for="email">Corporate Email Address</label>
                     <input type="email" id="email" class="form-control"
                            placeholder="you@yourorganization.com" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="department">Department</label>
+                    <label for="department">Department / Division</label>
                     <select id="department" class="form-control" disabled required>
-                        <option value="">— Enter the invite code to load departments —</option>
+                        <option value="">— Enter a valid invite code to load departments —</option>
                     </select>
                     <p class="form-hint">Only departments applicable to your organization's classification are shown.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="operationalRole">Operational Role</label>
+                    <select id="operationalRole" class="form-control" required>
+                        <option value="">— Select your operational role —</option>
+                        <option value="postholder">Postholder / Nominated Person</option>
+                        <option value="captain">Captain / Pilot</option>
+                        <option value="ame">Licensed Aircraft Engineer (AME)</option>
+                        <option value="dispatcher">Flight Dispatcher / Ops</option>
+                        <option value="ramp">Ramp / Ground Staff</option>
+                        <option value="safety_officer">Safety Officer / Auditor</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" class="form-control"
                            placeholder="At least 8 characters" minlength="8" required>
+                    <p class="form-hint">At least 8 characters, including one uppercase letter and one digit.</p>
                 </div>
 
                 <div class="form-group">
@@ -154,11 +185,26 @@
     </div>
 </div>
 
+<div id="joinToast" class="join-toast" role="status"></div>
+
+<script src="/js/firebase.js"></script>
 <script>
 // ============================================================================
-// TEAM ONBOARDING — resolves the tenant from the invite code (or ?tenant= id),
-// loads only its applicable departments, and POSTs /api/v1/auth/join-team.
+// TEAM ONBOARDING — real-time invite-code verification, mandatory invitee
+// profile, and least-privilege provisioning via /api/v1/auth/join-team.
+// On success the invitee is signed in automatically and routed to their
+// department dashboard.
 // ============================================================================
+
+// Friendly labels matching the fixed onboarding list (where a backend scope
+// maps 1:1); other scoped departments keep their backend label.
+var DEPT_LABELS = {
+    'flight_ops': 'Flight Operations',
+    'maintenance_145': 'Engineering & Maintenance (Part-145)',
+    'ground_ops': 'Ground Handling / Ramp'
+};
+
+var INVITE_VERIFIED = false;
 
 function getApiBaseUrl() {
     if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
@@ -182,7 +228,7 @@ function getQueryParam(name) {
 
 function showError(message) {
     var el = document.getElementById('errorMessage');
-    el.textContent = message;
+    el.innerHTML = message;
     el.style.display = 'block';
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -191,78 +237,124 @@ function hideError() {
     document.getElementById('errorMessage').style.display = 'none';
 }
 
-function renderTenantBanner(tenantName, classification) {
-    var banner = document.getElementById('tenantBanner');
-    var text = document.getElementById('tenantBannerText');
-    banner.style.display = 'block';
-    text.textContent = tenantName ? tenantName + (classification ? ' (' + classification + ')' : '') : 'Organization';
+function renderVerifyStatus(state, message) {
+    var el = document.getElementById('verifyStatus');
+    el.className = 'verify-status ' + state;
+    el.textContent = message;
+    el.style.display = 'block';
 }
 
-// Load tenant departments for a given code / tenant id and populate the dropdown.
-async function loadDepartments(code, tenantId) {
-    var deptSelect = document.getElementById('department');
-    var inviteInput = document.getElementById('inviteCode');
-    var params = new URLSearchParams();
-    if (code) params.set('code', code.toUpperCase());
-    if (tenantId) params.set('tenant_id', tenantId);
-
+// Real-time invite verification against /api/v1/auth/verify-invite.
+async function verifyInvite(code) {
+    renderVerifyStatus('checking', 'Verifying invite code…');
     try {
-        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/tenant-lookup?' + params.toString());
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/verify-invite?code=' + encodeURIComponent(code));
         var data = await resp.json().catch(function () { return {}; });
-
-        if (!resp.ok || !data.success) {
-            deptSelect.innerHTML = '<option value="">— Invite code not found —</option>';
-            deptSelect.disabled = true;
-            renderTenantBanner(null, null);
-            return null;
+        if (resp.ok && data.valid) {
+            INVITE_VERIFIED = true;
+            renderVerifyStatus('valid', '✓ Verified: Joining ' + (data.organization_name || 'your organization'));
+            loadDepartments(code);
+            return data;
         }
-
-        renderTenantBanner(data.tenant_name, data.classification);
-        var depts = data.applicable_departments || [];
-        var options = '<option value="">— Select your department —</option>';
-        depts.forEach(function (d) {
-            options += '<option value="' + d.code + '">' + d.label + '</option>';
-        });
-        deptSelect.innerHTML = options;
-        deptSelect.disabled = depts.length === 0;
-
-        // Remember the resolved tenant for the submit step.
-        deptSelect.setAttribute('data-tenant-id', data.tenant_id);
-        deptSelect.setAttribute('data-tenant-name', data.tenant_name || '');
-        if (inviteInput && data.tenant_id && !inviteInput.value && tenantId) {
-            inviteInput.value = tenantId;
-        }
-        return data;
+        INVITE_VERIFIED = false;
+        renderVerifyStatus('invalid', 'Invalid or expired code. Please check with your Safety Manager.');
+        disableDepartments('— Enter a valid invite code to load departments —');
+        return null;
     } catch (err) {
-        deptSelect.innerHTML = '<option value="">— Unable to reach server —</option>';
-        deptSelect.disabled = true;
+        INVITE_VERIFIED = false;
+        renderVerifyStatus('invalid', 'Unable to reach the server. Please try again.');
+        disableDepartments('— Unable to load departments —');
         return null;
     }
 }
 
-// Auto-resolve from the shared link (e.g. /join.html?tenant=X&code=YYYYYY).
+function disableDepartments(message) {
+    var deptSelect = document.getElementById('department');
+    deptSelect.innerHTML = '<option value="">' + message + '</option>';
+    deptSelect.disabled = true;
+    deptSelect.removeAttribute('data-tenant-id');
+    deptSelect.removeAttribute('data-tenant-name');
+}
+
+// Load tenant departments for a verified code and populate the dropdown.
+async function loadDepartments(code) {
+    var deptSelect = document.getElementById('department');
+    try {
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/tenant-lookup?code=' + encodeURIComponent(code.toUpperCase()));
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok || !data.success) {
+            disableDepartments('— Invite code not found —');
+            return null;
+        }
+        var depts = data.applicable_departments || [];
+        var options = '<option value="">— Select your department —</option>';
+        depts.forEach(function (d) {
+            options += '<option value="' + d.code + '">' + (DEPT_LABELS[d.code] || d.label) + '</option>';
+        });
+        deptSelect.innerHTML = options;
+        deptSelect.disabled = depts.length === 0;
+        deptSelect.setAttribute('data-tenant-id', data.tenant_id);
+        deptSelect.setAttribute('data-tenant-name', data.tenant_name || '');
+        return data;
+    } catch (err) {
+        disableDepartments('— Unable to reach server —');
+        return null;
+    }
+}
+
+// Auto-verify from the shared link (e.g. /join.html?code=YYYYYY).
 (function initFromQuery() {
     var code = getQueryParam('code');
-    var tenantId = getQueryParam('tenant');
     if (code) {
         document.getElementById('inviteCode').value = code.toUpperCase();
-        loadDepartments(code, tenantId || null);
-    } else if (tenantId) {
-        loadDepartments(null, tenantId);
+        verifyInvite(code.toUpperCase());
     }
 })();
 
-// Resolve departments as the invite code changes.
+// Real-time verification with a 300ms debounce on the invite code field.
 var inviteDebounce = null;
 document.getElementById('inviteCode').addEventListener('input', function () {
     hideError();
     clearTimeout(inviteDebounce);
     var value = this.value.trim().toUpperCase();
-    if (value.length < 4) return;
+    if (value.length < 6) {
+        INVITE_VERIFIED = false;
+        document.getElementById('verifyStatus').style.display = 'none';
+        disableDepartments('— Enter a valid invite code to load departments —');
+        return;
+    }
     inviteDebounce = setTimeout(function () {
-        loadDepartments(value, null);
-    }, 400);
+        verifyInvite(value);
+    }, 300);
 });
+
+function showWelcomeToast(message) {
+    var toast = document.getElementById('joinToast');
+    toast.textContent = message;
+    toast.classList.add('show');
+}
+
+// Auto sign-in + route the new member to their department dashboard.
+async function autoSignInAndRedirect(email, password, tenantName) {
+    await waitForFirebase();
+    try {
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+        var user = await getCurrentUser();
+        var destination = getRoleDestination(user || { role: 'USER', claims: {} });
+        showWelcomeToast('Welcome to ' + (tenantName || 'your organization') + ' SMS Portal');
+        setTimeout(function () {
+            window.location.href = destination;
+        }, 1600);
+        return;
+    } catch (err) {
+        document.getElementById('joinSuccessMessage').textContent =
+            'You are now part of ' + (tenantName || 'your organization') +
+            '. Sign in to access your department dashboard.';
+        document.getElementById('joinFormWrap').style.display = 'none';
+        document.getElementById('joinSuccess').style.display = 'block';
+        document.getElementById('joinSuccess').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
 
 document.getElementById('joinForm').addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -273,19 +365,32 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     var email = document.getElementById('email').value.trim();
     var deptSelect = document.getElementById('department');
     var department = deptSelect.value;
+    var operationalRole = document.getElementById('operationalRole').value;
     var password = document.getElementById('password').value;
     var confirmPassword = document.getElementById('confirmPassword').value;
 
-    if (!inviteCode || !fullName || !email || !department || !password) {
-        showError('Please complete all required fields, including your department.');
+    if (!inviteCode || !fullName || !email || !department || !operationalRole || !password) {
+        showError('Please complete all required fields, including your department and operational role.');
+        return;
+    }
+    if (!INVITE_VERIFIED) {
+        showError('Please enter a valid, verified invite code before joining.');
         return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showError('Please enter a valid email address.');
+        showError('Please enter a valid corporate email address.');
         return;
     }
     if (password.length < 8) {
         showError('Password must be at least 8 characters.');
+        return;
+    }
+    if (!/[A-Z]/.test(password)) {
+        showError('Password must contain at least one uppercase letter.');
+        return;
+    }
+    if (!/\d/.test(password)) {
+        showError('Password must contain at least one digit.');
         return;
     }
     if (password !== confirmPassword) {
@@ -299,7 +404,8 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
         email: email,
         password: password,
         confirm_password: confirmPassword,
-        department: department
+        department: department,
+        operational_role: operationalRole
     };
     var tenantId = deptSelect.getAttribute('data-tenant-id');
     if (tenantId) payload.tenant_id = tenantId;
@@ -317,13 +423,12 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
         });
         var data = await resp.json().catch(function () { return {}; });
 
+        if (resp.status === 409) {
+            showError('An account with this email address already exists. <a href="/login.html">Click here to Sign In</a> instead.');
+            return;
+        }
         if (resp.ok && data.success) {
-            document.getElementById('joinSuccessMessage').textContent =
-                'You are now part of ' + (data.tenant_name || 'your organization') +
-                ' (' + (data.department_label || data.department) + '). Sign in to access your dashboard.';
-            document.getElementById('joinFormWrap').style.display = 'none';
-            document.getElementById('joinSuccess').style.display = 'block';
-            document.getElementById('joinSuccess').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await autoSignInAndRedirect(email, password, data.tenant_name);
         } else {
             showError((data && data.detail) || 'Unable to join. Check the invite code and try again.');
         }
