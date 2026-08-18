@@ -89,4 +89,33 @@
     --z-sticky: 200;
     --z-modal: 300;
     --z-toast: 400;
+
+    /* ========== BRAND (AVIATION SKY) ========== */
+    /* Primary action / interactive brand color scale. brand-600 (#0284C7)
+       replaces legacy hardcoded action blue across the platform. */
+    --color-brand-50: #f0f9ff;
+    --color-brand-100: #e0f2fe;
+    --color-brand-200: #bae6fd;
+    --color-brand-300: #7dd3fc;
+    --color-brand-400: #38bdf8;
+    --color-brand-500: #0ea5e9;
+    --color-brand-600: #0284c7;
+    --color-brand-700: #0369a1;
+    --color-brand-800: #075985;
+    --color-brand-900: #0c4a6e;
+
+    /* ========== DEEP TEAL (DARK SURFACES) ========== */
+    /* Deep-teal dark surfaces for headers / heroes / footers.
+       deep-teal-900 (#072535) replaces legacy hardcoded dark navy. */
+    --color-deep-teal-700: #0e3a50;
+    --color-deep-teal-800: #0a2f40;
+    --color-deep-teal-900: #072535;
+    --color-deep-teal-950: #051a26;
+
+    /* ========== SURFACE & BORDER ========== */
+    /* Light-mode card surfaces and hairline borders (WCAG-friendly contrast
+       against #ffffff for AA text). */
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-border-light: #edf2f7;
 }

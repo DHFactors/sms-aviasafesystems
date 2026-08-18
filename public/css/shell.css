@@ -9,14 +9,14 @@
    ============================================================================ */
 
 :root {
-    --shell-navy: #0b2a42;
-    --shell-navy-dark: #08202f;
-    --shell-navy-light: #1a6b8a;
+    --shell-navy: var(--color-deep-teal-900);
+    --shell-navy-dark: var(--color-deep-teal-950);
+    --shell-navy-light: var(--color-brand-600);
     --shell-gold: #d4af37;
-    --shell-text: #0b2a42;
+    --shell-text: var(--color-deep-teal-900);
     --shell-muted: #64748b;
-    --shell-border: #e2e8f0;
-    --shell-light: #f8fafc;
+    --shell-border: var(--color-border);
+    --shell-light: var(--color-gray-50);
     --shell-sidebar-width: 250px;
 }
 

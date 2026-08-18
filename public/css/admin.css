@@ -2,7 +2,7 @@
    FILE: admin.css
    PATH: public/css/admin.css
    PURPOSE: Super-Admin panel styles (Developer Login + Production Setup).
-            Matches the AviaSAFE palette (deep blue #0b2a42 / teal #1a6b8a).
+            Matches the AviaSAFE palette (deep blue var(--color-deep-teal-900) / teal var(--color-brand-600)).
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
@@ -18,29 +18,29 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #0b2a42;
+    background: var(--color-deep-teal-900);
     color: #fff;
     padding: 12px 24px;
 }
 .admin-topbar .brand { font-weight: 700; font-size: 1.05rem; }
-.admin-topbar .brand i { margin-right: 8px; color: #4fc3f7; }
+.admin-topbar .brand i { margin-right: 8px; color: var(--color-brand-300); }
 .admin-topbar .user-info { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: #cbd5e1; }
 
 .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px 16px 60px; }
 
 .admin-card {
-    background: #fff;
+    background: var(--color-surface);
     border-radius: 10px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.07);
     padding: 20px 22px;
     margin-bottom: 22px;
 }
-.admin-card h2 { margin: 0 0 4px; font-size: 1.1rem; color: #0b2a42; }
+.admin-card h2 { margin: 0 0 4px; font-size: 1.1rem; color: var(--color-deep-teal-900); }
 .admin-card .card-sub { color: #64748b; font-size: 0.82rem; margin: 0 0 14px; }
-.admin-card h3 { margin: 0 0 12px; font-size: 1rem; color: #1a6b8a; }
+.admin-card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--color-brand-600); }
 
 .step-badge {
-    display: inline-block; background: #1a6b8a; color: #fff; border-radius: 999px;
+    display: inline-block; background: var(--color-brand-600); color: #fff; border-radius: 999px;
     padding: 2px 10px; font-size: 0.72rem; font-weight: 700; margin-right: 8px;
 }
 
@@ -52,7 +52,7 @@
     font-size: 0.9rem; box-sizing: border-box; font-family: inherit;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-    outline: none; border-color: #1a6b8a; box-shadow: 0 0 0 3px rgba(26, 107, 138, 0.12);
+    outline: none; border-color: var(--color-brand-600); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
 }
 .form-group textarea { min-height: 120px; font-family: 'Consolas', monospace; font-size: 0.85rem; }
 .form-group small { color: #64748b; font-size: 0.75rem; }
@@ -62,55 +62,55 @@
     border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none;
     transition: all 0.15s;
 }
-.btn-primary { background: #1a6b8a; color: #fff; }
-.btn-primary:hover { background: #0b2a42; }
+.btn-primary { background: var(--color-brand-600); color: #fff; }
+.btn-primary:hover { background: var(--color-deep-teal-900); }
 .btn-success { background: #34a853; color: #fff; }
 .btn-success:hover { background: #1e7e34; }
 .btn-danger { background: #ea4335; color: #fff; }
 .btn-danger:hover { background: #c5221f; }
-.btn-outline { background: transparent; color: #1a6b8a; border: 1px solid #1a6b8a; }
-.btn-outline:hover { background: #e8f0f8; }
+.btn-outline { background: transparent; color: var(--color-brand-600); border: 1px solid var(--color-brand-600); }
+.btn-outline:hover { background: var(--color-brand-100); }
 .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .admin-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .admin-table th {
-    background: #f8fafc; text-align: left; padding: 9px 11px; font-size: 0.72rem;
-    text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; border-bottom: 2px solid #e2e8f0;
+    background: var(--color-gray-50); text-align: left; padding: 9px 11px; font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; border-bottom: 2px solid var(--color-border);
 }
 .admin-table td { padding: 9px 11px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-.admin-table tr:hover td { background: #f8fafc; }
+.admin-table tr:hover td { background: var(--color-gray-50); }
 
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
 .badge-success { background: #e6f4ea; color: #1e7e34; }
-.badge-warn { background: #fff3cd; color: #9a6700; }
+.badge-warn { background: var(--color-warning-bg); color: #9a6700; }
 .badge-danger { background: #fce8e6; color: #c5221f; }
-.badge-info { background: #e8f0f8; color: #1a6b8a; }
+.badge-info { background: var(--color-brand-100); color: var(--color-brand-600); }
 
 .status-box { padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 0.88rem; }
 .status-box.success { background: #e6f4ea; border-left: 4px solid #34a853; }
 .status-box.error { background: #fce8e6; border-left: 4px solid #ea4335; }
-.status-box.info { background: #e8f0f8; border-left: 4px solid #1a6b8a; }
-.status-box.warn { background: #fff3cd; border-left: 4px solid #f9ab00; }
+.status-box.info { background: var(--color-brand-100); border-left: 4px solid var(--color-brand-600); }
+.status-box.warn { background: var(--color-warning-bg); border-left: 4px solid #f9ab00; }
 
 .loading, .empty-state { text-align: center; padding: 32px 12px; color: #64748b; }
 
 .preview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.preview-stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; text-align: center; }
-.preview-stat .num { font-size: 1.6rem; font-weight: 700; color: #0b2a42; }
+.preview-stat { background: var(--color-gray-50); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px; text-align: center; }
+.preview-stat .num { font-size: 1.6rem; font-weight: 700; color: var(--color-deep-teal-900); }
 .preview-stat .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; }
 
 .admin-login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .admin-login-card {
-    background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    background: var(--color-surface); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
     padding: 32px; width: 100%; max-width: 380px;
 }
 .admin-login-card .logo { text-align: center; margin-bottom: 20px; }
-.admin-login-card .logo i { font-size: 2.4rem; color: #1a6b8a; }
-.admin-login-card .logo h1 { margin: 6px 0 2px; font-size: 1.25rem; color: #0b2a42; }
+.admin-login-card .logo i { font-size: 2.4rem; color: var(--color-brand-600); }
+.admin-login-card .logo h1 { margin: 6px 0 2px; font-size: 1.25rem; color: var(--color-deep-teal-900); }
 .admin-login-card .logo p { margin: 0; font-size: 0.8rem; color: #64748b; }
 .admin-login-card .error-message { display: none; margin-top: 12px; padding: 10px 12px; border-radius: 6px; background: #fce8e6; color: #c5221f; font-size: 0.85rem; }
-.admin-login-card .back-link { display: block; text-align: center; margin-top: 18px; font-size: 0.82rem; color: #1a6b8a; text-decoration: none; }
+.admin-login-card .back-link { display: block; text-align: center; margin-top: 18px; font-size: 0.82rem; color: var(--color-brand-600); text-decoration: none; }
 .admin-login-card .back-link:hover { text-decoration: underline; }
 
 @media (max-width: 640px) {
