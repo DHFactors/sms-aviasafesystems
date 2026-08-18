@@ -16,7 +16,7 @@ function getTenantFromSubdomain() {
     
     if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
         const subdomain = parts[0];
-        const reserved = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms'];
+        const reserved = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
         if (reserved.includes(subdomain)) {
             return null;  // Not a tenant subdomain
         }

@@ -252,6 +252,29 @@ function test_subdomain_extraction() {
     });
 }
 
+function test_reserved_beta_subdomains() {
+    // Platform / infra hosts must never be treated as tenants.
+    ['betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'].forEach((sub) => {
+        withEnv(`${sub}.aviasafesystems.com`, () => {
+            assert.strictEqual(
+                TenantResolver.getTenantFromSubdomain(),
+                null,
+                `${sub} is a reserved platform subdomain`
+            );
+        });
+    });
+    // Even an explicit ?tenant=betasms query must be ignored on a reserved
+    // subdomain — the login must not auto-fill or redirect to it.
+    withEnv('betasms.aviasafesystems.com', () => {
+        global.location.search = '?tenant=betasms';
+        assert.strictEqual(
+            TenantResolver.getTenantFromSubdomain(),
+            null,
+            'no ?tenant fallback on reserved subdomain'
+        );
+    });
+}
+
 // ---------------------------------------------------------------------------
 // TenantResolver - current tenant resolution
 // ---------------------------------------------------------------------------
@@ -329,6 +352,7 @@ function main() {
     test_get_applicable_occurrence_categories();
     test_demo_environment_detection();
     test_subdomain_extraction();
+    test_reserved_beta_subdomains();
     test_current_tenant_prod_locks_to_subdomain();
     test_current_tenant_demo_uses_default();
     test_current_tenant_demo_toggle_via_session();

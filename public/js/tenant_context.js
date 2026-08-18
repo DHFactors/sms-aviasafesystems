@@ -17,7 +17,10 @@
     // subdomain and demo-switching controls are hidden.
     var DEMO_HOSTNAMES = ['sms-beta.web.app', 'demo.aviasafesystems.com', '127.0.0.1', 'localhost'];
 
-    var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo'];
+    // Reserved platform subdomains are NEVER treated as tenants. Visiting
+    // betasms.aviasafesystems.com (or any reserved host) must not auto-scope
+    // the login to `?tenant=betasms` or show a tenant badge on the root domain.
+    var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
 
     var DEMO_TENANT_STORAGE_KEY = 'aviasafe_demo_tenant';
     var DEFAULT_DEMO_TENANT = 'himalaya-airlines-demo';
@@ -107,7 +110,11 @@
         var parts = getHostname().split('.');
         if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
             var sub = parts[0];
-            if (RESERVED_SUBDOMAINS.indexOf(sub) === -1) return sub;
+            // Reserved platform subdomains are never tenants — return null
+            // WITHOUT falling back to the ?tenant= query param so the login
+            // never auto-fills or redirects to ?tenant=betasms on root hosts.
+            if (RESERVED_SUBDOMAINS.indexOf(sub) !== -1) return null;
+            return sub;
         }
         try {
             var params = new URLSearchParams(global.location.search);
