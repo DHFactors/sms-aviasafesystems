@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
     FIREBASE_DATABASE_ID: Optional[str] = None
+    # Public Firebase Web API key used by the server-side login endpoint
+    # (app/services/login_service.py) to verify credentials against the
+    # Identity Toolkit REST API. It is the same public key shipped in
+    # public/js/firebase.js — not a secret — but is configurable here for
+    # non-default projects.
+    FIREBASE_WEB_API_KEY: str = "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc"
     FIREBASE_COLLECTION_TENANTS: str = "tenants"
     FIREBASE_COLLECTION_REPORTS: str = "reports"
     FIREBASE_COLLECTION_METADATA: str = "metadata"

@@ -159,6 +159,10 @@
                            placeholder="Repeat your password" minlength="8" required>
                 </div>
 
+                <!-- Honeypot anti-bot trap: invisible to humans, silent kill-switch
+                     for form-filling bots. Must stay name="company_website_url". -->
+                <input type="text" name="company_website_url" class="hp-field" style="opacity:0;position:absolute;top:0;left:-9999px;height:1px;width:1px;z-index:-1;" tabindex="-1" autocomplete="off" aria-hidden="true">
+
                 <div id="errorMessage" class="error-message"></div>
 
                 <button type="submit" class="btn-join btn-primary" id="joinBtn">
@@ -192,6 +196,7 @@
 <div id="joinToast" class="join-toast" role="status"></div>
 
 <script src="/js/firebase.js"></script>
+<script src="/js/input_guard.js"></script>
 <script>
 // ============================================================================
 // TEAM ONBOARDING — real-time invite-code verification, mandatory invitee
@@ -380,6 +385,12 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     e.preventDefault();
     hideError();
 
+    // Anti-bot honeypot: bots that autofill the hidden field are silently
+    // dropped — no error, no redirect, no server hit.
+    if (typeof InputGuard !== 'undefined' && InputGuard.honeypotTrap(this)) {
+        return;
+    }
+
     var inviteCode = document.getElementById('inviteCode').value.trim().toUpperCase();
     var fullName = document.getElementById('fullName').value.trim();
     var email = document.getElementById('email').value.trim();
@@ -399,6 +410,10 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         showError('Please enter a valid corporate email address.');
+        return;
+    }
+    if (typeof InputGuard !== 'undefined' && InputGuard.isDisposableEmail(email)) {
+        showError('Please provide a valid corporate or organizational email address.');
         return;
     }
     if (password.length < 8) {

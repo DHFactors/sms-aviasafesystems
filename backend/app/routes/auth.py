@@ -3,12 +3,13 @@
 # PATH: backend/app/routes/auth.py
 # VERSION: 1.0.0
 # DATE CREATED: 2026-07-03
-# DATE REVISED: 2026-07-03
+# DATE REVISED: 2026-08-19
 # PURPOSE: Authentication endpoints with Firebase Auth integration.
 # AUTHOR: Ghanshyam Acharya
 # CODE OWNER: AviaSafeSystems
 # ============================================================================
 
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
@@ -17,14 +18,23 @@ from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.firebase import get_auth, get_db, verify_firebase_token, create_custom_claims
-from app.middleware.rate_limit import rate_limit
+from app.middleware.rate_limit import (
+    rate_limit,
+    enforce_login_rate_limit,
+    record_login_failure,
+    clear_login_failures,
+)
 from app.middleware.auth import resolve_user_context
 from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
+from app.services import login_service
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
+    DISPOSABLE_EMAIL_MESSAGE,
+    DisposableEmailError,
+    is_disposable_email,
     register_tenant,
     join_team,
     resolve_tenant,
@@ -39,12 +49,65 @@ class LoginRequest(BaseModel):
     id_token: str
 
 
+class LoginCredentials(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class LoginResponse(BaseModel):
     uid: str
     email: str
     role: str
     tenant_id: Optional[str]
     custom_claims: dict
+
+
+@router.post("/login")
+async def login_endpoint(
+    request: Request,
+    body: LoginCredentials,
+    _app_check: None = Depends(verify_app_check),
+):
+    """Server-side credential verification with anti-credential-stuffing lockout.
+
+    Verifies the email/password against Firebase Identity Toolkit (the same
+    backend that powers client-side sign-in), then returns a one-time custom
+    token the client exchanges through the Firebase SDK. Failed attempts are
+    tracked in a per-IP sliding window (5 failures / 15 minutes); the 6th
+    attempt is rejected with 429 + Retry-After before the provider is even
+    contacted.
+    """
+    await enforce_login_rate_limit(request)
+
+    try:
+        user = await login_service.verify_credentials(body.email, body.password)
+    except login_service.LoginProviderError:
+        raise HTTPException(
+            status_code=503,
+            detail="Authentication provider unavailable. Please try again shortly.",
+        )
+
+    if not user:
+        await record_login_failure(request)
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    await clear_login_failures(request)
+    custom_token = await asyncio.to_thread(login_service.mint_custom_token, user["uid"])
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="LOGIN",
+        user=user.get("email") or body.email,
+        tenant_id=None,
+        ip=ip,
+        request_id=request_id,
+    )
+    return {
+        "success": True,
+        "custom_token": custom_token,
+        "uid": user["uid"],
+        "email": user.get("email") or body.email,
+    }
 
 
 class RegisterRequest(BaseModel):
@@ -94,6 +157,8 @@ async def register_user(
                 status_code=403,
                 detail=f"Registration role must be one of: {', '.join(allowed_roles)}"
             )
+        if is_disposable_email(body.email):
+            raise HTTPException(status_code=400, detail=DISPOSABLE_EMAIL_MESSAGE)
 
         auth = get_auth()
         user = auth.create_user(
@@ -187,6 +252,8 @@ async def register_tenant_endpoint(
             beta_access_key=body.beta_access_key,
             request=request,
         )
+    except DisposableEmailError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -198,7 +265,7 @@ async def register_tenant_endpoint(
 
 
 @router.get("/verify-invite")
-@rate_limit("auth_attempts")
+@rate_limit("verify_invite")
 async def verify_invite_endpoint(
     request: Request,
     code: Optional[str] = Query(None, description="Team invite code"),
@@ -263,6 +330,8 @@ async def join_team_endpoint(
             status_code=409,
             detail="An account with this email address already exists.",
         )
+    except DisposableEmailError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

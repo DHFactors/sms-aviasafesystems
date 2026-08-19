@@ -77,6 +77,78 @@ INVITE_CODE_LENGTH = 6
 _NON_SLUG_CHARS = re.compile(r"[^a-z0-9]+")
 _REPEATED_HYPHENS = re.compile(r"-{2,}")
 
+# Blocklist of disposable / temporary email providers. Registrations using
+# these domains are rejected outright — self-service accounts must use a real
+# corporate / organizational mailbox. The list is intentionally modest but
+# covers the best-known throwaway providers; subdomains (e.g.
+# mailinator.com aliases) are matched via a suffix check.
+DISPOSABLE_EMAIL_DOMAINS = frozenset({
+    "mailinator.com",
+    "tempmail.com",
+    "tempmail.net",
+    "temp-mail.org",
+    "temp-mail.io",
+    "guerrillamail.com",
+    "guerrillamail.net",
+    "guerrillamail.org",
+    "guerrillamail.biz",
+    "guerrillamail.info",
+    "grr.la",
+    "10minutemail.com",
+    "10minutemail.net",
+    "yopmail.com",
+    "yopmail.fr",
+    "yopmail.net",
+    "yopmail.org",
+    "throwawaymail.com",
+    "throwaway.email",
+    "maildrop.cc",
+    "getnada.com",
+    "33mail.com",
+    "trashmail.com",
+    "mailnesia.com",
+    "spamgourmet.com",
+    "disposablemail.com",
+    "mailtemp.net",
+})
+
+# User-facing rejection message (mirrored in the frontend validation).
+DISPOSABLE_EMAIL_MESSAGE = "Please provide a valid corporate or organizational email address."
+
+
+class DisposableEmailError(ValueError):
+    """Raised when a registration uses a disposable / temporary email domain.
+
+    Subclasses ValueError so it can share the route-layer validation flow, but
+    the auth routes map it to a 400 (not the generic 422) per the anti-spam
+    contract. Catch it BEFORE the broad ValueError clause.
+    """
+
+
+def email_domain(email: str) -> str:
+    """Return the lower-cased domain portion of an email address."""
+    addr = str(email or "").strip().lower()
+    return addr.rsplit("@", 1)[1] if "@" in addr else addr
+
+
+def is_disposable_email(email: str) -> bool:
+    """True when the email domain (or a subdomain of it) is on the blocklist."""
+    domain = email_domain(email)
+    if not domain:
+        return False
+    if domain in DISPOSABLE_EMAIL_DOMAINS:
+        return True
+    for blocked in DISPOSABLE_EMAIL_DOMAINS:
+        if domain.endswith("." + blocked):
+            return True
+    return False
+
+
+def validate_corporate_email(email: str) -> None:
+    """Reject disposable / temporary email domains on self-service registration."""
+    if is_disposable_email(email):
+        raise DisposableEmailError(DISPOSABLE_EMAIL_MESSAGE)
+
 
 def slugify_organization(name: str) -> str:
     """Turn an organization name into a clean lowercase tenant slug."""
@@ -172,6 +244,7 @@ def register_tenant(
 ) -> Dict[str, Any]:
     """Provision a brand-new self-service tenant + primary administrator."""
     _validate_password(password)
+    validate_corporate_email(email)
 
     try:
         scope = OperationalScope(classification)
@@ -394,6 +467,7 @@ def join_team(
     that requires a Safety Manager action in the admin console.
     """
     _validate_password(password)
+    validate_corporate_email(email)
 
     db = get_db()
     auth = get_auth()

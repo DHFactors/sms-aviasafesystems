@@ -178,8 +178,18 @@
         const p = document.createElement('p');
         p.className = 'mb-0 text-muted';
         p.style.fontSize = '0.875rem';
-        p.innerHTML = 'A project by <strong>Ghanshyam Acharya</strong>.';
+        p.style.fontWeight = '500';
+        p.style.marginTop = '0.25rem';
+        p.innerHTML = 'A Project by <strong>Ghanshyam Acharya</strong>';
         footer.appendChild(p);
+
+        const cr = document.createElement('p');
+        cr.className = 'mb-0 text-muted';
+        cr.style.fontSize = '0.75rem';
+        cr.style.opacity = '0.7';
+        cr.style.marginTop = '0.25rem';
+        cr.textContent = '\u00A9 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.';
+        footer.appendChild(cr);
         return footer;
     }
 

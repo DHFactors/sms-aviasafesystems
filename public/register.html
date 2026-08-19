@@ -144,6 +144,10 @@
                     <p class="form-hint">Leave blank to use the default beta access key.</p>
                 </div>
 
+                <!-- Honeypot anti-bot trap: invisible to humans, silent kill-switch
+                     for form-filling bots. Must stay name="company_website_url". -->
+                <input type="text" name="company_website_url" class="hp-field" style="opacity:0;position:absolute;top:0;left:-9999px;height:1px;width:1px;z-index:-1;" tabindex="-1" autocomplete="off" aria-hidden="true">
+
                 <div id="errorMessage" class="error-message"></div>
 
                 <button type="submit" class="btn-register btn-primary" id="registerBtn">
@@ -188,6 +192,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
 <script src="/js/firebase.js"></script>
+<script src="/js/input_guard.js"></script>
 
 <script>
 // ============================================================================
@@ -262,6 +267,12 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     e.preventDefault();
     hideError();
 
+    // Anti-bot honeypot: bots that autofill the hidden field are silently
+    // dropped — no error, no redirect, no server hit.
+    if (typeof InputGuard !== 'undefined' && InputGuard.honeypotTrap(this)) {
+        return;
+    }
+
     var organizationName = document.getElementById('organizationName').value.trim();
     var classification = document.getElementById('classification').value;
     var adminFullName = document.getElementById('adminFullName').value.trim();
@@ -277,6 +288,10 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         showError('Please enter a valid email address.');
+        return;
+    }
+    if (typeof InputGuard !== 'undefined' && InputGuard.isDisposableEmail(email)) {
+        showError('Please provide a valid corporate or organizational email address.');
         return;
     }
     if (password.length < 8) {

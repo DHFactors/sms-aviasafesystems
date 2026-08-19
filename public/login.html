@@ -127,6 +127,10 @@ AUTHOR: AviaSAFE Systems
                 <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
             </div>
 
+            <!-- Honeypot anti-bot trap: invisible to humans, silent kill-switch
+                 for form-filling bots. Must stay name="company_website_url". -->
+            <input type="text" name="company_website_url" class="hp-field" style="opacity:0;position:absolute;top:0;left:-9999px;height:1px;width:1px;z-index:-1;" tabindex="-1" autocomplete="off" aria-hidden="true">
+
             <div id="errorMessage" class="error-message"></div>
 
             <button type="submit" class="btn-login" id="loginBtn">
@@ -160,6 +164,7 @@ AUTHOR: AviaSAFE Systems
 <script src="/js/firebase.js"></script>
 <script src="/js/tenant_context.js"></script>
 <script src="/js/department_resolver.js"></script>
+<script src="/js/input_guard.js"></script>
 
 <!-- ===== LOGIN LOGIC ===== -->
 <script>
@@ -187,27 +192,63 @@ function waitForFirebase() {
 }
 
 // ============================================================================
-// SIGN IN FUNCTION — force token refresh for fresh claims
+// SIGN IN FUNCTION — server-side credential verification + session restore
 // ============================================================================
 
-async function signIn(email, password) {
+function getApiBaseUrl() {
+    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
+    var host = window.location.hostname;
+    var isBeta = host.indexOf('beta') !== -1 ||
+        host === 'localhost' || host === '127.0.0.1';
+    return isBeta
+        ? 'https://sms-aviasafesystems-beta.onrender.com'
+        : 'https://aviasafe-unified-platform.onrender.com';
+}
+
+// Attach a fresh App Check token when available (best-effort).
+async function getAppCheckHeader() {
     try {
-        var userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        var user = userCredential.user;
-        var tokenResult = await user.getIdTokenResult(true);
-        var claims = tokenResult.claims || {};
-        
-        return {
-            uid: user.uid,
-            email: user.email,
-            role: claims.role || 'USER',
-            tenantId: claims.tenant_id || null,
-            claims: claims
-        };
-    } catch (error) {
-        console.error('Sign in error:', error);
-        throw error;
+        if (typeof window.getAppCheckToken === 'function') {
+            var token = await window.getAppCheckToken();
+            if (token) return { 'X-Firebase-AppCheck': token };
+        }
+    } catch (e) { /* best-effort */ }
+    return {};
+}
+
+// Credentials are verified server-side (POST /api/v1/auth/login) which enforces
+// a strict per-IP failed-attempt sliding window (5 / 15 min). On success the
+// backend returns a one-time custom token we exchange through the Firebase SDK,
+// so the existing onAuthStateChanged session flow (fresh claims, role-based
+// redirect) continues to work unchanged.
+async function signIn(email, password) {
+    var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/login', {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, await getAppCheckHeader()),
+        body: JSON.stringify({ email: email, password: password })
+    });
+    var data = await resp.json().catch(function () { return {}; });
+
+    if (!resp.ok) {
+        if (resp.status === 429) {
+            var rateErr = new Error(
+                (data && (data.detail || data.message)) ||
+                'Too many login attempts from this network. Please wait a few minutes and try again.'
+            );
+            rateErr.code = 'rate_limited';
+            throw rateErr;
+        }
+        var credErr = new Error(
+            (data && data.detail) || 'Invalid email or password. Please try again.'
+        );
+        credErr.code = 'invalid_credentials';
+        throw credErr;
     }
+
+    await waitForFirebase();
+    await firebase.auth().signInWithCustomToken(data.custom_token);
+    var user = await getCurrentUser();
+    return user;
 }
 
 // ============================================================================
@@ -482,7 +523,13 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
+    // Anti-bot honeypot: bots that autofill the hidden field are silently
+    // dropped — no error, no redirect, no server hit.
+    if (typeof InputGuard !== 'undefined' && InputGuard.honeypotTrap(this)) {
+        return;
+    }
+
     var email = document.getElementById('email').value.trim();
     var password = document.getElementById('password').value;
     var loginBtn = document.getElementById('loginBtn');
