@@ -88,9 +88,22 @@ def _build_message(
     msg["From"] = f"{SENDER_NAME} <{sender}>"
     msg["To"] = to_email
     msg["Subject"] = subject
+    msg["Auto-Submitted"] = "auto-generated"
+    msg["X-Auto-Response-Suppress"] = "All"
     bcc = _bcc()
     if bcc:
         msg["Bcc"] = bcc
+
+    plain_text = (
+        f"Dear {contact_name},\n\n"
+        f"Your organization {organization_name} has been registered on the "
+        "AviaSAFE Aviation SMS Beta Platform.\n\n"
+        "You can now sign in to your dashboard to manage hazard reports, risk "
+        "assessments, and compliance audits.\n\n"
+        "Safe skies,\n"
+        "Ghanshyam Acharya\n"
+        "AviaSAFE Systems"
+    )
 
     html_body = f"""
     <div style="font-family: Arial, sans-serif; color: #1e293b; max-width: 600px; margin: 0 auto;">
@@ -101,6 +114,7 @@ def _build_message(
         <p style="margin-top: 24px;">Safe skies,<br><strong>Ghanshyam Acharya</strong><br>AviaSAFE Systems</p>
     </div>
     """
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
     return msg
 

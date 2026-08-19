@@ -120,11 +120,19 @@ def test_build_message_subject_sender_body(_gmail_env):
     assert msg["From"] == "AviaSAFE Systems <ghanshyam.acharya@gmail.com>"
     assert msg["To"] == "safety@summitair.com"
     assert msg["Bcc"] == "ops@aviasafesystems.com"
+    assert msg["Auto-Submitted"] == "auto-generated"
+    assert msg["X-Auto-Response-Suppress"] == "All"
 
-    payload = msg.get_payload()[0]
-    html = payload.get_payload(decode=True).decode("utf-8")
-    assert payload.get_content_type() == "text/html"
-    assert "Dear Anil Shrestha," in html
+    parts = {p.get_content_type(): p.get_payload(decode=True).decode("utf-8") for p in msg.get_payload()}
+    assert set(parts) == {"text/plain", "text/html"}
+
+    text = parts["text/plain"]
+    assert "Dear Anil Shrestha," in text
+    assert "Summit Air has been registered" in text
+    assert "AviaSAFE Aviation SMS Beta Platform" in text
+    assert "Ghanshyam Acharya" in text
+
+    html = parts["text/html"]
     assert "<strong>Summit Air</strong> has been registered" in html
     assert "AviaSAFE Aviation SMS Beta Platform" in html
     assert "Ghanshyam Acharya" in html
@@ -184,6 +192,11 @@ def test_send_dispatches_with_to_and_bcc(_gmail_env, _fake_httpx):
     assert msg["Bcc"] == "ops@aviasafesystems.com"
     assert msg["From"] == "AviaSAFE Systems <ghanshyam.acharya@gmail.com>"
     assert _decoded_header(msg["Subject"]) == "Welcome to AviaSAFE SMS Beta \u2014 Summit Air"
+    assert msg["Auto-Submitted"] == "auto-generated"
+    assert msg["X-Auto-Response-Suppress"] == "All"
+
+    decoded = base64.urlsafe_b64decode(send_kwargs["json"]["raw"]).decode("utf-8")
+    assert "text/plain" in decoded and "text/html" in decoded
 
 
 def test_send_omits_bcc_when_unconfigured(_gmail_env, _fake_httpx, monkeypatch):
