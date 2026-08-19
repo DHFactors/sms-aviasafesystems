@@ -58,3 +58,36 @@ async def verify_app_check(request: Request) -> None:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=401, detail="App Check verification failed") from e
+
+
+async def verify_app_check_lenient(request: Request) -> None:
+    """Lenient App Check dependency for public guest endpoints.
+
+    Guest endpoints (e.g. copilot guest chat) are guarded primarily by per-IP
+    rate limiting rather than App Check. In InPrivate / incognito browsing the
+    browser's Tracking Prevention can block the reCAPTCHA provider's iframe
+    storage, which either suppresses the token entirely or yields a stale /
+    invalid one. A missing or invalid token must therefore NEVER hard-fail the
+    request — log a warning and continue (the sliding-window rate limit still
+    protects the endpoint).
+    """
+    token = request.headers.get(APP_CHECK_HEADER)
+    if not token:
+        return
+
+    try:
+        result = await asyncio.to_thread(_verify_sync, token)
+        if result is None:
+            logger.warning(
+                "App Check token rejected (lenient mode — continuing without enforcement)"
+            )
+        else:
+            logger.debug(
+                "App Check verified (app_id=%s, type=%s)",
+                getattr(result, "app_id", "?"),
+                getattr(result, "token_type", "?"),
+            )
+    except Exception as e:  # noqa: BLE001 - deliberate degradation
+        logger.warning(
+            "App Check verification failed (lenient mode — continuing): %s", e
+        )

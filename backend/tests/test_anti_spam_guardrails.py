@@ -587,3 +587,32 @@ def test_verify_invite_rate_limit_429_with_retry_after(monkeypatch):
     assert resp.status_code == 429, resp.text
     assert resp.headers.get("Retry-After") is not None
     assert int(resp.headers["Retry-After"]) >= 1
+
+
+# ============================================================================
+# POST /api/v1/copilot/guest/chat - sliding-window rate limit
+# ============================================================================
+
+def test_guest_copilot_rate_limit_429_with_retry_after(monkeypatch):
+    """Guest copilot chat is protected by a strict per-IP sliding window
+    (10 queries / minute) since App Check cannot be relied on in InPrivate /
+    incognito browsing."""
+    import app.routes.copilot as copilot_route
+    monkeypatch.setattr(copilot_route, "chat", lambda message, **kwargs: "instant reply")
+    _enable_rate_limit(monkeypatch)
+
+    client = TestClient(app)
+    for i in range(10):
+        resp = client.post(
+            "/api/v1/copilot/guest/chat",
+            json={"message": f"guidance {i}", "page_context": "register.html"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    resp = client.post(
+        "/api/v1/copilot/guest/chat",
+        json={"message": "one too many", "page_context": "register.html"},
+    )
+    assert resp.status_code == 429, resp.text
+    assert resp.headers.get("Retry-After") is not None
+    assert int(resp.headers["Retry-After"]) >= 1

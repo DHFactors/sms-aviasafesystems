@@ -61,10 +61,14 @@ RATE_LIMITS = {
 #   login_failures: 5 failed login attempts / 15 minutes / IP
 #   register_tenant: 5 registration attempts / hour / IP
 #   verify_invite: 10 invite-verification attempts / hour / IP
+#   copilot_guest: 10 guest copilot queries / minute / IP (primary protection
+#                  for the public chat endpoint in privacy modes where App
+#                  Check tokens are unavailable)
 SLIDING_WINDOW_LIMITS = {
     "login_failures": (5, 900),
     "register_tenant": (5, 3600),
     "verify_invite": (10, 3600),
+    "copilot_guest": (10, 60),
 }
 
 

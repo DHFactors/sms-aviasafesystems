@@ -20,7 +20,7 @@ from loguru import logger
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
-from app.middleware.app_check import verify_app_check
+from app.middleware.app_check import verify_app_check_lenient
 from app.services.groq_copilot import _offline_reply, chat
 
 router = APIRouter()
@@ -94,17 +94,21 @@ class GuestCopilotChatRequest(BaseModel):
 
 
 @router.post("/guest/chat", response_model=CopilotChatResponse, status_code=status.HTTP_200_OK)
-@rate_limit("copilot")
+@rate_limit("copilot_guest")
 async def copilot_guest_chat(
     request: Request,
     payload: GuestCopilotChatRequest,
-    _app_check: None = Depends(verify_app_check),
+    _app_check: None = Depends(verify_app_check_lenient),
 ) -> CopilotChatResponse:
     """Guest (unauthenticated) copilot chat for public onboarding pages.
 
     Used by the registration page (register.html) so prospective organizations
-    get guided assistance before creating an account. Rate-limited per IP and
-    only page-scoped guidance (no user / tenant context) is provided.
+    get guided assistance before creating an account. Protected primarily by a
+    strict per-IP sliding-window rate limit (10 queries / minute) rather than
+    App Check, which the browser's Tracking Prevention can defeat in
+    InPrivate / incognito browsing; a missing or invalid App Check token is
+    logged and ignored (see verify_app_check_lenient). Only page-scoped
+    guidance (no user / tenant context) is provided.
     """
     history = [item.dict() for item in (payload.history or [])]
 

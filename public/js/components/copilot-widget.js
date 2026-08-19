@@ -372,21 +372,37 @@
 
             if (isGuestPage()) {
                 // Public onboarding pages: guest endpoint, no authentication.
-                // App Check is best-effort — a failed reCAPTCHA token must
-                // degrade to a header-less request, never block dispatch.
+                // App Check is best-effort — in InPrivate / incognito browsing
+                // the browser's Tracking Prevention can block reCAPTCHA's
+                // iframe storage, so token retrieval may throw or resolve
+                // null. That must never block the chat request: log a debug
+                // warning and continue WITHOUT the X-Firebase-AppCheck header
+                // (the endpoint stays protected by per-IP rate limiting).
                 var guestHeaders = { 'Content-Type': 'application/json' };
-                var guestToken = (typeof window.getAppCheckToken === 'function')
-                    ? window.getAppCheckToken()
-                    : Promise.resolve(null);
-                guestToken.then(function (appCheckToken) {
-                    if (appCheckToken) guestHeaders['X-Firebase-AppCheck'] = appCheckToken;
-                    return fetch(chatEndpoint(), {
-                        method: 'POST',
-                        mode: 'cors',
-                        headers: guestHeaders,
-                        body: bodyPayload
-                    });
-                })
+                var guestAppCheck = Promise.resolve(null);
+                try {
+                    if (typeof window.getAppCheckToken === 'function') {
+                        guestAppCheck = window.getAppCheckToken().then(function (appCheckToken) {
+                            if (appCheckToken) guestHeaders['X-Firebase-AppCheck'] = appCheckToken;
+                            return appCheckToken;
+                        });
+                    }
+                } catch (appCheckError) {
+                    console.debug('[Copilot] App Check unavailable (privacy mode) — continuing without token.', appCheckError);
+                }
+                guestAppCheck
+                    .catch(function (appCheckError) {
+                        console.debug('[Copilot] App Check unavailable (privacy mode) — continuing without token.', appCheckError);
+                        return null;
+                    })
+                    .then(function () {
+                        return fetch(chatEndpoint(), {
+                            method: 'POST',
+                            mode: 'cors',
+                            headers: guestHeaders,
+                            body: bodyPayload
+                        });
+                    })
                     .then(function (res) { return res.json().catch(function () { return null; }); })
                     .then(handleReply)
                     .catch(handleError);

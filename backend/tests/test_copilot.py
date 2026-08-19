@@ -312,6 +312,22 @@ def test_guest_chat_works_without_authentication(monkeypatch):
     assert "5x5 SRA" in data["reply"]
 
 
+def test_guest_chat_lenient_with_invalid_app_check_token(monkeypatch):
+    """InPrivate / incognito browsing can leave a stale or malformed App Check
+    token in the header; the guest endpoint must degrade gracefully instead of
+    hard-failing with a 401 (per-IP rate limiting is the primary guard)."""
+    _patch_env(monkeypatch, groq=True)
+
+    resp = TestClient(app).post(
+        "/api/v1/copilot/guest/chat",
+        headers={"X-Firebase-AppCheck": "stale-or-invalid-token-from-privacy-mode"},
+        json={"message": "What is SMS maturity?", "page_context": "register.html"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "success"
+
+
 def test_guest_chat_injects_page_context_into_groq_payload(monkeypatch):
     module = _FakeGroqModule()
     monkeypatch.setitem(sys.modules, "groq", module)
