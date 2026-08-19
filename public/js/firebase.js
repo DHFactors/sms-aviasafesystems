@@ -13,11 +13,12 @@
 // FIREBASE CONFIGURATION
 // ============================================================================
 
-// Strict beta/production configuration isolation (2026-08).
-// Beta routes to the gap-analysis-ssp project (isolated sms-db-beta Firestore
-// database + auth pool) and the beta Render backend; everything else uses the
-// production aerosafety-sms-prod project (sms-db) + production backend. This
-// keeps beta traffic physically unable to touch production data.
+// Strict beta/production configuration (2026-08). Both environments use the
+// aerosafety-sms-prod Firebase project. Beta reads the isolated sms-db-beta
+// named Firestore database and the beta Render backend; production uses the
+// default sms-db database and the production backend. This keeps beta traffic
+// entirely inside aerosafety-sms-prod while still isolating beta data in its
+// own named database.
 //
 // Detection order (first match wins):
 //   1. ?env=beta  or  ?beta=1                 (manual/temporary override)
@@ -55,12 +56,12 @@ const PROD_CONFIG = {
 };
 
 const BETA_CONFIG = {
-    apiKey: "AIzaSyAhvyNyLyqRWidGIkk-by3J9bJ5xtSFTdc",
-    authDomain: "gap-analysis-ssp.firebaseapp.com",
-    projectId: "gap-analysis-ssp",
-    storageBucket: "gap-analysis-ssp.firebasestorage.app",
-    messagingSenderId: "817614332543",
-    appId: "1:817614332543:web:01224a312e8478b24d554a",
+    apiKey: "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc",
+    authDomain: "aerosafety-sms-prod.firebaseapp.com",
+    projectId: "aerosafety-sms-prod",
+    storageBucket: "aerosafety-sms-prod.firebasestorage.app",
+    messagingSenderId: "527947363983",
+    appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
     databaseId: "sms-db-beta",
     appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
 };
@@ -68,8 +69,8 @@ const BETA_CONFIG = {
 const firebaseConfig = IS_BETA_ENV ? BETA_CONFIG : PROD_CONFIG;
 
 // Per-environment reCAPTCHA v3 site key for App Check, sourced from the active
-// Firebase config. Both environments currently share the same key; if a
-// dedicated gap-analysis-ssp key is created later, update BETA_CONFIG only.
+// Firebase config. Both environments share the same key registered on
+// aerosafety-sms-prod.
 const RECAPTCHA_SITE_KEY = firebaseConfig.appCheckSiteKey || '';
 
 // Centralized application configuration (single source of truth)

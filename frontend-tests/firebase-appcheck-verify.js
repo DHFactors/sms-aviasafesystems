@@ -59,8 +59,9 @@ function assert(cond, msg) { if (!cond) { console.error('FAIL: ' + msg); process
 (async () => {
     const betaWin = run('betasms.aviasafesystems.com');
     assert(betaWin.firebase.app().config === betaWin.__FIREBASE_CONFIG__, 'beta picks BETA_CONFIG');
-    assert(betaWin.__FIREBASE_CONFIG__.projectId === 'gap-analysis-ssp', 'beta config project = gap-analysis-ssp');
+    assert(betaWin.__FIREBASE_CONFIG__.projectId === 'aerosafety-sms-prod', 'beta config project = aerosafety-sms-prod');
     assert(betaWin.__FIREBASE_CONFIG__.databaseId === 'sms-db-beta', 'beta database = sms-db-beta');
+    assert(JSON.stringify(betaWin.__FIREBASE_CONFIG__).indexOf('gap-analysis-ssp') === -1, 'beta config contains no gap-analysis-ssp reference');
     assert(betaWin.__FIREBASE_CONFIG__.appCheckSiteKey === BETA_KEY, 'beta appCheckSiteKey set');
     assert(activatedProvider && activatedProvider.key === BETA_KEY, 'App Check provider activated with beta key');
     assert(betaWin.APP_CONFIG.recaptchaSiteKey === BETA_KEY, 'APP_CONFIG.recaptchaSiteKey = beta key on beta host');
