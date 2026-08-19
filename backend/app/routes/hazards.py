@@ -1,11 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
 from loguru import logger
 
-from app.models.hazard import HazardCreate, HazardUpdate, HazardResponse, HazardListItem, HazardStatus, HazardSource, HazardTaxonomy, HAZARD_CREATION_SOURCES
+from app.models.hazard import (
+    HazardCreate,
+    HazardUpdate,
+    HazardResponse,
+    HazardListItem,
+    HazardStatus,
+    HazardSource,
+    HazardTaxonomy,
+    HAZARD_CREATION_SOURCES,
+    AnalysisMode,
+    SramCalculateRequest,
+    SramSaveRequest,
+)
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.services.hazard_service import HazardService
 from app.services.audit_service import log_audit, request_context
+from app.services import srm_engine
 
 router = APIRouter()
 
@@ -154,6 +168,182 @@ async def assign_hazard(
 
 _VALID_SOURCES = {s.value for s in HazardSource}
 _VALID_TAXONOMIES = {t.value for t in HazardTaxonomy}
+_VALID_ANALYSIS_MODES = {m.value for m in AnalysisMode}
+
+
+def _severity_inputs(data: dict) -> dict:
+    return {
+        "pax": int(data.get("pax") or 0),
+        "worker": int(data.get("worker") or 0),
+        "quality": int(data.get("quality") or 0),
+        "asset": int(data.get("asset") or 0),
+        "rep": int(data.get("rep") or 0),
+        "sec": int(data.get("sec") or 0),
+        "env": int(data.get("env") or 0),
+    }
+
+
+def _barrier_lists(barriers: Any) -> dict:
+    b = barriers or {}
+    if hasattr(b, "model_dump"):
+        b = b.model_dump()
+    return {
+        "ecb_barriers": b.get("ecb") or [],
+        "erb_barriers": b.get("erb") or [],
+        "ncb_barriers": b.get("ncb") or [],
+        "nrb_barriers": b.get("nrb") or [],
+    }
+
+
+@router.post("/{hazard_id}/sram/calculate", response_model=dict)
+async def calculate_sram(
+    hazard_id: str,
+    payload: SramCalculateRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Real-time CAAN CAR-19 SRM calculation — validates the hazard exists but
+    does NOT persist anything (dynamic preview for the Bow-Tie workspace)."""
+    service = HazardService(user.get("tenant_id", "default"))
+    doc = service.get_hazard_by_id(hazard_id, user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Hazard not found")
+
+    result = srm_engine.analyse(
+        severity_inputs=payload.severity.model_dump(),
+        **_barrier_lists(payload.barriers),
+    )
+    result["bowtie"] = payload.bowtie.model_dump() if payload.bowtie else None
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="SRAM_CALCULATED",
+        user=user.get("email"),
+        tenant_id=user.get("tenant_id"),
+        target_type="hazard",
+        target_id=hazard_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"index": result["risk_profile"]["resultant_risk"]["index"]},
+    )
+    return result
+
+
+@router.put("/{hazard_id}/sram/save", response_model=dict)
+async def save_sram(
+    hazard_id: str,
+    payload: SramSaveRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_tenant_user),
+):
+    """Validate and persist a full Bow-Tie / SRAM configuration.
+
+    Recomputes severity and barrier scoring authoritatively, updates the hazard's
+    Master Risk register (severity/probability/risk_index/risk_level/risk_outcome)
+    from the resultant risk, and stores the barrier register inside sram_data.
+    """
+    tenant_id = user["tenant_id"]
+    service = HazardService(tenant_id)
+    doc = service.get_hazard_by_id(hazard_id, user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Hazard not found")
+
+    data = payload.sram_data.model_dump(exclude_none=False)
+    severity_block = data.get("severity") or {}
+    barriers_block = data.get("barriers") or {}
+
+    if not severity_block.get("severity_letter"):
+        raise HTTPException(
+            status_code=422,
+            detail="sram_data.severity must contain a computed severity_letter.",
+        )
+
+    # Authoritative recomputation.
+    inputs = _severity_inputs(severity_block)
+    severity = srm_engine.calculate_severity(**inputs)
+    if severity["severity_letter"] != severity_block.get("severity_letter"):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Severity inputs inconsistent: recomputed {severity['severity_letter']} "
+                f"({severity['total_score']}) does not match stored "
+                f"{severity_block.get('severity_letter')}."
+            ),
+        )
+    severity_block.update(severity)
+    severity_block.update(inputs)
+
+    barriers = srm_engine.evaluate_barriers(
+        barriers_block.get("ecb") or [],
+        barriers_block.get("erb") or [],
+        barriers_block.get("ncb") or [],
+        barriers_block.get("nrb") or [],
+    )
+    risk_profile = srm_engine.evaluate_risk_profile(
+        severity, barriers["ecb"], barriers["erb"], barriers["ncb"], barriers["nrb"]
+    )
+
+    # Digital sign-off defaults keyed to the required authority.
+    signoffs = data.get("signoffs") or {}
+    if not signoffs.get("authority"):
+        signoffs["authority"] = risk_profile["signoff"]["authority"]
+    if not signoffs.get("required_tolerability"):
+        signoffs["required_tolerability"] = risk_profile["resultant_risk"]["tolerability"]
+
+    sram_data = {
+        "severity": severity_block,
+        "barriers": barriers,
+        "risk_profile": risk_profile,
+        "bowtie": (data.get("bowtie") or {}),
+        "fishbone": data.get("fishbone"),
+        "signoffs": signoffs,
+    }
+
+    sev_num = srm_engine.SEVERITY_LETTER_TO_NUMERIC[severity["severity_letter"]]
+    prob = risk_profile["resultant_risk"]["probability_value"]
+    now = datetime.now(timezone.utc)
+
+    update_payload = {
+        "analysis_mode": payload.analysis_mode.value,
+        "sram_data": sram_data,
+        "severity": sev_num,
+        "probability": prob,
+        "risk_index": sev_num * prob,
+        "srm_conducted": True,
+        "srm_date": now,
+        "srm_status": "Conducted",
+        "updated_at": now,
+    }
+    updated = service.update_hazard(hazard_id, update_payload, user)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Hazard not found")
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="SRAM_SAVED",
+        user=user.get("email"),
+        tenant_id=tenant_id,
+        target_type="hazard",
+        target_id=hazard_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={
+            "analysis_mode": payload.analysis_mode.value,
+            "resultant_index": risk_profile["resultant_risk"]["index"],
+            "authority": signoffs["authority"],
+        },
+    )
+    return {
+        "id": updated.get("id"),
+        "hazard_id": updated.get("hazard_id"),
+        "analysis_mode": updated.get("analysis_mode"),
+        "sram_data": updated.get("sram_data"),
+        "severity": updated.get("severity"),
+        "probability": updated.get("probability"),
+        "risk_index": updated.get("risk_index"),
+        "risk_level": updated.get("risk_level"),
+        "risk_outcome": updated.get("risk_outcome"),
+    }
 
 
 def _normalize_source(value):
@@ -219,6 +409,8 @@ def _to_hazard_response(data: dict) -> dict:
         "srm_conducted": data.get("srm_conducted", False),
         "srm_date": data.get("srm_date"),
         "srm_status": data.get("srm_status"),
+        "analysis_mode": data.get("analysis_mode", "FISHBONE_ONLY"),
+        "sram_data": data.get("sram_data"),
         "status": data.get("status", "Open"),
         "follow_up_date": data.get("follow_up_date"),
         "closed_at": data.get("closed_at"),

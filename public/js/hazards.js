@@ -23,6 +23,13 @@ const HazardsAPI = {
         ApiClient._request('PATCH', `/api/hazards/${hazardId}/assign?assigned_to=${encodeURIComponent(assignedTo)}&assigned_to_uid=${assignedToUid}`),
 
     getStats: () => ApiClient.get('/api/hazards/stats'),
+
+    // ── CAAN CAR-19 SRM (Bow-Tie) ──
+    sramCalculate: (hazardId, payload) =>
+        ApiClient.post(`/api/hazards/${hazardId}/sram/calculate`, payload),
+
+    sramSave: (hazardId, payload) =>
+        ApiClient.put(`/api/hazards/${hazardId}/sram/save`, payload),
 };
 
 const HAZARD_STATUSES = ['Open', 'Processing', 'Under Review', 'Closed', 'Reopened'];

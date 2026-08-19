@@ -409,6 +409,8 @@ class CanCapService:
             "root_causes": payload.get("root_causes") or None,
             "action_items": payload.get("action_items") or None,
             "process_owner": payload.get("process_owner"),
+            # CAAN CAR-19 SRM (Bow-Tie) block
+            "sram_data": payload.get("sram_data") or None,
         }
 
         # Server-side Residual SRA canonicalisation.

@@ -6,6 +6,7 @@
     <title>Hazard Detail - AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/srm.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -136,6 +137,11 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2><i class="fas fa-diagram-project"></i> CAAN CAR-19 SRM Analysis</h2>
+            <div id="srmWorkspace"></div>
+        </div>
+
         <div class="card" id="verificationSection" style="display:none;">
             <h2><i class="fas fa-clipboard-check"></i> Verification & Closure</h2>
             <div id="verificationContent">
@@ -171,10 +177,13 @@
 <script src="/js/api/client.js"></script>
 <script src="/js/hazards.js"></script>
 <script src="/js/verification.js"></script>
+<script src="/js/fishbone.js"></script>
+<script src="/js/srm.js"></script>
 <script>
 let hazardData = null;
 let currentUser = null;
 let currentUserRole = null;
+let srmWorkspace = null;
 
 firebase.auth().onAuthStateChanged(async function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -238,6 +247,24 @@ function renderHazard() {
     renderStatusButtons(h);
     populateEditForm(h);
     renderVerificationSection(h);
+    initSrm(h);
+}
+
+function initSrm(h) {
+    const el = document.getElementById('srmWorkspace');
+    if (!el || typeof SRM === 'undefined' || !SRM.createWorkspace) return;
+    try {
+        if (!srmWorkspace) {
+            srmWorkspace = SRM.createWorkspace(el, {
+                hazardId: h.id,
+                saved: h.sram_data || null,
+                mode: h.analysis_mode || 'FISHBONE_ONLY',
+            });
+        }
+    } catch (err) {
+        console.error('SRM workspace init failed:', err);
+        el.innerHTML = '<p style="font-size:0.85rem;color:#dc3545;">SRM workspace could not be initialised.</p>';
+    }
 }
 
 async function renderVerificationSection(h) {

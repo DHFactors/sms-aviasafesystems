@@ -115,6 +115,8 @@ class HazardService:
             "srm_conducted": payload.get("srm_conducted", False),
             "srm_date": payload.get("srm_date"),
             "srm_status": payload.get("srm_status"),
+            "analysis_mode": payload.get("analysis_mode", "FISHBONE_ONLY"),
+            "sram_data": payload.get("sram_data"),
             "status": payload.get("status", "Open"),
             "follow_up_date": payload.get("follow_up_date"),
             "closed_at": payload.get("closed_at"),

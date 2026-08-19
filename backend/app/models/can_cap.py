@@ -137,6 +137,9 @@ class CAPFormFields(BaseModel):
     # action_items: [{ id, description, root_cause_id, owner, target_date }]
     root_causes: Optional[list] = None
     action_items: Optional[list] = None
+    # ── CAAN CAR-19 SRM (Bow-Tie) block persisted with the CAP submission ──
+    # sram_data: { analysis_mode, severity, barriers, risk_profile, bowtie, signoffs }
+    sram_data: Optional[dict] = None
     sag_sign: Optional[str] = None
     sag_signed_by: Optional[str] = None
     sag_signed_at: Optional[datetime] = None

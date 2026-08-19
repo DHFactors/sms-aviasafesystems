@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/can-cap-print.css">
+    <link rel="stylesheet" href="/css/srm.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -146,6 +147,11 @@
             <div id="fishboneEditor"></div>
 
             <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
+                <i class="fas fa-bow-arrow"></i> CAAN CAR-19 SRM — Combined RCA + SRAM
+            </div>
+            <div id="srmCombinedPanel"></div>
+
+            <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
                 <i class="fas fa-th"></i> Residual Safety Risk Assessment (Severity A–E × Probability 1–5)
             </div>
             <div id="residualSraMatrix"></div>
@@ -180,10 +186,12 @@
 <script src="/js/risk_matrix.js"></script>
 <script src="/js/fishbone.js"></script>
 <script src="/js/can_cap.js"></script>
+<script src="/js/srm.js"></script>
 <script>
 let canId = null;
 let fishboneController = null;
 let residualSraController = null;
+let srmCombined = null;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -199,10 +207,29 @@ function initFishbone() {
     try {
         fishboneController = Fishbone.renderEditor('fishboneEditor', {
             data: { root_causes: [], action_items: [] },
-            onChange: () => {},
+            onChange: () => {
+                if (srmCombined && typeof srmCombined.refreshPromotion === 'function') {
+                    srmCombined.refreshPromotion();
+                }
+            },
         });
+        initSrmCombined();
     } catch (err) {
         console.error('Fishbone init failed:', err);
+    }
+}
+
+function initSrmCombined() {
+    const el = document.getElementById('srmCombinedPanel');
+    if (!el || typeof SRM === 'undefined' || !SRM.attachCombined) return;
+    try {
+        srmCombined = SRM.attachCombined(el, {
+            fishboneController,
+            severityLetter: null,
+        });
+    } catch (err) {
+        console.error('SRM combined init failed:', err);
+        el.innerHTML = '<p style="font-size:0.85rem;color:#dc3545;">SRM Combined panel could not be initialised.</p>';
     }
 }
 
@@ -213,6 +240,10 @@ async function initResidualSra() {
             showHeader: true,
             showSummary: true,
         });
+        if (srmCombined && residualSraController && typeof residualSraController.getValue === 'function') {
+            const v = residualSraController.getValue();
+            if (v && v.severity_letter) srmCombined.setSeverityLetter(v.severity_letter);
+        }
     } catch (err) {
         console.error('RiskMatrix init failed:', err);
     }
@@ -282,6 +313,7 @@ async function submitCap() {
         managerial_approval: managerialApproval,
         root_causes: fishData.root_causes && fishData.root_causes.length ? fishData.root_causes : null,
         action_items: fishData.action_items && fishData.action_items.length ? fishData.action_items : null,
+        sram_data: srmCombined && srmCombined.getSramData ? srmCombined.getSramData() : null,
         residual_severity: rSev || null,
         residual_probability: rProb || null,
         residual_risk_index: residualRiskIndex,

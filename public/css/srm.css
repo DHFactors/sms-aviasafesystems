@@ -1,0 +1,212 @@
+/* ============================================================================
+   srm.css — CAAN CAR-19 Safety Risk Management (SRM) Bow-Tie workspace
+   Styles for the Analysis Model Selector, 7-impact severity sliders,
+   interactive Bow-Tie visualizer, Barrier Quality modal, before/after risk
+   comparison and digital sign-off container.
+   ============================================================================ */
+
+.srm-workspace { display: block; }
+
+/* ── Analysis Model Selector ─────────────────────────────────────────────── */
+.srm-mode-selector {
+    display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
+    background: #f0f4ff; border: 1px solid #dbe7f5; border-radius: 8px;
+    padding: 0.7rem 1rem; margin-bottom: 1.1rem;
+}
+.srm-mode-title { font-weight: 700; font-size: 0.85rem; color: #0b2a42; }
+.srm-mode-selector label {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.82rem; font-weight: 600; color: #1e3a5f; cursor: pointer;
+    padding: 0.35rem 0.7rem; border-radius: 999px; background: #fff;
+    border: 1px solid #d1d9e6; transition: all 0.15s;
+}
+.srm-mode-selector label:hover { border-color: #1a6b8a; }
+.srm-mode-selector label.srm-mode-active {
+    background: #1a6b8a; color: #fff; border-color: #1a6b8a;
+}
+.srm-mode-selector input { accent-color: #1a6b8a; }
+
+.srm-section { margin-bottom: 1.4rem; }
+.srm-section h3 {
+    font-size: 0.88rem; font-weight: 700; color: #0b2a42; margin: 0 0 0.6rem;
+    text-transform: uppercase; letter-spacing: 0.4px;
+}
+.srm-hint { font-size: 0.75rem; color: #64748b; margin: -0.3rem 0 0.6rem; }
+
+/* ── Severity sliders ────────────────────────────────────────────────────── */
+.srm-severity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 1.2rem; }
+@media (max-width: 640px) { .srm-severity-grid { grid-template-columns: 1fr; } }
+.srm-slider-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0; }
+.srm-slider-icon { width: 1.3rem; text-align: center; color: #1a6b8a; }
+.srm-slider-label { flex: 1; font-size: 0.8rem; color: #334155; font-weight: 500; }
+.srm-slider-row input[type="range"] { flex: 1; accent-color: #1a6b8a; cursor: pointer; }
+.srm-slider-value {
+    width: 1.6rem; text-align: center; font-weight: 700; font-size: 0.85rem;
+    color: #0b2a42; background: #eef2f7; border-radius: 4px; padding: 0.15rem 0;
+}
+
+.srm-score-badge {
+    display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem;
+    background: #0b2a42; color: #fff; border-radius: 8px; padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+}
+.srm-score-value { font-size: 1.4rem; font-weight: 800; }
+.srm-severity-letter {
+    font-size: 1.4rem; font-weight: 800; color: #ffd166;
+    border: 2px solid #ffd166; border-radius: 8px; padding: 0.05rem 0.55rem;
+}
+.srm-severity-desc { color: #cbd5e1; font-weight: 600; }
+
+/* ── Bow-Tie visualizer ──────────────────────────────────────────────────── */
+.srm-bowtie {
+    display: grid; grid-template-columns: 1fr 1fr auto 1fr 1fr;
+    gap: 0.6rem; align-items: stretch; margin: 0.4rem 0;
+}
+@media (max-width: 900px) { .srm-bowtie { grid-template-columns: 1fr 1fr; } }
+.srm-bowtie .srm-col {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem;
+}
+.srm-col-head {
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.4px; color: #475569; margin-bottom: 0.45rem;
+}
+.srm-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+    padding: 0.45rem 0.55rem; margin-bottom: 0.45rem; font-size: 0.8rem;
+}
+.srm-card.srm-threat { border-left: 4px solid #dc3545; }
+.srm-card.srm-consequence { border-left: 4px solid #d97706; }
+.srm-card input, .srm-card select { border: 0; outline: 0; font-size: 0.8rem; width: 100%; background: transparent; }
+.srm-barrier-pill {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+    background: #e3f2fd; border: 1px solid #90caf9; border-radius: 999px;
+    padding: 0.35rem 0.7rem; margin-bottom: 0.4rem; font-size: 0.78rem;
+    font-weight: 600; color: #0d47a1; cursor: pointer; transition: all 0.15s;
+}
+.srm-barrier-pill:hover { background: #bbdefb; }
+.srm-barrier-pill.srm-erb { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+.srm-barrier-pill.srm-erb:hover { background: #c8e6c9; }
+.srm-barrier-pill.srm-ncb { background: #fff3e0; border-color: #ffcc80; color: #e65100; }
+.srm-barrier-pill.srm-nrb { background: #f3e5f5; border-color: #ce93d8; color: #6a1b9a; }
+.srm-bsv-badge {
+    background: #0d47a1; color: #fff; border-radius: 999px; font-size: 0.68rem;
+    padding: 0.05rem 0.45rem; font-weight: 700; white-space: nowrap;
+}
+.srm-erb .srm-bsv-badge { background: #1b5e20; }
+.srm-ncb .srm-bsv-badge { background: #e65100; }
+.srm-nrb .srm-bsv-badge { background: #6a1b9a; }
+.srm-pill-remove {
+    background: transparent; border: 0; color: inherit; cursor: pointer;
+    font-size: 0.7rem; opacity: 0.7; padding: 0;
+}
+.srm-pill-remove:hover { opacity: 1; }
+.srm-add-btn {
+    width: 100%; background: #fff; border: 1px dashed #94a3b8; border-radius: 6px;
+    color: #64748b; font-size: 0.75rem; padding: 0.35rem; cursor: pointer;
+}
+.srm-add-btn:hover { border-color: #1a6b8a; color: #1a6b8a; }
+
+.srm-top-event {
+    background: #7f1d1d; color: #fff; border-radius: 8px; text-align: center;
+    padding: 0.9rem 0.8rem; font-weight: 800; font-size: 0.8rem;
+    letter-spacing: 0.5px; display: flex; flex-direction: column; gap: 0.4rem;
+    justify-content: center; min-width: 130px;
+}
+.srm-top-event input {
+    background: rgba(255,255,255,0.15); color: #fff; border: 0; border-radius: 4px;
+    padding: 0.3rem; font-size: 0.78rem; text-align: center; outline: 0;
+}
+
+.srm-new-barriers { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+@media (max-width: 640px) { .srm-new-barriers { grid-template-columns: 1fr; } }
+
+/* ── Promotion panel (Combined RCA + SRAM) ───────────────────────────────── */
+.srm-promotion {
+    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.7rem 0.9rem;
+}
+.srm-promotion-head { font-weight: 700; font-size: 0.82rem; color: #166534; margin-bottom: 0.4rem; }
+.srm-promote-row {
+    display: flex; align-items: center; gap: 0.5rem; background: #fff;
+    border: 1px solid #d1fae5; border-radius: 6px; padding: 0.35rem 0.55rem;
+    margin-bottom: 0.35rem; font-size: 0.78rem;
+}
+.srm-promote-row .srm-promote-text { flex: 1; color: #14532d; }
+.srm-promote-btn {
+    background: #16a34a; color: #fff; border: 0; border-radius: 6px;
+    font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.6rem; cursor: pointer;
+}
+.srm-promote-btn:hover { background: #15803d; }
+.srm-promoted-note { font-size: 0.72rem; color: #166534; font-style: italic; }
+
+/* ── Before / After risk comparison ──────────────────────────────────────── */
+.srm-risk-comparison {
+    display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.8rem 1rem;
+}
+.srm-risk-box { flex: 1; min-width: 170px; text-align: center; }
+.srm-risk-box .srm-risk-index { font-size: 1.7rem; font-weight: 800; }
+.srm-risk-box .srm-risk-tol { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+.srm-risk-box .srm-risk-label { font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; }
+.srm-risk-arrow { color: #94a3b8; font-size: 1.3rem; }
+.srm-tol-intolerable { color: #dc3545; }
+.srm-tol-tolerable { color: #e65100; }
+.srm-tol-acceptable { color: #2e7d32; }
+.srm-bsv-summary { font-size: 0.78rem; color: #475569; margin-top: 0.4rem; }
+
+/* ── Sign-off ────────────────────────────────────────────────────────────── */
+.srm-signoff {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.8rem 1rem;
+}
+.srm-authority-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem;
+    font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px;
+    background: #0b2a42; color: #fff; margin-bottom: 0.6rem;
+}
+.srm-signoff-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem; }
+@media (max-width: 640px) { .srm-signoff-grid { grid-template-columns: 1fr; } }
+.srm-signoff-grid label { display: block; font-size: 0.72rem; font-weight: 600; color: #475569; margin-bottom: 0.2rem; }
+.srm-signoff-grid input {
+    width: 100%; padding: 0.4rem 0.55rem; border: 1px solid #d1d5db;
+    border-radius: 6px; font-size: 0.82rem; box-sizing: border-box;
+}
+.srm-signoff-grid input:focus { outline: 0; border-color: #1a6b8a; }
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+.srm-actions { display: flex; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+.srm-btn {
+    border: 0; border-radius: 6px; font-size: 0.85rem; font-weight: 700;
+    padding: 0.6rem 1.2rem; cursor: pointer; transition: opacity 0.15s;
+}
+.srm-btn:hover { opacity: 0.88; }
+.srm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.srm-btn-calc { background: #e3f2fd; color: #0d47a1; }
+.srm-btn-save { background: #0b2a42; color: #fff; }
+.srm-btn-outline { background: #fff; color: #1a6b8a; border: 1px solid #1a6b8a; }
+
+/* ── Barrier Quality modal ───────────────────────────────────────────────── */
+.srm-modal-overlay {
+    position: fixed; inset: 0; background: rgba(11, 42, 66, 0.55);
+    display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 1rem;
+}
+.srm-modal {
+    background: #fff; border-radius: 10px; width: 100%; max-width: 520px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.3); max-height: 90vh; overflow: auto; padding: 1.2rem 1.4rem;
+}
+.srm-modal h3 { margin: 0 0 0.2rem; font-size: 1rem; color: #0b2a42; }
+.srm-modal .srm-modal-sub { font-size: 0.75rem; color: #64748b; margin-bottom: 0.8rem; }
+.srm-bqv-badge {
+    display: flex; align-items: center; gap: 0.6rem; background: #0b2a42; color: #fff;
+    border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 0.9rem;
+}
+.srm-bqv-value { font-size: 1.3rem; font-weight: 800; }
+.srm-bsv-chip {
+    font-size: 1.3rem; font-weight: 800; color: #ffd166;
+    border: 2px solid #ffd166; border-radius: 8px; padding: 0.05rem 0.5rem;
+}
+.srm-bsv-robustness { color: #cbd5e1; font-weight: 600; font-size: 0.85rem; }
+.srm-modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
+
+/* ── Status / toast ──────────────────────────────────────────────────────── */
+.srm-status { font-size: 0.78rem; margin-top: 0.6rem; display: none; }
+.srm-status.srm-ok { color: #2e7d32; display: block; }
+.srm-status.srm-err { color: #dc3545; display: block; }
