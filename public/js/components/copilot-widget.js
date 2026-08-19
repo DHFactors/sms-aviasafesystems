@@ -372,10 +372,20 @@
 
             if (isGuestPage()) {
                 // Public onboarding pages: guest endpoint, no authentication.
-                fetch(chatEndpoint(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: bodyPayload
+                // App Check is best-effort — a failed reCAPTCHA token must
+                // degrade to a header-less request, never block dispatch.
+                var guestHeaders = { 'Content-Type': 'application/json' };
+                var guestToken = (typeof window.getAppCheckToken === 'function')
+                    ? window.getAppCheckToken()
+                    : Promise.resolve(null);
+                guestToken.then(function (appCheckToken) {
+                    if (appCheckToken) guestHeaders['X-Firebase-AppCheck'] = appCheckToken;
+                    return fetch(chatEndpoint(), {
+                        method: 'POST',
+                        mode: 'cors',
+                        headers: guestHeaders,
+                        body: bodyPayload
+                    });
                 })
                     .then(function (res) { return res.json().catch(function () { return null; }); })
                     .then(handleReply)
@@ -393,6 +403,7 @@
                 }
                 return fetch(chatEndpoint(), {
                     method: 'POST',
+                    mode: 'cors',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token

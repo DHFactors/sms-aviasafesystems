@@ -265,23 +265,48 @@ function patchFirestoreFactory() {
     firebase.firestore = factory;
 }
 
+// Ensure the Auth compat library is present before initServices() tries to
+// call firebase.auth(). Some pages load only the App + Firestore compat SDKs,
+// or load firebase.js before the auth-compat <script> has finished — calling
+// firebase.auth() in that window throws "firebase.auth is not a function".
+// Best-effort: load auth-compat dynamically when missing, then always resolve
+// (auth stays null if the CDN script fails, never blocking the page).
+function loadAuthCompatIfNeeded() {
+    return new Promise(function (resolve) {
+        if (typeof firebase === 'undefined') { resolve(); return; }
+        if (typeof firebase.auth === 'function') { resolve(); return; }
+        var script = document.createElement('script');
+        script.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js';
+        script.async = true;
+        script.onload = function () { resolve(); };
+        script.onerror = function () { resolve(); };
+        document.head.appendChild(script);
+    });
+}
+
 function initServices() {
-    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
-        try {
-            auth = firebase.auth();
-            if (typeof firebase.firestore === 'function') {
-                patchFirestoreFactory();
-                db = getNamedFirestore(firebase.app(), firebaseConfig.databaseId);
-            } else {
-                console.warn("Firestore SDK not available on this page.");
+    return loadAuthCompatIfNeeded().then(function () {
+        if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+            try {
+                if (typeof firebase.auth === 'function') {
+                    auth = firebase.auth();
+                } else {
+                    console.warn('⚠️ Firebase Auth SDK not available on this page — auth disabled.');
+                }
+                if (typeof firebase.firestore === 'function') {
+                    patchFirestoreFactory();
+                    db = getNamedFirestore(firebase.app(), firebaseConfig.databaseId);
+                } else {
+                    console.warn("Firestore SDK not available on this page.");
+                }
+                console.log('✅ Firebase services initialized');
+            } catch (error) {
+                console.warn('Error initializing Firebase services:', error);
             }
-            console.log('✅ Firebase services initialized');
-        } catch (error) {
-            console.warn('Error initializing Firebase services:', error);
+        } else {
+            console.warn('⚠️ Cannot initialize services - Firebase not available');
         }
-    } else {
-        console.warn('⚠️ Cannot initialize services - Firebase not available');
-    }
+    });
 }
 
 // ============================================================================
@@ -320,16 +345,30 @@ function initAppCheck() {
 
 // Resolve a fresh App Check token (or null when App Check is unavailable) so
 // public pages can attach it as X-Firebase-AppCheck to backend requests.
-function getAppCheckToken() {
+// Always resolves: a reCAPTCHA stall or failure (private windows, test
+// browsers) must degrade to null instead of blocking the network dispatch.
+function getAppCheckToken(timeoutMs) {
+    var limit = timeoutMs || 3000;
     if (typeof firebase === 'undefined' || !firebase.appCheck || !firebase.appCheck().getToken) {
         return Promise.resolve(null);
     }
-    return Promise.resolve().then(function () {
-        return firebase.appCheck().getToken(true);
-    }).then(function (tokenResult) {
-        return tokenResult && tokenResult.token ? tokenResult.token : null;
-    }).catch(function () {
-        return null;
+    return new Promise(function (resolve) {
+        var settled = false;
+        var done = function (value) {
+            if (settled) return;
+            settled = true;
+            resolve(value ? value : null);
+        };
+        try {
+            firebase.appCheck().getToken(true)
+                .then(function (tokenResult) {
+                    done(tokenResult && tokenResult.token ? tokenResult.token : null);
+                })
+                .catch(function () { done(null); });
+        } catch (e) {
+            done(null);
+        }
+        setTimeout(function () { done(null); }, limit);
     });
 }
 window.getAppCheckToken = getAppCheckToken;
@@ -344,16 +383,19 @@ window.getAppCheckToken = getAppCheckToken;
     if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         initializeFirebase();
         initAppCheck();
-        initServices();
-        window.firebase = firebase;
-        window.auth = auth;
-        window.db = db;
-        console.log('✅ Firebase loaded from CDN');
+        initServices().then(function() {
+            window.firebase = firebase;
+            window.auth = auth;
+            window.db = db;
+            console.log('✅ Firebase loaded from CDN');
+        });
     } else {
         // Load dynamically
         loadFirebaseSDK()
             .then(function() {
-                initServices();
+                return initServices();
+            })
+            .then(function() {
                 window.firebase = firebase;
                 window.auth = auth;
                 window.db = db;

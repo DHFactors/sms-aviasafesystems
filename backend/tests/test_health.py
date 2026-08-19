@@ -63,3 +63,45 @@ def test_cors_allows_canonical_frontend_origins(client):
         assert resp.status_code == 200, f"preflight rejected for {origin}"
         assert resp.headers.get("access-control-allow-origin") == origin
         assert resp.headers.get("access-control-allow-credentials") == "true"
+
+
+def test_cors_preflight_beta_hosting_and_local_origins(client):
+    """The beta web.app hosting origin and the local dev servers must pass the
+    CORS preflight with the explicit App Check / tenant-routing header list."""
+    from app.main import CANONICAL_ALLOWED_ORIGINS, _allowed_origins
+
+    merged = _allowed_origins()
+    for origin in CANONICAL_ALLOWED_ORIGINS:
+        assert origin in merged
+
+    for origin in (
+        "https://aerosafety-sms-beta.web.app",
+        "http://localhost:5000",
+        "http://localhost:8000",
+        "http://127.0.0.1:5500",
+    ):
+        resp = client.options(
+            "/api/v1/auth/register-tenant",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type,x-firebase-appcheck,x-requested-with,accept,origin",
+            },
+        )
+        assert resp.status_code == 200, f"preflight rejected for {origin}"
+        assert resp.headers.get("access-control-allow-origin") == origin
+        assert resp.headers.get("access-control-allow-credentials") == "true"
+        allowed = (resp.headers.get("access-control-allow-headers") or "").lower()
+        for header in ("x-firebase-appcheck", "x-requested-with", "x-tenant-id"):
+            assert header in allowed, f"header {header} not allowed for {origin}"
+
+
+def test_cors_exposes_rate_limit_headers(client):
+    """The rate-limit / back-off headers must be readable from a cross-origin
+    response so the SPA can honour Retry-After and the sliding-window counters."""
+    resp = client.get("/health", headers={"Origin": "https://aerosafety-sms-beta.web.app"})
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "https://aerosafety-sms-beta.web.app"
+    exposed = resp.headers.get("access-control-expose-headers") or ""
+    for header in ("Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"):
+        assert header.lower() in exposed.lower(), f"header {header} not exposed"

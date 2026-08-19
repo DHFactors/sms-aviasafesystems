@@ -24,12 +24,17 @@ CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
     "https://betasms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
+    "https://aerosafety-sms-beta.web.app",
     "https://sms-beta.web.app",
     "https://demo.aviasafesystems.com",
     # Public survey frontends (multi-tenant subdomains / portals)
     "https://smssurvey.gsacharya.com",
     "https://sms.nac.com.np",
     "https://ssp.caanepal.gov.np",
+    # Local development / static file servers
+    "http://localhost:5000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5500",
 )
 
 
@@ -62,8 +67,25 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Firebase-AppCheck",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+        "X-Tenant-Id",
+        "X-User-Department",
+        "X-Task-Key",
+        "X-Request-ID",
+    ],
+    expose_headers=[
+        "Retry-After",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+    ],
 )
 
 # Guarantees Access-Control-Allow-Origin on actual (non-preflight) responses.
@@ -95,6 +117,9 @@ def _cors_headers(request: Request) -> dict:
                 "Access-Control-Allow-Credentials": "true",
                 "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
                 "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+                "Access-Control-Expose-Headers": (
+                    "Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset"
+                ),
                 "Vary": "Origin",
             }
     except Exception:

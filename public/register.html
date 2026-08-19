@@ -322,6 +322,7 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         } catch (e) { /* App Check is best-effort on this page */ }
         var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/register-tenant', {
             method: 'POST',
+            mode: 'cors',
             headers: headers,
             body: JSON.stringify({
                 organization_name: organizationName,

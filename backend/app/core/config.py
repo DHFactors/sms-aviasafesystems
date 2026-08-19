@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
 
     # ── CORS ──
-    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000"
+    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://127.0.0.1:5500"
 
     # ── Firebase ──
     FIREBASE_PROJECT_ID: Optional[str] = None
