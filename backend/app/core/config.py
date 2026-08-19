@@ -162,16 +162,17 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASS: Optional[str] = None
 
-    # ── Gmail SMTP dispatcher (registration intake acknowledgments) ──
+    # ── Gmail REST API dispatcher (registration intake acknowledgments) ──
     # Dedicated Gmail channel used by app/services/gmail_dispatcher.py to send
-    # self-service registration acknowledgments. Leave GMAIL_SMTP_USER /
-    # GMAIL_SMTP_PASSWORD empty to skip delivery (the acknowledgment is logged
-    # only and the provisioned tenant record is never rolled back).
-    # Port 465 uses direct SMTP_SSL; port 587 falls back to STARTTLS.
-    GMAIL_SMTP_HOST: Optional[str] = None
-    GMAIL_SMTP_PORT: int = 465
-    GMAIL_SMTP_USER: Optional[str] = None
-    GMAIL_SMTP_PASSWORD: Optional[str] = None
+    # self-service registration acknowledgments over HTTPS (port 443) via the
+    # Gmail REST API with an OAuth2 refresh-token flow. Leave
+    # GMAIL_CLIENT_ID / GMAIL_REFRESH_TOKEN empty to skip delivery (the
+    # acknowledgment is logged only and the provisioned tenant record is never
+    # rolled back).
+    GMAIL_CLIENT_ID: Optional[str] = None
+    GMAIL_CLIENT_SECRET: Optional[str] = None
+    GMAIL_REFRESH_TOKEN: Optional[str] = None
+    GMAIL_SENDER_EMAIL: Optional[str] = None
     GMAIL_NOTIFICATION_BCC: Optional[str] = None
 
     # ── Contact form / Sender.net ──
