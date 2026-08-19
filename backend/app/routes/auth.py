@@ -34,7 +34,7 @@ from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
     DISPOSABLE_EMAIL_MESSAGE,
     DisposableEmailError,
-    is_disposable_email,
+    validate_corporate_email,
     register_tenant,
     join_team,
     resolve_tenant,
@@ -157,7 +157,9 @@ async def register_user(
                 status_code=403,
                 detail=f"Registration role must be one of: {', '.join(allowed_roles)}"
             )
-        if is_disposable_email(body.email):
+        try:
+            validate_corporate_email(body.email)
+        except DisposableEmailError:
             raise HTTPException(status_code=400, detail=DISPOSABLE_EMAIL_MESSAGE)
 
         auth = get_auth()

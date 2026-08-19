@@ -24,8 +24,12 @@ from app.main import app
 from app.core.config import settings
 from app.services.tenant_registration import (
     DISPOSABLE_EMAIL_MESSAGE,
+    DisposableEmailError,
     email_domain,
+    is_admin_allowlisted,
+    is_consumer_webmail,
     is_disposable_email,
+    validate_corporate_email,
 )
 
 
@@ -341,6 +345,60 @@ def test_is_disposable_email_allows_corporate_domains():
 
 
 # ============================================================================
+# Consumer webmail blocklist + admin allowlist bypass (2026-08)
+# ============================================================================
+
+def test_is_consumer_webmail_blocks_webmail_providers():
+    for addr in (
+        "user@gmail.com",
+        "test@outlook.com",
+        "boss@yahoo.com",
+        "x@hotmail.com",
+        "a@icloud.com",
+        "b@aol.com",
+        "c@protonmail.com",
+        "d@zoho.com",
+        "alias@sub.gmail.com",
+    ):
+        assert is_consumer_webmail(addr), addr
+
+
+def test_is_consumer_webmail_allows_corporate_domains():
+    for addr in (
+        "safety@summitair.com",
+        "smd@caanepal.gov.np",
+        "ops@yetiairlines.com",
+    ):
+        assert not is_consumer_webmail(addr), addr
+
+
+def test_admin_allowlist_bypasses_consumer_webmail():
+    assert is_admin_allowlisted("ghanshyamacharya@outlook.com")
+    assert is_admin_allowlisted(" GhanshyamAcharya@Outlook.com ")
+    assert not is_admin_allowlisted("someone@outlook.com")
+    assert not is_admin_allowlisted("test@gmail.com")
+    # Must not raise: the allowlisted admin address bypasses the restriction.
+    validate_corporate_email("ghanshyamacharya@outlook.com")
+
+
+def test_validate_corporate_email_rejects_consumer_webmail():
+    for addr in ("test@outlook.com", "user@gmail.com", "x@yahoo.com"):
+        try:
+            validate_corporate_email(addr)
+        except DisposableEmailError:
+            continue
+        raise AssertionError(f"{addr} should have been rejected")
+
+
+def test_validate_corporate_email_rejects_disposable():
+    try:
+        validate_corporate_email("boss@mailinator.com")
+    except DisposableEmailError:
+        return
+    raise AssertionError("disposable address should have been rejected")
+
+
+# ============================================================================
 # POST /api/v1/auth/register-tenant - disposable email (400)
 # ============================================================================
 
@@ -428,6 +486,54 @@ def test_legacy_register_disposable_email_rejected(monkeypatch):
             "password": "Legacy-Pass-2026",
             "full_name": "Spam Bot",
             "organization": "Spam Co",
+            "role": settings.ROLE_DEFAULT_REGISTRATION,
+        },
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["detail"] == DISPOSABLE_EMAIL_MESSAGE
+    assert not db.users
+
+
+def test_register_tenant_consumer_webmail_rejected(monkeypatch):
+    db = _FakeDB()
+    auth = _FakeAuth()
+    _patch(monkeypatch, db, auth)
+
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant",
+        json=_register_body(email="test@outlook.com"),
+    )
+    assert resp.status_code == 400, resp.text
+    assert resp.json()["detail"] == DISPOSABLE_EMAIL_MESSAGE
+    assert not db.tenants
+
+
+def test_register_tenant_admin_allowlist_bypasses_webmail(monkeypatch):
+    db = _FakeDB()
+    auth = _FakeAuth()
+    _patch(monkeypatch, db, auth)
+
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant",
+        json=_register_body(email="ghanshyamacharya@outlook.com"),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("success") is True
+    assert db.tenants
+
+
+def test_legacy_register_consumer_webmail_rejected(monkeypatch):
+    db = _FakeDB()
+    auth = _FakeAuth()
+    _patch(monkeypatch, db, auth)
+
+    resp = TestClient(app).post(
+        "/api/v1/auth/register",
+        json={
+            "email": "someone@gmail.com",
+            "password": "Legacy-Pass-2026",
+            "full_name": "Someone",
+            "organization": "Some Co",
             "role": settings.ROLE_DEFAULT_REGISTRATION,
         },
     )

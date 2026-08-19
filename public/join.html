@@ -412,7 +412,8 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
         showError('Please enter a valid corporate email address.');
         return;
     }
-    if (typeof InputGuard !== 'undefined' && InputGuard.isDisposableEmail(email)) {
+    if (typeof InputGuard !== 'undefined' && InputGuard.validateCorporateEmail &&
+        !InputGuard.validateCorporateEmail(email).valid) {
         showError('Please provide a valid corporate or organizational email address.');
         return;
     }

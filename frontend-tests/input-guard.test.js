@@ -97,8 +97,53 @@ function test_auth_pages_wired() {
 
     ['register.html', 'join.html'].forEach((file) => {
         const html = fs.readFileSync(path.join(__dirname, '..', 'public', file), 'utf8');
-        assert.ok(html.includes('isDisposableEmail(email)'), `${file} blocks disposable email`);
+        assert.ok(html.includes('validateCorporateEmail(email)'), `${file} uses the corporate-email validator`);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Consumer webmail blocklist + admin allowlist bypass
+// ---------------------------------------------------------------------------
+
+function test_consumer_webmail_flagged() {
+    const blocked = [
+        'test@outlook.com',
+        'user@gmail.com',
+        'boss@yahoo.com',
+        'x@hotmail.com',
+        'a@icloud.com',
+        'b@aol.com',
+        'c@protonmail.com',
+        'd@zoho.com',
+        'alias@sub.gmail.com',
+    ];
+    blocked.forEach((email) => {
+        assert.strictEqual(InputGuard.isConsumerWebmail(email), true, `flagged ${email}`);
+        assert.strictEqual(InputGuard.validateCorporateEmail(email).valid, false, `rejected ${email}`);
+    });
+}
+
+function test_consumer_webmail_allows_corporate() {
+    const allowed = [
+        'safety@summitair.com',
+        'smd@caanepal.gov.np',
+        'ops@yetiairlines.com',
+    ];
+    allowed.forEach((email) => {
+        assert.strictEqual(InputGuard.isConsumerWebmail(email), false, `allowed ${email}`);
+        assert.strictEqual(InputGuard.validateCorporateEmail(email).valid, true, `accepted ${email}`);
+    });
+}
+
+function test_admin_allowlist_bypasses_webmail() {
+    assert.strictEqual(InputGuard.isAdminAllowlisted('ghanshyamacharya@outlook.com'), true);
+    assert.strictEqual(InputGuard.isAdminAllowlisted('  GhanshyamAcharya@Outlook.com '), true);
+    assert.strictEqual(InputGuard.isAdminAllowlisted('someone@outlook.com'), false);
+    assert.strictEqual(InputGuard.validateCorporateEmail('ghanshyamacharya@outlook.com').valid, true);
+}
+
+function test_validate_corporate_email_rejects_disposable() {
+    assert.strictEqual(InputGuard.validateCorporateEmail('boss@mailinator.com').valid, false);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +157,11 @@ function main() {
     test_honeypot_trap_empty_or_missing();
     test_honeypot_custom_field_name();
     test_auth_pages_wired();
-    console.log('input-guard: 8 tests passed');
+    test_consumer_webmail_flagged();
+    test_consumer_webmail_allows_corporate();
+    test_admin_allowlist_bypasses_webmail();
+    test_validate_corporate_email_rejects_disposable();
+    console.log('input-guard: 12 tests passed');
 }
 
 main();

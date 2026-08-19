@@ -112,6 +112,29 @@ DISPOSABLE_EMAIL_DOMAINS = frozenset({
     "mailtemp.net",
 })
 
+# Admin / developer email allowlist. These addresses bypass the corporate-email
+# restriction (disposable AND consumer webmail domains) completely so the owner
+# and any listed personal test addresses can self-register a tenant even when
+# their mailbox uses a consumer provider.
+ADMIN_EMAIL_ALLOWLIST = frozenset({
+    "ghanshyamacharya@outlook.com",
+    # Add any additional personal test addresses if needed
+})
+
+# Consumer webmail providers. Self-service registration targets corporate /
+# organizational mailboxes, so these domains (and their subdomains) are treated
+# as non-corporate and rejected unless the address is on ADMIN_EMAIL_ALLOWLIST.
+CONSUMER_WEBMAIL_DOMAINS = frozenset({
+    "gmail.com", "googlemail.com",
+    "yahoo.com", "yahoo.co.uk", "ymail.com",
+    "outlook.com", "hotmail.com", "live.com", "msn.com",
+    "icloud.com", "me.com", "mac.com",
+    "aol.com",
+    "protonmail.com", "proton.me",
+    "zoho.com",
+    "mail.com", "gmx.com", "gmx.net",
+})
+
 # User-facing rejection message (mirrored in the frontend validation).
 DISPOSABLE_EMAIL_MESSAGE = "Please provide a valid corporate or organizational email address."
 
@@ -144,9 +167,32 @@ def is_disposable_email(email: str) -> bool:
     return False
 
 
+def is_admin_allowlisted(email: str) -> bool:
+    """True when the email is on the admin/dev allowlist (bypasses the
+    corporate-email restriction entirely)."""
+    return str(email or "").strip().lower() in ADMIN_EMAIL_ALLOWLIST
+
+
+def is_consumer_webmail(email: str) -> bool:
+    """True when the email uses a consumer webmail provider (or a subdomain of
+    one) rather than a corporate / organizational mailbox."""
+    domain = email_domain(email)
+    if not domain:
+        return False
+    if domain in CONSUMER_WEBMAIL_DOMAINS:
+        return True
+    for blocked in CONSUMER_WEBMAIL_DOMAINS:
+        if domain.endswith("." + blocked):
+            return True
+    return False
+
+
 def validate_corporate_email(email: str) -> None:
-    """Reject disposable / temporary email domains on self-service registration."""
-    if is_disposable_email(email):
+    """Reject disposable / consumer-webmail domains on self-service
+    registration, unless the address is on the admin/dev allowlist."""
+    if is_admin_allowlisted(email):
+        return
+    if is_disposable_email(email) or is_consumer_webmail(email):
         raise DisposableEmailError(DISPOSABLE_EMAIL_MESSAGE)
 
 
