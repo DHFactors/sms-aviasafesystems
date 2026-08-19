@@ -163,16 +163,16 @@
     // feedback.js and stays untouched.
     function buildFooter() {
         const footer = document.createElement('footer');
-        footer.className = 'dashboard-footer text-center py-3';
+        footer.className = 'dashboard-footer text-center';
         footer.id = 'shellFooter';
 
         const links = document.createElement('div');
         links.style.fontSize = '0.875rem';
-        links.style.marginBottom = '0.5rem';
+        links.style.marginBottom = '0.25rem';
         links.innerHTML =
-            '<a href="/privacy.html" style="color: rgba(255,255,255,0.75); text-decoration: none;">Privacy Policy</a>' +
-            '<span style="margin: 0 0.5rem; color: rgba(255,255,255,0.4);">|</span>' +
-            '<a href="/terms.html" style="color: rgba(255,255,255,0.75); text-decoration: none;">Terms of Service</a>';
+            '<a href="/privacy.html" style="color: var(--color-text-muted); text-decoration: none;">Privacy Policy</a>' +
+            '<span style="margin: 0 0.5rem; color: var(--color-gray-400);">|</span>' +
+            '<a href="/terms.html" style="color: var(--color-text-muted); text-decoration: none;">Terms of Service</a>';
         footer.appendChild(links);
 
         const p = document.createElement('p');

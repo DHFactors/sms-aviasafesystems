@@ -309,17 +309,17 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ========== FOOTER ========== */
 .app-footer {
-    background: var(--color-primary-dark);
-    border-top: none;
+    background: var(--color-gray-100);
+    border-top: 1px solid var(--color-border);
 }
 .app-footer .footer-links a {
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--color-text-muted);
 }
 .app-footer .footer-links a:hover {
-    color: var(--color-white);
+    color: var(--color-text-strong);
 }
 .app-footer .footer-divider {
-    color: rgba(255, 255, 255, 0.35);
+    color: var(--color-gray-400);
 }
 
 /* ========== LOGIN ========== */

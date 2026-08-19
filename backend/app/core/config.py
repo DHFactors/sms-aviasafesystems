@@ -162,6 +162,17 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASS: Optional[str] = None
 
+    # ── Gmail SMTP dispatcher (registration intake acknowledgments) ──
+    # Dedicated Gmail channel used by app/services/gmail_dispatcher.py to send
+    # self-service registration acknowledgments. Leave GMAIL_SMTP_USER /
+    # GMAIL_SMTP_PASSWORD empty to skip delivery (the acknowledgment is logged
+    # only and the provisioned tenant record is never rolled back).
+    GMAIL_SMTP_HOST: Optional[str] = None
+    GMAIL_SMTP_PORT: int = 587
+    GMAIL_SMTP_USER: Optional[str] = None
+    GMAIL_SMTP_PASSWORD: Optional[str] = None
+    GMAIL_NOTIFICATION_BCC: Optional[str] = None
+
     # ── Contact form / Sender.net ──
     # Sender.net REST API v2. The key must be set via the environment (Render
     # dashboard); never commit the key to the repository.

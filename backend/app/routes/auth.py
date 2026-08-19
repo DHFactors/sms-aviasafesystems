@@ -10,7 +10,7 @@
 # ============================================================================
 
 import asyncio
-from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from fastapi import APIRouter, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
@@ -29,7 +29,7 @@ from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
-from app.services import login_service
+from app.services import login_service, gmail_dispatcher
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
     DISPOSABLE_EMAIL_MESSAGE,
@@ -231,6 +231,7 @@ class RegisterTenantRequest(BaseModel):
 async def register_tenant_endpoint(
     request: Request,
     body: RegisterTenantRequest,
+    background_tasks: BackgroundTasks,
     _app_check: None = Depends(verify_app_check),
 ):
     """Self-service tenant registration (beta portal).
@@ -238,6 +239,10 @@ async def register_tenant_endpoint(
     Provisions the primary administrator (AIRLINE_ADMIN / safety), initialises
     the operational profile at ``tenants/{tenant_id}/profile/operational`` and
     issues a unique team invite code for colleague onboarding.
+
+    After honeypot validation (frontend), the disposable-email check and
+    database provisioning have all passed, a Gmail acknowledgment is scheduled
+    in the background — SMTP problems never block or roll back a valid record.
     """
     if body.password != body.confirm_password:
         raise HTTPException(status_code=422, detail="Passwords do not match")
@@ -260,6 +265,16 @@ async def register_tenant_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # Provisioning succeeded: schedule the registration acknowledgment. It runs
+    # after the response is sent and never raises, so a mail outage cannot
+    # surface an error to the applicant or roll back the tenant.
+    background_tasks.add_task(
+        gmail_dispatcher.send_registration_acknowledgment_async,
+        body.email,
+        body.admin_full_name,
+        body.organization_name,
+    )
 
     return {"success": True, **result}
 

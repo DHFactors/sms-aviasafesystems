@@ -243,19 +243,19 @@
 }
 
 .dashboard-footer {
-    background: var(--shell-navy);
-    color: #fff;
+    background: var(--color-gray-100);
+    color: var(--color-text);
     text-align: center;
-    border-top: 3px solid var(--shell-gold);
+    border-top: 1px solid var(--color-border);
 }
 
 .dashboard-footer p {
     margin: 0;
-    color: rgba(255,255,255,0.7);
+    color: var(--color-text-muted);
 }
 
 .dashboard-footer p strong {
-    color: #fff;
+    color: var(--color-text-strong);
 }
 
 /* ========== SCROLL-SPY ACTIVE MARKER ========== */
