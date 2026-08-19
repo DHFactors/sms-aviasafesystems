@@ -2,7 +2,7 @@
   "projects": {
     "default": "aerosafety-sms-prod",
     "smssurvey": "aerosafety-sms-prod",
-    "beta": "gap-analysis-ssp"
+    "beta": "aerosafety-sms-prod"
   },
   "targets": {},
   "etags": {}

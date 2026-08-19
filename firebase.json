@@ -87,7 +87,7 @@
     },
     {
       "public": "public",
-      "site": "sms-beta",
+      "site": "aerosafety-sms-beta",
       "ignore": [
         "firebase.json",
         "**/.*",
