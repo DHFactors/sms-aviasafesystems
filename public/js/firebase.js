@@ -50,7 +50,8 @@ const PROD_CONFIG = {
     storageBucket: "aerosafety-sms-prod.firebasestorage.app",
     messagingSenderId: "527947363983",
     appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
-    databaseId: "sms-db"
+    databaseId: "sms-db",
+    appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
 };
 
 const BETA_CONFIG = {
@@ -60,16 +61,16 @@ const BETA_CONFIG = {
     storageBucket: "gap-analysis-ssp.firebasestorage.app",
     messagingSenderId: "817614332543",
     appId: "1:817614332543:web:01224a312e8478b24d554a",
-    databaseId: "sms-db-beta"
+    databaseId: "sms-db-beta",
+    appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
 };
 
 const firebaseConfig = IS_BETA_ENV ? BETA_CONFIG : PROD_CONFIG;
 
-// Per-environment reCAPTCHA v3 site key for App Check. The production key is
-// registered on aerosafety-sms-prod; the beta key MUST be created in the
-// gap-analysis-ssp console (Security > App Check) and pasted here — until then
-// App Check is skipped on beta with a console warning (graceful degradation).
-const RECAPTCHA_SITE_KEY = IS_BETA_ENV ? '' : '6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv';
+// Per-environment reCAPTCHA v3 site key for App Check, sourced from the active
+// Firebase config. Both environments currently share the same key; if a
+// dedicated gap-analysis-ssp key is created later, update BETA_CONFIG only.
+const RECAPTCHA_SITE_KEY = firebaseConfig.appCheckSiteKey || '';
 
 // Centralized application configuration (single source of truth)
 const APP_CONFIG = {
@@ -322,7 +323,9 @@ function getAppCheckToken() {
     if (typeof firebase === 'undefined' || !firebase.appCheck || !firebase.appCheck().getToken) {
         return Promise.resolve(null);
     }
-    return firebase.appCheck().getToken(true).then(function (tokenResult) {
+    return Promise.resolve().then(function () {
+        return firebase.appCheck().getToken(true);
+    }).then(function (tokenResult) {
         return tokenResult && tokenResult.token ? tokenResult.token : null;
     }).catch(function () {
         return null;
