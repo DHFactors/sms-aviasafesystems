@@ -116,9 +116,7 @@
         if (window.API_BASE_URL) return window.API_BASE_URL;
         var host = window.location.hostname || '';
         var isBeta = host.indexOf('beta') !== -1 ||
-            host === 'localhost' || host === '127.0.0.1' ||
-            host === 'sms.aviasafesystems.com' ||
-            host === 'www.sms.aviasafesystems.com';
+            host === 'localhost' || host === '127.0.0.1';
         return isBeta
             ? 'https://sms-aviasafesystems-beta.onrender.com'
             : 'https://aviasafe-unified-platform.onrender.com';

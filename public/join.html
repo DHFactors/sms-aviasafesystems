@@ -215,12 +215,24 @@ function getApiBaseUrl() {
     if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
     var host = window.location.hostname;
     var isBeta = host.indexOf('beta') !== -1 ||
-        host === 'sms.aviasafesystems.com' ||
-        host === 'www.sms.aviasafesystems.com' ||
         host === 'localhost' || host === '127.0.0.1';
     return isBeta
         ? 'https://sms-aviasafesystems-beta.onrender.com'
         : 'https://aviasafe-unified-platform.onrender.com';
+}
+
+// Attach a fresh App Check token to the backend request when available (the
+// shared firebase.js activates App Check on this page). Best-effort: if App
+// Check is not provisioned the request simply carries no token.
+async function appCheckHeaders() {
+    var headers = {};
+    try {
+        if (typeof window.getAppCheckToken === 'function') {
+            var token = await window.getAppCheckToken();
+            if (token) headers['X-Firebase-AppCheck'] = token;
+        }
+    } catch (e) { /* best-effort */ }
+    return headers;
 }
 
 function getQueryParam(name) {
@@ -253,7 +265,9 @@ function renderVerifyStatus(state, message) {
 async function verifyInvite(code) {
     renderVerifyStatus('checking', 'Verifying invite code…');
     try {
-        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/verify-invite?code=' + encodeURIComponent(code));
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/verify-invite?code=' + encodeURIComponent(code), {
+            headers: await appCheckHeaders()
+        });
         var data = await resp.json().catch(function () { return {}; });
         if (resp.ok && data.valid) {
             INVITE_VERIFIED = true;
@@ -285,7 +299,9 @@ function disableDepartments(message) {
 async function loadDepartments(code) {
     var deptSelect = document.getElementById('department');
     try {
-        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/tenant-lookup?code=' + encodeURIComponent(code.toUpperCase()));
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/tenant-lookup?code=' + encodeURIComponent(code.toUpperCase()), {
+            headers: await appCheckHeaders()
+        });
         var data = await resp.json().catch(function () { return {}; });
         if (!resp.ok || !data.success) {
             disableDepartments('— Invite code not found —');
@@ -421,9 +437,11 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Joining…';
 
     try {
+        var headers = { 'Content-Type': 'application/json' };
+        Object.assign(headers, await appCheckHeaders());
         var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/join-team', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify(payload)
         });
         var data = await resp.json().catch(function () { return {}; });

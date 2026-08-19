@@ -642,7 +642,10 @@
             const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
 
             if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
-                const user = localStorage.getItem('user');
+                // Storage keys are env-prefixed (aviasafe:{env}:user) so beta
+                // state can never leak onto production tenant subdomains.
+                const isBetaHost = /beta/.test(hostname) || hostname === 'localhost' || hostname === '127.0.0.1';
+                const user = localStorage.getItem('aviasafe:' + (isBetaHost ? 'beta' : 'prod') + ':user');
                 if (user) {
                     window.location.href = '/safety.html';
                 } else {

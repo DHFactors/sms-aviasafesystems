@@ -11,6 +11,15 @@ How the AviaSAFE platform is deployed and how to deploy it to each environment.
 | Database | Cloud Firestore (`sms-db`) | Firebase project `aerosafety-sms-prod`, region `us-west1` |
 | Auth / App Check | Firebase Auth + App Check (reCAPTCHA v3) | Same project |
 
+**Beta (fully isolated):**
+
+| Surface | Provider | Location |
+|---|---|---|
+| Frontend (static site) | Firebase Hosting | `https://sms-beta.web.app` → `https://betasms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) |
+| Backend API | Render (Docker) | `https://sms-aviasafesystems-beta.onrender.com` |
+| Database | Cloud Firestore (`sms-db-beta`) | Firebase project `gap-analysis-ssp`, region `us-west1`, PITR 7d |
+| Auth / App Check | Firebase Auth | `gap-analysis-ssp` (separate auth pool; reCAPTCHA key pending) |
+
 **Live production URL: `https://sms.aviasafesystems.com`** (custom domain attached to the Firebase
 Hosting site; `https://aerosafety-sms-prod.web.app` remains the default fallback).
 
@@ -29,6 +38,8 @@ Required in **every** environment:
 | `FIREBASE_PROJECT_ID` | Backend — Admin SDK |
 | `FIREBASE_PRIVATE_KEY` | Backend — Admin SDK (quoted, with `\n` escapes) |
 | `FIREBASE_CLIENT_EMAIL` | Backend — Admin SDK |
+| `FIREBASE_DATABASE_ID` | Backend — named Firestore DB (`sms-db` prod, `sms-db-beta` beta) |
+| `ENVIRONMENT` | Backend — `production` (default) vs `beta`; drives registration gating + sandbox tagging |
 | `GEMINI_API_KEY` (or `AI_API_KEY`) | Backend — AI suggestions (mock fallback if empty) |
 | `SETUP_SECRET` | Backend — admin provisioning endpoints (RC-1) |
 | `DEFAULT_PROVISION_PASSWORD` | Backend — `/provision-airlines` |
@@ -96,8 +107,16 @@ firebase deploy --project gap-analysis-ssp --only hosting:sms-beta
 > `could not find site "sms-beta"`. Always target the site + project explicitly, and deploy **both** so
 > beta and prod stay consistent.
 
-- Hosting DB/API selection is automatic from the hostname in `public/js/firebase.js`: hostnames
-  containing `beta` use `sms-db-beta` + the beta Render API; everything else uses `sms-db` + prod API.
+- Hosting DB/API selection is automatic from the hostname in `public/js/firebase.js` (dual
+  `PROD_CONFIG` / `BETA_CONFIG`): `betasms.aviasafesystems.com`, `sms-beta.web.app`, any host
+  containing `beta`, and localhost use the isolated `gap-analysis-ssp` project (`sms-db-beta` +
+  beta Render API); everything else — including `sms.aviasafesystems.com` and tenant subdomains —
+  uses `sms-db` + prod API. Storage keys are env-prefixed (`aviasafe:{beta|prod}:*`).
+- Registration is gated per environment (`ENVIRONMENT`): production requires the enterprise access
+  code; beta tags self-service tenants `is_beta_sandbox` + `auto_expire_days`.
+- App Check reCAPTCHA site key is per project in `firebase.js` (`APP_CONFIG.recaptchaSiteKey`): the
+  production key is registered; the beta key must be created in the `gap-analysis-ssp` console and
+  pasted in (until then App Check is skipped on beta with a console warning).
 - No build step: `public/` is served as-is.
 - `firebase.json` routes all requests to `index.html` (SPA rewrite) and caches static assets
   aggressively.
@@ -110,10 +129,12 @@ Hosting console "Release history" and promote a previous version.
 - Collections are created on first write; no migrations required for the current schema.
 - Security rules live in `firestore/firestore.rules` (deployed). Indexes:
   `firestore.indexes.json` (also mirrored under `backend/firestore.indexes.json`).
-- Deploy rules/indexes:
+- Deploy rules/indexes (per project — the named database must match):
   ```bash
-  firebase deploy --only firestore:rules
-  firebase deploy --only firestore:indexes
+  # Production (sms-db)
+  firebase deploy --only firestore:sms-db --project aerosafety-sms-prod
+  # Beta (sms-db-beta, project gap-analysis-ssp)
+  firebase deploy --only firestore:sms-db-beta --project gap-analysis-ssp
   ```
 - Backups are **not automated** (see [OPERATIONS.md](./OPERATIONS.md) and
   [KNOWN_LIMITATIONS.md](./KNOWN_LIMITATIONS.md)).
@@ -132,6 +153,7 @@ Hosting console "Release history" and promote a previous version.
 |---|---|---|---|
 | Local dev | `uvicorn` on `:8000` | `firebase serve` `:5000` | emulator or live project |
 | Staging | Render branch preview / Firebase channel | Firebase preview channel | shared `aerosafety-sms-prod` |
+| Beta | Render `sms-aviasafesystems-beta` | `betasms.aviasafesystems.com` / `sms-beta.web.app` | `gap-analysis-ssp` / `sms-db-beta` (isolated) |
 | Production | Render `main` | `sms.aviasafesystems.com` (custom domain) | shared `aerosafety-sms-prod` |
 
 **Known limitation:** no dedicated staging Firestore project exists; staging and production share
@@ -141,7 +163,19 @@ Hosting console "Release history" and promote a previous version.
 
 | Date | Commit | Scope | Environments |
 |---|---|---|---|
+| 2026-08-19 | — | Guardrails + isolation: prod registration gate, beta sandbox tagging, tighter rate limits, App Check verification, copilot safety boundary | Beta + Production |
 | 2026-08-07 | `4f71944` | Phases 1–3: per-tenant survey rate-limit control, view-only authorized users list, survey instructions management | Beta + Production |
+
+**Release notes (guardrails, 2026-08-19):**
+
+- Backend: `ENVIRONMENT` setting (prod default) gates self-service registration behind the enterprise
+  access code; beta tags new tenants `is_beta_sandbox` + `auto_expire_days: 30`. Rate-limit buckets
+  tightened (`register_tenant` 10/hr, `join_team` 30/hr, `register` 10/hr). New App Check header
+  verification (`app/middleware/app_check.py`) on register/join/verify/lookup/guest-chat. Copilot
+  (`groq_copilot.py`) rejects prompt injection + out-of-scope queries before any model call.
+- Frontend: dual Firebase configs (isolated beta `gap-analysis-ssp`), fixed env detection, env-prefixed
+  storage keys, per-env reCAPTCHA, App Check tokens on register/join, production tenant-membership
+  verification on login.
 
 **Release notes (Phases 1–3, `4f71944`):**
 

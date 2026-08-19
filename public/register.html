@@ -185,6 +185,11 @@
     </div>
 </div>
 
+<!-- ===== SHARED FIREBASE CONFIG (App Check + APP_CONFIG for this page) ===== -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
+<script src="/js/firebase.js"></script>
+
 <script>
 // ============================================================================
 // SELF-SERVICE TENANT REGISTRATION — POSTs to /api/v1/auth/register-tenant.
@@ -195,12 +200,46 @@ function getApiBaseUrl() {
     if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
     var host = window.location.hostname;
     var isBeta = host.indexOf('beta') !== -1 ||
-        host === 'sms.aviasafesystems.com' ||
-        host === 'www.sms.aviasafesystems.com' ||
         host === 'localhost' || host === '127.0.0.1';
     return isBeta
         ? 'https://sms-aviasafesystems-beta.onrender.com'
         : 'https://aviasafe-unified-platform.onrender.com';
+}
+
+// Production host (APP_CONFIG preferred; hostname fallback for pages where the
+// shared firebase.js has not run). Production registration is by invitation
+// only — the enterprise access code is mandatory there.
+function isProductionEnvironment() {
+    if (window.APP_CONFIG && window.APP_CONFIG.environment) {
+        return window.APP_CONFIG.environment === 'production';
+    }
+    var host = window.location.hostname || '';
+    return host.indexOf('beta') === -1 && host !== 'localhost' && host !== '127.0.0.1';
+}
+
+var IS_PRODUCTION = isProductionEnvironment();
+
+if (IS_PRODUCTION) {
+    var accessKeyField = document.getElementById('betaAccessKey');
+    if (accessKeyField) {
+        var fieldGroup = accessKeyField.closest('.form-group');
+        if (fieldGroup) {
+            var keyLabel = fieldGroup.querySelector('label');
+            if (keyLabel) {
+                keyLabel.innerHTML = 'Enterprise Access Code <span style="font-weight:400;color:var(--color-danger);">(required — issued by AviaSAFE)</span>';
+            }
+        }
+        accessKeyField.placeholder = 'Provided by AviaSAFE — registration is by invitation';
+        accessKeyField.required = true;
+    }
+    var prodNotice = document.createElement('div');
+    prodNotice.innerHTML = '<i class="fas fa-lock"></i> Registration on the production portal is by invitation only. ' +
+        'To request access, please use the enterprise intake process: <a href="mailto:info@aviasafesystems.com">info@aviasafesystems.com</a>.';
+    prodNotice.style.cssText = 'margin-bottom: var(--spacing-md); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--border-radius-sm); font-size: var(--font-size-sm);';
+    var regFormEl = document.getElementById('registerForm');
+    if (regFormEl && regFormEl.parentNode) {
+        regFormEl.parentNode.insertBefore(prodNotice, regFormEl);
+    }
 }
 
 function showError(message) {
@@ -249,6 +288,10 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         showError('Passwords do not match.');
         return;
     }
+    if (IS_PRODUCTION && !betaAccessKey) {
+        showError('An enterprise access code is required on the production portal. Contact info@aviasafesystems.com to request one.');
+        return;
+    }
 
     var btn = document.getElementById('registerBtn');
     var original = btn.innerHTML;
@@ -256,9 +299,16 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Registering…';
 
     try {
+        var headers = { 'Content-Type': 'application/json' };
+        try {
+            if (typeof window.getAppCheckToken === 'function') {
+                var appCheckToken = await window.getAppCheckToken();
+                if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+            }
+        } catch (e) { /* App Check is best-effort on this page */ }
         var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/register-tenant', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify({
                 organization_name: organizationName,
                 classification: classification,

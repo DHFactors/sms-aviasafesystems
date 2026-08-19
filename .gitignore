@@ -10,6 +10,7 @@ recaptch.txt
 # Firebase service account key
 service-account.json
 *.service-account.json
+*-sa.json
 
 # Beta-testing credential exports (real passwords)
 beta-testing-credentials.csv

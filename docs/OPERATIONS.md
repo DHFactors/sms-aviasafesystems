@@ -145,9 +145,9 @@ Consolidated from the former `docs/BETA_MONITORING_GUIDE.md` (2026-08-06). Appli
 closed beta is active; see [DEPLOYMENT.md](./DEPLOYMENT.md) for the beta stack.
 
 **Beta surfaces:**
-- Hosting: `https://sms-beta.web.app`
+- Hosting: `https://sms-beta.web.app` / `https://betasms.aviasafesystems.com`
 - Backend: `https://sms-aviasafesystems-beta.onrender.com` (Render service `sms-aviasafesystems-beta`)
-- Firestore: `sms-db-beta` (project `aerosafety-sms-prod`, us-west1)
+- Firestore: `sms-db-beta` (project `gap-analysis-ssp`, us-west1, PITR 7d — fully isolated)
 - Redis: Upstash `aviasafe-redis`
 
 ### 9.1 Daily — Render Beta Logs
@@ -185,9 +185,9 @@ No `gcloud firestore documents` command exists — use the Firestore REST API or
 ```bash
 TOKEN=$(gcloud auth print-access-token)
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://firestore.googleapis.com/v1/projects/aerosafety-sms-prod/databases/sms-db-beta/documents/<collection>?pageSize=1000"
+  "https://firestore.googleapis.com/v1/projects/gap-analysis-ssp/databases/sms-db-beta/documents/<collection>?pageSize=1000"
 ```
-- Console: `https://console.firebase.google.com/project/aerosafety-sms-prod/firestore/data/sms-db-beta`
+- Console: `https://console.firebase.google.com/project/gap-analysis-ssp/firestore/data/sms-db-beta`
 - Top-level collections: `tenants`, `reports`, `hazards`, `can_cap`, `reporting`, `flight_diversions`,
   `caan_reports`, `state`, `metadata`. Survey responses live under each tenant:
   `tenants/{tenant_id}/surveys` (collection group).

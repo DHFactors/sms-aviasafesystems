@@ -20,6 +20,7 @@ from loguru import logger
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
+from app.middleware.app_check import verify_app_check
 from app.services.groq_copilot import _offline_reply, chat
 
 router = APIRouter()
@@ -97,6 +98,7 @@ class GuestCopilotChatRequest(BaseModel):
 async def copilot_guest_chat(
     request: Request,
     payload: GuestCopilotChatRequest,
+    _app_check: None = Depends(verify_app_check),
 ) -> CopilotChatResponse:
     """Guest (unauthenticated) copilot chat for public onboarding pages.
 

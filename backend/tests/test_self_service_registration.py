@@ -370,12 +370,64 @@ def test_register_tenant_wrong_beta_access_key(monkeypatch):
 
 
 def test_register_tenant_blank_access_key_uses_default(monkeypatch):
+    # Beta sandbox: the access key is optional (blank falls back to default).
+    monkeypatch.setattr(settings, "ENVIRONMENT", "beta")
     _patch(monkeypatch, _FakeDB(), _FakeAuth())
     resp = TestClient(app).post(
         "/api/v1/auth/register-tenant",
         json=_register_body(beta_access_key=""),
     )
     assert resp.status_code == 200, resp.text
+
+
+def test_register_tenant_production_requires_access_key(monkeypatch):
+    # Production gate: self-service registration is by invitation only — a valid
+    # enterprise access code is mandatory, blank is rejected.
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    _patch(monkeypatch, _FakeDB(), _FakeAuth())
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant",
+        json=_register_body(beta_access_key=""),
+    )
+    assert resp.status_code == 403
+    assert "beta access key" in resp.json()["detail"].lower()
+
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant",
+        json=_register_body(beta_access_key="NOT-THE-KEY"),
+    )
+    assert resp.status_code == 403
+
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant",
+        json=_register_body(beta_access_key=settings.BETA_ACCESS_KEY),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+def test_register_tenant_beta_tags_sandbox(monkeypatch):
+    """Beta self-service tenants are tagged for sandbox cleanup."""
+    monkeypatch.setattr(settings, "ENVIRONMENT", "beta")
+    db = _FakeDB()
+    _patch(monkeypatch, db, _FakeAuth())
+    resp = TestClient(app).post("/api/v1/auth/register-tenant", json=_register_body())
+    assert resp.status_code == 200, resp.text
+    tenant = db.tenants["summit-air"]
+    assert tenant["is_beta_sandbox"] is True
+    assert tenant["auto_expire_days"] == 30
+
+
+def test_register_tenant_production_not_sandbox_tagged(monkeypatch):
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    db = _FakeDB()
+    _patch(monkeypatch, db, _FakeAuth())
+    resp = TestClient(app).post(
+        "/api/v1/auth/register-tenant", json=_register_body()
+    )
+    assert resp.status_code == 200, resp.text
+    tenant = db.tenants["summit-air"]
+    assert "is_beta_sandbox" not in tenant
+    assert "auto_expire_days" not in tenant
 
 
 def test_register_tenant_password_mismatch(monkeypatch):

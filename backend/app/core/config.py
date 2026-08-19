@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     API_PREFIX_SURVEYS_LEGACY: str = "/api/surveys"
     API_PREFIX_TENANTS_LEGACY: str = "/api/tenants"
     DEBUG: bool = False
+    # Deployment environment: "production" (default), "beta", "staging",
+    # "development". Drives self-service registration gating (production
+    # requires the enterprise access key / admin invite code) and beta sandbox
+    # tagging (is_beta_sandbox + auto_expire_days on self-service tenants).
+    ENVIRONMENT: str = "production"
 
     # ── CORS ──
     ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000"

@@ -13,18 +13,21 @@
 // FIREBASE CONFIGURATION
 // ============================================================================
 
-// Environment resolution.
-// Beta routes to the isolated beta backend (sms-aviasafesystems-beta.onrender.com)
-// and the sms-db-beta Firestore database; everything else uses production
-// (aviasafe-unified-platform.onrender.com + sms-db). This keeps both deployment
-// paths correct so beta traffic can never touch production data.
+// Strict beta/production configuration isolation (2026-08).
+// Beta routes to the gap-analysis-ssp project (isolated sms-db-beta Firestore
+// database + auth pool) and the beta Render backend; everything else uses the
+// production aerosafety-sms-prod project (sms-db) + production backend. This
+// keeps beta traffic physically unable to touch production data.
 //
 // Detection order (first match wins):
 //   1. ?env=beta  or  ?beta=1                 (manual/temporary override)
 //   2. localStorage "aviasafe_env" === "beta" (persisted override for testing)
 //   3. window.__APP_ENV__ === "beta"          (deploy-time injected flag)
-//   4. hostname contains "beta"               (e.g. sms-beta.web.app, *-beta.onrender.com)
-//   5. hostname === "sms.aviasafesystems.com" (the operator's beta site domain)
+//   4. hostname contains "beta"               (e.g. betasms.aviasafesystems.com,
+//                                              sms-beta.web.app, *-beta.onrender.com)
+//   5. localhost / 127.0.0.1                  (local development)
+// Anything else — sms.aviasafesystems.com, www.sms.aviasafesystems.com, tenant
+// subdomains (*.aviasafesystems.com) and *.web.app hosts — is PRODUCTION.
 function detectBetaEnvironment() {
     if (typeof window === 'undefined') return false;
     try {
@@ -33,22 +36,40 @@ function detectBetaEnvironment() {
         if (window.localStorage && window.localStorage.getItem('aviasafe_env') === 'beta') return true;
     } catch (e) { /* ignore */ }
     if (window.__APP_ENV__ === 'beta') return true;
-    const h = window.location.hostname;
+    const h = window.location.hostname || '';
     if (h.indexOf('beta') !== -1) return true;
-    if (h === 'sms.aviasafesystems.com' || h === 'www.sms.aviasafesystems.com') return true;
+    if (h === 'localhost' || h === '127.0.0.1') return true;
     return false;
 }
 const IS_BETA_ENV = detectBetaEnvironment();
 
-const firebaseConfig = {
+const PROD_CONFIG = {
     apiKey: "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc",
     authDomain: "aerosafety-sms-prod.firebaseapp.com",
     projectId: "aerosafety-sms-prod",
     storageBucket: "aerosafety-sms-prod.firebasestorage.app",
     messagingSenderId: "527947363983",
     appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
-    databaseId: IS_BETA_ENV ? "sms-db-beta" : "sms-db"
+    databaseId: "sms-db"
 };
+
+const BETA_CONFIG = {
+    apiKey: "AIzaSyAhvyNyLyqRWidGIkk-by3J9bJ5xtSFTdc",
+    authDomain: "gap-analysis-ssp.firebaseapp.com",
+    projectId: "gap-analysis-ssp",
+    storageBucket: "gap-analysis-ssp.firebasestorage.app",
+    messagingSenderId: "817614332543",
+    appId: "1:817614332543:web:01224a312e8478b24d554a",
+    databaseId: "sms-db-beta"
+};
+
+const firebaseConfig = IS_BETA_ENV ? BETA_CONFIG : PROD_CONFIG;
+
+// Per-environment reCAPTCHA v3 site key for App Check. The production key is
+// registered on aerosafety-sms-prod; the beta key MUST be created in the
+// gap-analysis-ssp console (Security > App Check) and pasted here — until then
+// App Check is skipped on beta with a console warning (graceful degradation).
+const RECAPTCHA_SITE_KEY = IS_BETA_ENV ? '' : '6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv';
 
 // Centralized application configuration (single source of truth)
 const APP_CONFIG = {
@@ -56,12 +77,36 @@ const APP_CONFIG = {
         ? 'https://sms-aviasafesystems-beta.onrender.com'
         : 'https://aviasafe-unified-platform.onrender.com',
     environment: IS_BETA_ENV ? 'beta' : 'production',
+    recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     pagination: { defaultPageSize: 20, maxPageSize: 100 },
 };
+
+// Environment-prefixed storage keys. Cross-environment data must never leak:
+// beta state (demo tenant, setup key, persisted user) stays in a `aviasafe:beta:*`
+// namespace, production in `aviasafe:prod:*`.
+function storageKey(name) {
+    return 'aviasafe:' + (IS_BETA_ENV ? 'beta' : 'prod') + ':' + String(name);
+}
+function storageGet(name, storage) {
+    try { return (storage || window.localStorage).getItem(storageKey(name)); }
+    catch (e) { return null; }
+}
+function storageSet(name, value, storage) {
+    try { (storage || window.localStorage).setItem(storageKey(name), String(value)); }
+    catch (e) { /* ignore */ }
+}
+function storageRemove(name, storage) {
+    try { (storage || window.localStorage).removeItem(storageKey(name)); }
+    catch (e) { /* ignore */ }
+}
 
 window.APP_CONFIG = APP_CONFIG;
 window.API_BASE_URL = APP_CONFIG.apiBaseUrl;
 window.__FIREBASE_CONFIG__ = firebaseConfig;
+window.storageKey = storageKey;
+window.storageGet = storageGet;
+window.storageSet = storageSet;
+window.storageRemove = storageRemove;
 
 // ============================================================================
 // DYNAMIC LOADING OF FIREBASE SDK
@@ -241,8 +286,6 @@ function initServices() {
 // APP CHECK
 // ============================================================================
 
-const RECAPTCHA_SITE_KEY = '6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv';
-
 function initAppCheck() {
     if (typeof firebase === 'undefined' || !firebase.appCheck) return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -260,8 +303,9 @@ function initAppCheck() {
         console.log('ℹ️ App Check skipped (admin pages)');
         return;
     }
-    if (RECAPTCHA_SITE_KEY.length < 20) {
-        console.warn('⚠️ App Check skipped — invalid reCAPTCHA key. Set RECAPTCHA_SITE_KEY in firebase.js');
+    if (!RECAPTCHA_SITE_KEY || RECAPTCHA_SITE_KEY.length < 20) {
+        console.warn('⚠️ App Check skipped — no reCAPTCHA site key configured for this environment (' +
+            APP_CONFIG.environment + '). Register one in the Firebase console (Security > App Check).');
         return;
     }
     try {
@@ -271,6 +315,20 @@ function initAppCheck() {
         console.warn('⚠️ App Check activation failed:', e);
     }
 }
+
+// Resolve a fresh App Check token (or null when App Check is unavailable) so
+// public pages can attach it as X-Firebase-AppCheck to backend requests.
+function getAppCheckToken() {
+    if (typeof firebase === 'undefined' || !firebase.appCheck || !firebase.appCheck().getToken) {
+        return Promise.resolve(null);
+    }
+    return firebase.appCheck().getToken(true).then(function (tokenResult) {
+        return tokenResult && tokenResult.token ? tokenResult.token : null;
+    }).catch(function () {
+        return null;
+    });
+}
+window.getAppCheckToken = getAppCheckToken;
 
 // ============================================================================
 // LOAD AND INITIALIZE

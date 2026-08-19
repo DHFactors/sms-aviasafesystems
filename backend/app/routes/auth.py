@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.firebase import get_auth, get_db, verify_firebase_token, create_custom_claims
 from app.middleware.rate_limit import rate_limit
 from app.middleware.auth import resolve_user_context
+from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
@@ -80,10 +81,15 @@ async def verify_token(request: Request, body: LoginRequest):
     }
 
 @router.post("/register")
-async def register_user(request: RegisterRequest):
+@rate_limit("register")
+async def register_user(
+    request: Request,
+    body: RegisterRequest,
+    _app_check: None = Depends(verify_app_check),
+):
     try:
         allowed_roles = {settings.ROLE_DEFAULT_REGISTRATION}
-        if request.role not in allowed_roles:
+        if body.role not in allowed_roles:
             raise HTTPException(
                 status_code=403,
                 detail=f"Registration role must be one of: {', '.join(allowed_roles)}"
@@ -91,15 +97,15 @@ async def register_user(request: RegisterRequest):
 
         auth = get_auth()
         user = auth.create_user(
-            email=request.email,
-            password=request.password,
-            display_name=request.full_name,
+            email=body.email,
+            password=body.password,
+            display_name=body.full_name,
             email_verified=False,
         )
 
-        claims = {"role": request.role}
-        if request.tenant_id:
-            claims["tenant_id"] = request.tenant_id
+        claims = {"role": body.role}
+        if body.tenant_id:
+            claims["tenant_id"] = body.tenant_id
 
         auth.set_custom_user_claims(user.uid, claims)
 
@@ -107,9 +113,9 @@ async def register_user(request: RegisterRequest):
         upsert_user_doc(user.uid, {
             "uid": user.uid,
             "email": user.email,
-            "display_name": request.full_name,
-            "role": request.role,
-            "tenant_id": request.tenant_id,
+            "display_name": body.full_name,
+            "role": body.role,
+            "tenant_id": body.tenant_id,
             "created_at": now,
             "updated_at": now,
         })
@@ -117,8 +123,8 @@ async def register_user(request: RegisterRequest):
         ip, request_id = request_context(request)
         log_audit(
             action="REGISTER",
-            user=request.email,
-            tenant_id=request.tenant_id,
+            user=body.email,
+            tenant_id=body.tenant_id,
             ip=ip,
             request_id=request_id,
         )
@@ -127,8 +133,8 @@ async def register_user(request: RegisterRequest):
             "success": True,
             "uid": user.uid,
             "email": user.email,
-            "role": request.role,
-            "tenant_id": request.tenant_id,
+            "role": body.role,
+            "tenant_id": body.tenant_id,
         }
 
     except HTTPException:
@@ -156,8 +162,12 @@ class RegisterTenantRequest(BaseModel):
 
 
 @router.post("/register-tenant")
-@rate_limit("auth_attempts")
-async def register_tenant_endpoint(request: Request, body: RegisterTenantRequest):
+@rate_limit("register_tenant")
+async def register_tenant_endpoint(
+    request: Request,
+    body: RegisterTenantRequest,
+    _app_check: None = Depends(verify_app_check),
+):
     """Self-service tenant registration (beta portal).
 
     Provisions the primary administrator (AIRLINE_ADMIN / safety), initialises
@@ -192,6 +202,7 @@ async def register_tenant_endpoint(request: Request, body: RegisterTenantRequest
 async def verify_invite_endpoint(
     request: Request,
     code: Optional[str] = Query(None, description="Team invite code"),
+    _app_check: None = Depends(verify_app_check),
 ):
     """Real-time invite-code verification for /join.html.
 
@@ -227,8 +238,12 @@ class JoinTeamRequest(BaseModel):
 
 
 @router.post("/join-team")
-@rate_limit("auth_attempts")
-async def join_team_endpoint(request: Request, body: JoinTeamRequest):
+@rate_limit("join_team")
+async def join_team_endpoint(
+    request: Request,
+    body: JoinTeamRequest,
+    _app_check: None = Depends(verify_app_check),
+):
     """Self-register a department postholder under an existing tenant."""
     if body.password != body.confirm_password:
         raise HTTPException(status_code=422, detail="Passwords do not match")
@@ -259,10 +274,12 @@ async def join_team_endpoint(request: Request, body: JoinTeamRequest):
 
 
 @router.get("/tenant-lookup")
+@rate_limit("auth_attempts")
 async def tenant_lookup_endpoint(
     request: Request,
     code: Optional[str] = Query(None, description="Team invite code"),
     tenant_id: Optional[str] = Query(None, description="Tenant id / slug"),
+    _app_check: None = Depends(verify_app_check),
 ):
     """Public tenant lookup for /join.html.
 

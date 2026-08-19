@@ -45,16 +45,22 @@
     }
 
     // ========================================================================
-    // SETUP KEY — stored in sessionStorage for this tab only
+    // SETUP KEY — stored in sessionStorage for this tab only. The key is
+    // env-prefixed (aviasafe:{env}:setup_key) so beta sessions can never reuse
+    // a production setup secret (or vice versa).
     // ========================================================================
 
+    var SETUP_KEY_STORAGE = (typeof global.window !== 'undefined' && typeof global.window.storageKey === 'function')
+        ? global.window.storageKey('setup_key')
+        : 'aviasafe_setup_key';
+
     function getSetupKey() {
-        return global.sessionStorage.getItem('aviasafe_setup_key') || '';
+        return global.sessionStorage.getItem(SETUP_KEY_STORAGE) || '';
     }
 
     function setSetupKey(value) {
-        if (value) global.sessionStorage.setItem('aviasafe_setup_key', value.trim());
-        else global.sessionStorage.removeItem('aviasafe_setup_key');
+        if (value) global.sessionStorage.setItem(SETUP_KEY_STORAGE, value.trim());
+        else global.sessionStorage.removeItem(SETUP_KEY_STORAGE);
     }
 
     function ensureSetupKey() {

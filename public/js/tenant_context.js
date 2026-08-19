@@ -22,7 +22,9 @@
     // the login to `?tenant=betasms` or show a tenant badge on the root domain.
     var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
 
-    var DEMO_TENANT_STORAGE_KEY = 'aviasafe_demo_tenant';
+    var DEMO_TENANT_STORAGE_KEY = (typeof global.storageKey === 'function')
+        ? global.storageKey('demo_tenant')
+        : 'aviasafe_demo_tenant';
     var DEFAULT_DEMO_TENANT = 'himalaya-airlines-demo';
 
     // Demo personas shown on the login page (beta/demo hosts only). Each maps

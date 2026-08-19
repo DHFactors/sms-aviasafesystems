@@ -178,6 +178,100 @@ def sanitize_message(text: str, limit: int = 2000) -> str:
     return (text or "").strip()[:limit]
 
 
+# ============================================================================
+# AVIATION SAFETY BOUNDARY — strict topic + prompt-injection rejection
+# ============================================================================
+# The copilot may ONLY assist with SMS, flight operations, airworthiness,
+# safety climate and regulatory compliance. Queries outside that scope, and any
+# attempt to override / reveal / bypass the assistant's instructions, are
+# rejected here in code — before any model call — so the boundary cannot be
+# relaxed by prompt manipulation.
+#
+# Heuristic: hard injection markers are always rejected; clearly off-topic
+# requests are rejected unless they also reference a safety-topic keyword (so a
+# question such as "weather for a go-around" stays in scope).
+
+SAFETY_TOPIC_MARKERS = (
+    "sms", "safety", "hazard", "risk", "report", "occurrence", "incident",
+    "accident", "aircraft", "flight", "airline", "aoc", "airworthiness",
+    "maintenance", "amo", "part-145", "part 145", "camo", "aerodrome", "airport",
+    "runway", "icao", "annex 19", "doc 9859", "easa", "faa", "compliance",
+    "regulator", "caan", "ssp", "audit", "inspection", "hfacs", "human factors",
+    "fatigue", "bird strike", "turbulence", "fuel", "engine", "crew", "pilot",
+    "training", "emergency", "evacuation", "corrective action", "investigation",
+    "root cause", "fishbone", "sra", "state safety", "certification", "landing",
+    "takeoff", "near miss", "runway incursion", "ground handling", "de-icing",
+    "airworthiness directive", "safety culture", "safety climate", "just culture",
+    "operational",
+)
+
+INJECTION_MARKERS = (
+    "ignore previous instructions", "ignore all previous instructions",
+    "ignore all prior instructions", "disregard previous instructions",
+    "disregard your instructions", "forget your instructions", "forget your role",
+    "forget all instructions", "system prompt", "reveal your system prompt",
+    "repeat your system prompt", "print your system prompt",
+    "what is your system prompt", "what are your instructions",
+    "show your instructions", "jailbreak", "developer mode", "dan mode",
+    "do anything now", "act as a", "act as though", "you are now",
+    "from now on", "new persona", "ignore your role", "ignore the rules",
+    "override your instructions", "bypass your",
+)
+
+OFF_TOPIC_MARKERS = (
+    "recipe", "cooking", "bake a", "poem", "poetry", "song", "lyrics", "joke",
+    "stock market", "crypto", "bitcoin", "invest", "politics", "election",
+    "celebrity", "horoscope", "astrology", "capital of", "geography", "movie",
+    "video game", "playstation", "xbox", "football", "cricket", "homework",
+    "translate", "write code", "python", "javascript", "html", "css",
+    "programming", "hack", "crack", "credit card", "password",
+)
+
+SAFETY_BOUNDARY_REPLY = (
+    "I'm **Ghanshyam** — Executive Safety & SMS Copilot. I'm strictly focused on "
+    "aviation safety and compliance: Safety Management Systems (ICAO Annex 19 / "
+    "Doc 9859), flight operations, airworthiness & Part-145, safety climate, and "
+    "regulatory compliance (CAAN / EASA / FAA).\n\n"
+    "I can't help with that request. If you have an aviation-safety question — hazard "
+    "identification, reporting (VSR/MOR), risk assessment, corrective actions, or SMS "
+    "implementation — I'm glad to assist. For anything else, please contact the "
+    "AviaSAFE team at info@aviasafesystems.com."
+)
+
+INJECTION_REPLY = (
+    "I can't comply with that request. As AviaSAFE's Safety & SMS Copilot, my "
+    "operating boundaries are fixed to aviation safety guidance (ICAO Annex 19 / "
+    "Doc 9859), and I do not respond to attempts to override, reveal, or bypass them.\n\n"
+    "Please ask an aviation-safety question — hazard reporting, risk assessment, "
+    "corrective actions, or SMS compliance — and I'll be glad to help."
+)
+
+
+def enforce_safety_boundary(
+    message: str, history: Optional[List[Dict[str, Any]]] = None
+) -> Optional[str]:
+    """Return a canned boundary reply when the input violates the safety scope.
+
+    Rejects prompt-injection attempts outright and redirects clearly off-topic
+    queries (unless they also touch an aviation-safety topic). Returns None when
+    the message is in scope and may be passed to the model.
+    """
+    texts = [message] + [str((entry or {}).get("content") or "") for entry in (history or [])]
+    joined = " ".join(texts).lower()
+
+    if any(marker in joined for marker in INJECTION_MARKERS):
+        logger.warning("Copilot prompt-injection attempt blocked")
+        return INJECTION_REPLY
+
+    if any(marker in joined for marker in OFF_TOPIC_MARKERS) and not any(
+        marker in joined for marker in SAFETY_TOPIC_MARKERS
+    ):
+        logger.info("Copilot off-topic query redirected to aviation-safety scope")
+        return SAFETY_BOUNDARY_REPLY
+
+    return None
+
+
 def get_tenant_classification(tenant_id: Optional[str]) -> Optional[str]:
     """Resolve the tenant's formal operational classification from Firestore."""
     if not tenant_id:
@@ -398,6 +492,9 @@ def chat(
     HTTP status code and error message are logged on every failure.
     """
     api_key = os.environ.get("GROQ_API_KEY") or settings.GROQ_API_KEY
+    boundary_reply = enforce_safety_boundary(message, history)
+    if boundary_reply:
+        return boundary_reply
     if not api_key:
         logger.warning(
             "GROQ_API_KEY is not set in the environment — copilot returning offline reply. "

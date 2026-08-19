@@ -350,6 +350,34 @@ async function updateTenantDisplay() {
 }
 
 // ============================================================================
+// PRODUCTION TENANT-MEMBERSHIP VERIFICATION — a signed-in user must belong to
+// the tenant this subdomain is scoped to. SUPER_ADMIN / CAAN_SMD are
+// cross-tenant by design and always allowed. Demo hosts (beta) are exempt so
+// persona switching keeps working.
+// ============================================================================
+
+function isProductionHost() {
+    if (window.APP_CONFIG && window.APP_CONFIG.environment) {
+        return window.APP_CONFIG.environment === 'production';
+    }
+    var host = window.location.hostname || '';
+    return host.indexOf('beta') === -1 && host !== 'localhost' && host !== '127.0.0.1';
+}
+
+function tenantMembershipError(user) {
+    if (!isProductionHost()) return null;
+    var role = (user && user.role) || '';
+    if (role === 'SUPER_ADMIN' || role === 'CAAN_SMD') return null;
+    var activeTenant = getActiveTenant();
+    if (!activeTenant) return null; // root production host — no subdomain scope
+    if (user.tenantId && user.tenantId !== activeTenant) {
+        return 'Your account is registered under "' + user.tenantId + '". This portal is scoped to "' +
+            activeTenant + '". Please sign in through your own organization\'s portal.';
+    }
+    return null;
+}
+
+// ============================================================================
 // REDIRECT BASED ON ROLE
 // ============================================================================
 
@@ -390,6 +418,21 @@ function onAuthStateChanged(user) {
         var tenantId = claims.tenant_id || null;
         
         console.log('Authenticated as:', user.email, 'role:', role, 'tenant:', tenantId);
+
+        // Production tenant-membership check: block cross-tenant sessions on a
+        // tenant-scoped subdomain (SUPER_ADMIN / CAAN_SMD are cross-tenant).
+        var membershipErr = tenantMembershipError({ uid: user.uid, email: user.email, role: role, tenantId: tenantId, claims: claims });
+        if (membershipErr) {
+            authRedirectInProgress = false;
+            if (errorDiv) {
+                errorDiv.textContent = membershipErr;
+                errorDiv.style.display = 'block';
+            }
+            if (loginForm) loginForm.style.display = 'block';
+            if (loginBtn) loginBtn.disabled = false;
+            firebase.auth().signOut().catch(function() {});
+            return;
+        }
         
         // Check if we should redirect (skip if already on a target page)
         var currentPath = window.location.pathname;
@@ -457,6 +500,18 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             console.log('✅ Logged in as:', user.email);
             console.log('   Role:', user.role);
             console.log('   Tenant:', user.tenantId || 'None');
+
+            // Production tenant-membership verification (blocked before redirect).
+            var membershipErr = tenantMembershipError(user);
+            if (membershipErr) {
+                errorDiv.textContent = membershipErr;
+                errorDiv.style.display = 'block';
+                if (firebase && firebase.auth && firebase.auth().signOut) {
+                    firebase.auth().signOut().catch(function() {});
+                }
+                return;
+            }
+
             // The onAuthStateChanged listener will handle the redirect with fresh claims,
             // but call it directly here for immediate response
             if (developerPersonaActive) {

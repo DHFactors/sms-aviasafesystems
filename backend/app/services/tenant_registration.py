@@ -186,9 +186,23 @@ def register_tenant(
             + ", ".join(s.value for s in REGISTRATION_SCOPES)
         )
 
+    is_beta_env = (settings.ENVIRONMENT or "").strip().lower() in ("beta", "staging", "development")
     provided_key = (beta_access_key or "").strip()
-    if provided_key and provided_key != settings.BETA_ACCESS_KEY:
-        raise PermissionError("Invalid beta access key")
+    if is_beta_env:
+        # Beta sandbox: the access key is optional; a provided key must match.
+        if provided_key and provided_key != settings.BETA_ACCESS_KEY:
+            raise PermissionError("Invalid beta access key")
+    else:
+        # Production gate: self-service registration is by invitation only — a
+        # valid enterprise access code (admin-issued invite key) is mandatory.
+        # Without it the public form can never provision a tenant.
+        if provided_key != settings.BETA_ACCESS_KEY:
+            raise PermissionError(
+                "Invalid or missing beta access key. Self-service registration on the "
+                "production portal is by invitation only — enter the enterprise access "
+                "code provided by AviaSAFE, or contact info@aviasafesystems.com to "
+                "request access."
+            )
 
     db = get_db()
     auth = get_auth()
@@ -211,6 +225,11 @@ def register_tenant(
     invite_code = generate_invite_code(db)
 
     tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid)
+    sandbox_tags = {}
+    if is_beta_env:
+        # Beta sandbox marker: self-service tenants created on the beta portal
+        # are flagged for periodic cleanup / evaluation.
+        sandbox_tags = {"is_beta_sandbox": True, "auto_expire_days": 30}
     tenant_ref.set(
         {
             "tenant_id": tid,
@@ -231,6 +250,7 @@ def register_tenant(
             "config": {"survey_rate_limit": settings.SURVEY_RATE_LIMIT},
             "created_at": now,
             "updated_at": now,
+            **sandbox_tags,
         }
     )
 
