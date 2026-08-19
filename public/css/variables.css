@@ -118,4 +118,10 @@
     --color-surface: #ffffff;
     --color-border: #e2e8f0;
     --color-border-light: #edf2f7;
+
+    /* ========== PAGE CANVAS & TEXT (ICAO Clean Light) ========== */
+    --color-bg: #f8fafc;
+    --color-text: #334155;
+    --color-text-muted: #64748b;
+    --color-text-strong: #0f172a;
 }
