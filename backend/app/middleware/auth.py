@@ -63,6 +63,34 @@ def resolve_user_context(email: str, role: str, tenant_id: Optional[str]) -> Dic
     return {"role": role, "tenant_id": tenant_id}
 
 
+SUSPENDED_TENANT_DETAIL = (
+    "This organization account is currently inactive or suspended. "
+    "Please contact support@aviasafesystems.com."
+)
+
+
+def _tenant_is_suspended(tenant_id: str) -> bool:
+    """True when the tenant document's governance status is SUSPENDED.
+
+    Fail-open by design: a missing doc, missing status or a database error
+    must never lock a user out of the platform — only an explicit
+    ``status == "SUSPENDED"`` blocks access.
+    """
+    try:
+        db = get_db()
+        doc = (
+            db.collection(settings.FIREBASE_COLLECTION_TENANTS)
+            .document(tenant_id)
+            .get()
+        )
+        if doc is None or not doc.exists:
+            return False
+        return (doc.to_dict() or {}).get("status") == "SUSPENDED"
+    except Exception as e:
+        logger.warning(f"Tenant status check failed for {tenant_id}: {e}")
+        return False
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ) -> Dict[str, Any]:
@@ -84,6 +112,10 @@ async def get_current_user(
     resolved = resolve_user_context(email, role, tenant_id)
     role = resolved["role"]
     tenant_id = resolved["tenant_id"]
+
+    if tenant_id and role not in settings.CROSS_TENANT_ROLES and _tenant_is_suspended(tenant_id):
+        logger.warning(f"Suspended tenant access denied for {email} (tenant={tenant_id})")
+        raise HTTPException(status_code=403, detail=SUSPENDED_TENANT_DETAIL)
 
     logger.info(f"Authenticated user {email}: role={role}, tenant_id={tenant_id}")
 

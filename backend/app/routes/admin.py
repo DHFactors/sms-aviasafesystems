@@ -25,6 +25,7 @@ from app.services.risk_matrix import (
     THRESHOLDS_DEFAULT,
 )
 from app.services.users import upsert_user_doc, user_doc_from_auth_record
+from app.services.audit_service import log_audit, request_context
 
 router = APIRouter()
 
@@ -850,3 +851,152 @@ async def list_feedback(
         )
 
     return {"feedback": items, "count": len(items)}
+
+
+# ============================================================================
+# Developer / SuperAdmin tenant governance (admin/admin-tenants.html)
+# ============================================================================
+# Governance statuses control whether a tenant's users can authenticate. They
+# live on the tenant document's `status` field (ACTIVE / SUSPENDED /
+# PENDING_REVIEW); `get_current_user` in middleware/auth.py rejects users whose
+# tenant is SUSPENDED with HTTP 403. The access gate is SUPER_ADMIN role OR the
+# developer email allowlist (defense in depth — never rely on role alone).
+
+GOVERNANCE_STATUSES = {"ACTIVE", "SUSPENDED", "PENDING_REVIEW"}
+DEVELOPER_EMAIL_ALLOWLIST = {"ghanshyamacharya@outlook.com"}
+
+
+async def get_developer_user(
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Gate for tenant governance endpoints: SUPER_ADMIN role or developer email."""
+    if user.get("role") in settings.SUPER_ADMIN_ROLES:
+        return user
+    if (user.get("email") or "").strip().lower() in DEVELOPER_EMAIL_ALLOWLIST:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="SUPER_ADMIN or developer access required",
+    )
+
+
+class TenantGovernanceStatusRequest(BaseModel):
+    status: str
+
+
+def _governance_row(snap: Any) -> Dict[str, Any]:
+    """Normalize one tenant document into the governance list row shape."""
+    x = snap.to_dict() or {}
+    raw_status = str(x.get("status") or "ACTIVE").strip().upper()
+    if raw_status not in GOVERNANCE_STATUSES:
+        raw_status = "ACTIVE"
+    created_at = x.get("created_at")
+    return {
+        "tenant_id": x.get("tenant_id") or snap.id,
+        "name": x.get("name") or x.get("tenant_name") or snap.id,
+        "classification": x.get("classification") or x.get("tenant_type") or "",
+        "admin_email": (x.get("safety_manager") or {}).get("email") or "",
+        "status": raw_status,
+        "created_at": (
+            created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None)
+        ),
+        "is_beta_sandbox": bool(x.get("is_beta_sandbox", False)),
+    }
+
+
+@router.get("/tenants/governance", status_code=status.HTTP_200_OK)
+async def admin_list_tenant_governance(
+    user: Dict[str, Any] = Depends(get_developer_user),
+):
+    """List every tenant for governance review (SUPER_ADMIN / developer).
+
+    Returns a clean summary: tenant_id, name, classification, admin_email,
+    status (default ACTIVE when unset), created_at and is_beta_sandbox.
+    """
+    try:
+        docs = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).get()
+    except Exception as e:
+        logger.error(f"Failed to list tenant governance for {user.get('email')}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not retrieve tenants at this time.",
+        )
+
+    rows = [_governance_row(d) for d in docs]
+    rows.sort(key=lambda r: (r["name"] or "").lower())
+    return {"tenants": rows, "count": len(rows)}
+
+
+@router.patch("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
+async def admin_update_tenant_governance_status(
+    tenant_id: str,
+    req: TenantGovernanceStatusRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_developer_user),
+):
+    """Set a tenant's governance status (ACTIVE / SUSPENDED / PENDING_REVIEW).
+
+    Users belonging to a SUSPENDED tenant are blocked at authentication
+    (middleware/auth.py -> get_current_user) with HTTP 403.
+    """
+    new_status = (req.status or "").strip().upper()
+    if new_status not in GOVERNANCE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"status must be one of: {sorted(GOVERNANCE_STATUSES)}",
+        )
+
+    db = get_db()
+    ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
+    try:
+        doc = ref.get()
+    except Exception as e:
+        logger.error(f"Failed to read tenant {tenant_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not read the tenant at this time.",
+        )
+    if doc is None or not doc.exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant '{tenant_id}' not found",
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    updates = {
+        "status": new_status,
+        "active": new_status == "ACTIVE",
+        "status_updated_at": now,
+        "status_updated_by": user.get("uid"),
+        "updated_at": now,
+    }
+    try:
+        ref.update(updates)
+    except Exception as e:
+        logger.error(f"Failed to update tenant {tenant_id} status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not update the tenant status at this time.",
+        )
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="TENANT_GOVERNANCE_STATUS_UPDATED",
+        user=user.get("email"),
+        tenant_id=tenant_id,
+        target_type="tenant",
+        target_id=tenant_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"status": new_status, "by_uid": user.get("uid")},
+    )
+    logger.info(f"Tenant {tenant_id} governance status -> {new_status} by {user.get('email')}")
+
+    return {
+        "success": True,
+        "tenant": {
+            **{"tenant_id": tenant_id},
+            **_governance_row(doc),
+            "status": new_status,
+        },
+    }

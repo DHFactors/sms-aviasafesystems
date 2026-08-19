@@ -148,6 +148,7 @@ const ApiClient = {
     get: (path) => ApiClient._request('GET', path),
     post: (path, body) => ApiClient._request('POST', path, body),
     put: (path, body) => ApiClient._request('PUT', path, body),
+    patch: (path, body) => ApiClient._request('PATCH', path, body),
     del: (path) => ApiClient._request('DELETE', path),
 };
 
