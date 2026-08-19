@@ -1,13 +1,16 @@
 """Unit tests for the Gmail SMTP registration-acknowledgment dispatcher.
 
 Covers email composition (subject / sender / body), recipient addressing
-(To + optional Bcc), the real smtplib call path via a fake SMTP server, and the
-graceful fallbacks: empty credentials and SMTP transport failures must never
-raise — a mail problem can never crash or roll back a valid tenant record.
+(To + optional Bcc), the real smtplib call path via a fake SMTP server, the
+IPv4-forced resolution (socket.AF_INET), the SMTP_SSL-on-465 / STARTTLS-on-587
+transport selection, and the graceful fallbacks: empty credentials and SMTP
+transport failures must never raise — a mail problem can never crash or roll
+back a valid tenant record.
 """
 
 import asyncio
 import smtplib
+import socket
 
 import pytest
 
@@ -19,6 +22,7 @@ class _FakeSMTP:
     """Drop-in smtplib.SMTP recording everything the dispatcher does."""
 
     instances = []
+    is_ssl = False
 
     def __init__(self, host, port, timeout=None):
         self.host = host
@@ -28,6 +32,7 @@ class _FakeSMTP:
         self.ehlo_calls = 0
         self.tls_started = False
         self.login_credentials = None
+        self.ssl_mode = self.is_ssl
         _FakeSMTP.instances.append(self)
 
     def ehlo(self):
@@ -42,6 +47,9 @@ class _FakeSMTP:
     def send_message(self, msg):
         self.sent.append(msg)
 
+    def close(self):
+        pass
+
     def __enter__(self):
         return self
 
@@ -49,10 +57,26 @@ class _FakeSMTP:
         return False
 
 
+class _FakeSMTP_SSL(_FakeSMTP):
+    is_ssl = True
+
+
+# Deterministic IPv4 result returned by the patched socket.getaddrinfo.
+_FAKE_IPV4 = "142.250.190.109"
+
+
+def _fake_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+    _fake_getaddrinfo.calls.append((host, port, family, type, proto, flags))
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (_FAKE_IPV4, port))]
+
+
 @pytest.fixture(autouse=True)
 def _fake_smtp(monkeypatch):
     _FakeSMTP.instances = []
+    _fake_getaddrinfo.calls = []
     monkeypatch.setattr(smtplib, "SMTP", _FakeSMTP)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", _FakeSMTP_SSL)
+    monkeypatch.setattr(socket, "getaddrinfo", _fake_getaddrinfo)
     yield _FakeSMTP
     _FakeSMTP.instances = []
 
@@ -110,8 +134,9 @@ def test_send_dispatches_with_to_and_bcc(_gmail_env, _fake_smtp):
 
     assert len(_fake_smtp.instances) == 1
     server = _fake_smtp.instances[0]
-    assert server.host == "smtp.gmail.com"
+    assert server.host == _FAKE_IPV4  # IPv4-forced resolution
     assert server.port == 587
+    assert server.ssl_mode is False
     assert server.tls_started is True
     assert server.login_credentials == ("ghanshyam.acharya@gmail.com", "app-password-123")
 
@@ -142,6 +167,68 @@ def test_async_wrapper_runs_dispatch(_gmail_env, _fake_smtp):
     assert result["sent"] is True
     assert len(_fake_smtp.instances) == 1
     assert len(_fake_smtp.instances[0].sent) == 1
+
+
+def test_port_465_uses_direct_smtp_ssl(_gmail_env, _fake_smtp, monkeypatch):
+    monkeypatch.setattr(settings, "GMAIL_SMTP_PORT", 465)
+
+    result = gmail_dispatcher.send_registration_acknowledgment(
+        "safety@summitair.com", "Anil Shrestha", "Summit Air"
+    )
+
+    assert result["sent"] is True
+    server = _fake_smtp.instances[0]
+    assert server.port == 465
+    assert server.ssl_mode is True
+    assert server.tls_started is False  # direct SSL — no STARTTLS
+    assert server.login_credentials == ("ghanshyam.acharya@gmail.com", "app-password-123")
+    assert len(server.sent) == 1
+
+
+def test_default_port_is_465_when_unset(monkeypatch, _fake_smtp):
+    """GMAIL_SMTP_PORT unset must default to 465 (direct SMTP_SSL)."""
+    monkeypatch.setattr(settings, "GMAIL_SMTP_PORT", None)
+    monkeypatch.setattr(settings, "GMAIL_SMTP_USER", "ghanshyam.acharya@gmail.com")
+    monkeypatch.setattr(settings, "GMAIL_SMTP_PASSWORD", "app-password-123")
+
+    assert gmail_dispatcher._port() == 465
+
+    result = gmail_dispatcher.send_registration_acknowledgment(
+        "safety@summitair.com", "Anil Shrestha", "Summit Air"
+    )
+    assert result["sent"] is True
+    server = _fake_smtp.instances[0]
+    assert server.port == 465
+    assert server.ssl_mode is True
+
+
+def test_forces_ipv4_resolution(_gmail_env, _fake_smtp):
+    """smtp.gmail.com must be resolved with socket.AF_INET so IPv6-unreachable
+    hosts never hit [Errno 101]; the SMTP server must connect to the IPv4 addr."""
+    gmail_dispatcher.send_registration_acknowledgment(
+        "safety@summitair.com", "Anil Shrestha", "Summit Air"
+    )
+
+    assert len(_fake_getaddrinfo.calls) == 1
+    host_arg, port_arg, family, type_arg = _fake_getaddrinfo.calls[0][:4]
+    assert host_arg == "smtp.gmail.com"
+    assert family == socket.AF_INET
+    assert type_arg == socket.SOCK_STREAM
+
+    server = _fake_smtp.instances[0]
+    assert server.host == _FAKE_IPV4
+    assert server.port == port_arg
+
+
+def test_get_smtp_connection_587_starts_tls(_gmail_env, _fake_smtp):
+    server = gmail_dispatcher._get_smtp_connection(
+        "smtp.gmail.com", 587, "ghanshyam.acharya@gmail.com", "app-password-123"
+    )
+    assert server.port == 587
+    assert server.ssl_mode is False
+    assert server.tls_started is True
+    assert server.ehlo_calls == 2
+    assert server.login_credentials == ("ghanshyam.acharya@gmail.com", "app-password-123")
 
 
 def test_password_whitespace_stripped(_gmail_env, _fake_smtp, monkeypatch):

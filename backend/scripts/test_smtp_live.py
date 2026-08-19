@@ -2,7 +2,9 @@
 # FILE: test_smtp_live.py
 # PATH: backend/scripts/test_smtp_live.py
 # PURPOSE: Live SMTP verification for the Gmail registration-acknowledgment
-#          dispatcher. Connects to Gmail SMTP, performs the EHLO -> STARTTLS ->
+#          dispatcher. Connects to Gmail SMTP through the same
+#          gmail_dispatcher._get_smtp_connection() path (IPv4-forced, SMTP_SSL
+#          on 465 / STARTTLS on 587), performs the EHLO -> (SSL|STARTTLS) ->
 #          LOGIN handshake, then dispatches a real test message via
 #          gmail_dispatcher.send_registration_acknowledgment().
 #
@@ -21,7 +23,6 @@
 
 import argparse
 import smtplib
-import ssl
 import sys
 from pathlib import Path
 
@@ -62,16 +63,14 @@ def main() -> int:
     port = gmail_dispatcher._port()
     user = gmail_dispatcher._user()
     print(f"Gmail SMTP target: {host}:{port} as {user}")
-    print("Step 1: SMTP handshake (EHLO -> STARTTLS -> LOGIN)...")
+    print("Step 1: SMTP handshake (EHLO -> SSL/STARTTLS -> LOGIN)...")
 
     try:
-        with smtplib.SMTP(host, port, timeout=30) as server:
-            server.ehlo()
-            if port in (587, 25):
-                server.starttls(context=ssl.create_default_context())
-                server.ehlo()
-            server.login(user, gmail_dispatcher._password())
-        print("Step 1 OK: connection, STARTTLS and login accepted.")
+        server = gmail_dispatcher._get_smtp_connection(
+            host, port, user, gmail_dispatcher._password()
+        )
+        server.close()
+        print("Step 1 OK: connection, TLS and login accepted.")
     except smtplib.SMTPException as err:
         print(f"Step 1 FAILED (SMTP error): {err}", file=sys.stderr)
         return 1

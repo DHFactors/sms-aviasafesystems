@@ -167,8 +167,9 @@ class Settings(BaseSettings):
     # self-service registration acknowledgments. Leave GMAIL_SMTP_USER /
     # GMAIL_SMTP_PASSWORD empty to skip delivery (the acknowledgment is logged
     # only and the provisioned tenant record is never rolled back).
+    # Port 465 uses direct SMTP_SSL; port 587 falls back to STARTTLS.
     GMAIL_SMTP_HOST: Optional[str] = None
-    GMAIL_SMTP_PORT: int = 587
+    GMAIL_SMTP_PORT: int = 465
     GMAIL_SMTP_USER: Optional[str] = None
     GMAIL_SMTP_PASSWORD: Optional[str] = None
     GMAIL_NOTIFICATION_BCC: Optional[str] = None

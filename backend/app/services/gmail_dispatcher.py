@@ -12,10 +12,17 @@
 #
 #          Configuration (environment / Render dashboard):
 #            GMAIL_SMTP_HOST          smtp.gmail.com
-#            GMAIL_SMTP_PORT          587
+#            GMAIL_SMTP_PORT          465 (default; 587 also supported)
 #            GMAIL_SMTP_USER          sender gmail address
 #            GMAIL_SMTP_PASSWORD      app password / SMTP credential
 #            GMAIL_NOTIFICATION_BCC   optional bcc observer address
+#
+#          Transport:
+#            * smtp.gmail.com is resolved with socket.AF_INET (IPv4 only) so a
+#              cloud host that only maps smtp.gmail.com to an unreachable IPv6
+#              address never fails with [Errno 101] Network is unreachable.
+#            * Port 465  -> direct SMTP_SSL (preferred on cloud providers).
+#            * Port 587  -> SMTP + STARTTLS fallback.
 #
 #          Credential fallbacks: GMAIL_SMTP_USER falls back to SMTP_USER;
 #          GMAIL_SMTP_PASSWORD falls back to SMTP_PASSWORD / SMTP_PASS. The
@@ -31,6 +38,7 @@
 import asyncio
 import os
 import smtplib
+import socket
 import ssl
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -42,7 +50,7 @@ from app.core.config import settings
 
 SENDER_NAME = "Ghanshyam Acharya"
 GMAIL_DEFAULT_HOST = "smtp.gmail.com"
-GMAIL_DEFAULT_PORT = 587
+GMAIL_DEFAULT_PORT = 465
 EM_DASH = "\u2014"  # em-dash: "AviaSAFE Beta Registration Request — [Org]"
 
 
@@ -138,6 +146,37 @@ def _build_message(
     return msg
 
 
+def _get_smtp_connection(
+    host: str, port: int, user: Optional[str], password: Optional[str]
+) -> smtplib.SMTP:
+    """Open an authenticated SMTP connection, forcing IPv4 resolution.
+
+    smtp.gmail.com sometimes resolves to IPv6 addresses that cloud hosts
+    (Render) cannot reach, surfacing as "[Errno 101] Network is unreachable".
+    Resolving with socket.AF_INET guarantees a usable IPv4 endpoint.
+
+    * Port 465 -> direct SMTP_SSL (universally supported on cloud providers).
+    * Otherwise -> SMTP + STARTTLS fallback (587 / 25).
+    """
+    addr_info = socket.getaddrinfo(
+        host, port, socket.AF_INET, socket.SOCK_STREAM
+    )
+    ipv4_host = addr_info[0][4][0]
+
+    if port == 465:
+        server = smtplib.SMTP_SSL(ipv4_host, port, timeout=15)
+        server.ehlo()
+    else:
+        server = smtplib.SMTP(ipv4_host, port, timeout=15)
+        server.ehlo()
+        server.starttls(context=ssl.create_default_context())
+        server.ehlo()
+
+    if user and password:
+        server.login(user, password)
+    return server
+
+
 def _dispatch(msg: MIMEText) -> None:
     """Blocking SMTP send. Raises on any transport failure (caller catches)."""
     host = _host()
@@ -145,14 +184,14 @@ def _dispatch(msg: MIMEText) -> None:
     user = _user()
     password = _password()
 
-    with smtplib.SMTP(host, port, timeout=30) as server:
-        server.ehlo()
-        if port in (587, 25):
-            server.starttls(context=ssl.create_default_context())
-            server.ehlo()
-        if user and password:
-            server.login(user, password)
+    server = _get_smtp_connection(host, port, user, password)
+    try:
         server.send_message(msg)
+    finally:
+        try:
+            server.close()
+        except Exception:  # noqa: BLE001 - best-effort teardown
+            pass
 
 
 def send_registration_acknowledgment(
