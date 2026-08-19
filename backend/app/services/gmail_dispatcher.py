@@ -17,23 +17,28 @@
 #            GMAIL_SMTP_PASSWORD      app password / SMTP credential
 #            GMAIL_NOTIFICATION_BCC   optional bcc observer address
 #
-#          When GMAIL_SMTP_USER / GMAIL_SMTP_PASSWORD are empty the dispatch is
-#          skipped gracefully (logged only) — the endpoint still returns 200.
+#          Credential fallbacks: GMAIL_SMTP_USER falls back to SMTP_USER;
+#          GMAIL_SMTP_PASSWORD falls back to SMTP_PASSWORD / SMTP_PASS. The
+#          app password is sanitized (all whitespace stripped) so copy/paste
+#          artifacts from the dashboard can never break login.
+#
+#          When no SMTP user/password is configured the dispatch is skipped
+#          gracefully (logged only) — the endpoint still returns 200.
 #
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
 
 import asyncio
-import logging
+import os
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from typing import Any, Dict, Optional
 
-from app.core.config import settings
+from loguru import logger
 
-logger = logging.getLogger("email")
+from app.core.config import settings
 
 SENDER_NAME = "Ghanshyam Acharya"
 GMAIL_DEFAULT_HOST = "smtp.gmail.com"
@@ -50,13 +55,27 @@ def _port() -> int:
 
 
 def _user() -> Optional[str]:
-    value = (settings.GMAIL_SMTP_USER or "").strip()
+    value = (
+        (settings.GMAIL_SMTP_USER or "")
+        or (settings.SMTP_USER or "")
+        or (os.getenv("SMTP_USER") or "")
+    ).strip()
     return value or None
 
 
 def _password() -> Optional[str]:
-    value = settings.GMAIL_SMTP_PASSWORD
-    return value if value else None
+    value = (
+        (settings.GMAIL_SMTP_PASSWORD or "")
+        or (settings.SMTP_PASS or "")
+        or (os.getenv("SMTP_PASSWORD") or "")
+        or (os.getenv("SMTP_PASS") or "")
+    )
+    if not value:
+        return None
+    # Gmail app passwords are often pasted with stray spaces / newlines from
+    # the Render dashboard. Strip every space character so authentication can
+    # never fail on formatting.
+    return str(value).replace(" ", "").strip()
 
 
 def _bcc() -> Optional[str]:
@@ -149,7 +168,7 @@ def send_registration_acknowledgment(
     """
     if not gmail_configured():
         logger.info(
-            "Registration acknowledgment to %s skipped: "
+            "Registration acknowledgment to {} skipped: "
             "GMAIL_SMTP_USER/GMAIL_SMTP_PASSWORD not configured",
             to_email,
         )
@@ -160,14 +179,16 @@ def send_registration_acknowledgment(
             "reason": "GMAIL_SMTP_USER/GMAIL_SMTP_PASSWORD not configured",
         }
 
+    logger.info(
+        "Attempting to dispatch registration acknowledgment to {} via Gmail SMTP...",
+        to_email,
+    )
     try:
         msg = _build_message(to_email, contact_name, organization_name)
         _dispatch(msg)
         logger.info(
-            "Registration acknowledgment sent to %s (subject=%r, bcc=%r)",
+            "Successfully sent registration acknowledgment email to {}",
             to_email,
-            msg["Subject"],
-            _bcc(),
         )
         return {
             "sent": True,
@@ -176,8 +197,11 @@ def send_registration_acknowledgment(
             "bcc": _bcc(),
             "subject": msg["Subject"],
         }
+    except smtplib.SMTPException as err:
+        logger.error("Failed to dispatch registration acknowledgment: {}", err)
+        return {"sent": False, "provider": "gmail", "to": to_email, "error": str(err)}
     except Exception as e:
-        logger.error("Registration acknowledgment to %s failed: %s", to_email, e)
+        logger.error("Registration acknowledgment to {} failed: {}", to_email, e)
         return {"sent": False, "provider": "gmail", "to": to_email, "error": str(e)}
 
 

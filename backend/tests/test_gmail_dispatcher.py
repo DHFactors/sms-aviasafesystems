@@ -144,6 +144,39 @@ def test_async_wrapper_runs_dispatch(_gmail_env, _fake_smtp):
     assert len(_fake_smtp.instances[0].sent) == 1
 
 
+def test_password_whitespace_stripped(_gmail_env, _fake_smtp, monkeypatch):
+    """App passwords pasted from the Render dashboard may carry stray spaces;
+    they must be stripped before login."""
+    monkeypatch.setattr(settings, "GMAIL_SMTP_PASSWORD", "  ab cd  ef gh  ")
+    result = gmail_dispatcher.send_registration_acknowledgment(
+        "safety@summitair.com", "Anil Shrestha", "Summit Air"
+    )
+    assert result["sent"] is True
+    assert _fake_smtp.instances[0].login_credentials == (
+        "ghanshyam.acharya@gmail.com", "abcdefgh",
+    )
+
+
+def test_credentials_fall_back_to_smtp_user_pass(monkeypatch, _fake_smtp):
+    """GMAIL_SMTP_* must fall back cleanly to SMTP_USER / SMTP_PASS."""
+    monkeypatch.setattr(settings, "GMAIL_SMTP_USER", None)
+    monkeypatch.setattr(settings, "GMAIL_SMTP_PASSWORD", None)
+    monkeypatch.setattr(settings, "SMTP_USER", "fallback@gmail.com")
+    monkeypatch.setattr(settings, "SMTP_PASS", "fallback-secret")
+
+    assert gmail_dispatcher.gmail_configured() is True
+    assert gmail_dispatcher._user() == "fallback@gmail.com"
+    assert gmail_dispatcher._password() == "fallback-secret"
+
+    result = gmail_dispatcher.send_registration_acknowledgment(
+        "safety@summitair.com", "Anil Shrestha", "Summit Air"
+    )
+    assert result["sent"] is True
+    assert _fake_smtp.instances[0].login_credentials == (
+        "fallback@gmail.com", "fallback-secret",
+    )
+
+
 # ---------------------------------------------------------------------------
 # Graceful fallbacks (never raise, never roll back)
 # ---------------------------------------------------------------------------

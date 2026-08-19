@@ -29,7 +29,8 @@ from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
-from app.services import login_service, gmail_dispatcher
+from app.services import login_service
+from app.services.gmail_dispatcher import send_registration_acknowledgment
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
     DISPOSABLE_EMAIL_MESSAGE,
@@ -272,10 +273,10 @@ async def register_tenant_endpoint(
     # after the response is sent and never raises, so a mail outage cannot
     # surface an error to the applicant or roll back the tenant.
     background_tasks.add_task(
-        gmail_dispatcher.send_registration_acknowledgment_async,
-        body.email,
-        body.admin_full_name,
-        body.organization_name,
+        send_registration_acknowledgment,
+        to_email=body.email,
+        contact_name=body.admin_full_name,
+        organization_name=body.organization_name,
     )
 
     return {"success": True, **result}
