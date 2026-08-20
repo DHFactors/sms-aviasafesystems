@@ -186,6 +186,23 @@
     padding: 8px 12px;
 }
 
+.cpi-notice {
+    align-self: center;
+    color: var(--cpi-text, #e6edf3);
+    font-size: 12.5px;
+    background: rgba(255, 166, 43, 0.12);
+    border: 1px solid rgba(255, 166, 43, 0.4);
+    border-radius: 10px;
+    padding: 8px 12px;
+    text-align: center;
+}
+
+.cpi-notice a {
+    color: var(--color-brand-500, #ffb454);
+    font-weight: 700;
+    text-decoration: underline;
+}
+
 .cpi-footer {
     border-top: 1px solid var(--cpi-border);
     padding: 10px 12px;

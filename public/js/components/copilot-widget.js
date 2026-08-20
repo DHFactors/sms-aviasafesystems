@@ -18,11 +18,23 @@
     var WIDGET_SUBTITLE = '50 Years Aviation Leadership | ICAO Annex 19 (3rd Ed.) SMS Guide';
 
     // Public pages where the copilot runs WITHOUT authentication (guest mode).
-    var GUEST_PAGES = ['register.html', 'join.html', 'login.html'];
+    // Scoped (Step 4A) to the three public onboarding pages only.
+    var GUEST_PAGES = ['index.html', 'register.html', 'join.html'];
 
     // Per-page guest guidance: greeting intro + quick-suggestion chips served
     // on unauthenticated pages. Keyed by page filename (from the URL path).
     var PAGE_GUEST_GUIDANCE = {
+        'index.html': {
+            intro: 'I can help you understand the AviaSAFE SMS platform: ICAO Annex 19 / Doc 9859 ' +
+                'compliance, the modules available to airlines, operators and regulators, and how to ' +
+                'request beta access, register your organization, or join with an invite code.',
+            suggestions: [
+                'What does AviaSAFE SMS do?',
+                'Which modules are available?',
+                'How do I register my organization?',
+                'How do I sign in to my tenant?'
+            ]
+        },
         'register.html': {
             intro: 'I can help you register your organization: choosing the correct operator ' +
                 'classification (Fixed-Wing Airline, Helicopter/Rotary, Part-145 AMO, or Certified ' +
@@ -44,16 +56,6 @@
                 'Which department should I select?',
                 'What is my operational role?',
                 'How do I create a strong password?'
-            ]
-        },
-        'login.html': {
-            intro: 'I can help you sign in: troubleshooting sign-in problems, confirming the correct ' +
-                'tenant scope, and resetting or recovering your password.',
-            suggestions: [
-                'I forgot my password',
-                'I can\'t sign in — what should I check?',
-                'Which tenant am I signing into?',
-                'Do I need an invite code first?'
             ]
         }
     };
@@ -130,6 +132,35 @@
 
     var history = [];
     var sending = false;
+
+    // ── Client-side session rate limit (Step 4A) ──
+    // Public-page guests get a maximum of SESSION_MESSAGE_LIMIT user messages
+    // per browser session. The counter lives in sessionStorage so it survives
+    // in-tab navigation but resets on a new tab / browser close. The key is
+    // env-prefixed via window.storageKey (when available) so beta and prod
+    // counters never mix on tenant subdomains.
+    var SESSION_MESSAGE_LIMIT = 8;
+    var SESSION_COUNT_KEY = (typeof window.storageKey === 'function')
+        ? window.storageKey('copilot_message_count')
+        : 'aviasafe_copilot_message_count';
+
+    function messageCount() {
+        try {
+            return parseInt(window.sessionStorage.getItem(SESSION_COUNT_KEY) || '0', 10) || 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function incrementMessageCount() {
+        var n = messageCount() + 1;
+        try { window.sessionStorage.setItem(SESSION_COUNT_KEY, String(n)); } catch (e) { /* ignore */ }
+        return n;
+    }
+
+    function limitReached() {
+        return messageCount() >= SESSION_MESSAGE_LIMIT;
+    }
 
     function getToken() {
         if (!window.firebase || !firebase.auth || !firebase.auth().currentUser) {
@@ -283,7 +314,10 @@
         function toggleOpen(open) {
             modal.style.display = open ? 'flex' : 'none';
             toggle.style.display = open ? 'none' : 'flex';
-            if (open) input.focus();
+            if (open) {
+                enforceSessionLimit();
+                if (!input.disabled) input.focus();
+            }
         }
 
         toggle.addEventListener('click', function () { toggleOpen(true); });
@@ -308,6 +342,30 @@
             input.value = '';
             input.style.height = 'auto';
             sendMessage(msg);
+        }
+
+        // Session limit: when the free-message quota is exhausted, show a
+        // graceful notice and disable further input instead of silently failing.
+        var limitNoticeShown = false;
+
+        function showLimitNotice() {
+            var msg = 'You have reached the free session limit of ' + SESSION_MESSAGE_LIMIT +
+                ' messages for Ghanshyam. To continue the conversation, please ' +
+                '<a href="/register.html">register your organization</a> or ' +
+                '<a href="/login.html">sign in</a>.';
+            body.appendChild(el('div', 'cpi-notice', msg));
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function enforceSessionLimit() {
+            if (!limitReached()) return false;
+            if (!limitNoticeShown) {
+                limitNoticeShown = true;
+                showLimitNotice();
+            }
+            input.disabled = true;
+            sendBtn.disabled = true;
+            return true;
         }
 
         function appendMsg(text, kind) {
@@ -335,10 +393,12 @@
 
         function sendMessage(msg) {
             if (sending) return;
+            if (enforceSessionLimit()) return;
             sending = true;
             sendBtn.disabled = true;
             appendMsg(msg, 'user');
             history.push({ role: 'user', content: msg });
+            incrementMessageCount();
 
             var typing = showTyping();
 
