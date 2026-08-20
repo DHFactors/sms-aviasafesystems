@@ -409,11 +409,13 @@ function renderHazardWidget(matrix) {
         return;
     }
 
+    const level2 = matrix.level2 || 0;
     const level3 = matrix.level3 || 0;
     const level4 = matrix.level4 || 0;
     const total = matrix.total || 0;
 
     chipsEl.innerHTML = `
+        <span class="hazard-chip chip-ii"><strong>${level2}</strong> Level II (Low)</span>
         <span class="hazard-chip chip-iii"><strong>${level3}</strong> Level III (High)</span>
         <span class="hazard-chip chip-iv"><strong>${level4}</strong> Level IV (Very High)</span>
         <span class="hazard-chip"><strong>${total}</strong> Total State Hazards</span>
@@ -475,11 +477,9 @@ function renderCaanHeatMap(data, containerId, caption) {
     if (!container) return;
 
     const getHeatMapColor = (riskIndex) => {
-        if (riskIndex >= 1 && riskIndex <= 3) return '#34a853';
-        if (riskIndex >= 4 && riskIndex <= 6) return '#f9ab00';
-        if (riskIndex >= 8 && riskIndex <= 12) return '#f57c00';
-        if (riskIndex >= 15 && riskIndex <= 25) return '#ea4335';
-        return '#f1f5f9';
+        if (riskIndex >= 1 && riskIndex <= 5) return '#34a853';
+        if (riskIndex >= 6 && riskIndex <= 15) return '#f9ab00';
+        return '#ea4335';
     };
 
     const getRiskClass = (index) => getRiskBadgeClass(classifyRisk(index));

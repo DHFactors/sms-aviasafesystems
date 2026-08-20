@@ -104,7 +104,20 @@ SIGNOFF_AUTHORITY = {
     "Acceptable": "Safety Manager / SAG Member",
 }
 
+# Map SRAM tolerability outcomes to the 3-tier CAAN CAR-19 tolerance tiers so
+# the SRAM engine aligns with the operator risk matrix (Level II/III/IV).
+TOLERABILITY_TO_TIER = {
+    "Acceptable": "LOW",
+    "Tolerable": "HIGH",
+    "Intolerable": "VERY HIGH",
+}
+
 SEVERITY_LETTER_TO_NUMERIC = {"A": 5, "B": 4, "C": 3, "D": 2, "E": 1}
+
+
+def tolerability_tier(tolerability: str) -> str:
+    """Return the 3-tier tolerance tier for an SRAM tolerability outcome."""
+    return TOLERABILITY_TO_TIER.get(tolerability, "HIGH")
 
 
 def _lookup_band(value: int, bands: Sequence[Tuple[int, int, Any, Any]]) -> Tuple[Any, Any]:
@@ -290,17 +303,20 @@ def evaluate_risk_profile(
         "existing_bsv": existing_bsv,
         "consolidated_bsv": consolidated_bsv,
         "severity_letter": letter,
+        "tier": tolerability_tier(resultant_tol),
         "initial_risk": {
             "index": f'{initial["probability_value"]}{letter}',
             "probability_value": initial["probability_value"],
             "descriptor": initial["descriptor"],
             "tolerability": initial_tol,
+            "tier": tolerability_tier(initial_tol),
         },
         "resultant_risk": {
             "index": f'{resultant["probability_value"]}{letter}',
             "probability_value": resultant["probability_value"],
             "descriptor": resultant["descriptor"],
             "tolerability": resultant_tol,
+            "tier": tolerability_tier(resultant_tol),
         },
         "signoff": {
             "authority": SIGNOFF_AUTHORITY[resultant_tol],

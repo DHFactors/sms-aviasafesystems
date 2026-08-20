@@ -230,7 +230,7 @@ def mock_firebase_and_gemini(monkeypatch):
     fake_analysis = {
         "occurrence_type": "System/Component Failure",
         "human_factors": ["Procedural Deviation"],
-        "risk_level": "Medium",
+        "risk_level": "High",
         "phase_of_flight": "En-route",
         "summary": "Test AI analysis summary.",
         "recommendations": ["Review maintenance procedures."],
@@ -284,7 +284,7 @@ class TestSubmissionAutoCalculation:
         assert data["severity_level"] == 3, f"Expected severity_level=3, got {data.get('severity_level')}"
         assert data["probability_level"] == 3, f"Expected probability_level=3, got {data.get('probability_level')}"
         assert data["risk_index"] == 9, f"Expected risk_index=9 (3×3), got {data.get('risk_index')}"
-        assert data["risk_level"] == "Medium", f"Expected risk_level=Medium, got {data.get('risk_level')}"
+        assert data["risk_level"] == "High", f"Expected risk_level=High, got {data.get('risk_level')}"
         assert data["report_type"] == "mandatory"
         assert data["status"] == "NEW"
 
@@ -398,7 +398,7 @@ class TestAiGroundingAndSuggestion:
         assert ai_suggested["suggested_severity"] == 4, f"Expected 4, got {ai_suggested.get('suggested_severity')}"
         assert ai_suggested["suggested_probability"] == 2, f"Expected 2, got {ai_suggested.get('suggested_probability')}"
         assert ai_suggested["suggested_risk_index"] == 8, f"Expected 8 (4×2), got {ai_suggested.get('suggested_risk_index')}"
-        assert ai_suggested["suggested_risk_level"] == "Medium", f"Expected Medium, got {ai_suggested.get('suggested_risk_level')}"
+        assert ai_suggested["suggested_risk_level"] == "High", f"Expected High, got {ai_suggested.get('suggested_risk_level')}"
 
         # Verify explanations are present (Phase 2 grounding requirement)
         assert "severity_explanation" in ai_suggested, "Missing severity_explanation"
@@ -460,7 +460,7 @@ class TestSafetyManagerOverride:
         assert resp.status_code == 201
         report = resp.json()
         assert report["risk_index"] == 6  # 2×3
-        assert report["risk_level"] == "Medium"
+        assert report["risk_level"] == "High"
 
         report_id = report["id"]
 
@@ -562,7 +562,7 @@ class TestFullLifecycle:
     """Complete operational flow from submission to final official assessment."""
 
     def test_complete_lifecycle(self, client):
-        # Step 1: Submit MOR with initial assessment (S=3, P=3 → RI=9, Medium)
+        # Step 1: Submit MOR with initial assessment (S=3, P=3 → RI=9, High)
         body = {
             "narrative": "Dual hydraulic system failure during approach. Emergency checklists performed. Landed safely with reduced braking.",
             "location": "KTM",
@@ -576,7 +576,7 @@ class TestFullLifecycle:
         assert resp.status_code == 201
         report = resp.json()
         assert report["risk_index"] == 9
-        assert report["risk_level"] == "Medium"
+        assert report["risk_level"] == "High"
         report_id = report["id"]
 
         # Step 2: AI analysis (simulated by mock) provides suggested assessment
@@ -610,7 +610,7 @@ class TestFullLifecycle:
         assert final["severity_level"] == 3
         assert final["probability_level"] == 2
         assert final["risk_index"] == 6  # 3×2
-        assert final["risk_level"] == "Medium"
+        assert final["risk_level"] == "High"
 
         ra = final["risk_assessment"]
         assert ra["severity"] == 3
@@ -669,7 +669,7 @@ class TestCrossTenantAndAuthorization:
         assert resp3.status_code == 200, resp3.text
         confirmed = resp3.json()
         assert confirmed["risk_assessment"]["severity"] == 4, resp3.text
-        assert confirmed["risk_level"] == "Medium"
+        assert confirmed["risk_level"] == "High"
 
     def test_caan_lists_reports_across_tenants(self, client):
         """CAAN (no tenant claim) can list reports across tenants (regression for
@@ -820,7 +820,7 @@ class TestSraAndFishboneIntegration:
                 "severity_letter": "C",
                 "probability": 3,
                 "risk_index": 9,
-                "risk_level": "Medium",
+                "risk_level": "High",
                 "risk_outcome": "Tolerable",
             },
         }
@@ -836,13 +836,15 @@ class TestSraAndFishboneIntegration:
         assert can["initial_sra"]["severity"] == 3
         assert can["initial_sra"]["severity_letter"] == "C"
         assert can["initial_sra"]["risk_index"] == 9
-        assert can["initial_sra"]["risk_level"] == "Medium"
+        assert can["initial_sra"]["risk_level"] == "High"
         assert can["initial_sra"]["risk_outcome"] == "Tolerable"
+        assert can["initial_sra"]["tolerability_tier"] == "HIGH"
         # Legacy flat fields stay in sync.
         assert can["initial_severity"] == 3
         assert can["initial_probability"] == 3
         assert can["initial_risk_index"] == 9
-        assert can["initial_risk_level"] == "Medium"
+        assert can["initial_risk_level"] == "High"
+        assert can["initial_tolerability_tier"] == "HIGH"
 
     def test_can_issue_recomputes_risk_server_side(self, client):
         # Client sends a wrong index/level; the server must canonicalise from
@@ -945,7 +947,7 @@ class TestSraAndFishboneIntegration:
                 "target_completion_date": "2026-12-31T00:00:00Z",
                 "residual_severity": 3,
                 "residual_probability": 3,
-                "residual_sra": {"severity": 3, "probability": 3, "risk_index": 9, "risk_level": "Medium", "risk_outcome": "Tolerable"},
+                "residual_sra": {"severity": 3, "probability": 3, "risk_index": 9, "risk_level": "High", "risk_outcome": "Tolerable"},
             },
             headers=_auth_header("AIRLINE_ADMIN_TOKEN"),
         )

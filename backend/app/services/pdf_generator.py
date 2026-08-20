@@ -97,7 +97,7 @@ def generate_report_pdf(report_data: dict, report_type: str,
     if risk_dist:
         story.append(Paragraph("Risk Distribution", heading_style))
         risk_rows = [[Paragraph("<b>Level</b>", normal), Paragraph("<b>Count</b>", normal)]]
-        for level in ["Low", "Medium", "High", "Very High"]:
+        for level in ["Low", "High", "Very High"]:
             risk_rows.append([
                 Paragraph(level, normal),
                 Paragraph(str(risk_dist.get(level, 0)), normal),

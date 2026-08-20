@@ -44,10 +44,34 @@ def test_classify_falls_back_to_other():
 def test_tolerability_bands():
     assert StateRiskService._tolerability(None) == "Acceptable"
     assert StateRiskService._tolerability(1) == "Acceptable"
+    assert StateRiskService._tolerability(5) == "Acceptable"
+    assert StateRiskService._tolerability(6) == "Tolerable"
     assert StateRiskService._tolerability(9) == "Tolerable"
     assert StateRiskService._tolerability(15) == "Tolerable"
     assert StateRiskService._tolerability(16) == "Intolerable"
     assert StateRiskService._tolerability(25) == "Intolerable"
+
+
+def test_aggregate_groups_risk_into_level_ii_iii_iv(monkeypatch):
+    """State aggregation must group hazard counts into Level II (Low),
+    Level III (High) and Level IV (Very High) tiers."""
+    svc = _svc(
+        monkeypatch,
+        hazards=[
+            {"tenant_id": "air1", "occurrence_category": "BIRD", "risk_level": "Low"},
+            {"tenant_id": "air1", "occurrence_category": "BIRD", "risk_level": "Medium"},
+            {"tenant_id": "air1", "occurrence_category": "BIRD", "risk_level": "High"},
+            {"tenant_id": "air1", "occurrence_category": "BIRD", "risk_level": "Very High"},
+        ],
+    )
+    result = svc.aggregate_state_risk(2026, 3)
+    by_cat = {r["icoc_category"]: r for r in result["risks"]}
+    bird = by_cat["BIRD"]
+    assert bird["count"] == 4
+    assert bird["level_ii_count"] == 1
+    assert bird["level_iii_count"] == 2  # Medium + High fold into Level III
+    assert bird["level_iv_count"] == 1
+    assert bird["high_risk_count"] == 3
 
 
 # ============================================================================
@@ -319,6 +343,24 @@ def test_sync_records_aggregated_at_staleness(monkeypatch):
     bird = coll._store["BIRD-2026Q3"]
     assert "aggregated_at" in bird
     assert bird["aggregated_at"] == result["aggregated_at"]
+
+
+def test_sync_persists_tier_and_level(monkeypatch):
+    """Register entries must carry the 3-tier tolerability tier + Level naming."""
+    coll, svc = _svc_with_risk_collection(
+        monkeypatch,
+        hazards=[
+            {"tenant_id": "air1", "occurrence_category": "BIRD", "severity_level": 5, "probability_level": 5, "risk_level": "Very High"},
+        ],
+    )
+    svc.sync_register_from_aggregation(2026, 3)
+    bird = coll._store["BIRD-2026Q3"]
+    assert bird["tolerability"] == "Intolerable"
+    assert bird["tolerability_tier"] == "VERY HIGH"
+    assert bird["level"] == "Level IV"
+    assert bird["level_ii_count"] == 0
+    assert bird["level_iii_count"] == 0
+    assert bird["level_iv_count"] == 1
 
 
 def test_sync_retains_ssp_target_on_resync(monkeypatch):

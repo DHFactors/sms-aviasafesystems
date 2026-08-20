@@ -373,7 +373,8 @@ function renderRiskDisplay(h) {
     const rl = h.risk_level;
     const ro = h.risk_outcome;
 
-    const bgClass = rl === 'Very High' ? 'bg-very-high' : rl === 'High' ? 'bg-high' : rl === 'Medium' ? 'bg-medium' : rl === 'Low' ? 'bg-low' : 'bg-na';
+    const rlNorm = rl === 'Very High' ? 'Very High' : rl === 'Low' ? 'Low' : 'High';
+    const bgClass = rlNorm === 'Very High' ? 'bg-very-high' : rlNorm === 'High' ? 'bg-high' : rlNorm === 'Low' ? 'bg-low' : 'bg-na';
     const rlDisplay = rl || 'N/A';
 
     container.innerHTML = `

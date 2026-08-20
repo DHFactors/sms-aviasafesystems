@@ -205,9 +205,9 @@ function statusBadgeClass(status) {
 
 function riskBadgeClass(risk) {
     const r = (risk || '').toLowerCase();
-    if (r.indexOf('high') !== -1 || r.indexOf('intol') !== -1) return 'badge-danger';
-    if (r.indexOf('medium') !== -1 || r.indexOf('action') !== -1) return 'badge-medium';
-    if (r.indexOf('low') !== -1 || r.indexOf('acceptable') !== -1) return 'badge-low';
+    if (r.indexOf('very high') !== -1 || r.indexOf('intol') !== -1 || r.indexOf('level iv') !== -1) return 'badge-critical';
+    if (r.indexOf('high') !== -1 || r.indexOf('medium') !== -1 || r.indexOf('moderate') !== -1 || r.indexOf('tol') !== -1 || r.indexOf('level iii') !== -1 || r.indexOf('action') !== -1) return 'badge-high';
+    if (r.indexOf('low') !== -1 || r.indexOf('acceptable') !== -1 || r.indexOf('level ii') !== -1) return 'badge-low';
     return 'badge-default';
 }
 

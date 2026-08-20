@@ -7,8 +7,10 @@
 // MODES:
 //   - 'interactive': click a cell to select (Severity, Probability) -> risk state
 //   - 'readonly'   : highlight a given (severity, probability) risk state
-// COLOR CODING: outcome-based (Red=Unacceptable, Yellow=Tolerable, Green=
-//   Acceptable) by default, or 4-level config colors via { colorMode: 'level' }.
+// COLOR CODING: CAAN CAR-19 3-tier tolerability — Red (Level IV / Intolerable),
+//   Amber (Level III / Tolerable), Green (Level II / Acceptable) by default, or
+//   config colors via { colorMode: 'level' }. Legacy "Medium"/"Moderate" labels
+//   are folded into the High (Level III) tier.
 // ============================================================================
 
 const RiskMatrix = (() => {
@@ -26,11 +28,11 @@ const RiskMatrix = (() => {
             1: 'Extremely Improbable', 2: 'Improbable', 3: 'Remote', 4: 'Occasional', 5: 'Frequent',
         },
         risk_level_labels: {
-            Low: 'Low (Acceptable)', Medium: 'Medium (Tolerable)',
-            High: 'High (Intolerable)', 'Very High': 'Very High (Intolerable – Immediate Action)',
+            Low: 'Low (Acceptable)', High: 'High (Tolerable)',
+            'Very High': 'Very High (Intolerable – Immediate Action)',
         },
         risk_level_colors: {
-            Low: '#4CAF50', Medium: '#FFC107', High: '#FF9800', 'Very High': '#F44336',
+            Low: '#4CAF50', High: '#FF9800', 'Very High': '#F44336',
         },
     };
 
@@ -71,6 +73,14 @@ const RiskMatrix = (() => {
     // Classification
     // ------------------------------------------------------------------
 
+    function normalizeLevel(level) {
+        if (level === null || level === undefined) return 'High';
+        const norm = String(level).trim().toUpperCase();
+        if (norm === 'LOW' || norm === 'ACCEPTABLE') return 'Low';
+        if (norm === 'VERY HIGH' || norm === 'CRITICAL' || norm === 'INTOLERABLE') return 'Very High';
+        return 'High';
+    }
+
     function classify(severity, probability, cfg) {
         const config = resolveConfig(cfg);
         const s = parseInt(severity, 10);
@@ -82,8 +92,7 @@ const RiskMatrix = (() => {
         const t = config.thresholds || DEFAULTS.thresholds;
         let level, outcome;
         if (index <= t.low_max) { level = 'Low'; outcome = 'Acceptable'; }
-        else if (index <= t.medium_max) { level = 'Medium'; outcome = 'Tolerable'; }
-        else if (index <= t.high_max) { level = 'High'; outcome = 'Intolerable'; }
+        else if (index <= t.high_max) { level = 'High'; outcome = 'Tolerable'; }
         else { level = 'Very High'; outcome = 'Intolerable'; }
         const color = (config.risk_level_colors || {})[level] || null;
         return {
@@ -106,8 +115,8 @@ const RiskMatrix = (() => {
     }
 
     function badgeClassFor(level) {
-        const map = { Low: 'badge-low', Medium: 'badge-medium', High: 'badge-high', 'Very High': 'badge-critical' };
-        return map[level] || 'badge-default';
+        const map = { Low: 'badge-low', High: 'badge-high', 'Very High': 'badge-critical' };
+        return map[normalizeLevel(level)] || 'badge-default';
     }
 
     /**
@@ -151,9 +160,9 @@ const RiskMatrix = (() => {
             head.innerHTML = `
                 <div class="sra-matrix-title"><i class="fas fa-th"></i> Safety Risk Assessment (Severity A–E × Probability 1–5)</div>
                 <div class="sra-matrix-legend">
-                    <span class="sra-legend-item sra-legend-acceptable"><i class="fas fa-square"></i> Acceptable</span>
-                    <span class="sra-legend-item sra-legend-tolerable"><i class="fas fa-square"></i> Tolerable</span>
-                    <span class="sra-legend-item sra-legend-intolerable"><i class="fas fa-square"></i> Unacceptable</span>
+                    <span class="sra-legend-item sra-legend-acceptable"><i class="fas fa-square"></i> Acceptable (Level II)</span>
+                    <span class="sra-legend-item sra-legend-tolerable"><i class="fas fa-square"></i> Tolerable (Level III)</span>
+                    <span class="sra-legend-item sra-legend-intolerable"><i class="fas fa-square"></i> Unacceptable (Level IV)</span>
                 </div>
             `;
             wrapper.appendChild(head);
@@ -289,7 +298,7 @@ const RiskMatrix = (() => {
         };
     }
 
-    return { render, classify, fetchConfig, resolveConfig, SEVERITY_LETTERS, DEFAULTS, OUTCOME_COLORS };
+    return { render, classify, fetchConfig, resolveConfig, normalizeLevel, SEVERITY_LETTERS, DEFAULTS, OUTCOME_COLORS };
 })();
 
 if (typeof window !== 'undefined') {

@@ -148,7 +148,8 @@
         var hasContent = Boolean(
             (section.paragraphs && section.paragraphs.length) ||
             (section.bullets && section.bullets.length) ||
-            (section.table && section.table.headers && section.table.headers.length)
+            (section.table && section.table.headers && section.table.headers.length) ||
+            (section.tiers && section.tiers.headers && section.tiers.headers.length)
         );
         if (!hasContent) {
             return;
@@ -161,6 +162,7 @@
         renderParagraphs(sec, section.paragraphs);
         renderBullets(sec, section.bullets);
         renderTable(sec, section.table);
+        renderTable(sec, section.tiers);
         container.appendChild(sec);
     }
 

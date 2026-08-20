@@ -201,9 +201,9 @@ function renderRiskChart(data) {
     const ctx = document.getElementById('riskChartCanvas');
     if (!ctx) return;
 
-    const counts = { Low: 0, Medium: 0, High: 0, 'Very High': 0 };
+    const counts = { Low: 0, High: 0, 'Very High': 0 };
     for (const d of data) {
-        const level = d.risk_level;
+        const level = typeof normalizeRiskLevel === 'function' ? normalizeRiskLevel(d.risk_level) : d.risk_level;
         if (counts.hasOwnProperty(level)) counts[level] = d.count;
     }
     const labels = ICAO_RISK_LABELS;

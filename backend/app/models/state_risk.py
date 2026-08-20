@@ -22,6 +22,12 @@ class RiskTolerability(str, Enum):
     INTOLERABLE = "Intolerable"
 
 
+class RiskTolerabilityTier(str, Enum):
+    LOW = "LOW"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY HIGH"
+
+
 class RiskTrend(str, Enum):
     IMPROVING = "improving"
     STABLE = "stable"
@@ -34,6 +40,8 @@ class StateRiskRegisterCreate(BaseModel):
     icao_reference: Optional[str] = None
     current_risk_index: Optional[int] = Field(None, ge=1, le=25)
     tolerability: RiskTolerability = RiskTolerability.TOLERABLE
+    tolerability_tier: Optional[RiskTolerabilityTier] = None
+    level: Optional[str] = None
     ssp_target: Optional[float] = None
     actual_ssp_value: Optional[float] = None
     risk_reduction_rate: Optional[float] = None
@@ -49,6 +57,8 @@ class StateRiskRegisterUpdate(BaseModel):
     icao_reference: Optional[str] = None
     current_risk_index: Optional[int] = Field(None, ge=1, le=25)
     tolerability: Optional[RiskTolerability] = None
+    tolerability_tier: Optional[RiskTolerabilityTier] = None
+    level: Optional[str] = None
     ssp_target: Optional[float] = None
     actual_ssp_value: Optional[float] = None
     risk_reduction_rate: Optional[float] = None
@@ -65,6 +75,8 @@ class StateRiskRegisterResponse(BaseModel):
     icao_reference: Optional[str] = None
     current_risk_index: Optional[int] = None
     tolerability: str
+    tolerability_tier: Optional[str] = None
+    level: Optional[str] = None
     ssp_target: Optional[float] = None
     actual_ssp_value: Optional[float] = None
     risk_reduction_rate: Optional[float] = None

@@ -155,7 +155,7 @@ def test_cap_has_six_branch_fishbone_primary_and_1to1_actions():
         fishbone=fishbone,
     )
     assert cap["submitted_by"] == "Head of Flight Operations"
-    assert cap["residual_sra"]["risk_level"] in {"Low", "Medium"}
+    assert cap["residual_sra"]["risk_level"] in {"Low", "High"}
     assert cap["residual_sra"]["risk_index"] <= 9
     assert all(ai["target_date"] for ai in cap["action_items"])
     assert cap["process_owner"] == "Head of Flight Operations"

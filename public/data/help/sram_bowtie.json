@@ -17,8 +17,11 @@
       "BQV (Barrier Quality Value) 10-50 — seven criteria rated 1-5, weighted: Effectiveness ×3, Disinclination to Override ×2, Cost-Benefit/Practicality/Acceptability/Enforceability/Durability ×1.",
       "BQV bands: Excellent 42-50, Very Good 34-41, Good 26-33, Fair 18-25, Poor 10-17, Ineffective 0-9.",
       "BSV (Barrier Strength Value) 0-5 — the barrier robustness score taken from the BQV band (Excellent = 5 … Ineffective = 0).",
-      "Risk index = Severity × Probability; the 5x5 result is mapped to a tolerability band (Intolerable / Tolerable / Acceptable).",
-      "Sign-off authority follows tolerability: Intolerable → Accountable Manager, Tolerable → Risk Owner / Functional Chief, Acceptable → Safety Manager / SAG Member."
+      "Risk index (RI) = Probability × Severity (P × S) — the 5x5 product of the numeric severity (1-5) and probability (1-5) values, giving an index from 1 to 25.",
+      "CAAN CAR-19 / Doc 9859 3-tier tolerability: Low (Level II, Acceptable, Green, RI ≤ 5) → routine monitoring; High (Level III, Tolerable, Amber, RI 6-15) → formal mitigation required (existing/new control measures, ECM/NCM) with HOD / Safety Manager sign-off; Very High (Level IV, Intolerable, Red, RI > 15) → operations must cease or require Accountable Executive sign-off with mandatory barriers.",
+      "Legacy 'Medium / Moderate' labels are folded into the High (Level III, Tolerable) tier.",
+      "Sign-off authority follows the resultant-risk tolerability tier: Intolerable → Accountable Manager; Tolerable → Risk Owner / Functional Chief; Acceptable → Safety Manager / SAG Member.",
+      "Barrier quality shifts the risk across tiers — a higher BQV (10-50) yields a higher BSV (0-5) and a lower probability value, which lowers the resultant risk index (e.g. a 4C risk can drop to 2D / 2E and move from Level III to Level II)."
     ],
     "table": {
       "headers": ["BQV Score", "Band", "BSV"],
@@ -29,6 +32,15 @@
         ["18-25", "Fair", "2"],
         ["10-17", "Poor", "1"],
         ["0-9", "Ineffective", "0"]
+      ]
+    },
+    "tiers": {
+      "title": "3-Tier Tolerability (CAAN CAR-19 / ICAO Doc 9859)",
+      "headers": ["Tier", "Risk Index", "Outcome", "Colour", "Action Required"],
+      "rows": [
+        ["Level II (Low)", "≤ 5", "Acceptable", "Green", "Routine monitoring"],
+        ["Level III (High)", "6-15", "Tolerable", "Amber", "Formal mitigation (ECM/NCM) & HOD / Safety Manager sign-off"],
+        ["Level IV (Very High)", "> 15", "Intolerable", "Red", "Operations must cease or Accountable Executive sign-off with mandatory barriers"]
       ]
     }
   },

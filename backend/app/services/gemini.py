@@ -75,11 +75,10 @@ Your explanation should be 1-2 sentences that anchor the assigned level to an ac
 investigation outcome or industry statistical precedent.
 
 RISK INDEX is then computed automatically as Severity x Probability.
-Risk Level thresholds (ICAO-aligned):
-  <= {THRESHOLDS_DEFAULT['low_max']} = Low
-  <= {THRESHOLDS_DEFAULT['medium_max']} = Medium
-  <= {THRESHOLDS_DEFAULT['high_max']} = High
-  > {THRESHOLDS_DEFAULT['high_max']} = Very High
+Risk Level thresholds (ICAO/CAAN CAR-19 aligned, 3-tier):
+  <= {THRESHOLDS_DEFAULT['low_max']} = Low (Acceptable, Level II)
+  <= {THRESHOLDS_DEFAULT['high_max']} = High (Tolerable, Level III)
+  > {THRESHOLDS_DEFAULT['high_max']} = Very High (Intolerable, Level IV)
 """
 
 

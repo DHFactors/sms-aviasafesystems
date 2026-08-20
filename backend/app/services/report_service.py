@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.metrics import record_ai_result
 from app.firebase import get_tenant_collection, get_cross_tenant_collection, get_db
 from app.services.gemini import analyze_report, classify_mandatory
-from app.services.risk_matrix import compute_risk_index, get_risk_level, get_thresholds
+from app.services.risk_matrix import compute_risk_index, get_risk_level, get_thresholds, get_tolerability_tier
 from app.services.repository import ReportRepository
 
 
@@ -24,9 +24,12 @@ class ReportService:
         probability_level = payload.get("probability_level")
         risk_index = None
         risk_level = None
+        tolerability_tier = None
         if severity_level is not None and probability_level is not None:
             risk_index = compute_risk_index(severity_level, probability_level)
-            risk_level = get_risk_level(risk_index, get_thresholds(self.tenant_id))
+            thresholds = get_thresholds(self.tenant_id)
+            risk_level = get_risk_level(risk_index, thresholds)
+            tolerability_tier = get_tolerability_tier(risk_index, thresholds)
 
         doc_data = {
             "tenant_id": self.tenant_id,
@@ -50,6 +53,7 @@ class ReportService:
             "probability_level": probability_level,
             "risk_index": risk_index,
             "risk_level": risk_level,
+            "tolerability_tier": tolerability_tier,
             "risk_assessment": None,
             "ai_suggested_assessment": None,
 
@@ -173,7 +177,7 @@ class ReportService:
             ai_analysis = {
                 "occurrence_type": analysis.get("occurrence_type"),
                 "human_factors": analysis.get("human_factors", []),
-                "risk_level": analysis.get("risk_level", "Medium"),
+                "risk_level": analysis.get("risk_level") or "High",
                 "phase_of_flight": analysis.get("phase_of_flight"),
                 "confidence": analysis.get("confidence", 0.0),
                 "summary": analysis.get("summary"),
@@ -189,13 +193,15 @@ class ReportService:
             suggested_probability = analysis.get("suggested_probability")
             ai_suggested_assessment = None
             if suggested_severity is not None and suggested_probability is not None:
+                thresholds = get_thresholds(self.tenant_id)
                 ai_risk_index = compute_risk_index(suggested_severity, suggested_probability)
-                ai_risk_level = get_risk_level(ai_risk_index, get_thresholds(self.tenant_id))
+                ai_risk_level = get_risk_level(ai_risk_index, thresholds)
                 ai_suggested_assessment = {
                     "suggested_severity": suggested_severity,
                     "suggested_probability": suggested_probability,
                     "suggested_risk_index": ai_risk_index,
                     "suggested_risk_level": ai_risk_level,
+                    "tolerability_tier": get_tolerability_tier(ai_risk_index, thresholds),
                     "confidence": analysis.get("confidence", 0.0),
                     "severity_explanation": analysis.get("severity_explanation"),
                     "probability_explanation": analysis.get("probability_explanation"),
@@ -255,7 +261,9 @@ class ReportService:
                 raise ValueError("Report not found")
 
             risk_index = compute_risk_index(severity, probability)
-            risk_level = get_risk_level(risk_index, get_thresholds(report_tenant))
+            thresholds = get_thresholds(report_tenant)
+            risk_level = get_risk_level(risk_index, thresholds)
+            tolerability_tier = get_tolerability_tier(risk_index, thresholds)
             now = datetime.now(timezone.utc)
 
             risk_assessment = {
@@ -263,6 +271,7 @@ class ReportService:
                 "probability": probability,
                 "risk_index": risk_index,
                 "risk_level": risk_level,
+                "tolerability_tier": tolerability_tier,
                 "assessed_by": user["uid"],
                 "assessed_at": now,
                 "notes": notes,
@@ -273,6 +282,7 @@ class ReportService:
                 "probability_level": probability,
                 "risk_index": risk_index,
                 "risk_level": risk_level,
+                "tolerability_tier": tolerability_tier,
                 "risk_assessment": risk_assessment,
                 "reviewed_by": user["uid"],
                 "reviewed_at": now,
@@ -286,6 +296,7 @@ class ReportService:
                 "probability_level": probability,
                 "risk_index": risk_index,
                 "risk_level": risk_level,
+                "tolerability_tier": tolerability_tier,
                 "risk_assessment": risk_assessment,
                 "reviewed_by": user["uid"],
                 "reviewed_at": now,

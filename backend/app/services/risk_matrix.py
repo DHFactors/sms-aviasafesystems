@@ -24,23 +24,54 @@ PROBABILITY_LABELS_DEFAULT = {
 
 RISK_LEVEL_LABELS_DEFAULT = {
     "Low": "Low (Acceptable)",
-    "Medium": "Medium (Tolerable)",
-    "High": "High (Intolerable)",
+    "High": "High (Tolerable)",
     "Very High": "Very High (Intolerable – Immediate Action)",
 }
 
 RISK_LEVEL_COLORS_DEFAULT = {
     "Low": "#4CAF50",
-    "Medium": "#FFC107",
     "High": "#FF9800",
     "Very High": "#F44336",
 }
 
+# THRESHOLDS_DEFAULT keeps medium_max for backward compatibility with stored
+# tenant configs, but classification is now 3-tier (low_max / high_max only):
+#   <= low_max  -> LOW     (Acceptable, Level II, green)
+#   <= high_max -> HIGH    (Tolerable,  Level III, amber/orange)
+#   >  high_max -> VERY HIGH (Intolerable, Level IV, red)
 THRESHOLDS_DEFAULT = {
     "low_max": 5,
     "medium_max": 9,
     "high_max": 15,
 }
+
+# CAAN CAR-19 aligned 3-tier tolerability classification. Legacy "Medium"/
+# "Moderate" labels are folded into the HIGH tier (Level III).
+TOLERABILITY_TIERS = {
+    "LOW": {
+        "level": "Level II",
+        "label": "Low (Acceptable)",
+        "color": "#4CAF50",
+        "outcome": "Acceptable",
+        "signoff": "Routine Monitoring",
+    },
+    "HIGH": {
+        "level": "Level III",
+        "label": "High (Tolerable)",
+        "color": "#FF9800",
+        "outcome": "Tolerable",
+        "signoff": "Formal Mitigation & HOD Sign-off",
+    },
+    "VERY HIGH": {
+        "level": "Level IV",
+        "label": "Very High (Intolerable)",
+        "color": "#F44336",
+        "outcome": "Intolerable",
+        "signoff": "Mandatory Cease / Accountable Executive Sign-off",
+    },
+}
+
+TIER_TO_OUTCOME = {tier: cfg["outcome"] for tier, cfg in TOLERABILITY_TIERS.items()}
 
 
 def _default_matrix_config() -> dict:
@@ -63,12 +94,54 @@ def get_risk_level(risk_index: int, thresholds: Optional[dict] = None) -> str:
         thresholds = THRESHOLDS_DEFAULT
     if risk_index <= thresholds["low_max"]:
         return "Low"
-    elif risk_index <= thresholds["medium_max"]:
-        return "Medium"
     elif risk_index <= thresholds["high_max"]:
         return "High"
     else:
         return "Very High"
+
+
+def get_tolerability_tier(risk_index: int, thresholds: Optional[dict] = None) -> str:
+    """Return the uppercase tolerability tier (LOW / HIGH / VERY HIGH) for a
+    risk index under the CAAN CAR-19 3-tier scheme."""
+    if not thresholds:
+        thresholds = THRESHOLDS_DEFAULT
+    if risk_index <= thresholds["low_max"]:
+        return "LOW"
+    elif risk_index <= thresholds["high_max"]:
+        return "HIGH"
+    else:
+        return "VERY HIGH"
+
+
+def normalize_tolerability(label: Optional[str]) -> str:
+    """Normalise any legacy risk label/outcome into the 3-tier tolerance tier.
+
+    Low / Acceptable -> LOW; Very High / Critical / Intolerable -> VERY HIGH;
+    Medium / Moderate / High / Tolerable / unknown -> HIGH.
+    """
+    if not label:
+        return "HIGH"
+    norm = str(label).strip().upper()
+    if norm in ("LOW", "ACCEPTABLE"):
+        return "LOW"
+    if norm in ("VERY HIGH", "CRITICAL", "INTOLERABLE", "SEVERE"):
+        return "VERY HIGH"
+    return "HIGH"
+
+
+def classify_tolerability(risk_index: int, thresholds: Optional[dict] = None) -> dict:
+    """Full 3-tier classification payload for a risk index."""
+    tier = get_tolerability_tier(risk_index, thresholds)
+    cfg = dict(TOLERABILITY_TIERS[tier])
+    cfg["tier"] = tier
+    cfg["risk_level"] = get_risk_level(risk_index, thresholds)
+    cfg["risk_index"] = risk_index
+    return cfg
+
+
+def risk_outcome_by_index(risk_index: int, thresholds: Optional[dict] = None) -> str:
+    """Outcome (Acceptable / Tolerable / Intolerable) from a risk index only."""
+    return TIER_TO_OUTCOME[get_tolerability_tier(risk_index, thresholds)]
 
 
 def get_risk_matrix_config(tenant_id: str) -> dict:
@@ -122,11 +195,4 @@ def classify_risk(risk_index: int, thresholds: Optional[dict] = None) -> str:
 
 def risk_outcome(severity: int, probability: int, thresholds: Optional[dict] = None) -> str:
     risk_index = compute_risk_index(severity, probability)
-    if not thresholds:
-        thresholds = THRESHOLDS_DEFAULT
-    if risk_index <= thresholds["low_max"]:
-        return "Acceptable"
-    elif risk_index <= thresholds["medium_max"]:
-        return "Tolerable"
-    else:
-        return "Intolerable"
+    return risk_outcome_by_index(risk_index, thresholds)

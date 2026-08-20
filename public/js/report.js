@@ -175,9 +175,8 @@ async function updateRiskMatrix(thresholds) {
 }
 
 function getRiskLevelLabel(index) {
-    if (index === null || index === undefined) return 'N/A';
+    if (index === null || index === undefined) return { text: 'N/A', class: 'badge-default' };
     if (index <= 5) return { text: 'Low', class: 'badge-low' };
-    if (index <= 9) return { text: 'Medium', class: 'badge-medium' };
     if (index <= 15) return { text: 'High', class: 'badge-high' };
     return { text: 'Very High', class: 'badge-critical' };
 }

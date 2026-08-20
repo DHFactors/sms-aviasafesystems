@@ -7,7 +7,14 @@ from app.firebase import get_tenant_collection, get_cross_tenant_collection
 from app.services.hazard_service import HazardService
 from app.services.users import get_user_department
 from app.services.repository import coerce_utc_datetime
-from app.services.risk_matrix import compute_risk_index, get_risk_level, risk_outcome, get_thresholds
+from app.services.risk_matrix import (
+    compute_risk_index,
+    get_risk_level,
+    risk_outcome,
+    get_thresholds,
+    get_tolerability_tier,
+    normalize_tolerability,
+)
 
 
 CAN_COLLECTION = "can_cap"
@@ -89,6 +96,7 @@ class CanCapService:
             "risk_index": index,
             "risk_level": level,
             "risk_outcome": outcome,
+            "tolerability_tier": get_tolerability_tier(index, thresholds),
         }
 
     def _sra_block(self, severity, probability, assessed_by=None, assessed_at=None, provided=None):
@@ -144,6 +152,7 @@ class CanCapService:
             "initial_risk_index": payload.get("initial_risk_index"),
             "initial_risk_level": payload.get("initial_risk_level"),
             "initial_risk_outcome": payload.get("initial_risk_outcome"),
+            "initial_tolerability_tier": payload.get("initial_tolerability_tier"),
             "initial_sra": payload.get("initial_sra"),
             "classification_type": payload.get("classification_type"),
             "classification_level": payload.get("classification_level"),
@@ -165,6 +174,7 @@ class CanCapService:
             doc_data["initial_risk_index"] = initial_sra["risk_index"]
             doc_data["initial_risk_level"] = initial_sra["risk_level"]
             doc_data["initial_risk_outcome"] = initial_sra["risk_outcome"]
+            doc_data["initial_tolerability_tier"] = initial_sra["tolerability_tier"]
         elif payload.get("initial_risk_index"):
             # Back-compat: legacy clients that only sent an index get a level too.
             thresholds = get_thresholds(self.tenant_id)
@@ -174,6 +184,7 @@ class CanCapService:
                 payload.get("initial_probability") or 1,
                 thresholds,
             )
+            doc_data["initial_tolerability_tier"] = get_tolerability_tier(payload["initial_risk_index"], thresholds)
 
         try:
             ref = self._can_collection().add(doc_data)
@@ -404,6 +415,7 @@ class CanCapService:
             "residual_risk_index": payload.get("residual_risk_index"),
             "residual_risk_level": payload.get("residual_risk_level"),
             "residual_risk_outcome": payload.get("residual_risk_outcome"),
+            "residual_tolerability_tier": payload.get("residual_tolerability_tier"),
             "residual_sra": payload.get("residual_sra"),
             # Structured RCA (Fishbone / Ishikawa 5M + Management)
             "root_causes": payload.get("root_causes") or None,
@@ -428,6 +440,7 @@ class CanCapService:
             doc_data["residual_risk_index"] = residual_sra["risk_index"]
             doc_data["residual_risk_level"] = residual_sra["risk_level"]
             doc_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
+            doc_data["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
         elif payload.get("residual_risk_index"):
             thresholds = get_thresholds(self.tenant_id)
             doc_data["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
@@ -436,6 +449,7 @@ class CanCapService:
                 payload.get("residual_probability") or 1,
                 thresholds,
             )
+            doc_data["residual_tolerability_tier"] = get_tolerability_tier(payload["residual_risk_index"], thresholds)
 
         try:
             ref = self._caps_collection(can_doc_id).add(doc_data)
@@ -618,6 +632,7 @@ class CanCapService:
                             "residual_risk_index": review.get("residual_risk_index"),
                             "residual_risk_level": review.get("residual_risk_level"),
                             "residual_risk_outcome": review.get("residual_risk_outcome"),
+                            "residual_tolerability_tier": review.get("residual_tolerability_tier"),
                             "residual_sra": review.get("residual_sra"),
                             "root_causes": review.get("root_causes"),
                             "action_items": review.get("action_items"),
@@ -642,6 +657,7 @@ class CanCapService:
                             update_data["residual_risk_index"] = residual_sra["risk_index"]
                             update_data["residual_risk_level"] = residual_sra["risk_level"]
                             update_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
+                            update_data["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
                         elif review.get("residual_risk_index"):
                             thresholds = get_thresholds(self.tenant_id)
                             update_data["residual_risk_level"] = get_risk_level(
@@ -651,6 +667,9 @@ class CanCapService:
                                 review.get("residual_severity") or 1,
                                 review.get("residual_probability") or 1,
                                 thresholds,
+                            )
+                            update_data["residual_tolerability_tier"] = get_tolerability_tier(
+                                review["residual_risk_index"], thresholds
                             )
                         if review.get("sag_sign"):
                             update_data["sag_signed_by"] = review.get("sag_signed_by")

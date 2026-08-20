@@ -15,12 +15,24 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from app.firebase import get_db
-from app.services.risk_matrix import compute_risk_index
+from app.services.risk_matrix import (
+    compute_risk_index,
+    get_tolerability_tier,
+    normalize_tolerability,
+    TIER_TO_OUTCOME,
+)
 
 
 STATE_COLLECTION = "state"
 ICAO_REFERENCE_DOCUMENT = "icao_top_risks"
 RISK_REGISTER_SUBCOLLECTION = "risk_register"
+
+# CAAN CAR-19 3-tier tolerance -> state register Level naming.
+_LEVEL_NAMES = {
+    "LOW": "Level II",
+    "HIGH": "Level III",
+    "VERY HIGH": "Level IV",
+}
 
 # ICAO-aligned top safety risk categories (state-level SSP register).
 # Keys mirror the ADREP occurrence categories used across tenant reports.
@@ -132,6 +144,9 @@ class StateRiskService:
                 "ssp_target": (ref or {}).get("ssp_target") or cat_def.get("ssp_target"),
                 "count": 0,
                 "high_risk_count": 0,
+                "level_ii_count": 0,
+                "level_iii_count": 0,
+                "level_iv_count": 0,
                 "severity_sum": 0,
                 "probability_sum": 0,
                 "tenant_ids": set(),
@@ -146,8 +161,15 @@ class StateRiskService:
             if isinstance(sev, int) and isinstance(prob, int):
                 agg["severity_sum"] += sev
                 agg["probability_sum"] += prob
-            if h.get("risk_level") in ("High", "Very High", "Critical"):
+            tier = normalize_tolerability(h.get("risk_level"))
+            if tier == "LOW":
+                agg["level_ii_count"] += 1
+            else:
                 agg["high_risk_count"] += 1
+                if tier == "VERY HIGH":
+                    agg["level_iv_count"] += 1
+                else:
+                    agg["level_iii_count"] += 1
             tid = h.get("tenant_id")
             if tid:
                 agg["tenant_ids"].add(tid)
@@ -161,8 +183,15 @@ class StateRiskService:
             if isinstance(sev, int) and isinstance(prob, int):
                 agg["severity_sum"] += sev
                 agg["probability_sum"] += prob
-            if r.get("risk_level") in ("High", "Very High", "Critical"):
+            tier = normalize_tolerability(r.get("risk_level"))
+            if tier == "LOW":
+                agg["level_ii_count"] += 1
+            else:
                 agg["high_risk_count"] += 1
+                if tier == "VERY HIGH":
+                    agg["level_iv_count"] += 1
+                else:
+                    agg["level_iii_count"] += 1
             tid = r.get("tenant_id")
             if tid:
                 agg["tenant_ids"].add(tid)
@@ -180,6 +209,9 @@ class StateRiskService:
                 "ssp_target": agg["ssp_target"],
                 "count": n,
                 "high_risk_count": agg["high_risk_count"],
+                "level_ii_count": agg["level_ii_count"],
+                "level_iii_count": agg["level_iii_count"],
+                "level_iv_count": agg["level_iv_count"],
                 "current_risk_index": current_index,
                 "avg_severity": avg_sev,
                 "avg_probability": avg_prob,
@@ -209,6 +241,7 @@ class StateRiskService:
 
         for row in agg["risks"]:
             existing = self._find_entry(row["icoc_category"], year, quarter)
+            tolerability = self._tolerability(row["current_risk_index"])
             data = {
                 "icoc_category": row["icoc_category"],
                 "name": row["name"],
@@ -218,9 +251,14 @@ class StateRiskService:
                 "actual_ssp_value": row["current_risk_index"],
                 "count": row["count"],
                 "high_risk_count": row["high_risk_count"],
+                "level_ii_count": row["level_ii_count"],
+                "level_iii_count": row["level_iii_count"],
+                "level_iv_count": row["level_iv_count"],
                 "avg_severity": row["avg_severity"],
                 "avg_probability": row["avg_probability"],
-                "tolerability": self._tolerability(row["current_risk_index"]),
+                "tolerability": tolerability,
+                "tolerability_tier": get_tolerability_tier(row["current_risk_index"]),
+                "level": _LEVEL_NAMES[get_tolerability_tier(row["current_risk_index"])],
                 "trend": self._trend(existing, row["current_risk_index"]),
                 "year": year,
                 "quarter": quarter,
@@ -329,13 +367,13 @@ class StateRiskService:
 
     @staticmethod
     def _tolerability(risk_index: Optional[int]) -> str:
+        """3-tier outcome aligned to the operator risk matrix (Level II/III/IV).
+
+        Acceptable <= low_max, Tolerable <= high_max, Intolerable above.
+        """
         if risk_index is None:
             return "Acceptable"
-        if risk_index >= 16:
-            return "Intolerable"
-        if risk_index >= 9:
-            return "Tolerable"
-        return "Acceptable"
+        return TIER_TO_OUTCOME[get_tolerability_tier(risk_index)]
 
     @staticmethod
     def _trend(existing: Optional[Dict[str, Any]], current: Optional[int]) -> str:

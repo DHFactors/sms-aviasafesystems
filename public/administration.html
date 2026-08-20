@@ -66,7 +66,7 @@
         <div class="section-title"><i class="fas fa-sliders-h"></i> ICAO Risk Matrix Configuration</div>
         <div class="config-card">
             <p class="note">
-                Configure the thresholds that define Low, Medium, High, and Very High risk levels.
+                Configure the thresholds that define Low, High, and Very High risk levels.
                 Changes apply to your organization only.
             </p>
             <form id="riskMatrixForm" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;align-items:end;max-width:500px;">
@@ -91,10 +91,9 @@
                 <p style="font-size:0.8rem;color:#475569;font-weight:600;margin-bottom:0.5rem;">Preview — Severity × Probability (cell = risk index)</p>
                 <div id="riskMatrixPreview" style="overflow-x:auto;"></div>
                 <div style="display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin-top:0.75rem;font-size:0.72rem;color:#475569;">
-                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#34a853;border-radius:3px;display:inline-block;"></span> Low</span>
-                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#f9ab00;border-radius:3px;display:inline-block;"></span> Medium</span>
-                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#f57c00;border-radius:3px;display:inline-block;"></span> High</span>
-                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#ea4335;border-radius:3px;display:inline-block;"></span> Very High</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#34a853;border-radius:3px;display:inline-block;"></span> Low (Level II)</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#f9ab00;border-radius:3px;display:inline-block;"></span> High (Level III)</span>
+                    <span style="display:inline-flex;align-items:center;gap:0.35rem;"><span style="width:14px;height:14px;background:#ea4335;border-radius:3px;display:inline-block;"></span> Very High (Level IV)</span>
                 </div>
                 <p style="font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;text-align:center;">
                     Thresholds are inclusive maximums (1–25). Risk index = Severity × Probability. Changes apply to your organization only.
@@ -309,7 +308,6 @@ function renderRiskMatrixPreview() {
     const levelFor = (index) => {
         if (!valid) return 'Very High';
         if (index <= t.lowMax) return 'Low';
-        if (index <= t.mediumMax) return 'Medium';
         if (index <= t.highMax) return 'High';
         return 'Very High';
     };
@@ -341,7 +339,7 @@ function renderRiskMatrixPreview() {
     if (!valid) {
         note = '<p style="text-align:center;font-size:0.72rem;color:#d97706;margin-top:0.5rem;">Thresholds must be strictly increasing: 1 ≤ Low &lt; Medium &lt; High ≤ 25.</p>';
     } else {
-        note = `<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;">Low ≤ ${t.lowMax} · Medium ≤ ${t.mediumMax} · High ≤ ${t.highMax} · Very High &gt; ${t.highMax}</p>`;
+        note = `<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;">Low ≤ ${t.lowMax} · High ≤ ${t.highMax} · Very High &gt; ${t.highMax}</p>`;
     }
     container.innerHTML = html + note;
 }

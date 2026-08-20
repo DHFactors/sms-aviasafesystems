@@ -84,6 +84,32 @@ const SRM = (() => {
 
     const LETTER_TO_NUMERIC = { A: 5, B: 4, C: 3, D: 2, E: 1 };
 
+    // Map SRAM tolerability outcomes to the 3-tier CAAN CAR-19 tolerance tiers
+    // (mirrors backend/app/services/srm_engine.py#tolerability_tier).
+    const TOLERABILITY_TO_TIER = {
+        Acceptable: 'LOW',
+        Tolerable: 'HIGH',
+        Intolerable: 'VERY HIGH',
+    };
+
+    const TIER_LEVELS = {
+        LOW: 'Level II',
+        HIGH: 'Level III',
+        'VERY HIGH': 'Level IV',
+    };
+
+    function tolerabilityTier(tolerability) {
+        return TOLERABILITY_TO_TIER[tolerability] || 'HIGH';
+    }
+
+    function normalizeTier(label) {
+        if (label === null || label === undefined) return 'HIGH';
+        const norm = String(label).trim().toUpperCase();
+        if (norm === 'LOW' || norm === 'ACCEPTABLE') return 'LOW';
+        if (norm === 'VERY HIGH' || norm === 'CRITICAL' || norm === 'INTOLERABLE') return 'VERY HIGH';
+        return 'HIGH';
+    }
+
     const FISHBONE_CATEGORIES = ['Man', 'Machine', 'Method', 'Medium', 'Management', 'Material'];
 
     // ── Helpers ─────────────────────────────────────────────────────────────
@@ -166,13 +192,16 @@ const SRM = (() => {
             existing_bsv: existingBsv,
             consolidated_bsv: consolidatedBsv,
             severity_letter: letter,
+            tier: tolerabilityTier(resultantTol),
             initial_risk: {
                 index: initialP + letter, probability_value: initialP,
                 descriptor: '', tolerability: initialTol,
+                tier: tolerabilityTier(initialTol),
             },
             resultant_risk: {
                 index: resultantP + letter, probability_value: resultantP,
                 descriptor: '', tolerability: resultantTol,
+                tier: tolerabilityTier(resultantTol),
             },
             signoff: {
                 authority: SIGNOFF_AUTHORITY[resultantTol],
@@ -719,7 +748,7 @@ const SRM = (() => {
                 const tol = this.el.querySelector(sel + '-tol');
                 const bsv = this.el.querySelector(sel + '-bsv');
                 idx.textContent = risk.index;
-                tol.textContent = risk.tolerability;
+                tol.textContent = `${risk.tolerability} · ${TIER_LEVELS[risk.tier] || risk.tier}`;
                 tol.className = 'srm-risk-tol ' + (risk.tolerability === 'Intolerable' ? 'srm-tol-intolerable' : risk.tolerability === 'Tolerable' ? 'srm-tol-tolerable' : 'srm-tol-acceptable');
                 bsv.textContent = '';
             };
@@ -775,7 +804,7 @@ const SRM = (() => {
                     });
                     this.renderBarriers();
                 }
-                this._status(`Calculated: ${result.risk_profile.initial_risk.index} → ${result.risk_profile.resultant_risk.index} (${result.risk_profile.resultant_risk.tolerability})`, 'srm-ok');
+                this._status(`Calculated: ${result.risk_profile.initial_risk.index} → ${result.risk_profile.resultant_risk.index} (${result.risk_profile.resultant_risk.tolerability} · ${TIER_LEVELS[result.risk_profile.resultant_risk.tier] || result.risk_profile.resultant_risk.tier})`, 'srm-ok');
             } catch (err) {
                 this._status('Calculate failed: ' + err.message, 'srm-err');
             } finally {
@@ -826,7 +855,7 @@ const SRM = (() => {
             btn.disabled = true;
             try {
                 const result = await HazardsAPI.sramSave(this.hazardId, this._buildSavePayload());
-                this._status(`Saved: resultant risk ${result.sram_data.risk_profile.resultant_risk.index} (${result.sram_data.risk_profile.resultant_risk.tolerability})`, 'srm-ok');
+                this._status(`Saved: resultant risk ${result.sram_data.risk_profile.resultant_risk.index} (${result.sram_data.risk_profile.resultant_risk.tolerability} · ${TIER_LEVELS[result.sram_data.risk_profile.resultant_risk.tier] || result.sram_data.risk_profile.resultant_risk.tier})`, 'srm-ok');
                 if (typeof this.onSaved === 'function') this.onSaved(result);
             } catch (err) {
                 this._status('Save failed: ' + err.message, 'srm-err');
@@ -920,9 +949,9 @@ const SRM = (() => {
             const profile = evaluateRiskProfile(severity, { ecb: [], erb: [], ncb: state.ncm, nrb: [] });
 
             el.querySelector('[data-srm-initial-index]').textContent = profile.initial_risk.index;
-            el.querySelector('[data-srm-initial-tol]').textContent = profile.initial_risk.tolerability;
+            el.querySelector('[data-srm-initial-tol]').textContent = `${profile.initial_risk.tolerability} · ${TIER_LEVELS[profile.initial_risk.tier] || profile.initial_risk.tier}`;
             el.querySelector('[data-srm-resultant-index]').textContent = profile.resultant_risk.index;
-            el.querySelector('[data-srm-resultant-tol]').textContent = profile.resultant_risk.tolerability;
+            el.querySelector('[data-srm-resultant-tol]').textContent = `${profile.resultant_risk.tolerability} · ${TIER_LEVELS[profile.resultant_risk.tier] || profile.resultant_risk.tier}`;
             el.querySelector('[data-srm-resultant-bsv]').textContent = `NCM BSV ${profile.consolidated_bsv}`;
             el.querySelector('[data-srm-authority]').innerHTML =
                 `<i class="fas fa-user-shield"></i> Required: ${esc(profile.signoff.authority)}`;
@@ -1042,6 +1071,10 @@ const SRM = (() => {
         BQV_BANDS,
         PROBABILITY_CONFIG,
         TOLERABILITY,
+        TOLERABILITY_TO_TIER,
+        TIER_LEVELS,
+        tolerabilityTier,
+        normalizeTier,
         SIGNOFF_AUTHORITY,
         LETTER_TO_NUMERIC,
         FISHBONE_CATEGORIES,

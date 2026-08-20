@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
 from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
+from app.services.risk_matrix import normalize_tolerability
 from seed.config import FLIGHT_OPERATOR_TYPES
 
 DIVERSION_COLLECTION = "flight_diversions"
@@ -578,7 +579,7 @@ class DashboardService:
             tid = h.get("tenant_id") or "unknown"
             if tid not in per_tenant:
                 per_tenant[tid] = {"mors": 0, "high_risk_hazards": 0, "responses": 0}
-            if h.get("risk_level") in ("High", "Very High", "Critical"):
+            if normalize_tolerability(h.get("risk_level")) in ("HIGH", "VERY HIGH"):
                 per_tenant[tid]["high_risk_hazards"] += 1
         for res in responses:
             tid = res.get("tenant_id") or "unknown"
@@ -591,7 +592,7 @@ class DashboardService:
 
         # ---- Hazard matrix heatmap (severity x probability) ----
         heat_map = [{"severity": s, "probability": p, "count": 0} for s in range(1, 6) for p in range(1, 6)]
-        level3 = level4 = 0
+        level2 = level3 = level4 = 0
         for h in hazards:
             s = h.get("severity")
             p = h.get("probability")
@@ -599,10 +600,12 @@ class DashboardService:
                 cell = next((c for c in heat_map if c["severity"] == s and c["probability"] == p), None)
                 if cell:
                     cell["count"] += 1
-            rl = h.get("risk_level")
-            if rl == "High":
+            tier = normalize_tolerability(h.get("risk_level"))
+            if tier == "LOW":
+                level2 += 1
+            elif tier == "HIGH":
                 level3 += 1
-            elif rl == "Very High":
+            elif tier == "VERY HIGH":
                 level4 += 1
 
         # ---- Operator grid (merge tenant meta + per-tenant stats + maturity) ----
@@ -638,6 +641,7 @@ class DashboardService:
             "operators": operators,
             "hazard_matrix": {
                 "cells": heat_map,
+                "level2": level2,
                 "level3": level3,
                 "level4": level4,
                 "total": len(hazards),

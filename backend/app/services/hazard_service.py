@@ -10,6 +10,8 @@ from app.services.risk_matrix import (
     classify_risk,
     risk_outcome,
     get_thresholds,
+    get_tolerability_tier,
+    normalize_tolerability,
 )
 from app.services.users import get_user_department
 
@@ -64,6 +66,7 @@ class HazardService:
         risk_index = payload.get("risk_index")
         risk_level = payload.get("risk_level")
         risk_out = payload.get("risk_outcome")
+        tolerability_tier = payload.get("tolerability_tier")
 
         if severity is not None and probability is not None:
             computed_risk_index = compute_risk_index(severity, probability)
@@ -74,8 +77,15 @@ class HazardService:
                 risk_level = classify_risk(computed_risk_index, thresholds)
             if risk_out is None:
                 risk_out = risk_outcome(severity, probability, thresholds)
+            if tolerability_tier is None:
+                tolerability_tier = get_tolerability_tier(computed_risk_index, thresholds)
         elif risk_index is not None and risk_level is None:
-            risk_level = classify_risk(risk_index, get_thresholds(self.tenant_id))
+            thresholds = get_thresholds(self.tenant_id)
+            risk_level = classify_risk(risk_index, thresholds)
+            tolerability_tier = get_tolerability_tier(risk_index, thresholds)
+
+        if tolerability_tier is None and risk_level is not None:
+            tolerability_tier = normalize_tolerability(risk_level)
 
         taxonomy = payload.get("taxonomy", "Other")
         sequence = self._get_next_sequence(taxonomy, year)
@@ -99,6 +109,7 @@ class HazardService:
             "risk_index": risk_index,
             "risk_level": risk_level,
             "risk_outcome": risk_out,
+            "tolerability_tier": tolerability_tier,
             "priority": payload["priority"],
             "recommended_action": payload.get("recommended_action"),
             "corrective_action": payload.get("corrective_action"),
@@ -228,9 +239,13 @@ class HazardService:
                 prob = payload.get("probability", target_doc.get("probability"))
                 if sev is not None and prob is not None:
                     thresholds = get_thresholds(self.tenant_id)
-                    payload["risk_index"] = compute_risk_index(sev, prob)
-                    payload["risk_level"] = classify_risk(compute_risk_index(sev, prob), thresholds)
+                    computed = compute_risk_index(sev, prob)
+                    payload["risk_index"] = computed
+                    payload["risk_level"] = classify_risk(computed, thresholds)
                     payload["risk_outcome"] = risk_outcome(sev, prob, thresholds)
+                    payload["tolerability_tier"] = get_tolerability_tier(computed, thresholds)
+            elif "risk_level" in payload:
+                payload["tolerability_tier"] = normalize_tolerability(payload.get("risk_level"))
 
             if "assigned_to" in payload or "assigned_to_uid" in payload:
                 new_uid = payload.get("assigned_to_uid", target_doc.get("assigned_to_uid"))

@@ -73,7 +73,7 @@ class CANFormFields(BaseModel):
         {
           "severity": 1..5, "severity_letter": "A".."E",
           "probability": 1..5, "risk_index": 1..25,
-          "risk_level": "Low"|"Medium"|"High"|"Very High",
+          "risk_level": "Low"|"High"|"Very High",
           "risk_outcome": "Acceptable"|"Tolerable"|"Intolerable",
           "assessed_by": "email", "assessed_at": iso-datetime
         }
@@ -88,6 +88,7 @@ class CANFormFields(BaseModel):
     initial_risk_index: Optional[int] = Field(None, ge=1, le=25)
     initial_risk_level: Optional[str] = None
     initial_risk_outcome: Optional[str] = None
+    initial_tolerability_tier: Optional[str] = None
     initial_sra: Optional[dict] = None
     classification_type: Optional[str] = None
     classification_level: Optional[str] = None
@@ -131,6 +132,7 @@ class CAPFormFields(BaseModel):
     residual_risk_index: Optional[int] = Field(None, ge=1, le=25)
     residual_risk_level: Optional[str] = None
     residual_risk_outcome: Optional[str] = None
+    residual_tolerability_tier: Optional[str] = None
     residual_sra: Optional[dict] = None
     # ── Structured RCA (Fishbone / Ishikawa 5M + Management) ──
     # root_causes: [{ id, category, description, is_primary }]

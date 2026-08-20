@@ -159,6 +159,7 @@ class HazardCreate(BaseModel):
     risk_index: Optional[int] = None
     risk_level: Optional[str] = None
     risk_outcome: Optional[str] = None
+    tolerability_tier: Optional[str] = None
 
     priority: HazardPriority = Field(...)
 
@@ -200,6 +201,7 @@ class HazardUpdate(BaseModel):
     risk_index: Optional[int] = None
     risk_level: Optional[str] = None
     risk_outcome: Optional[str] = None
+    tolerability_tier: Optional[str] = None
     priority: Optional[HazardPriority] = None
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None
@@ -233,6 +235,7 @@ class HazardResponse(BaseModel):
     risk_index: Optional[int] = None
     risk_level: Optional[str] = None
     risk_outcome: Optional[str] = None
+    tolerability_tier: Optional[str] = None
     priority: HazardPriority
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None
@@ -263,6 +266,7 @@ class HazardListItem(BaseModel):
     taxonomy: HazardTaxonomy
     priority: HazardPriority
     risk_level: Optional[str] = None
+    tolerability_tier: Optional[str] = None
     status: HazardStatus
     assigned_to: Optional[str] = None
     department: Optional[str] = None

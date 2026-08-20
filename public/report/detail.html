@@ -237,7 +237,7 @@ function renderReport(report, isSafetyManager, user) {
         riskIndexCard.style.display = 'block';
         const index = report.risk_index;
         const level = report.risk_level || getRiskLevelLabel(index).text;
-        const levelClass = level === 'Very High' ? 'bg-very-high' : level === 'High' ? 'bg-high' : level === 'Medium' ? 'bg-medium' : level === 'Low' ? 'bg-low' : 'bg-na';
+        const levelClass = level === 'Very High' ? 'bg-very-high' : level === 'Low' ? 'bg-low' : 'bg-high';
         const isOfficial = report.risk_assessment ? true : false;
         riskIndexDisplay.innerHTML = `
             <div class="risk-index-display ${levelClass}">
@@ -264,7 +264,7 @@ function renderReport(report, isSafetyManager, user) {
 
         if (report.ai_suggested_assessment) {
             const ai = report.ai_suggested_assessment;
-            const aiLevelClass = ai.suggested_risk_level === 'Very High' ? 'bg-very-high' : ai.suggested_risk_level === 'High' ? 'bg-high' : ai.suggested_risk_level === 'Medium' ? 'bg-medium' : ai.suggested_risk_level === 'Low' ? 'bg-low' : 'bg-na';
+            const aiLevelClass = ai.suggested_risk_level === 'Very High' ? 'bg-very-high' : ai.suggested_risk_level === 'Low' ? 'bg-low' : 'bg-high';
             const confidencePct = ai.confidence ? Math.round(ai.confidence * 100) : 'N/A';
 
             html += `
@@ -313,7 +313,7 @@ function renderReport(report, isSafetyManager, user) {
         // If official assessment already exists, show it
         if (report.risk_assessment) {
             const oa = report.risk_assessment;
-            const oaLevelClass = oa.risk_level === 'Very High' ? 'bg-very-high' : oa.risk_level === 'High' ? 'bg-high' : oa.risk_level === 'Medium' ? 'bg-medium' : oa.risk_level === 'Low' ? 'bg-low' : 'bg-na';
+            const oaLevelClass = oa.risk_level === 'Very High' ? 'bg-very-high' : oa.risk_level === 'Low' ? 'bg-low' : 'bg-high';
             document.getElementById('officialAssessmentDisplay').style.display = 'block';
             document.getElementById('officialAssessmentDisplay').className = `risk-index-display ${oaLevelClass}`;
             document.getElementById('officialAssessmentDisplay').innerHTML = `
@@ -388,7 +388,6 @@ function getBadgeClass(level) {
 function getRiskLevelLabel(index) {
     if (index === null || index === undefined) return { text: 'N/A', class: 'badge-default' };
     if (index <= 5) return { text: 'Low', class: 'badge-low' };
-    if (index <= 9) return { text: 'Medium', class: 'badge-medium' };
     if (index <= 15) return { text: 'High', class: 'badge-high' };
     return { text: 'Very High', class: 'badge-critical' };
 }

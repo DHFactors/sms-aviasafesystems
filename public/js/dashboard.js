@@ -265,9 +265,9 @@ function renderRiskChart(data) {
     const ctx = document.getElementById('riskChartCanvas');
     if (!ctx) return;
 
-    const counts = { Low: 0, Medium: 0, High: 0, 'Very High': 0 };
+    const counts = { Low: 0, High: 0, 'Very High': 0 };
     for (const d of data) {
-        const level = d.risk_level;
+        const level = typeof normalizeRiskLevel === 'function' ? normalizeRiskLevel(d.risk_level) : d.risk_level;
         if (counts.hasOwnProperty(level)) counts[level] = d.count;
     }
     const labels = ICAO_RISK_LABELS;
@@ -426,7 +426,7 @@ function renderReportsTable(items) {
     for (const r of items) {
         const date = r.occurrence_date ? new Date(r.occurrence_date).toLocaleDateString() : '-';
         const riskLevel = r.risk_level || getRiskLevelLabel(r.risk_index).text;
-        const riskClass = riskLevel === 'Very High' ? 'badge-critical' : riskLevel === 'High' ? 'badge-high' : riskLevel === 'Medium' ? 'badge-medium' : riskLevel === 'Low' ? 'badge-low' : 'badge-default';
+        const riskClass = getRiskBadgeClass(riskLevel);
         const statClass = statusBadgeClass(r.status);
         const ri = r.risk_index !== null && r.risk_index !== undefined ? r.risk_index : '-';
         const reportId = r.id;
@@ -548,7 +548,6 @@ function renderRiskMatrixPreview() {
     const levelFor = (index) => {
         if (!valid) return 'Very High';
         if (index <= t.lowMax) return 'Low';
-        if (index <= t.mediumMax) return 'Medium';
         if (index <= t.highMax) return 'High';
         return 'Very High';
     };
@@ -580,7 +579,7 @@ function renderRiskMatrixPreview() {
     if (!valid) {
         note = '<p style="text-align:center;font-size:0.72rem;color:#d97706;margin-top:0.5rem;">Thresholds must be strictly increasing: 1 ≤ Low &lt; Medium &lt; High ≤ 25.</p>';
     } else {
-        note = `<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;">Low ≤ ${t.lowMax} · Medium ≤ ${t.mediumMax} · High ≤ ${t.highMax} · Very High &gt; ${t.highMax}</p>`;
+        note = `<p style="text-align:center;font-size:0.72rem;color:#94a3b8;margin-top:0.5rem;">Low ≤ ${t.lowMax} · High ≤ ${t.highMax} · Very High &gt; ${t.highMax}</p>`;
     }
     container.innerHTML = html + note;
 }

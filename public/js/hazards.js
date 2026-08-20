@@ -63,9 +63,17 @@ function hazardPriorityBadgeClass(priority) {
     return map[priority] || 'badge-default';
 }
 
+function normalizeHazardRiskLevel(riskLevel) {
+    if (riskLevel === null || riskLevel === undefined) return 'High';
+    const norm = String(riskLevel).trim().toUpperCase();
+    if (norm === 'LOW' || norm === 'ACCEPTABLE' || norm === 'LEVEL II') return 'Low';
+    if (norm === 'VERY HIGH' || norm === 'CRITICAL' || norm === 'INTOLERABLE' || norm === 'SEVERE' || norm === 'LEVEL IV') return 'Very High';
+    return 'High';
+}
+
 function hazardRiskBadgeClass(riskLevel) {
-    const map = { 'Low': 'badge-low', 'Medium': 'badge-medium', 'High': 'badge-high', 'Very High': 'badge-critical' };
-    return map[riskLevel] || 'badge-default';
+    const map = { Low: 'badge-low', High: 'badge-high', 'Very High': 'badge-critical' };
+    return map[normalizeHazardRiskLevel(riskLevel)] || 'badge-default';
 }
 
 function calculateRiskIndex(severity, probability) {
@@ -78,7 +86,6 @@ window.ICAO_THRESHOLDS = window.ICAO_THRESHOLDS || { lowMax: 5, mediumMax: 9, hi
 function classifyHazardRisk(riskIndex) {
     if (riskIndex == null) return 'Unknown';
     if (riskIndex <= ICAO_THRESHOLDS.lowMax) return 'Low';
-    if (riskIndex <= ICAO_THRESHOLDS.mediumMax) return 'Medium';
     if (riskIndex <= ICAO_THRESHOLDS.highMax) return 'High';
     return 'Very High';
 }
@@ -87,7 +94,7 @@ function getRiskOutcome(severity, probability) {
     const ri = calculateRiskIndex(severity, probability);
     if (ri == null) return null;
     if (ri <= ICAO_THRESHOLDS.lowMax) return 'Acceptable';
-    if (ri <= ICAO_THRESHOLDS.mediumMax) return 'Tolerable';
+    if (ri <= ICAO_THRESHOLDS.highMax) return 'Tolerable';
     return 'Intolerable';
 }
 

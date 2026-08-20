@@ -166,7 +166,7 @@
         <ul class="check">
             <li>Create a hazard from a VSR</li>
             <li>Verify risk-matrix calculation:
-                S3 × P3 = 9 → <span class="pill red">Medium / Tolerable</span> and S2 × P2 = 4 → <span class="pill green">Low / Acceptable</span></li>
+                S3 × P3 = 9 → <span class="pill red">High / Tolerable</span> and S2 × P2 = 4 → <span class="pill green">Low / Acceptable</span></li>
             <li>Confirm status transitions (Under Review → Active → Closed)</li>
         </ul>
 
@@ -201,9 +201,10 @@
     <div class="card" id="taxonomy">
         <h2><span class="step">3</span>Hazard &amp; Reporting Taxonomy Reference</h2>
         <div class="note">
-            <strong>Risk levels:</strong> the canonical classification is <strong>Low | Medium | High | Very High</strong>,
-            derived from the ICAO 5×5 matrix (<code>risk_index = severity × probability</code>).
-            Default thresholds: risk index ≤ 5 → Low; ≤ 9 → Medium; ≤ 15 → High; else → Very High.
+            <strong>Risk levels:</strong> the canonical classification is <strong>Low | High | Very High</strong>
+            (CAAN CAR-19 3-tier), derived from the ICAO 5×5 matrix (<code>risk_index = severity × probability</code>).
+            Default thresholds: risk index ≤ 5 → Low (Level II); ≤ 15 → High (Level III); else → Very High (Level IV).
+            Legacy "Medium"/"Moderate" labels are folded into the High (Level III) tier.
         </div>
 
         <h3>Occurrence Types</h3>
@@ -213,7 +214,7 @@
         <p>Situational Awareness (Loss of) · Decision Making Error · Skill-Based Error · Procedural Deviation · Communication Issue · CRM Breakdown · Fatigue · Pressure · Distraction · Workload Management</p>
 
         <h3>Risk Levels</h3>
-        <p><span class="pill green">Low</span> <span class="pill blue">Medium</span> <span class="pill red">High</span> <span class="pill red">Very High</span></p>
+        <p><span class="pill green">Low</span> <span class="pill red">High</span> <span class="pill red">Very High</span></p>
 
         <h3>Phases of Flight</h3>
         <p>Standing · Pushback · Taxi · Takeoff · Initial Climb · En-route · Holding · Approach · Landing · Go-Around</p>

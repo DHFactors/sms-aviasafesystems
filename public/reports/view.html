@@ -230,13 +230,23 @@ function renderReport(data, type) {
     }
 }
 
+function normalizeRiskLevel(level) {
+    if (!level) return 'High';
+    const norm = String(level).trim().toUpperCase();
+    if (norm === 'LOW' || norm === 'ACCEPTABLE' || norm === 'LEVEL II') return 'Low';
+    if (norm === 'VERY HIGH' || norm === 'CRITICAL' || norm === 'INTOLERABLE' || norm === 'SEVERE' || norm === 'LEVEL IV') return 'Very High';
+    return 'High';
+}
+
 function renderRiskChart(dist) {
     destroyChart('riskChart');
     const ctx = document.getElementById('riskChartCanvas');
     if (!ctx) return;
-    const labels = ['Low', 'Medium', 'High', 'Very High'];
-    const data = labels.map(l => dist[l] || 0);
-    const colors = ['#34a853', '#f9ab00', '#f57c00', '#ea4335'];
+    const labels = ['Low', 'High', 'Very High'];
+    const counts = { Low: 0, High: 0, 'Very High': 0 };
+    Object.keys(dist || {}).forEach(k => { counts[normalizeRiskLevel(k)] += (dist[k] || 0); });
+    const data = labels.map(l => counts[l] || 0);
+    const colors = ['#34a853', '#f9ab00', '#ea4335'];
     chartInstances.risk = new Chart(ctx, {
         type: 'doughnut',
         data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },

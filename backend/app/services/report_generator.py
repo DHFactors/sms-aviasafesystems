@@ -5,11 +5,14 @@ from loguru import logger
 
 from app.core.config import settings
 from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.services.risk_matrix import normalize_tolerability
 
 
 HAZARD_COLLECTION = "hazards"
 CAN_COLLECTION = "can_cap"
 CAP_SUBCOLLECTION = "caps"
+
+TIER_TO_LEVEL = {"LOW": "Low", "HIGH": "High", "VERY HIGH": "Very High"}
 
 
 class ReportGenerator:
@@ -75,11 +78,10 @@ class ReportGenerator:
         closed_hazards = len([h for h in hazards if h.get("status") == "Closed" and self._in_period(h.get("closed_at"), year, start_month, end_month)])
         open_hazards = len([h for h in hazards if h.get("status") not in ("Closed",)])
 
-        risk_dist = {"Low": 0, "Medium": 0, "High": 0, "Very High": 0}
+        risk_dist = {"Low": 0, "High": 0, "Very High": 0}
         for h in hazards:
-            rl = h.get("risk_level")
-            if rl in risk_dist:
-                risk_dist[rl] += 1
+            tier = normalize_tolerability(h.get("risk_level"))
+            risk_dist[TIER_TO_LEVEL[tier]] += 1
 
         top_risks = self._calculate_top_risks(hazards)
         can_cap_status = self._calculate_can_cap_status(cans)
@@ -123,11 +125,10 @@ class ReportGenerator:
         opened = len([h for h in hazards if self._in_year(h.get("created_at"), year)])
         closed = len([h for h in hazards if h.get("status") == "Closed" and self._in_year(h.get("closed_at"), year)])
 
-        risk_dist = {"Low": 0, "Medium": 0, "High": 0, "Very High": 0}
+        risk_dist = {"Low": 0, "High": 0, "Very High": 0}
         for h in hazards:
-            rl = h.get("risk_level")
-            if rl in risk_dist:
-                risk_dist[rl] += 1
+            tier = normalize_tolerability(h.get("risk_level"))
+            risk_dist[TIER_TO_LEVEL[tier]] += 1
 
         hazard_trends = self._calculate_hazard_trends(hazards, year)
         risk_trends = self._calculate_risk_trends(hazards, year)
@@ -261,11 +262,10 @@ class ReportGenerator:
                 h for h in hazards
                 if self._in_period(h.get("created_at"), year, m, m)
             ]
-            levels = {"Low": 0, "Medium": 0, "High": 0, "Very High": 0}
+            levels = {"Low": 0, "High": 0, "Very High": 0}
             for h in month_hazards:
-                rl = h.get("risk_level")
-                if rl in levels:
-                    levels[rl] += 1
+                tier = normalize_tolerability(h.get("risk_level"))
+                levels[TIER_TO_LEVEL[tier]] += 1
             trends.append({
                 "month": f"{year}-{m:02d}",
                 "levels": levels,
@@ -357,7 +357,7 @@ class ReportGenerator:
 
     @staticmethod
     def _format_risk_levels(dist: dict) -> list:
-        colors = {"Low": "#34a853", "Medium": "#f9ab00", "High": "#f57c00", "Very High": "#ea4335"}
+        colors = {"Low": "#34a853", "High": "#f57c00", "Very High": "#ea4335"}
         return [
             {"label": k, "value": v, "color": colors.get(k, "#ccc")}
             for k, v in dist.items()

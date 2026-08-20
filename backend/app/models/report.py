@@ -85,6 +85,7 @@ class RiskAssessment(BaseModel):
     probability: int
     risk_index: int
     risk_level: str
+    tolerability_tier: Optional[str] = None
     assessed_by: str
     assessed_at: datetime
     notes: Optional[str] = None
@@ -95,6 +96,7 @@ class AiSuggestedAssessment(BaseModel):
     suggested_probability: int
     suggested_risk_index: int
     suggested_risk_level: str
+    tolerability_tier: Optional[str] = None
     confidence: float
     severity_explanation: Optional[str] = None
     probability_explanation: Optional[str] = None
@@ -291,7 +293,7 @@ class MorCreate(BaseModel):
 class AiAnalysisResult(BaseModel):
     occurrence_type: Optional[str] = None
     human_factors: List[str] = []
-    risk_level: str = "Medium"
+    risk_level: str = "High"
     phase_of_flight: Optional[str] = None
     confidence: float = 0.0
     summary: Optional[str] = None

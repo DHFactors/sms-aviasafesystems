@@ -172,6 +172,22 @@ class TestRiskProfile:
         assert profile["initial_risk"]["index"] == "4D"
         assert profile["signoff"]["authority"] == "Risk Owner / Functional Chief"
 
+    def test_risk_profile_carries_3_tier_tolerance(self):
+        """The SRAM engine must map tolerability outcomes onto the CAAN CAR-19
+        3-tier tolerance classification (Level II/III/IV)."""
+        severity = {"severity_letter": "A"}
+        profile = srm_engine.evaluate_risk_profile(severity, [], [], [], [])
+        assert profile["initial_risk"]["tier"] == "VERY HIGH"
+        assert profile["resultant_risk"]["tier"] == "VERY HIGH"
+        assert profile["tier"] == "VERY HIGH"
+
+        tolerable = srm_engine.evaluate_risk_profile({"severity_letter": "D"}, [{"bsv": 4}], [], [], [])
+        assert tolerable["initial_risk"]["tier"] == "HIGH"
+        assert tolerable["tier"] == "HIGH"
+
+        acceptable = srm_engine.evaluate_risk_profile({"severity_letter": "D"}, [{"bsv": 6}, {"bsv": 6}], [], [], [])
+        assert acceptable["resultant_risk"]["tier"] == "LOW"
+
     def test_analyse_pipeline(self):
         result = srm_engine.analyse(
             severity_inputs={"pax": 0, "worker": 4, "quality": 3, "asset": 4, "rep": 1, "sec": 0, "env": 0},
