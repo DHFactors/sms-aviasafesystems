@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Management — AviaSAFE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0b2a42; min-height: 100vh; }
+        #pageContent { display: none; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .page-header h2 { margin: 0; color: #0b2a42; }
+        .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; }
+        .card h3 { font-size: 1rem; font-weight: 600; color: #0b2a42; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .card .hint { font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; }
+        .form-row { margin-bottom: 1rem; }
+        .form-row label { display: block; font-size: 0.85rem; font-weight: 500; color: #0b2a42; margin-bottom: 0.35rem; }
+        .form-row select, .form-row input { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; background: #fff; color: #0b2a42; }
+        .form-row select:disabled, .form-row input:disabled { background: #f1f5f9; color: #475569; cursor: not-allowed; }
+        .btn-primary { background: #1a6b8a; color: #fff; border: none; padding: 0.55rem 1.25rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: background 0.15s; }
+        .btn-primary:hover { background: #0b2a42; }
+        .btn-outline { background: #fff; color: #1a6b8a; border: 1px solid #cbd5e1; padding: 0.4rem 0.9rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 500; }
+        .btn-outline:hover { border-color: #1a6b8a; }
+        .btn-copy { margin-left: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0.6rem; }
+        .role-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+        .role-admin { background: #dcfce7; color: #166534; }
+        .role-hod { background: #dbeafe; color: #1e40af; }
+        .role-officer { background: #fef9c3; color: #854d0e; }
+        .role-staff { background: #e2e8f0; color: #334155; }
+        .dept-tag { font-size: 0.75rem; color: #64748b; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid #eef2f7; vertical-align: middle; }
+        th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; font-weight: 600; }
+        tr:hover td { background: #f8fafc; }
+        .invite-code { font-family: 'Consolas', 'Menlo', monospace; font-weight: 700; letter-spacing: 1px; color: #0b2a42; }
+        .invite-result { display: none; margin-top: 1rem; padding: 0.9rem 1rem; border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 8px; }
+        .invite-result .code-big { font-size: 1.4rem; font-weight: 800; letter-spacing: 2px; color: #166534; font-family: 'Consolas', 'Menlo', monospace; }
+        .empty { text-align: center; padding: 2rem 1rem; color: #64748b; font-size: 0.85rem; }
+        .error-box, .denied-box { display: none; text-align: center; padding: 3rem 1rem; }
+        .error-box i, .denied-box i { font-size: 2.5rem; color: #dc3545; }
+        .denied-box h2 { color: #dc3545; margin-top: 1rem; }
+        .denied-box p { color: #64748b; margin-top: 0.5rem; }
+        .denied-box a { display: inline-block; margin-top: 1rem; }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #0b2a42; color: #fff; padding: 0.7rem 1.1rem; border-radius: 8px; font-size: 0.85rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 999; }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div id="pageContent">
+
+        <div id="deniedBox" class="denied-box">
+            <i class="fas fa-lock"></i>
+            <h2>Access Denied</h2>
+            <p>Team management is available to the Safety Manager (Tenant Admin) and Department Admins only.</p>
+            <a href="/safety.html" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+        </div>
+
+        <div id="errorBox" class="error-box">
+            <i class="fas fa-exclamation-circle"></i>
+            <h2 style="margin-top:1rem;color:#dc3545;">Failed to load Team Management</h2>
+            <p style="color:#64748b;margin-top:0.5rem;" id="errorMsg">Please reload the page.</p>
+        </div>
+
+        <div id="teamContent" style="display:none;">
+            <div class="page-header">
+                <h2><i class="fas fa-users-gear"></i> Team Management</h2>
+                <span id="scopeBadge" class="dept-tag"></span>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3><i class="fas fa-user-plus"></i> Invite Team Member</h3>
+                    <form id="inviteForm">
+                        <div class="form-row">
+                            <label for="inviteDepartment">Department</label>
+                            <select id="inviteDepartment"></select>
+                        </div>
+                        <div class="form-row">
+                            <label for="inviteRole">Role</label>
+                            <select id="inviteRole"></select>
+                        </div>
+                        <button type="submit" class="btn-primary"><i class="fas fa-paper-plane"></i> Generate Invite Code</button>
+                        <p class="hint">Share the generated invite code with your colleague — they enter it on the Join Team page to connect to your organization.</p>
+                    </form>
+                    <div id="inviteResult" class="invite-result">
+                        <div style="font-size:0.8rem;color:#166534;font-weight:600;">Invite generated for
+                            <span id="inviteResultDept"></span> · <span id="inviteResultRole"></span></div>
+                        <div class="code-big" id="inviteResultCode">ABCDEF</div>
+                        <a href="/join.html" class="btn btn-outline" style="margin-top:0.75rem;display:inline-block;">
+                            <i class="fas fa-arrow-up-right-from-square"></i> Open Join Team Page</a>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3><i class="fas fa-ticket"></i> Active Invites</h3>
+                    <div id="invitesList">
+                        <div class="empty">No active invites.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1.5rem;">
+                <h3><i class="fas fa-address-book"></i> Team Members</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Department</th>
+                        </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                        <tr><td colspan="4" class="empty">Loading team members…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    nav: [
+        { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+        { href: '/dashboard/index.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+        { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+        { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+        { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
+        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'safety'] },
+    ],
+};
+</script>
+<script src="/js/api/client.js"></script>
+<script src="/js/shell.js"></script>
+<script src="/js/team.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    window.initTeamPage();
+});
+</script>
+
+</body>
+</html>

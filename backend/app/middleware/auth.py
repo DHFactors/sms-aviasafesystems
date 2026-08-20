@@ -165,15 +165,15 @@ async def get_admin_user(
 async def get_safety_manager(
     user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    if user.get('role') not in settings.CROSS_TENANT_ROLES and user.get('role') != "AIRLINE_ADMIN":
+    if user.get('role') not in settings.CROSS_TENANT_ROLES and user.get('role') not in settings.TENANT_ADMIN_ROLES:
         raise HTTPException(
             status_code=403,
             detail="Safety Manager or CAAN_SMD role required"
         )
-    if user.get('role') == "AIRLINE_ADMIN" and not user.get('tenant_id'):
+    if user.get('role') in settings.TENANT_ADMIN_ROLES and not user.get('tenant_id'):
         raise HTTPException(
             status_code=403,
-            detail="Tenant access required for AIRLINE_ADMIN"
+            detail="Tenant access required for Safety Manager"
         )
     return user
 
@@ -203,10 +203,16 @@ def get_department_scope(user: Dict[str, Any]) -> Optional[str]:
 async def get_responsible_manager(
     user: Dict[str, Any] = Depends(get_current_user)
 ) -> Dict[str, Any]:
-    if user.get('role') not in settings.CROSS_TENANT_ROLES and user.get('role') not in ("AIRLINE_ADMIN", "USER"):
+    allowed = (
+        settings.CROSS_TENANT_ROLES
+        + settings.TENANT_ADMIN_ROLES
+        + settings.SAFETY_OFFICER_ROLES
+        + settings.STAFF_ROLES
+    )
+    if user.get('role') not in allowed:
         raise HTTPException(
             status_code=403,
-            detail="Responsible Manager, AIRLINE_ADMIN, or CAAN_SMD role required"
+            detail="Responsible Manager, Safety Manager, or CAAN_SMD role required"
         )
     if not user.get('tenant_id') and user.get('role') not in settings.CROSS_TENANT_ROLES:
         raise HTTPException(

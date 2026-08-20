@@ -41,7 +41,7 @@ async def get_optional_user(
         return None
     return await get_current_user(credentials)
 
-SURVEY_MANAGER_ROLES = ("AIRLINE_ADMIN", "safety")
+SURVEY_MANAGER_ROLES = ("AIRLINE_ADMIN", "TENANT_ADMIN", "safety")
 
 
 def _envelope(data: Any) -> Dict[str, Any]:
@@ -61,8 +61,9 @@ class TenantConfigUpdate(BaseModel):
 
 
 def _require_tenant_admin(user: Dict[str, Any], tenant_id: str) -> None:
-    """Only the Safety Manager (AIRLINE_ADMIN / safety) of the target tenant
-    may update its config. SUPER_ADMIN / CAAN_SMD cannot edit tenant settings."""
+    """Only the Safety Manager (AIRLINE_ADMIN / TENANT_ADMIN / safety) of the
+    target tenant may update its config. SUPER_ADMIN / CAAN_SMD cannot edit
+    tenant settings."""
     if user.get("role") not in SURVEY_MANAGER_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -76,13 +77,15 @@ def _require_tenant_admin(user: Dict[str, Any], tenant_id: str) -> None:
 
 
 def _require_tenant_viewer(user: Dict[str, Any], tenant_id: str) -> None:
-    """Phase 2: AIRLINE_ADMIN of the tenant or SUPER_ADMIN may list users."""
+    """AIRLINE_ADMIN / TENANT_ADMIN / DEPT_ADMIN of the tenant or SUPER_ADMIN
+    may list users. DEPT_ADMIN is additionally restricted to their own
+    department (enforced in the list endpoint)."""
     if user.get("role") == "SUPER_ADMIN":
         return
-    if user.get("role") != "AIRLINE_ADMIN":
+    if user.get("role") not in ("AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the AIRLINE_ADMIN of this tenant or SUPER_ADMIN can view users",
+            detail="Only the Safety Manager or Department Admin of this tenant or SUPER_ADMIN can view users",
         )
     if user.get("tenant_id") != tenant_id:
         raise HTTPException(
@@ -157,6 +160,14 @@ async def list_users(
     except Exception as e:
         logger.warning(f"Failed to list users for tenant {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to list tenant users")
+    # DEPT_ADMIN sees only their own department's members.
+    if user.get("role") == "DEPT_ADMIN":
+        from app.services.invites import department_to_code
+        caller_code = department_to_code(user.get("department"))
+        users = [
+            u for u in users
+            if department_to_code(u.get("department")) == caller_code
+        ]
     return _envelope({"tenant_id": tenant_id, "users": users})
 
 

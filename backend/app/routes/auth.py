@@ -24,12 +24,13 @@ from app.middleware.rate_limit import (
     record_login_failure,
     clear_login_failures,
 )
-from app.middleware.auth import resolve_user_context
+from app.middleware.auth import resolve_user_context, get_current_user
 from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
 from app.services import login_service
+from app.services.invites import create_invite, list_invites
 from app.services.gmail_dispatcher import send_registration_acknowledgment
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
@@ -322,14 +323,78 @@ class JoinTeamRequest(BaseModel):
     operational_role: Optional[str] = Field(None, max_length=100)
 
 
+class InviteRequest(BaseModel):
+    department: str = Field(..., min_length=1, description="Target department code or label")
+    role: str = Field(default="STAFF", max_length=50, description="Role to assign on join")
+
+
+@router.post("/invite")
+@rate_limit("invite")
+async def invite_endpoint(
+    request: Request,
+    body: InviteRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Issue a department-scoped team invite (TENANT_ADMIN / DEPT_ADMIN).
+
+    Role-aware enforcement:
+      - TENANT_ADMIN / AIRLINE_ADMIN / SUPER_ADMIN: invite into any applicable
+        department with DEPT_ADMIN / SAFETY_OFFICER / STAFF.
+      - DEPT_ADMIN: target department must equal the caller's department and
+        only the STAFF role may be assigned (403 otherwise).
+    """
+    try:
+        result = create_invite(
+            caller=user,
+            department=body.department,
+            role=body.role,
+            request=request,
+        )
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"success": True, **result}
+
+
+@router.get("/invites")
+async def invite_list_endpoint(
+    user: dict = Depends(get_current_user),
+):
+    """List department-scoped invites for the caller's tenant.
+
+    TENANT_ADMIN / SUPER_ADMIN see every invite for the tenant; DEPT_ADMIN sees
+    only their own department's invites.
+    """
+    try:
+        rows = list_invites(caller=user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"success": True, "invites": rows}
+
+
 @router.post("/join-team")
+@router.post("/join")
 @rate_limit("join_team")
 async def join_team_endpoint(
     request: Request,
     body: JoinTeamRequest,
     _app_check: None = Depends(verify_app_check),
 ):
-    """Self-register a department postholder under an existing tenant."""
+    """Self-register a department postholder under an existing tenant.
+
+    When the invite code is an admin-issued department-scoped invite the
+    assigned department and role are read directly from the invite document.
+    Legacy tenant-level team invite codes keep the previous behavior (invitee
+    self-selects the department and is provisioned with the least-privilege
+    role). Available at both /api/v1/auth/join-team and /api/v1/auth/join.
+    """
     if body.password != body.confirm_password:
         raise HTTPException(status_code=422, detail="Passwords do not match")
     try:

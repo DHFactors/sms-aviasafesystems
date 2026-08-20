@@ -473,14 +473,41 @@ def resolve_tenant(
 def verify_invite(db: Any, code: Optional[str]) -> Dict[str, Any]:
     """Real-time invite-code verification for /join.html.
 
-    Resolves the tenant by invite code and confirms it is active. Returns a
-    minimal public payload (no internal fields). Raises:
+    Resolves the tenant by invite code and confirms it is active. Accepts both
+    legacy tenant-level team invite codes and admin-issued department-scoped
+    invites (returning the assigned department + role). Returns a minimal
+    public payload (no internal fields). Raises:
       ValueError  -> caller supplied no / blank code
       LookupError -> code unknown, or tenant is inactive/expired
     """
     if not code or not code.strip():
         raise ValueError("An invite code is required")
-    tid, tenant_doc = resolve_tenant(db, code.strip(), None)
+
+    from app.services.invites import resolve_invite, department_label
+
+    raw = code.strip()
+    invite = resolve_invite(db, raw)
+    if invite:
+        tid = invite.get("tenant_id")
+        if not tid:
+            raise LookupError("Invalid or expired invite code")
+        tid, tenant_doc = resolve_tenant(db, None, tid)
+        active = tenant_doc.get("active")
+        status = str(tenant_doc.get("status") or "").lower()
+        if active is False or status == "inactive":
+            raise LookupError("Invalid or expired invite code")
+        dept = invite.get("department")
+        return {
+            "valid": True,
+            "organization_name": tenant_doc.get("name") or tid,
+            "tenant_id": tid,
+            "category": tenant_doc.get("tenant_type") or tenant_doc.get("classification"),
+            "department": dept,
+            "department_label": department_label(dept),
+            "role": invite.get("role", settings.ROLE_DEFAULT),
+        }
+
+    tid, tenant_doc = resolve_tenant(db, raw, None)
 
     active = tenant_doc.get("active")
     status = str(tenant_doc.get("status") or "").lower()
@@ -519,16 +546,42 @@ def join_team(
     auth = get_auth()
     now = datetime.now(timezone.utc)
 
-    try:
-        tid, tenant_doc = resolve_tenant(db, invite_code, tenant_id)
-    except LookupError:
-        raise
-    except Exception as e:
-        if isinstance(e, ValueError):
-            raise
-        raise LookupError(str(e))
+    # Admin-issued department-scoped invites bind BOTH the department and the
+    # role directly from the invite document. Legacy tenant-level invite codes
+    # fall back to the previous behavior (invitee self-selects the department
+    # and is provisioned with the least-privilege role).
+    from app.services.invites import resolve_invite, department_label
 
-    code = department.strip()
+    assigned_role = settings.ROLE_DEFAULT
+    department_code: Optional[str] = None
+
+    if invite_code and invite_code.strip():
+        invite = resolve_invite(db, invite_code.strip())
+        if invite:
+            if str(invite.get("status") or "ACTIVE").strip().upper() != "ACTIVE":
+                raise LookupError("Invalid or expired invite code")
+            tid = invite.get("tenant_id")
+            if not tid:
+                raise LookupError("Invalid or expired invite code")
+            try:
+                tid, tenant_doc = resolve_tenant(db, None, tid)
+            except LookupError:
+                raise
+            department_code = invite.get("department") or department.strip()
+            assigned_role = str(invite.get("role") or settings.ROLE_DEFAULT).upper()
+
+    if department_code is None:
+        try:
+            tid, tenant_doc = resolve_tenant(db, invite_code, tenant_id)
+        except LookupError:
+            raise
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise LookupError(str(e))
+        department_code = department.strip()
+
+    code = department_code
     allowed = tenant_doc.get("applicable_departments") or []
     if code not in allowed:
         raise ValueError(
@@ -546,16 +599,17 @@ def join_team(
     )
     auth.set_custom_user_claims(
         user.uid,
-        {"role": "USER", "tenant_id": tid, "department": label},
+        {"role": assigned_role, "tenant_id": tid, "department": label},
     )
 
     user_doc = {
         "uid": user.uid,
         "email": email,
         "display_name": full_name,
-        "role": "USER",
+        "role": assigned_role,
         "tenant_id": tid,
         "department": label,
+        "status": "ACTIVE",
         "created_at": now,
         "updated_at": now,
     }
@@ -572,10 +626,17 @@ def join_team(
         target_id=tid,
         ip=ip,
         request_id=request_id,
-        metadata={"department": code, "department_label": label},
+        metadata={
+            "department": code,
+            "department_label": label,
+            "role": assigned_role,
+            "invite_scoped": department_code is not None,
+        },
     )
 
-    logger.info(f"Team member joined tenant {tid}: {email} -> {label}")
+    logger.info(
+        f"Team member joined tenant {tid}: {email} -> {label} ({assigned_role})"
+    )
 
     return {
         "tenant_id": tid,
@@ -583,6 +644,7 @@ def join_team(
         "classification": tenant_doc.get("tenant_type") or tenant_doc.get("classification"),
         "department": code,
         "department_label": label,
+        "role": assigned_role,
         "admin_email": email,
         "created_at": now,
     }

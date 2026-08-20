@@ -108,6 +108,7 @@ def list_tenant_users(tenant_id: str) -> List[Dict[str, Any]]:
             {
                 "uid": data.get("uid") or snap.id,
                 "email": data.get("email"),
+                "displayName": data.get("display_name"),
                 "role": data.get("role"),
                 "department": data.get("department") or "",
                 "createdAt": data.get("created_at").isoformat() if data.get("created_at") else None,

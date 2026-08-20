@@ -12,10 +12,20 @@ if _env_path.exists():
 
 
 class AuthRole(str, Enum):
+    # Legacy tenant-admin role (kept for backward compatibility).
     AIRLINE_ADMIN = "AIRLINE_ADMIN"
+    # Canonical tenant admin (Safety Manager); AIRLINE_ADMIN is its legacy alias.
+    TENANT_ADMIN = "TENANT_ADMIN"
+    # Department-scoped administrator (Head of Department).
+    DEPT_ADMIN = "DEPT_ADMIN"
+    # Operational safety review role (cross-department review within tenant).
+    SAFETY_OFFICER = "SAFETY_OFFICER"
+    # Legacy least-privilege member role.
+    USER = "USER"
+    # Canonical least-privilege member role; USER is its legacy alias.
+    STAFF = "STAFF"
     CAAN_SMD = "CAAN_SMD"
     SUPER_ADMIN = "SUPER_ADMIN"
-    USER = "USER"
 
 
 class Settings(BaseSettings):
@@ -117,6 +127,19 @@ class Settings(BaseSettings):
     ROLE_DEFAULT_REGISTRATION: str = "AIRLINE_ADMIN"
     CROSS_TENANT_ROLES: List[str] = ["CAAN_SMD", "SUPER_ADMIN"]
     SUPER_ADMIN_ROLES: List[str] = ["SUPER_ADMIN"]
+    # Canonical role constants for the delegated admin hierarchy.
+    ROLE_TENANT_ADMIN: str = "TENANT_ADMIN"
+    ROLE_DEPT_ADMIN: str = "DEPT_ADMIN"
+    ROLE_SAFETY_OFFICER: str = "SAFETY_OFFICER"
+    ROLE_STAFF: str = "STAFF"
+    # Role-alias groups so existing AIRLINE_ADMIN/USER checks recognize the new
+    # canonical names (TENANT_ADMIN == AIRLINE_ADMIN, STAFF == USER).
+    TENANT_ADMIN_ROLES: List[str] = ["AIRLINE_ADMIN", "TENANT_ADMIN"]
+    DEPT_ADMIN_ROLES: List[str] = ["DEPT_ADMIN"]
+    SAFETY_OFFICER_ROLES: List[str] = ["SAFETY_OFFICER"]
+    STAFF_ROLES: List[str] = ["USER", "STAFF"]
+    # Roles permitted to act across the whole tenant (tenant admins + cross-tenant).
+    TENANT_WIDE_ROLES: List[str] = ["AIRLINE_ADMIN", "TENANT_ADMIN", "CAAN_SMD", "SUPER_ADMIN"]
 
     # ── Upstash Redis (enabled when REDIS_URL is non-empty) ──
     REDIS_URL: str = ""

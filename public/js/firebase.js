@@ -493,7 +493,7 @@ function getDepartmentLabel(claims) {
     var role = (claims && claims.role) || 'USER';
     var dept = (claims && claims.department) || '';
     if (role === 'CAAN_SMD') return 'State Aviation Safety Oversight';
-    if (role === 'AIRLINE_ADMIN') return 'Corporate Safety Department';
+    if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN') return 'Corporate Safety Department';
     if (dept === 'CAMO') return 'CAMO Department';
     if (dept === 'Part-145') return 'Part-145 Maintenance Department';
     if (dept === 'Flight Operations') return 'Flight Operations Department';
