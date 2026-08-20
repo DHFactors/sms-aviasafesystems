@@ -1,0 +1,40 @@
+{
+  "topic": "can_cap",
+  "title": "Corrective Action Notices (CAN) & Corrective Action Plans (CAP)",
+  "subtitle": "Closed-Loop CAN/CAP Workflow (FORM SMSM 8.8.2)",
+  "overview": [
+    "A Corrective Action Notice (CAN) is issued against a hazard, finding, or report and assigns a required corrective action to an owner with a target completion date.",
+    "The owner responds with a Corrective Action Plan (CAP) that details the action plan, timeline, root-cause analysis, evidence, and sign-offs. The workflow stays open until the CAP is accepted and closed."
+  ],
+  "method": {
+    "title": "Method & Scoring Rules",
+    "paragraphs": [
+      "CAN lifecycle — Open → Under Review → Closed (or Escalated). A CAN carries title, description, required action, assigned owner, department, priority and target date, plus the optional FORM SMSM 8.8.2 issuance block (copies to, requested/addressed function, initial 5x5 SRA).",
+      "CAP lifecycle — In Progress → Under Review → Completed, with Revision Required and Overdue states. Each CAP is linked to its CAN (can_id) and carries an action plan, timeline, resources and a target completion date.",
+      "Root-cause promotion — in the Combined RCA + SRAM workflow, 6M Fishbone root causes are promoted into Bow-Tie New Control Measures (NCM) and the SRAM data is persisted with the CAP.",
+      "Evidence & sign-off — the CAP mirrors FORM SMSM 8.8.2 Section 5.1 analysis items (factual review, RCA, short-term and long-term corrective actions, implementation timeline), plus managerial approval and CAA acceptance sign-off blocks, residual-risk 5x5 SRA, and closure details (closed_by, closed_signature, closed_at)."
+    ],
+    "bullets": [
+      "RCA block: root_causes [{ category, description, is_primary }] and action_items [{ description, root_cause_id, owner, target_date }].",
+      "145 / CAMO accounts can only create and review CAPs for their own department.",
+      "A CAP can be sent back with Revision Required and a new revision deadline instead of being closed."
+    ]
+  },
+  "mapping": {
+    "title": "CAR-19 / Appendix 10 Mapping",
+    "paragraphs": [
+      "The closed-loop CAN/CAP process is ICAO Annex 19 Component 3 — Safety Assurance: monitoring of corrective actions, management of change, and continuous improvement.",
+      "It closes the loop opened by Component 2 (SRM) — each hazard/risk must end in an implemented, verified and signed-off corrective action."
+    ]
+  },
+  "example": {
+    "title": "Worked Example",
+    "paragraphs": [
+      "Finding: debris (FOD) repeatedly observed on the apron near Gate 3.",
+      "CAN issued to Ground Operations: 'Implement and enforce daily FOD sweeps' — priority High, target 14 days.",
+      "CAP submitted: daily FOD sweep procedure with a checklist, sweep logs as evidence, and a short-term mitigation (pre-arrival walk) plus long-term fix (apron edge repair).",
+      "Root cause promoted: Method — 'no scheduled FOD sweep' becomes a New Control Measure in the Bow-Tie.",
+      "Sign-off: managerial approval → CAA acceptance → residual-risk SRA re-assessed → CAP closed with closure signature and timestamp."
+    ]
+  }
+}

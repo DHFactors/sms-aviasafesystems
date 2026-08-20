@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hazard Detail - AviaSAFE</title>
+    <meta name="help-drawer-topic" content="sram_bowtie">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/srm.css">
+    <link rel="stylesheet" href="/css/help-drawer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -58,6 +60,8 @@
         .edit-field { width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.9rem; }
         .edit-field:focus { outline: none; border-color: #1a6b8a; }
         .btn-save-edit { background: #1a6b8a; color: #fff; border: none; padding: 0.3rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; margin-top: 0.25rem; }
+        .card h2 .help-link { margin-left: 0.5rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
+        .card h2 .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         #message { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; font-size: 0.85rem; }
         #message.success { display: block; background: #e6f4ea; color: #1e7e34; border-left: 4px solid #34a853; }
         #message.error { display: block; background: #fce8e6; color: #d33426; border-left: 4px solid #ea4335; }
@@ -138,7 +142,10 @@
         </div>
 
         <div class="card">
-            <h2><i class="fas fa-diagram-project"></i> CAAN CAR-19 SRM Analysis</h2>
+            <h2><i class="fas fa-diagram-project"></i> CAAN CAR-19 SRM Analysis
+                <button type="button" class="help-link" data-help-topic="sram_bowtie" title="How SRAM Bow-Tie scoring works"><i class="fas fa-circle-question"></i> SRAM Bow-Tie</button>
+                <button type="button" class="help-link" data-help-topic="fishbone" title="How 6M Fishbone RCA works"><i class="fas fa-circle-question"></i> 6M Fishbone</button>
+            </h2>
             <div id="srmWorkspace"></div>
         </div>
 
@@ -179,6 +186,7 @@
 <script src="/js/verification.js"></script>
 <script src="/js/fishbone.js"></script>
 <script src="/js/srm.js"></script>
+<script src="/js/help-drawer.js"></script>
 <script>
 let hazardData = null;
 let currentUser = null;

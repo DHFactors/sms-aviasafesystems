@@ -1,0 +1,47 @@
+{
+  "topic": "fishbone",
+  "title": "Fishbone / Ishikawa Root Cause Analysis",
+  "subtitle": "6M Methodology (5M + Management)",
+  "overview": [
+    "A Fishbone (Ishikawa) diagram separates a symptom from its root causes. The problem is written as the 'head' of the fish and potential causes are grouped along the 'bones' into six categories.",
+    "The purpose is to move the investigation from what happened (the symptom) to why it happened (the root cause) before any corrective action is planned. Only genuine root causes should be promoted into CAN/CAP actions."
+  ],
+  "method": {
+    "title": "Method & Scoring Rules",
+    "paragraphs": [
+      "Six categories — ask 'why' under each until a true root cause (not a symptom) emerges:",
+      "Man — people, staffing, training, fatigue, human performance.",
+      "Machine — equipment, tools, aircraft/component condition, technology.",
+      "Method — procedures, processes, documentation, compliance.",
+      "Medium — environment (weather, facilities, noise, workspace).",
+      "Management — policies, oversight, supervision, accountability, culture.",
+      "Material — parts, materials, consumables, specifications."
+    ],
+    "bullets": [
+      "A symptom is the observed effect; a cause is a reason the effect occurred. Keep asking 'why' until a cause is actionable.",
+      "Mark the primary root cause (is_primary) per category or overall.",
+      "Action items are linked to a root_cause_id so every planned action traces back to a proven cause.",
+      "In the Combined RCA + SRAM workflow, a fishbone root cause can be promoted into a Bow-Tie New Control Measure (NCM)."
+    ]
+  },
+  "mapping": {
+    "title": "CAR-19 / Appendix 10 Mapping",
+    "paragraphs": [
+      "The 6M fishbone supports ICAO Annex 19 / CAAN Appendix 10 Component 2 — Safety Risk Management, by turning identified hazards into understood root causes.",
+      "It also feeds Component 3 — Safety Assurance, where investigations and corrective actions are monitored to closure through the CAN/CAP process."
+    ]
+  },
+  "example": {
+    "title": "Worked Example",
+    "paragraphs": [
+      "Symptom: hard landing during approach in gusty conditions.",
+      "Man: rostered crew fatigue after a long duty day.",
+      "Machine: unreliable brake wear indicator gave false confidence.",
+      "Method: no stabilised-approach criteria defined in the Flight Ops Manual.",
+      "Medium: gusty crosswind and poor runway friction reporting.",
+      "Management: weak line-check oversight of approach profiles.",
+      "Material: incorrect tyre pressures recorded on the previous walkaround.",
+      "Primary root cause: Method (no stabilised-approach criteria) — promoted to CAP action items for the Flight Ops Manual and approach monitoring."
+    ]
+  }
+}

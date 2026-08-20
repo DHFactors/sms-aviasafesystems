@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Management — AviaSAFE</title>
+    <meta name="help-drawer-topic" content="team_admin">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
@@ -11,12 +12,15 @@
     <link rel="stylesheet" href="/css/shell.css">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/styles/global.css">
+    <link rel="stylesheet" href="/css/help-drawer.css">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0b2a42; min-height: 100vh; }
         #pageContent { display: none; }
         .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
         .page-header h2 { margin: 0; color: #0b2a42; }
+        .page-header h2 .help-link { margin-left: 0.5rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
+        .page-header h2 .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         .grid-2 { display: grid; grid-template-columns: 1.1fr 1fr; gap: 1.5rem; }
         @media (max-width: 960px) { .grid-2 { grid-template-columns: 1fr; } }
         .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; }
@@ -75,7 +79,9 @@
 
         <div id="teamContent" style="display:none;">
             <div class="page-header">
-                <h2><i class="fas fa-users-gear"></i> Team Management</h2>
+                <h2><i class="fas fa-users-gear"></i> Team Management
+                    <button type="button" class="help-link" data-help-topic="team_admin" title="How roles, departments and invite codes work"><i class="fas fa-circle-question"></i> Roles & Invites</button>
+                </h2>
                 <span id="scopeBadge" class="dept-tag"></span>
             </div>
 
@@ -156,6 +162,7 @@ window.SHELL_CONFIG = {
 <script src="/js/api/client.js"></script>
 <script src="/js/shell.js"></script>
 <script src="/js/team.js"></script>
+<script src="/js/help-drawer.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

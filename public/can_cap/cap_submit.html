@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Submit CAP - AviaSAFE</title>
+    <meta name="help-drawer-topic" content="can_cap">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/can-cap-print.css">
     <link rel="stylesheet" href="/css/srm.css">
+    <link rel="stylesheet" href="/css/help-drawer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -40,6 +42,8 @@
         .badge-high { background: #fff3e0; color: #e65100; }
         .badge-critical { background: #fde8e8; color: #dc3545; }
         .badge-default { background: #f1f5f9; color: #64748b; }
+        .card h2 .help-link { margin-left: 0.5rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
+        .card h2 .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,7 +59,9 @@
     <div id="message"></div>
 
     <div class="card">
-        <h2><i class="fas fa-tasks"></i> Submit Corrective Action Plan</h2>
+        <h2><i class="fas fa-tasks"></i> Submit Corrective Action Plan
+            <button type="button" class="help-link" data-help-topic="can_cap" title="How the closed-loop CAN/CAP workflow works"><i class="fas fa-circle-question"></i> CAN/CAP Help</button>
+        </h2>
 
         <div id="canInfo" class="can-info" style="display:none;">
             <h4 id="canRefTitle"></h4>
@@ -187,6 +193,7 @@
 <script src="/js/fishbone.js"></script>
 <script src="/js/can_cap.js"></script>
 <script src="/js/srm.js"></script>
+<script src="/js/help-drawer.js"></script>
 <script>
 let canId = null;
 let fishboneController = null;

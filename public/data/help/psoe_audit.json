@@ -1,0 +1,48 @@
+{
+  "topic": "psoe_audit",
+  "title": "PSOE Audit & Surveillance (CAAN Appendix 10)",
+  "subtitle": "Provider Surveillance & Oversight Evaluation",
+  "overview": [
+    "PSOE audits evaluate a provider's SMS against the standard surveillance checklist in the CAAN SMS Procedure Manual, Appendix 10 (ICAO Annex 19 aligned).",
+    "The checklist is organised into the four SMS components. Each surveillance question is scored 0-3 on the implementation scale; questions that do not apply to the provider are marked N/A and excluded from the score."
+  ],
+  "method": {
+    "title": "Method & Scoring Rules",
+    "paragraphs": [
+      "Four components with fixed weights — Safety Policy & Objectives 10%, Safety Risk Management 40%, Safety Assurance 30%, Safety Promotion 20%.",
+      "Scoring scale — 0: Not Implemented / Non-Compliant; 1: Partially Implemented (Documented only); 2: Implemented & Operational; 3: Fully Effective & Continuous Improvement.",
+      "N/A handling — a Not-Applicable answer is excluded from both the numerator and the denominator, so it cannot drag the score down.",
+      "Overall score — each component is scored as a percentage of applicable questions, then combined using the component weights."
+    ],
+    "bullets": [
+      "Target thresholds — ≥90% Fully Effective & Continuous Improvement; ≥70% Implemented & Operational; ≥40% Partially Implemented (Documented only); below 40% Not Implemented / Non-Compliant.",
+      "A draft assessment can be saved with partial responses; scores are recomputed whenever responses change.",
+      "The template, weights, and target thresholds are versioned so older assessments stay reproducible."
+    ],
+    "table": {
+      "headers": ["Component", "Weight"],
+      "rows": [
+        ["Safety Policy & Objectives", "10%"],
+        ["Safety Risk Management", "40%"],
+        ["Safety Assurance", "30%"],
+        ["Safety Promotion", "20%"]
+      ]
+    }
+  },
+  "mapping": {
+    "title": "CAR-19 / Appendix 10 Mapping",
+    "paragraphs": [
+      "The four components map directly to ICAO Annex 19 safety management pillars.",
+      "Safety Risk Management carries the highest weight (40%) because hazard identification, risk assessment and mitigation are the core of an effective SMS under CAR-19."
+    ]
+  },
+  "example": {
+    "title": "Worked Example",
+    "paragraphs": [
+      "A provider is assessed across all four components (all questions applicable).",
+      "Safety Policy & Objectives scored 100%, Safety Risk Management 60%, Safety Assurance 80%, Safety Promotion 90%.",
+      "Overall = (100 × 0.10) + (60 × 0.40) + (80 × 0.30) + (90 × 0.20) = 10 + 24 + 24 + 18 = 76% → Implemented & Operational.",
+      "If a question were not applicable (e.g. no Part-145 activity), it would be marked N/A and simply excluded from its component's denominator."
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "topic": "sram_bowtie",
+  "title": "SRAM Bow-Tie Analysis",
+  "subtitle": "CAAN CAR-19 Safety Risk Analysis Method (SRAM)",
+  "overview": [
+    "SRAM is CAAN CAR-19's Safety Risk Analysis Method. It combines a Bow-Tie model with a 7-impact severity scoring system so a hazard can be assessed from cause through to consequence, with every barrier scored for strength.",
+    "The Bow-Tie runs left to right: Threats and their Preventative Controls (ECM / NCM) on the left, the Top Event in the centre, and the Consequence Mitigations (ERB / NRB) on the right. The model is 'combined' with the 6M Fishbone when a CAP submission promotes root causes into New Control Measures (NCM)."
+  ],
+  "method": {
+    "title": "Method & Scoring Rules",
+    "paragraphs": [
+      "Bow-Tie structure — Threats feed the Top Event through existing or new control measures; consequences are reduced by existing or new recovery barriers.",
+      "Seven-impact severity — each impact is rated 0-5 and weighted: Passenger Safety ×4, Worker/Staff ×3, Quality/Service ×2, Asset/Equipment ×1, Reputation ×1, Security ×1, Environment ×1."
+    ],
+    "bullets": [
+      "Severity band (total 0-65): A Catastrophic 52-65, B Major 39-51, C Moderate 26-38, D Minor 13-25, E Insignificant 0-12.",
+      "BQV (Barrier Quality Value) 10-50 — seven criteria rated 1-5, weighted: Effectiveness ×3, Disinclination to Override ×2, Cost-Benefit/Practicality/Acceptability/Enforceability/Durability ×1.",
+      "BQV bands: Excellent 42-50, Very Good 34-41, Good 26-33, Fair 18-25, Poor 10-17, Ineffective 0-9.",
+      "BSV (Barrier Strength Value) 0-5 — the barrier robustness score taken from the BQV band (Excellent = 5 … Ineffective = 0).",
+      "Risk index = Severity × Probability; the 5x5 result is mapped to a tolerability band (Intolerable / Tolerable / Acceptable).",
+      "Sign-off authority follows tolerability: Intolerable → Accountable Manager, Tolerable → Risk Owner / Functional Chief, Acceptable → Safety Manager / SAG Member."
+    ],
+    "table": {
+      "headers": ["BQV Score", "Band", "BSV"],
+      "rows": [
+        ["42-50", "Excellent", "5"],
+        ["34-41", "Very Good", "4"],
+        ["26-33", "Good", "3"],
+        ["18-25", "Fair", "2"],
+        ["10-17", "Poor", "1"],
+        ["0-9", "Ineffective", "0"]
+      ]
+    }
+  },
+  "mapping": {
+    "title": "CAR-19 / Appendix 10 Mapping",
+    "paragraphs": [
+      "CAR-19 is the civil aviation requirement that mandates an SMS and prescribes the Safety Risk Analysis Method (SRAM).",
+      "The SRAM Bow-Tie operationalises ICAO Annex 19 Component 2 — Safety Risk Management (hazard identification, risk assessment, risk mitigation), which carries a 40% weight in the CAAN Appendix 10 surveillance checklist."
+    ]
+  },
+  "example": {
+    "title": "Worked Example",
+    "paragraphs": [
+      "Hazard: 'Wheel jack sinks into the apron during maintenance.'",
+      "Threat → ECM: technician uses an unstable jacking technique on soft ground; existing control: ground-handling training + daily jack inspection.",
+      "Top Event: the jack sinks and the aircraft is destabilised on jacks.",
+      "ERB → Consequence: failsafe jack stands and an evacuation procedure reduce the outcome of aircraft damage / worker injury.",
+      "Severity inputs: pax 0, worker 4, quality 2, asset 3, rep 2, sec 0, env 0 → total 21 → D Minor.",
+      "BQV example: effectiveness 4, cost_benefit 3, practicality 4, acceptability 4, enforceability 3, durability 4, disinclination 3 → weighted total 36 → Very Good (BSV 4)."
+    ]
+  }
+}
