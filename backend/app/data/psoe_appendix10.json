@@ -1,0 +1,192 @@
+{
+  "version": "1.0.0",
+  "source": "CAAN SMS Procedure Manual - Appendix 10 (ICAO Annex 19 aligned)",
+  "scoring_scale": {
+    "0": "Not Implemented / Non-Compliant",
+    "1": "Partially Implemented (Documented only)",
+    "2": "Implemented & Operational",
+    "3": "Fully Effective & Continuous Improvement",
+    "NA": "Not Applicable (excluded from denominator)"
+  },
+  "components": [
+    {
+      "id": "component_1",
+      "name": "Safety Policy & Objectives",
+      "key": "safety_policy",
+      "weight": 10,
+      "questions": [
+        {
+          "id": "SP-01",
+          "text": "Is there a documented safety policy, signed by the Accountable Executive, that demonstrates a positive safety culture and commitment to the SMS?",
+          "guidance": "The policy should be endorsed at the highest level of the organisation and reviewed periodically to remain current.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SP-02",
+          "text": "Is the safety policy communicated effectively to all personnel and made accessible throughout the organisation?",
+          "guidance": "Evidence may include induction briefings, intranet postings, notice boards, and training records.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SP-03",
+          "text": "Are safety accountabilities and responsibilities for key safety positions defined and documented (Accountable Executive, Safety Manager, postholders)?",
+          "guidance": "Roles, authorities, and reporting lines should be described in the SMS manual or organisational charts.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SP-04",
+          "text": "Are key safety personnel appointed, competent, and provided with the resources needed to discharge their safety duties?",
+          "guidance": "Verify appointment letters, competency records, and resource allocation for the safety function.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SP-05",
+          "text": "Is the emergency response plan (ERP) coordinated with relevant stakeholders, documented, and exercised periodically?",
+          "guidance": "Check ERP documentation, coordination arrangements with external agencies, and exercise/test records.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SP-06",
+          "text": "Is the SMS documented in a controlled manner, including the SMS manual, procedures, and records management?",
+          "guidance": "Verify document control, versioning, and accessibility of SMS documentation and records.",
+          "allow_na": true,
+          "max_score": 3
+        }
+      ]
+    },
+    {
+      "id": "component_2",
+      "name": "Safety Risk Management",
+      "key": "safety_risk_management",
+      "weight": 40,
+      "questions": [
+        {
+          "id": "SRM-01",
+          "text": "Is a formal process in place for proactive, reactive, and predictive hazard identification across the operation?",
+          "guidance": "Assess the completeness of hazard identification sources and the process for capturing hazards.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SRM-02",
+          "text": "Are hazard and safety reporting channels accessible to all personnel, confidential, and supported by a just culture?",
+          "guidance": "Verify reporting channels, confidentiality protections, and non-punitive reporting policy.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SRM-03",
+          "text": "Is a documented risk assessment process used that determines severity and probability for each identified hazard?",
+          "guidance": "Check risk assessment records, the risk matrix used, and consistency of ratings.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SRM-04",
+          "text": "Are risk controls and mitigations defined, assigned, implemented, and tracked to closure?",
+          "guidance": "Verify mitigation plans, ownership, timelines, and closure/verification records.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SRM-05",
+          "text": "Is safety risk management applied to operational changes, new services, products, and organisational changes?",
+          "guidance": "Assess whether a formal management-of-change / safety assessment process is followed.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SRM-06",
+          "text": "Is a safety risk register maintained, reviewed periodically, and used to support management decision-making?",
+          "guidance": "Verify the risk register's completeness, review cadence, and use in management reviews.",
+          "allow_na": true,
+          "max_score": 3
+        }
+      ]
+    },
+    {
+      "id": "component_3",
+      "name": "Safety Assurance",
+      "key": "safety_assurance",
+      "weight": 30,
+      "questions": [
+        {
+          "id": "SA-01",
+          "text": "Are safety performance indicators (SPIs) and targets defined, measured, and reviewed to monitor safety performance?",
+          "guidance": "Verify SPI definitions, data sources, measurement frequency, and review of results.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SA-02",
+          "text": "Are internal SMS audits conducted in accordance with an approved schedule and audit procedures?",
+          "guidance": "Check audit schedules, audit reports, auditor competency, and follow-up of findings.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SA-03",
+          "text": "Is the SMS reviewed periodically by senior management, with findings and actions documented?",
+          "guidance": "Verify management review meeting minutes, attendance, and action tracking.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SA-04",
+          "text": "Are safety events investigated using appropriate analysis methods, with root causes identified and corrective actions implemented?",
+          "guidance": "Assess investigation procedures, analysis methods, and effectiveness of corrective actions.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SA-05",
+          "text": "Is there a process to capture audit findings, investigation outcomes, and lessons learned to drive continuous improvement of the SMS?",
+          "guidance": "Verify the linkage between assurance outputs and SMS improvements.",
+          "allow_na": true,
+          "max_score": 3
+        }
+      ]
+    },
+    {
+      "id": "component_4",
+      "name": "Safety Promotion",
+      "key": "safety_promotion",
+      "weight": 20,
+      "questions": [
+        {
+          "id": "SPROM-01",
+          "text": "Are SMS training and education programmes delivered to all personnel appropriate to their roles?",
+          "guidance": "Check training curriculum, delivery records, and refresher training for safety-critical roles.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SPROM-02",
+          "text": "Are safety briefings and safety communications delivered regularly to promote awareness and understanding of the SMS?",
+          "guidance": "Verify the frequency and content of safety communications and briefings.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SPROM-03",
+          "text": "Are mechanisms in place to promote, measure, and continuously improve the safety culture (e.g., safety culture surveys, just culture policies)?",
+          "guidance": "Assess culture measurement activities and actions taken from survey results.",
+          "allow_na": true,
+          "max_score": 3
+        },
+        {
+          "id": "SPROM-04",
+          "text": "Are lessons learned and safety information disseminated across the organisation to support learning and improvement?",
+          "guidance": "Verify dissemination of safety information, bulletins, and lessons-learned communications.",
+          "allow_na": true,
+          "max_score": 3
+        }
+      ]
+    }
+  ]
+}

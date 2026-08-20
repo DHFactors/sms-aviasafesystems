@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     API_PREFIX_CONTACT: str = "/api/v1/contact"
     API_PREFIX_FEEDBACK: str = "/api/v1/feedback"
     API_PREFIX_COPILOT: str = "/api/v1/copilot"
+    API_PREFIX_PSOE: str = "/api/v1/psoe"
     API_PREFIX_AUTH_LEGACY: str = "/api/auth"
     API_PREFIX_REPORTS_LEGACY: str = "/api/reports"
     API_PREFIX_DASHBOARD_LEGACY: str = "/api/dashboard"
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
     API_PREFIX_STATE_RISK_LEGACY: str = "/api/state-risk"
     API_PREFIX_SURVEYS_LEGACY: str = "/api/surveys"
     API_PREFIX_TENANTS_LEGACY: str = "/api/tenants"
+    API_PREFIX_PSOE_LEGACY: str = "/api/psoe"
     DEBUG: bool = False
     # Deployment environment: "production" (default), "beta", "staging",
     # "development". Drives self-service registration gating (production
