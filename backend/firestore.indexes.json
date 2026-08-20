@@ -58,6 +58,51 @@
         { "fieldPath": "report_type", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "hazards",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenant_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hazards",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenant_id", "order": "ASCENDING" },
+        { "fieldPath": "department", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "invites",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenant_id", "order": "ASCENDING" },
+        { "fieldPath": "department", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "surveys",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenant_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "can_cap",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tenant_id", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "target_completion_date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
