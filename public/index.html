@@ -85,7 +85,7 @@
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="/css/copilot-widget.css">
     </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white min-h-screen flex flex-col">
 
     <!-- TOP NAVIGATION BAR (Clean & Crisp Header) -->
     <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
@@ -123,7 +123,7 @@
         </div>
     </header>
 
-    <main class="pt-20">
+    <main class="pt-20 flex-grow flex-shrink-0 basis-auto pb-12">
 
         <!-- ROW 1: HYBRID HERO SECTION (Deep Oceanic Teal Header from Existing Site) -->
         <section class="relative min-h-[85vh] flex items-center pt-10 pb-20 overflow-hidden bg-gradient-to-b from-deepTeal-900 via-deepTeal-800 to-[#0A2540] text-white border-b border-deepTeal-700">
@@ -610,18 +610,18 @@
 
                 </div>
 
-                <!-- Footer Credit -->
-                <div class="py-4 text-center border-t border-slate-200 space-y-1.5 bg-slate-100">
-                    <p class="text-sm font-medium text-slate-600">
-                        A Project by <a href="https://gsacharya.com" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 font-medium underline underline-offset-2 transition-colors">Ghanshyam Acharya</a>
-                    </p>
-                    <p class="text-xs text-slate-500">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
-                </div>
-
             </div>
         </section>
 
     </main>
+
+    <!-- Sticky footer: anchored to the bottom when page content is short -->
+    <footer class="flex-shrink-0 w-full py-4 text-center border-t border-slate-200 space-y-1.5 bg-slate-100">
+        <p class="text-sm font-medium text-slate-600">
+            A Project by <a href="https://gsacharya.com" target="_blank" rel="noopener noreferrer" class="text-brand-400 hover:text-brand-300 font-medium underline underline-offset-2 transition-colors">Ghanshyam Acharya</a>
+        </p>
+        <p class="text-xs text-slate-500">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
+    </footer>
 
     <script>
     // Subdomain redirect: route non-reserved tenant subdomains of
