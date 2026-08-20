@@ -186,11 +186,12 @@ def _sra_doc(severity: int, probability: int, assessed_by: str, assessed_at) -> 
 
 
 def _fishbone_doc(rng: SeededRandom, seed: int, can_index: int, submitted_by: str) -> dict:
-    """Structured Fishbone (Ishikawa 5M + Management) RCA.
+    """Structured Fishbone (Ishikawa 6M) RCA.
 
-    One root cause per Fishbone branch (all 6 categories), exactly one
-    designated primary cause, and structured action items mapped 1:1 to each
-    root cause via root_cause_id.
+    One root cause per Fishbone branch (all 6 categories: Man, Machine,
+    Medium, Mission, Management, Measurement), exactly one designated primary
+    cause, and structured action items mapped 1:1 to each root cause via
+    root_cause_id.
     """
     rng.seed(seed)
     available = list(FISHBONE_CATEGORIES)
@@ -262,6 +263,8 @@ def _hazard_doc(rng: SeededRandom, profile: dict, index: int) -> dict:
         "probability": probability,
         "risk_index": risk_index,
         "risk_level": risk_level,
+        "risk_score": risk_index,
+        "risk_tier": "Low" if risk_index <= 5 else ("Medium" if risk_index <= 15 else "High"),
         "priority": priority,
         "recommended_action": rng.choice(REQUIRED_ACTIONS),
         "corrective_action": "Pending CAN issuance",

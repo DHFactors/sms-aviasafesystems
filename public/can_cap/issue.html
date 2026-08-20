@@ -172,6 +172,24 @@ let initialSraController = null;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
+    // Prefill from a PSOE audit "Promote to CAN/CAP" deep link.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('source') === 'psoe') {
+        const t = params.get('title');
+        const d = params.get('description');
+        const r = params.get('required_action');
+        if (t) document.getElementById('fieldTitle').value = t;
+        if (d) document.getElementById('fieldDescription').value = d;
+        if (r) document.getElementById('fieldRequiredAction').value = r;
+        const ct = document.getElementById('fieldClassType');
+        if (ct && !ct.value) ct.value = 'Compliance';
+        const msg = document.getElementById('message');
+        if (msg) {
+            msg.textContent = 'Finding promoted from a PSOE assessment. Review and complete the notice before issuing.';
+            msg.className = 'success';
+            msg.style.display = 'block';
+        }
+    }
     loadHazards();
     initInitialSra();
 });

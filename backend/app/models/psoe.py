@@ -108,7 +108,7 @@ class PSOEAssessmentUpdate(BaseModel):
     auditor_name: Optional[str] = None
     assessor_email: Optional[str] = None
     assessment_date: Optional[datetime] = None
-    status: Optional[str] = Field(None, pattern="^(draft|in_progress|submitted|closed)$")
+    status: Optional[str] = Field(None, pattern="^(draft|in_progress|submitted|completed|closed)$")
     responses: Optional[List[PSOEAnswer]] = None
     notes: Optional[str] = None
 

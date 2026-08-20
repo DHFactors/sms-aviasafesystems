@@ -12,6 +12,7 @@ Usage:
     python -m seed.runner --surveys-only     # Only seed survey data
     python -m seed.runner --reports-only     # Only seed VSR + MOR data
     python -m seed.runner --users-only       # Only seed auth users
+    python -m seed.runner --tenants-only     # Only seed 3-tenant demo (Phase 3 Step 5)
 
 Idempotent: records the seed version in Firestore. Will not duplicate data
 on repeated runs unless --force is used.
@@ -23,11 +24,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from loguru import logger
 
-from seed.config import (
-    SEED_VERSION,
-    SEED_DOC_PATH,
-    OPERATOR_PROFILES,
-)
+from seed.config import SEED_VERSION, SEED_DOC_PATH, OPERATOR_PROFILES
 
 logger.remove()
 logger.add(sys.stdout, format="{time:HH:mm:ss} | {level:<7} | {message}", level="INFO")
@@ -120,6 +117,7 @@ def run(
     reports_only: bool = False,
     users_only: bool = False,
     tenant_ids: Optional[list] = None,
+    tenants_only: bool = False,
 ) -> dict:
     """Seed demo data.
 
@@ -128,6 +126,9 @@ def run(
     When scoped, the CAAN state-regulator tenant and the global state-risk
     reference are left untouched. When None, the full 13-tenant beta model is
     seeded (12 providers + CAAN).
+
+    `tenants_only` seeds only the 3-tenant demo setup (Buddha Air, Yeti Airlines,
+    Sita Air) with users and PSAOE assessments (Phase 3 Step 5).
     """
     if not dry_run:
         if db is None:
@@ -144,7 +145,7 @@ def run(
         logger.info("Use --force to re-seed")
         return {"status": "skipped", "version": SEED_VERSION, "seeded_at": status.get("seeded_at")}
 
-    all_doing_all = not surveys_only and not reports_only and not users_only
+    all_doing_all = not surveys_only and not reports_only and not users_only and not tenants_only
     counts = {
         "version": SEED_VERSION,
         "tenants": 0,
@@ -159,20 +160,32 @@ def run(
     }
     if tenant_ids:
         counts["tenant_ids"] = sorted(set(tenant_ids))
+    else:
+        tenant_ids = []
 
     if dry_run:
         from seed.hazard_can import estimate_counts
+        from seed.config import OPERATOR_PROFILES as _OP_PROFILES
+
         hc = estimate_counts(tenant_ids)
         counts["hazards"] = hc["hazards"]
         counts["cans"] = hc["cans"]
         counts["caps"] = hc["caps"]
-        profiles = [p for p in OPERATOR_PROFILES if not tenant_ids or p["id"] in tenant_ids]
+
+        if tenants_only:
+            step5_ids = ["buddha-air", "yeti-airlines", "sita-air"]
+            profiles = [_p for _p in _OP_PROFILES if _p["id"] in step5_ids]
+            counts["tenants"] = len(step5_ids)
+        else:
+            profiles = [_p for _p in _OP_PROFILES if not tenant_ids or _p["id"] in tenant_ids]
+            counts["tenants"] = len(profiles)
+
         for p in profiles:
-            counts["tenants"] += 1
             counts["surveys"] += p["survey_count"]
             counts["vsr_reports"] += p["vsr_count"]
             counts["mor_reports"] += p["mor_count"]
-        scope = "scoped" if tenant_ids else "12-tenant beta"
+
+        scope = "scoped" if (tenants_only or tenant_ids) else "12-tenant beta"
         logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "
@@ -183,7 +196,7 @@ def run(
                      f"{counts['state_risk_categories']} state risk categories")
         return counts
 
-    if all_doing_all or users_only:
+    if all_doing_all or users_only or tenants_only:
         logger.info("=== Seeding users ===")
         from seed.users import create_all_users
         created = create_all_users(auth, tenant_ids)
@@ -232,9 +245,203 @@ def run(
         from seed.state_risk import create_all_state_risk_reference
         counts["state_risk_categories"] = create_all_state_risk_reference(db)
 
+    if tenants_only:
+        logger.info("=== Seeding 3-tenant demo setup (Phase 3 Step 5) ===")
+        from seed.config import OPERATOR_PROFILES as _OP_PROFILES
+
+        # Three demo tenants for Phase 3 Step 5
+        step5_tenant_ids = ["buddha-air", "yeti-airlines", "sita-air"]
+
+        from seed.config import CREDENTIAL_TENANT_CODES
+        step5_tenant_ids = ["buddha-air", "yeti-airlines", "sita-air"]
+
+        # Count tenants
+        counts["tenants"] = len(step5_tenant_ids)
+
+        # === Seed users for the 3 tenants ===
+        logger.info("=== Seeding users ===")
+        from seed.users import create_user
+
+        # AE, Safety Manager, and Pilot/Reporter per tenant
+        ae_email_base = ["ae@buddha.test", "ae@yeti.test", "ae@sita.test"]
+        sm_email_base = ["safety@buddha.test", "safety@yeti.test", "safety@sita.test"]
+        pilot_email_base = ["pilot@buddha.test", "pilot@yeti.test", "pilot@sita.test"]
+
+        for idx, tid in enumerate(step5_tenant_ids):
+            profile = next(p for p in OPERATOR_PROFILES if p["id"] == tid)
+            tenant_name = profile["name"]
+
+            # Tenant code for password generation
+            code = CREDENTIAL_TENANT_CODES[tid]
+
+            # AE account
+            ae_uid = f"ae-{tid}-001"
+            ae_pwd = f"{code}-AE-2026"
+            create_user(auth, {
+                "uid": ae_uid,
+                "email": ae_email_base[idx],
+                "full_name": f"Accountable Executive ({tenant_name})",
+                "organization": tenant_name,
+                "role": "AIRLINE_ADMIN",
+                "tenant_id": tid,
+                "password": ae_pwd,
+            })
+
+            # Safety Manager account
+            sm_uid = f"sm-{tid}-001"
+            sm_pwd = f"{code}-Safety-2026"
+            create_user(auth, {
+                "uid": sm_uid,
+                "email": sm_email_base[idx],
+                "full_name": f"Safety Manager ({tenant_name})",
+                "organization": tenant_name,
+                "role": "TENANT_ADMIN",
+                "tenant_id": tid,
+                "department": "Safety",
+                "password": sm_pwd,
+            })
+
+            # Pilot / Reporter account
+            pilot_uid = f"pilot-{tid}-001"
+            pilot_pwd = f"{code}-Pilot-2026"
+            create_user(auth, {
+                "uid": pilot_uid,
+                "email": pilot_email_base[idx],
+                "full_name": f"Pilot/Reporter ({tenant_name})",
+                "organization": tenant_name,
+                "role": "USER",
+                "tenant_id": tid,
+                "password": pilot_pwd,
+            })
+
+        counts["users"] = 9  # 3 tenants × 3 roles each
+
+        # === Seed PSAOE assessments for the 3 tenants ===
+        logger.info("=== Seeding PSAOE assessments ===")
+        from app.firebase import get_db
+        from app.services.psoe_service import load_template
+        from datetime import datetime, timezone
+
+        db_firestore = get_db()
+        template = load_template()
+
+        # PSAOE question data (simplified reflecting Appendix 10)
+        psoe_templates = {
+            "buddha-air": {
+                "title": "Annual SMS Surveillance Audit — Buddha Air",
+                "assessment_date": "2026-08-15",
+                "auditor_name": "Capt. Rajesh Sharma",
+                "status": "completed",
+                "responses": [
+                    {"question_id": "Q1", "score": 3, "is_na": False, "comment": "Safety policy fully documented and communicated", "evidence": "Policy manual v2.1"},
+                    {"question_id": "Q2", "score": 2, "is_na": False, "comment": "Risk assessments conducted quarterly", "evidence": "Risk register Q2 2026"},
+                    {"question_id": "Q3", "score": 1, "is_na": False, "comment": "Some mitigations aging", "evidence": "Mitigation plan in progress"},
+                    {"question_id": "Q4", "score": 3, "is_na": False, "comment": "Strong safety reporting culture", "evidence": "SMS reports database"},
+                    {"question_id": "Q5", "score": 2, "is_na": False, "comment": "SOP reviews up to date", "evidence": "SOP revision log"},
+                    {"question_id": "Q6", "score": 2, "is_na": False, "comment": "Safety performance monitoring active", "evidence": "KPI dashboard"},
+                    {"question_id": "Q7", "score": 1, "is_na": False, "comment": "One finding overdue", "evidence": "Corrective action pending"},
+                    {"question_id": "Q8", "score": 3, "is_na": False, "comment": "Extensive training program", "evidence": "Training records 2026"},
+                    {"question_id": "Q9", "score": 2, "is_na": False, "comment": "Safety communication improved", "evidence": "Newsletter Q3"},
+                ]
+            },
+            "yeti-airlines": {
+                "title": "Annual SMS Surveillance Audit — Yeti Airlines",
+                "assessment_date": "2026-08-15",
+                "auditor_name": "F/O Ramesh Thapa",
+                "status": "draft",
+                "responses": [
+                    {"question_id": "Q1", "score": 2, "is_na": False, "comment": "Policy documented, partial implementation", "evidence": "Policy draft v0.9"},
+                    {"question_id": "Q2", "score": 3, "is_na": False, "comment": "Robust risk assessment process", "evidence": "Risk register current"},
+                    {"question_id": "Q3", "score": 3, "is_na": False, "comment": "All mitigations current", "evidence": "Mitigation complete"},
+                    {"question_id": "Q4", "score": 2, "is_na": False, "comment": "Safety reporting average", "evidence": "Reports database"},
+                    {"question_id": "Q5", "score": 1, "is_na": False, "comment": "Some SOPs outdated", "evidence": "SOP revision needed"},
+                    {"question_id": "Q6", "score": 2, "is_na": False, "comment": "Assurance activities ongoing", "evidence": "Audit schedule"},
+                    {"question_id": "Q7", "score": 3, "is_na": False, "comment": "Strong safety culture", "evidence": "Climate survey"},
+                    {"question_id": "Q8", "score": 1, "is_na": False, "comment": "Limited promotion activities", "evidence": "Draft plan"},
+                    {"question_id": "Q9", "score": 2, "is_na": False, "comment": "Communication improving", "evidence": "Briefing records"},
+                ]
+            },
+            "sita-air": {
+                "title": "Annual SMS Surveillance Audit — Sita Air",
+                "assessment_date": "2026-08-15",
+                "auditor_name": "Sita Kumari Gurung",
+                "status": "completed",
+                "responses": [
+                    {"question_id": "Q1", "score": 3, "is_na": False, "comment": "Safety policy fully effective", "evidence": "Policy manual approved"},
+                    {"question_id": "Q2", "score": 3, "is_na": False, "comment": "Excellent risk management", "evidence": "Risk register gold"},
+                    {"question_id": "Q3", "score": 2, "is_na": False, "comment": "Most mitigations effective", "evidence": "Action plan complete"},
+                    {"question_id": "Q4", "score": 3, "is_na": False, "comment": "Strong reporting culture", "evidence": "SMS database"},
+                    {"question_id": "Q5", "score": 3, "is_na": False, "comment": "All SOPs current", "evidence": "Revision log"},
+                    {"question_id": "Q6", "score": 3, "is_na": False, "comment": "Assurance excellent", "evidence": "Performance dashboard"},
+                    {"question_id": "Q7", "score": 2, "is_na": False, "comment": "One area for improvement", "evidence": "Corrective action"},
+                    {"question_id": "Q8", "score": 3, "is_na": False, "comment": "Promotion very active", "evidence": "Training records"},
+                    {"question_id": "Q9", "score": 3, "is_na": False, "comment": "Communication excellent", "evidence": "Newsletters"},
+                ]
+            },
+        }
+
+        for idx, tid in enumerate(step5_tenant_ids):
+            psoe_t = psoe_templates[tid]
+
+            from app.models.psoe import PSOEAnswer, PSOEAssessmentCreate
+
+            # Create response objects
+            responses = []
+            for r in psoe_t["responses"]:
+                responses.append(PSOEAnswer(
+                    question_id=r["question_id"],
+                    score=r["score"] if not r["is_na"] else None,
+                    is_na=r["is_na"],
+                    comment=r.get("comment"),
+                    evidence=r.get("evidence"),
+                ))
+
+            from app.services.psoe_service import score_assessment
+            scores = score_assessment(responses)
+
+            now = datetime.now(timezone.utc)
+
+            assessment_create = PSOEAssessmentCreate(
+                title=psoe_t["title"],
+                tenant_id=tid,
+                department="Safety",
+                scope="Annual SMS surveillance",
+                auditor_name=psoe_t["auditor_name"],
+                assessor_email=f"ae@{tid}.test",
+                assessment_date=psoe_t["assessment_date"],
+                template_version="1.0.0",
+                responses=responses,
+                notes="Seeded PSAOE assessment for Phase 3 Step 5 demo",
+            )
+
+            doc_data = {
+                "tenant_id": assessment_create.tenant_id,
+                "title": assessment_create.title,
+                "status": psoe_t["status"],
+                "department": assessment_create.department,
+                "scope": assessment_create.scope,
+                "auditor_name": assessment_create.auditor_name,
+                "assessor_email": assessment_create.assessor_email,
+                "assessment_date": assessment_create.assessment_date,
+                "template_version": assessment_create.template_version,
+                "responses": [r.model_dump() for r in assessment_create.responses],
+                "component_scores": scores["component_scores"],
+                "overall_score_pct": scores["overall_score_pct"],
+                "overall_level": scores["overall_level"],
+                "created_by": "seed.runner",
+                "created_at": now,
+                "updated_at": now,
+                "notes": assessment_create.notes,
+            }
+
+            doc_ref = db_firestore.collection("psoe_assessments").document(tid)
+            doc_ref.set(doc_data)
+
+        logger.info(f"Seeded PSAOE assessments for {counts['tenants']} tenants: "
+                     f"1 COMPLETED + 1 DRAFT per tenant")
+
+    # Purge / stamp after all steps
     if not dry_run:
-        # Purge runner-owned leftovers only after the whole seed succeeded, so a
-        # failed re-seed can no longer wipe existing data (non-destructive-until-success).
         if all_doing_all:
             purge_stale_seed(db, tenant_ids)
         counts["seeded_at"] = datetime.now(timezone.utc).isoformat()
@@ -255,6 +462,8 @@ def main():
     parser.add_argument("--surveys-only", action="store_true", help="Only seed survey data")
     parser.add_argument("--reports-only", action="store_true", help="Only seed VSR + MOR data")
     parser.add_argument("--users-only", action="store_true", help="Only seed auth users")
+    parser.add_argument("--tenants-only", action="store_true", help="Seed 3-tenant demo setup (Phase 3 Step 5)")
+
     args = parser.parse_args()
 
     from app.core.config import settings
@@ -272,6 +481,7 @@ def main():
         surveys_only=args.surveys_only,
         reports_only=args.reports_only,
         users_only=args.users_only,
+        tenants_only=args.tenants_only,
     )
     return result
 

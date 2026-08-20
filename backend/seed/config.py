@@ -998,8 +998,8 @@ CAN_ASSIGNED_POSTHOLDERS = [
     ("Cabin Safety Manager", "Cabin Services"),
 ]
 
-# Fishbone (Ishikawa 5M + Management) categories and their demo root causes.
-FISHBONE_CATEGORIES = ["Man", "Machine", "Method", "Medium", "Management", "Material"]
+# Fishbone (Ishikawa 6M) categories and their demo root causes.
+FISHBONE_CATEGORIES = ["Man", "Machine", "Medium", "Mission", "Management", "Measurement"]
 
 FISHBONE_ROOT_CAUSE_POOL = {
     "Man": [
@@ -1012,25 +1012,25 @@ FISHBONE_ROOT_CAUSE_POOL = {
         "Sensor / indicating system drift outside tolerance",
         "Aging component with intermittent uncommanded behaviour",
     ],
-    "Method": [
-        "Task card does not capture the required inspection step",
-        "Outdated SOP inconsistent with the current revision",
-        "Missing verification step in the sign-off process",
-    ],
     "Medium": [
         "Poor apron lighting during low-visibility turnaround",
         "Uncontrolled weather exposure during ramp operations",
         "Cluttered / congested work environment at the stand",
+    ],
+    "Mission": [
+        "Ambiguous flight objective failing to align with safety goals",
+        "Mission profile insufficiently risk-assessed for exposure",
+        "Crew resource misallocation during critical flight phase",
     ],
     "Management": [
         "Insufficient supervisory oversight of the shift",
         "Inadequate resourcing of the maintenance line",
         "Safety requirements not prioritised under schedule pressure",
     ],
-    "Material": [
-        "Substandard spare part installed on a prior visit",
-        "Incorrect lubricant grade used during servicing",
-        "Consumable life not tracked in the inventory system",
+    "Measurement": [
+        "Safety performance monitoring gaps in data collection",
+        "Key safety indicators not tracked or trended over time",
+        "Insufficient analysis of occurrence patterns and root factors",
     ],
 }
 
