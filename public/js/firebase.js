@@ -324,6 +324,19 @@ function initAppCheck() {
         console.log('ℹ️ App Check skipped (localhost)');
         return;
     }
+    // Debug bypass for beta environments when reCAPTCHA keys are not fully configured
+    if (IS_BETA_ENV) {
+        console.log('ℹ️ App Check beta debug mode — using development token');
+        try {
+            firebase.appCheck().activate(
+                new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+                /* autoRefresh */ false
+            );
+        } catch (e) {
+            console.warn('ℹ️ App Check beta debug activation failed, continuing without:', e);
+        }
+        return;
+    }
     // Admin pages are SUPER_ADMIN + SETUP_SECRET gated; the reCAPTCHA provider
     // must not be able to break their auth requests.
     if (window.location.pathname.indexOf('/admin/') === 0) {
@@ -339,7 +352,7 @@ function initAppCheck() {
         firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), true);
         console.log('✅ App Check activated');
     } catch (e) {
-        console.warn('⚠️ App Check activation failed:', e);
+        console.warn('⚠️ App Check activation failed (likely throttled/403), continuing gracefully:', e);
     }
 }
 
