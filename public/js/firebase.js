@@ -313,7 +313,7 @@ function initServices() {
 // APP CHECK
 // ============================================================================
 
-export function initAppCheckSafe(app) {
+function initAppCheckSafe(app) {
   try {
     const siteKey = window.RECAPTCHA_SITE_KEY || "";
     // Only attempt App Check if an explicit site key exists
@@ -347,6 +347,10 @@ export function initAppCheckSafe(app) {
   }
 }
 
+// Attach to window for global access
+window.initAppCheckSafe = initAppCheckSafe;
+
+// Clear any stored throttling timestamp from localStorage/sessionStorage
 function clearAppCheckThrottle() {
   // Clear any stored throttling timestamp from localStorage/sessionStorage
   const keys = ["firebase:app-check", "app-check-throttle", "fb_app_check"];
@@ -364,6 +368,9 @@ function clearAppCheckThrottle() {
     } catch (e) { /* IndexedDB not available or error */ }
   }
 }
+
+// Attach to window for global access
+window.clearAppCheckThrottle = clearAppCheckThrottle;
 
 function initAppCheck() {
     if (typeof firebase === 'undefined' || !firebase.appCheck) return;
