@@ -282,7 +282,7 @@ def test_preview_seed(monkeypatch):
     plan = preview_seed(actor=_admin_user())
     assert plan["regulator"]["id"] == "caan"
     assert plan["regulator"]["exists"] is False
-    assert len(plan["operators"]) == 12
+    assert len(plan["operators"]) == 11
     assert all(o["surveys_existing"] == 0 for o in plan["operators"])
 
 
@@ -290,7 +290,7 @@ def test_deploy_seed(monkeypatch):
     db = _patch_db(monkeypatch)
     from app.services.production_seed import deploy_seed
     result = deploy_seed(force=False, actor=_admin_user())
-    assert result["operators"] == 12
+    assert result["operators"] == 11
     assert db._stores["regulators"]["caan"]["id"] == "caan"
     assert db._stores["regulators"]["caan"]["operator_tenant_ids"]
     # Every operator tagged + has seeded data
@@ -386,7 +386,7 @@ def test_admin_seed_preview_route(monkeypatch):
     resp = _client().get("/api/v1/admin/seed/preview")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
-    assert len(resp.json()["operators"]) == 12
+    assert len(resp.json()["operators"]) == 11
 
 
 def test_admin_seed_deploy_route(monkeypatch):
@@ -394,7 +394,7 @@ def test_admin_seed_deploy_route(monkeypatch):
     _patch_secret(monkeypatch)
     resp = _client().post("/api/v1/admin/seed/deploy", json={"setup_key": "test-setup-key", "force": False})
     assert resp.status_code == 200
-    assert resp.json()["result"]["operators"] == 12
+    assert resp.json()["result"]["operators"] == 11
     assert "caan" in db._stores["regulators"]
 
 

@@ -1,4 +1,9 @@
-SEED_VERSION = "2.2.0"
+SEED_VERSION = "2.4.0"
+
+# Rolling seeding window in days. The runner presets mutate this (dev = 90)
+# before generation so every timestamp generator scales to the active window.
+# Read dynamically (seed.config.SEED_WINDOW_DAYS) — never import by value.
+SEED_WINDOW_DAYS = 365
 SEED_DOC_PATH = "seed_metadata/seed"
 
 SURVEY_COLLECTION = "surveys"
@@ -80,13 +85,14 @@ SURVEY_DEPARTMENTS = [
 ]
 
 # ============================================================================
-# 12-Tenant Beta configuration (2026-08-17)
+# 11-Tenant Beta configuration (2026-08-21)
 #
-# OPERATOR_PROFILES holds the 12 active service-provider tenants of the beta
+# OPERATOR_PROFILES holds the 11 active service-provider tenants of the beta
 # set, covering every tenant type (airline, helicopter-operator, mro, aerodrome,
-# ground-handling, caan-directorate). Universal oversight logic: internal CAAN
-# directorates (FSSD, ASSD) are treated exactly like external service providers
-# for aggregation, scoping and the regulator dashboard operator directory.
+# ground-handling). The former internal CAAN directorate tenants (caan-fssd,
+# caan-assd) were retired on 2026-08-21: state oversight runs exclusively
+# through the single `caan` state-regulator tenant (smd@caanepal.gov.np), and
+# every external service provider is aggregated under regulators/caan.
 # The former legacy seed operators (yeti-airlines, summit-air, sita-air,
 # simrik-air, tara-air) were re-activated and moved into OPERATOR_PROFILES;
 # LEGACY_OPERATOR_PROFILES is now empty.
@@ -96,8 +102,7 @@ SURVEY_DEPARTMENTS = [
 #   strict 90:10 VSR anonymity ratio -> ~63% overall Anon Rate
 #   survey_count in [15, 25]
 #   flight_diversion_count = 10 for airline + helicopter-operator,
-#                            0 for mro / aerodrome / ground-handling /
-#                              caan-directorate
+#                            0 for mro / aerodrome / ground-handling
 # ============================================================================
 
 TENANT_TYPES = {
@@ -106,7 +111,6 @@ TENANT_TYPES = {
     "mro",
     "aerodrome",
     "ground-handling",
-    "caan-directorate",
     "state-regulator",
 }
 BETA_SERVICE_PROVIDER_TYPES = TENANT_TYPES - {"state-regulator"}
@@ -409,10 +413,10 @@ OPERATOR_PROFILES = [
         "mor_risk_mean": 0.60,
         "mor_risk_std": 0.18,
         "anonymous_rate": 0.31,
-        "aircraft_types": ["Dornier Do 228", "Let L-410 Turbolet", "de Havilland DHC-6 Twin Otter"],
+        "aircraft_types": ["Let L-410 UVP-E20"],
         "flight_number_prefixes": ["SMM-"],
         "routes": ["KTM-SIF", "KTM-DP", "KTM-LUA", "KTM-TPN", "KTM-BJP"],
-        "email_domain": "summitair.com.np",
+        "email_domain": "summitair.com",
     },
     {
         "id": "sita-air",
@@ -544,97 +548,54 @@ OPERATOR_PROFILES = [
         "email_domain": "taraair.com",
     },
     {
-        "id": "caan-fssd",
-        "name": "CAAN Flight Safety Standards Dept",
-        "type": "caan-directorate",
-        "tenant_type": "caan-directorate",
-        "icao": "FSSD",
+        "id": "fishtail-air",
+        "name": "Fishtail Air",
+        "type": "helicopter-operator",
+        "tenant_type": "helicopter-operator",
+        "icao": "",
         "iata": "–",
         "country": "Nepal",
         "base": "Kathmandu (KTM/VNKT)",
-        "fleet_size": 0,
-        "employees": 90,
+        "fleet_size": 9,
+        "employees": 140,
         "survey_count": 16,
-        "vsr_count": 20,
+        "vsr_count": 22,
         "mor_count": 9,
         "hazard_count": 13,
         "can_count": 9,
-        "flight_diversion_count": 0,
+        "flight_diversion_count": 10,
         "element_scores": {
-            "management_commitment": 4.2,
-            "safety_accountability": 4.1,
-            "key_safety_personnel": 4.0,
-            "emergency_response_planning": 3.9,
-            "sms_documentation": 4.3,
-            "hazard_identification": 4.0,
-            "risk_assessment_and_mitigation": 4.1,
-            "safety_performance_monitoring": 3.8,
-            "management_of_change": 3.9,
-            "continuous_improvement": 4.0,
-            "training_and_education": 4.1,
-            "safety_communication": 3.9,
-        },
-        "culture_variance": 0.40,
-        "culture_description": "CAAN Flight Safety Standards directorate setting and enforcing flight operations standards across operators",
-        "vsr_risk_mean": 0.44,
-        "vsr_risk_std": 0.20,
-        "mor_risk_mean": 0.57,
-        "mor_risk_std": 0.19,
-        "anonymous_rate": 0.30,
-        "aircraft_types": [],
-        "flight_number_prefixes": [],
-        "routes": [],
-        "email_domain": "caanepal.gov.np",
-    },
-    {
-        "id": "caan-assd",
-        "name": "CAAN Aerodrome Safety Standards Dept",
-        "type": "caan-directorate",
-        "tenant_type": "caan-directorate",
-        "icao": "ASSD",
-        "iata": "–",
-        "country": "Nepal",
-        "base": "Kathmandu (KTM/VNKT)",
-        "fleet_size": 0,
-        "employees": 80,
-        "survey_count": 15,
-        "vsr_count": 20,
-        "mor_count": 9,
-        "hazard_count": 12,
-        "can_count": 8,
-        "flight_diversion_count": 0,
-        "element_scores": {
-            "management_commitment": 4.1,
-            "safety_accountability": 4.0,
-            "key_safety_personnel": 4.0,
-            "emergency_response_planning": 4.2,
-            "sms_documentation": 4.2,
-            "hazard_identification": 3.9,
+            "management_commitment": 3.4,
+            "safety_accountability": 3.3,
+            "key_safety_personnel": 3.5,
+            "emergency_response_planning": 3.7,
+            "sms_documentation": 3.4,
+            "hazard_identification": 3.8,
             "risk_assessment_and_mitigation": 4.0,
-            "safety_performance_monitoring": 3.7,
-            "management_of_change": 3.8,
-            "continuous_improvement": 3.9,
-            "training_and_education": 3.9,
-            "safety_communication": 3.8,
+            "safety_performance_monitoring": 3.5,
+            "management_of_change": 3.4,
+            "continuous_improvement": 3.5,
+            "training_and_education": 3.6,
+            "safety_communication": 3.3,
         },
-        "culture_variance": 0.40,
-        "culture_description": "CAAN Aerodrome Safety Standards directorate overseeing aerodrome certification and ground safety across the network",
-        "vsr_risk_mean": 0.43,
-        "vsr_risk_std": 0.19,
-        "mor_risk_mean": 0.56,
-        "mor_risk_std": 0.20,
+        "culture_variance": 0.50,
+        "culture_description": "Developing rotor-wing SMS with solid hazard identification driven by high-altitude charter work; Safety Communication needs attention",
+        "vsr_risk_mean": 0.47,
+        "vsr_risk_std": 0.20,
+        "mor_risk_mean": 0.60,
+        "mor_risk_std": 0.19,
         "anonymous_rate": 0.31,
-        "aircraft_types": [],
+        "aircraft_types": ["Airbus AS350 B3e", "Bell 206"],
         "flight_number_prefixes": [],
-        "routes": [],
-        "email_domain": "caanepal.gov.np",
+        "routes": ["KTM-PKR", "KTM-JMO", "KTM-LUA", "KTM-DP", "KTM-SYX"],
+        "email_domain": "fishtailair.com",
     },
 ]
 
 # ---------------------------------------------------------------------------
 # Archived legacy seed operators. All former legacy operators (yeti-airlines,
 # summit-air, sita-air, simrik-air, tara-air) were re-activated and moved into
-# OPERATOR_PROFILES on 2026-08-14. The runner now seeds all 12 tenants.
+# OPERATOR_PROFILES on 2026-08-14. The runner now seeds all 11 tenants.
 # ---------------------------------------------------------------------------
 LEGACY_OPERATOR_PROFILES = []
 
@@ -702,6 +663,7 @@ AIRCRAFT_REGISTRATIONS = {
                     "9N-AMY", "9N-AMZ", "9N-ANA"],
     "simrik-air": ["9N-ANB", "9N-ANC", "9N-AND", "9N-ANE", "9N-ANF", "9N-ANG", "9N-ANH"],
     "tara-air": ["9N-APB", "9N-APC", "9N-APD", "9N-APE", "9N-APF"],
+    "fishtail-air": ["9N-AJP", "9N-AJQ", "9N-AJR", "9N-AJS"],
 }
 
 GENERIC_MOR_OCCURRENCE_TYPES = [
@@ -983,6 +945,7 @@ PERSONA_ORGANISATIONS = {
     "sita-air": "Sita Air",
     "simrik-air": "Simrik Air",
     "tara-air": "Tara Air",
+    "fishtail-air": "Fishtail Air",
 }
 
 # CAN issuance authority (Corporate Safety).
@@ -1105,12 +1068,14 @@ OPERATOR_USER_TEMPLATES = {}
 # ============================================================================
 # Simplified credential scheme (2026-08)
 #
-# Email:   {role}@{tenant}.com          e.g. safety@buddha-air.com
+# Email:   {role}@{domain}          e.g. safety@buddha-air.com
 # Password: {TENANT_CODE}-{ROLE}-2026   e.g. BHA-Safety-2026
 #
-# The ONLY accounts provisioned per operator are the four functional role
-# accounts below (legacy Safety Manager / Accountable Executive / Department
-# Manager accounts were removed 2026-08-14).
+# Every operator is provisioned with the four functional role accounts in
+# SIMPLIFIED_ROLE_ACCOUNTS. Commercial flight operators listed in
+# EXTENDED_ROLE_TENANT_IDS (fishtail-air, summit-air) additionally receive the
+# Accountable Executive and Line Pilot accounts from
+# EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS (six-role scheme, added 2026-08-21).
 # ============================================================================
 
 CREDENTIAL_TENANT_CODES = {
@@ -1124,8 +1089,7 @@ CREDENTIAL_TENANT_CODES = {
     "sita-air": "SITA",
     "simrik-air": "SIMRIK",
     "tara-air": "TARA",
-    "caan-fssd": "FSSD",
-    "caan-assd": "ASSD",
+    "fishtail-air": "FISHTAIL",
 }
 
 CREDENTIAL_EMAIL_DOMAINS = {
@@ -1135,12 +1099,11 @@ CREDENTIAL_EMAIL_DOMAINS = {
     "pokhara-aerodrome": "pokhara-aerodrome.com",
     "himalaya-ground-services": "himalaya-ground-services.com",
     "yeti-airlines": "yeti-airlines.com",
-    "summit-air": "summit-air.com",
+    "summit-air": "summitair.com",
     "sita-air": "sita-air.com",
     "simrik-air": "simrik-air.com",
     "tara-air": "tara-air.com",
-    "caan-fssd": "fssd.caanepal.gov.np",
-    "caan-assd": "assd.caanepal.gov.np",
+    "fishtail-air": "fishtailair.com",
 }
 
 SIMPLIFIED_ROLE_ACCOUNTS = [
@@ -1154,6 +1117,24 @@ SIMPLIFIED_ROLE_ACCOUNTS = [
      "full_name": "Operations Manager", "department": "Flight Operations"},
 ]
 
+# Extended six-role scheme: Accountable Executive + Line Pilot, provisioned on
+# top of the four base roles for the commercial operators below.
+EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS = [
+    {"token": "ae", "password_token": "AE", "app_role": "AIRLINE_ADMIN",
+     "full_name": "Accountable Executive", "department": ""},
+    {"token": "pilot", "password_token": "Pilot", "app_role": "USER",
+     "full_name": "Line Pilot", "department": "Line Crew"},
+]
+
+EXTENDED_ROLE_TENANT_IDS = {"fishtail-air", "summit-air"}
+
+
+def roles_for_tenant(op_id: str) -> list:
+    """Return the role account templates provisioned for an operator."""
+    if op_id in EXTENDED_ROLE_TENANT_IDS:
+        return SIMPLIFIED_ROLE_ACCOUNTS + EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS
+    return list(SIMPLIFIED_ROLE_ACCOUNTS)
+
 
 def simplified_email(role_token: str, op_id: str) -> str:
     """Return the simplified-format email for a role token + operator id."""
@@ -1164,7 +1145,11 @@ def simplified_password(role_token: str, op_id: str) -> str:
     """Return the simplified-format password for a role token + operator id."""
     code = CREDENTIAL_TENANT_CODES[op_id]
     pwd_token = next(
-        (r["password_token"] for r in SIMPLIFIED_ROLE_ACCOUNTS if r["token"] == role_token),
+        (
+            r["password_token"]
+            for r in roles_for_tenant(op_id)
+            if r["token"] == role_token
+        ),
         role_token,
     )
     return f"{code}-{pwd_token}-2026"
@@ -1173,14 +1158,14 @@ def simplified_password(role_token: str, op_id: str) -> str:
 def build_simplified_role_plan():
     """Return the full list of simplified role accounts across all operators.
 
-    One account per SIMPLIFIED_ROLE_ACCOUNTS entry for every OPERATOR_PROFILES
+    One account per roles_for_tenant(op_id) entry for every OPERATOR_PROFILES
     tenant, carrying the RBAC app_role + department claim used by both the
     Auth-provisioning script and the tests.
     """
     plan = []
     for profile in OPERATOR_PROFILES:
         op_id = profile["id"]
-        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+        for role in roles_for_tenant(op_id):
             plan.append({
                 "op_id": op_id,
                 "op_name": profile["name"],

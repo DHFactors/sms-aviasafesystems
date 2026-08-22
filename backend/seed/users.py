@@ -4,7 +4,7 @@ from seed.config import (
     DEMO_USERS,
     DEVELOPER_ACCOUNT,
     OPERATOR_PROFILES,
-    SIMPLIFIED_ROLE_ACCOUNTS,
+    roles_for_tenant,
     simplified_email,
     simplified_password,
 )
@@ -70,7 +70,8 @@ def create_all_users(auth, tenant_ids=None) -> list:
         op_name = profile["name"]
 
         # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
-        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+        # (fishtail-air / summit-air additionally get AE + Line Pilot accounts)
+        for role in roles_for_tenant(op_id):
             token = role["token"]
             role_user = {
                 "uid": f"{token}-{op_id}-001",

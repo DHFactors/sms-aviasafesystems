@@ -1,7 +1,7 @@
 {
   "topic": "fishbone",
   "title": "Fishbone / Ishikawa Root Cause Analysis",
-  "subtitle": "6M Methodology (5M + Management)",
+  "subtitle": "6M Methodology (Aviation Human Factors Schema)",
   "overview": [
     "A Fishbone (Ishikawa) diagram separates a symptom from its root causes. The problem is written as the 'head' of the fish and potential causes are grouped along the 'bones' into six categories.",
     "The purpose is to move the investigation from what happened (the symptom) to why it happened (the root cause) before any corrective action is planned. Only genuine root causes should be promoted into CAN/CAP actions."
@@ -12,10 +12,10 @@
       "Six categories — ask 'why' under each until a true root cause (not a symptom) emerges:",
       "Man — people, staffing, training, fatigue, human performance.",
       "Machine — equipment, tools, aircraft/component condition, technology.",
-      "Method — procedures, processes, documentation, compliance.",
+      "Mission — mission objective / profile risk, crew-resource alignment during critical phases.",
       "Medium — environment (weather, facilities, noise, workspace).",
       "Management — policies, oversight, supervision, accountability, culture.",
-      "Material — parts, materials, consumables, specifications."
+      "Measurement — safety performance monitoring, KPIs, occurrence data analysis."
     ],
     "bullets": [
       "A symptom is the observed effect; a cause is a reason the effect occurred. Keep asking 'why' until a cause is actionable.",
@@ -37,11 +37,11 @@
       "Symptom: hard landing during approach in gusty conditions.",
       "Man: rostered crew fatigue after a long duty day.",
       "Machine: unreliable brake wear indicator gave false confidence.",
-      "Method: no stabilised-approach criteria defined in the Flight Ops Manual.",
+      "Mission: approach profile into a mountain strip accepted without a formal risk assessment.",
       "Medium: gusty crosswind and poor runway friction reporting.",
       "Management: weak line-check oversight of approach profiles.",
-      "Material: incorrect tyre pressures recorded on the previous walkaround.",
-      "Primary root cause: Method (no stabilised-approach criteria) — promoted to CAP action items for the Flight Ops Manual and approach monitoring."
+      "Measurement: no trend monitoring of hard-landing reports or brake-wear KPIs.",
+      "Primary root cause: Mission (unassessed approach profile) — promoted to CAP action items for mission risk assessment and approach monitoring."
     ]
   }
 }

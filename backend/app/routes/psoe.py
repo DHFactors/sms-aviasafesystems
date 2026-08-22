@@ -91,10 +91,14 @@ async def get_template():
 async def list_assessments(
     tenant_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """List PSOE assessments for the caller's tenant (all tenants for CAAN_SMD)."""
     effective = _effective_tenant(user, tenant_id)
+    # Virtual archetype tenants (safe fallback: only demo-* values honored).
+    if archetypeId and str(archetypeId).strip().startswith("demo-"):
+        effective = str(archetypeId).strip()
     try:
         docs = _coll().get()
     except Exception as e:
@@ -270,7 +274,6 @@ async def update_assessment(
 # ── Step 2C: Export PDF/HTML Report ─────────────────────────────────────────
 
 _JINJA_ENV = Environment(
-    loader=FileSystemLoader(searchpath=None),
     autoescape=select_autoescape(['html', 'xml']),
     trim_blocks=True,
     lstrip_blocks=True,

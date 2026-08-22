@@ -22,10 +22,13 @@ from app.middleware.rate_limit import rate_limit
 from app.services.audit_service import log_audit, request_context
 from app.services.survey_scoring import (
     SURVEY_VERSION,
+    SURVEY_VERSION_V4,
     compute_overall_maturity,
     compute_percentage_score,
     compute_pillar_scores,
     compute_question_scores,
+    compute_survey_result,
+    detect_survey_version,
     validate_answers,
 )
 
@@ -56,6 +59,9 @@ class SurveySubmission(BaseModel):
     employee_category: Optional[str] = None
     years_experience: Optional[str] = None
     language: Optional[str] = Field("en", max_length=8)
+    survey_version: Optional[str] = Field(
+        None, description="Explicit contract version ('3.0.0' | '4.0.0'); auto-detected when omitted"
+    )
 
 
 def _persist_tenant_survey(
@@ -113,8 +119,14 @@ async def submit_survey(
     if not tenant_snap.exists:
         raise HTTPException(status_code=400, detail=f"Unknown tenant: {tenant_id}")
 
-    # Validate answers against the master question contract.
-    errors = validate_answers(payload.answers)
+    # Resolve the active question contract (explicit version wins, otherwise
+    # auto-detect from the answered v4-only questions).
+    survey_version = payload.survey_version or detect_survey_version(payload.answers)
+    if survey_version not in (SURVEY_VERSION, SURVEY_VERSION_V4):
+        survey_version = detect_survey_version(payload.answers)
+
+    # Validate answers against the active master question contract.
+    errors = validate_answers(payload.answers, survey_version)
     if errors:
         raise HTTPException(
             status_code=422,
@@ -125,10 +137,22 @@ async def submit_survey(
             },
         )
 
-    pillar_scores = compute_pillar_scores(payload.answers)
-    overall = compute_overall_maturity(pillar_scores)
-    question_scores = compute_question_scores(payload.answers)
     now = datetime.now(timezone.utc)
+
+    if survey_version == SURVEY_VERSION_V4:
+        result = compute_survey_result(payload.answers, survey_version)
+        pillar_scores = result["pillar_scores"]
+        overall = result["overall_maturity"]
+        question_scores = result["question_scores"]
+        element_scores = result["element_scores"]
+        overall_pct = result["overall_score_pct"]
+    else:
+        # Legacy v3 path — byte-compatible with historical dashboards.
+        pillar_scores = compute_pillar_scores(payload.answers)
+        overall = compute_overall_maturity(pillar_scores)
+        question_scores = compute_question_scores(payload.answers)
+        element_scores = {}
+        overall_pct = compute_percentage_score(overall)
 
     survey_doc: Dict[str, Any] = {
         "tenant_id": tenant_id,
@@ -141,11 +165,12 @@ async def submit_survey(
         "employee_category": payload.employee_category,
         "years_experience": payload.years_experience,
         "language_used": payload.language,
-        "survey_version": SURVEY_VERSION,
+        "survey_version": survey_version,
         "seed_version": None,
         "answers": payload.answers,
         "question_scores": question_scores,
         "questionScores": question_scores,
+        "element_scores": element_scores,
         "safety_policy": pillar_scores["safety_policy"],
         "safety_risk_management": pillar_scores["safety_risk_management"],
         "safety_assurance": pillar_scores["safety_assurance"],
@@ -153,7 +178,7 @@ async def submit_survey(
         "overall_sms_maturity": overall,
         "overallSMSMaturity": overall,
         "pillarScores": pillar_scores,
-        "overall_score_pct": compute_percentage_score(overall),
+        "overall_score_pct": overall_pct,
     }
 
     response_doc: Dict[str, Any] = {
@@ -168,7 +193,7 @@ async def submit_survey(
         "language_used": payload.language,
         "submitted_at": now,
         "submittedAt": now,
-        "survey_version": SURVEY_VERSION,
+        "survey_version": survey_version,
     }
 
     try:
@@ -200,8 +225,10 @@ async def submit_survey(
         "data": {
             "id": survey_id,
             "tenant_id": tenant_id,
+            "survey_version": survey_version,
             "overall_sms_maturity": overall,
-            "overall_score_pct": compute_percentage_score(overall),
+            "overall_score_pct": overall_pct,
             "pillar_scores": pillar_scores,
+            "element_scores": element_scores or None,
         },
     }

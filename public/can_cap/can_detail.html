@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CAN Detail - AviaSAFE</title>
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/can-cap-print.css">
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/can-cap-print.css">
+<link rel="stylesheet" href="/css/srm.css">
+<link rel="stylesheet" href="/css/help-drawer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
@@ -16,6 +18,8 @@
         .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 1.25rem; }
         .card h2 { font-size: 1rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
         .card h2 i { width: 1.25rem; text-align: center; }
+        .help-link { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
+        .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .detail-field { margin-bottom: 0.5rem; }
         .detail-field .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 600; }
@@ -118,9 +122,18 @@
             </div>
         </div>
 
-        <!-- Fishbone RCA -->
+        <!-- RCA (Bow-Tie / Fishbone) — read-only audit review -->
         <div class="card" id="fishboneCard">
-            <h2><i class="fas fa-diagnoses"></i> Root Cause Analysis (Fishbone)</h2>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
+                <h2 id="rcaCardTitle" style="margin:0;"><i class="fas fa-diagnoses"></i> Root Cause Analysis (Fishbone)</h2>
+                <button type="button" class="help-link" id="rcaGuideBtn" data-help-topic="sram_bowtie" title="Open RCA methodology guidance"><i class="fas fa-circle-question"></i> Guide</button>
+            </div>
+            <div id="rcaViewToggle" style="display:none;gap:0.5rem;align-items:center;margin-bottom:0.6rem;">
+                <span style="font-size:0.75rem;color:#64748b;font-weight:600;">View:</span>
+                <button type="button" class="btn btn-outline btn-sm" id="rcaToggleBowtie" style="display:none;"><i class="fas fa-bow-arrow"></i> Bow-Tie</button>
+                <button type="button" class="btn btn-outline btn-sm" id="rcaToggleFishbone" style="display:none;"><i class="fas fa-diagnoses"></i> Fishbone</button>
+            </div>
+            <div id="bowtieView"></div>
             <div id="fishboneView"></div>
         </div>
 
@@ -146,7 +159,9 @@
 <script src="/js/api/client.js"></script>
 <script src="/js/risk_matrix.js"></script>
 <script src="/js/fishbone.js"></script>
+<script src="/js/srm.js"></script>
 <script src="/js/can_cap.js"></script>
+<script src="/js/help-drawer.js"></script>
 <script>
 let canData = null;
 let currentUser = null;
@@ -185,19 +200,33 @@ async function loadCaps(canId) {
             container.innerHTML = '<p style="color:#94a3b8;font-size:0.85rem;">No CAPs submitted yet.</p>';
             return;
         }
-        container.innerHTML = caps.map(c => `
+        container.innerHTML = caps.map(c => {
+            const methodChip = c.rca_method === 'bow_tie'
+                ? '<span class="badge badge-new">Bow-Tie SRAM</span>'
+                : c.rca_method === 'fishbone' ? '<span class="badge badge-default">6M Fishbone</span>' : '';
+            const residualChip = (c.residual_risk_index != null)
+                ? `<span class="badge ${canPriorityBadgeClass(c.residual_risk_index >= 12 ? 'High' : c.residual_risk_index >= 6 ? 'Medium' : 'Low')}">Residual ${c.residual_risk_index}</span>`
+                : '';
+            const reviewActions = c.status === 'Under Review' ? `
+                <span class="no-print" style="display:flex;gap:0.4rem;" onclick="event.stopPropagation();">
+                    <button type="button" class="action-btn action-btn-close" style="padding:0.35rem 0.7rem;font-size:0.78rem;" onclick="event.stopPropagation();reviewCapAction('${c.id}', 'Completed', '');"><i class="fas fa-check"></i> Accept CAP</button>
+                    <button type="button" class="action-btn action-btn-open" style="padding:0.35rem 0.7rem;font-size:0.78rem;background:#fde8e8;color:#b91c1c;" onclick="event.stopPropagation();rejectCapWithFeedback('${c.id}');"><i class="fas fa-rotate-left"></i> Reject with Feedback</button>
+                </span>` : '';
+            return `
             <div class="cap-card" style="cursor:pointer;" onclick="window.location.href='/can_cap/cap_review.html?id=${c.id}'">
                 <div class="cap-header">
                     <h4>${c.cap_reference}</h4>
                     <span style="display:flex;align-items:center;gap:0.5rem;">
+                        ${methodChip}${residualChip}
                         <span class="badge ${capStatusBadgeClass(c.status)}">${c.status}</span>
                         <a href="/can_cap/cap_review.html?id=${c.id}" class="btn btn-outline btn-sm no-print" style="font-size:0.78rem;" onclick="event.stopPropagation();"><i class="fas fa-file-pdf"></i> Export PDF</a>
                     </span>
                 </div>
                 <p style="font-size:0.85rem;color:#475569;">Submitted by ${c.submitted_by || '-'} on ${formatCanDate(c.submitted_at)}</p>
                 <p style="font-size:0.85rem;color:#475569;">Target: ${formatCanDate(c.target_completion_date)}</p>
+                ${reviewActions}
             </div>
-        `).join('');
+        `; }).join('');
     } catch (e) {
         console.error('Load CAPs error:', e);
     }
@@ -265,6 +294,23 @@ async function changeCanStatus(newStatus) {
     }
 }
 
+// Safety Manager audit actions on a submitted CAP (read-only RCA review).
+async function reviewCapAction(capId, status, comments) {
+    try {
+        await CanCapAPI.reviewCap(capId, { status: status, comments: comments || null });
+        showMessage(status === 'Completed' ? 'CAP accepted.' : 'CAP returned for revision.', 'success');
+        loadCan(canData.id);
+    } catch (err) {
+        showMessage('Error: ' + err.message, 'error');
+    }
+}
+
+async function rejectCapWithFeedback(capId) {
+    const feedback = prompt('Feedback for the postholder (required to reject):');
+    if (!feedback || !feedback.trim()) { showMessage('Rejection requires feedback.', 'error'); return; }
+    await reviewCapAction(capId, 'Revision Required', feedback.trim());
+}
+
 function renderSraViews(c) {
     const initialSraEl = document.getElementById('initialSraView');
     const residualSraEl = document.getElementById('residualSraView');
@@ -289,12 +335,59 @@ function renderSraViews(c) {
     }
 
     const rc = cap.root_causes || null;
-    if (rc && rc.length) {
+    const hasSram = !!(cap.sram_data && (cap.sram_data.barriers || cap.sram_data.bowtie));
+    const hasFishbone = !!(rc && rc.length);
+    if (hasSram || hasFishbone) {
         fishboneCard.style.display = '';
-        Fishbone.renderViewer(fishboneEl, { root_causes: rc, action_items: cap.action_items || [] });
+        renderRcaCard(cap, { hasSram, hasFishbone });
     } else {
         fishboneCard.style.display = 'none';
     }
+}
+
+// Renders the CAP's RCA per its chosen methodology, with a view toggle when
+// both Bow-Tie and Fishbone data exist.
+function renderRcaCard(cap, opts) {
+    const titleEl = document.getElementById('rcaCardTitle');
+    const bowtieEl = document.getElementById('bowtieView');
+    const fishboneEl = document.getElementById('fishboneView');
+    const toggleWrap = document.getElementById('rcaViewToggle');
+    const btnBowtie = document.getElementById('rcaToggleBowtie');
+    const btnFishbone = document.getElementById('rcaToggleFishbone');
+
+    let method = cap.rca_method || (opts.hasSram ? 'bow_tie' : 'fishbone');
+
+    const guideBtn = document.getElementById('rcaGuideBtn');
+    if (guideBtn) guideBtn.setAttribute('data-help-topic', method === 'bow_tie' ? 'sram_bowtie' : 'fishbone');
+
+    const show = (view) => {
+        const bowtieVisible = view === 'bow_tie' && opts.hasSram;
+        const fishboneVisible = view === 'fishbone' && opts.hasFishbone;
+        bowtieEl.style.display = bowtieVisible ? '' : 'none';
+        fishboneEl.style.display = fishboneVisible ? '' : 'none';
+        if (bowtieVisible) SRM.renderBowtieViewer(bowtieEl, cap.sram_data);
+        if (fishboneVisible) Fishbone.renderViewer(fishboneEl, { root_causes: cap.root_causes, action_items: cap.action_items || [] });
+        btnBowtie.style.display = opts.hasSram ? '' : 'none';
+        btnFishbone.style.display = opts.hasFishbone ? '' : 'none';
+        btnBowtie.disabled = (view === 'bow_tie');
+        btnFishbone.disabled = (view === 'fishbone');
+        // Locked read-only rendering of the postholder's submitted RCA.
+        const badge = view === 'bow_tie'
+            ? '<span class="srm-submitted-badge">Submitted via: Bow-Tie SRAM</span>'
+            : '<span class="srm-submitted-badge">Submitted via: 6M Fishbone</span>';
+        titleEl.innerHTML = (view === 'bow_tie'
+            ? '<i class="fas fa-bow-arrow"></i> Root Cause Analysis (Bow-Tie — CAAN CAR-19 SRAM)'
+            : '<i class="fas fa-diagnoses"></i> Root Cause Analysis (Fishbone 6M)') + badge;
+    };
+
+    if (opts.hasSram && opts.hasFishbone) {
+        toggleWrap.style.display = 'flex';
+        btnBowtie.onclick = () => show('bow_tie');
+        btnFishbone.onclick = () => show('fishbone');
+    } else {
+        toggleWrap.style.display = 'none';
+    }
+    show(method);
 }
 
 async function renderSingleSra(containerEl, sra) {

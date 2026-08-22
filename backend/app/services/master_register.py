@@ -20,6 +20,37 @@ HAZARD_COLLECTION = "hazards"
 CAN_COLLECTION = "can_cap"
 CAP_SUBCOLLECTION = "caps"
 
+# Department aliases — normalizes the many spellings used across seed data,
+# account claims and UI filters onto canonical queue names.
+_DEPARTMENT_ALIASES = {
+    "part-145": "Part-145", "part 145": "Part-145", "145": "Part-145",
+    "maintenance": "Part-145", "maintenance_145": "Part-145",
+    "engineering": "Part-145", "amo": "Part-145",
+    "engineering & maintenance": "Part-145",
+    "engineering and maintenance": "Part-145",
+    "maintenance & engineering": "Part-145",
+    "maintenance and engineering": "Part-145",
+    "camo": "CAMO", "camo / engineering": "CAMO",
+    "camo-engineering": "CAMO", "continuing airworthiness": "CAMO",
+    "flight operations": "Flight Operations", "flight ops": "Flight Operations",
+    "ops": "Flight Operations", "flight_operations": "Flight Operations",
+    "line crew": "Flight Operations", "line pilot": "Flight Operations",
+    "ground operations": "Ground Operations", "ground ops": "Ground Operations",
+    "ground handling": "Ground Operations", "ground_ops": "Ground Operations",
+    "cabin services": "Cabin Services", "cabin crew": "Cabin Services",
+    "cabin safety": "Cabin Services",
+    "safety": "Safety", "safety & quality": "Safety",
+    "safety and quality": "Safety", "qa": "Safety", "smd": "Safety",
+}
+
+
+def normalize_department(value: Any) -> str:
+    """Canonicalize a department string (e.g. '145' -> 'Part-145')."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return _DEPARTMENT_ALIASES.get(raw.lower().replace("_", " "), raw)
+
 
 def _iso(value: Any) -> Optional[str]:
     if value is None:
@@ -33,12 +64,22 @@ def build_master_register(
     user: dict,
     department: Optional[str] = None,
     assigned_to_uid: Optional[str] = None,
+    assigned_to_email: Optional[str] = None,
+    user_department: Optional[str] = None,
 ) -> dict:
     """Assemble the unified register for the authenticated user's scope.
 
     - CAAN/SUPER_ADMIN see every tenant (unless a department filter is given).
     - Tenant users see their own tenant, optionally filtered by department or
-      the assignee uid.
+      assignee.
+
+    Assignment matching is flexible — a task matches when ANY of the provided
+    dimensions hit:
+      * assigned_to_uid == task.assigned_to_uid
+      * assigned_to_email == task.assigned_to   (case-insensitive)
+      * normalize_department(user_department) ==
+        normalize_department(task.department)   (e.g. '145' -> 'Part-145')
+    Hazard rows are tenant-wide safety items and skip the assignee filter.
     """
     tenant_id = user.get("tenant_id")
     cross_tenant = user.get("role") in settings.CROSS_TENANT_ROLES
@@ -56,21 +97,29 @@ def build_master_register(
     def _match_department(data: dict, fallback: str = "") -> bool:
         if not department:
             return True
-        return (data.get("department") or fallback or "") == department
+        return normalize_department(data.get("department") or fallback) == normalize_department(department)
+
+    assignee_filters = any([assigned_to_uid, assigned_to_email, user_department])
 
     def _match_assignee(data: dict) -> bool:
-        if not assigned_to_uid:
+        if not assignee_filters:
             return True
-        return (data.get("assigned_to_uid") or "") == assigned_to_uid
+        if assigned_to_uid and (data.get("assigned_to_uid") or "") == assigned_to_uid:
+            return True
+        if assigned_to_email and str(data.get("assigned_to") or "").lower() == assigned_to_email.lower():
+            return True
+        if user_department and normalize_department(data.get("department")) == normalize_department(user_department):
+            return True
+        return False
 
     rows: List[dict] = []
 
     try:
         for doc in _hazards():
             data = doc.to_dict() or {}
+            # Hazards are tenant-wide safety items — department filter applies,
+            # but the assignee dimensions do not (most hazards are unassigned).
             if not _match_department(data):
-                continue
-            if not _match_assignee(data):
                 continue
             rows.append({
                 "id": doc.id,
@@ -119,7 +168,7 @@ def build_master_register(
             for cap in caps:
                 cap_data = cap.to_dict() or {}
                 dept = cap_data.get("department") or can_data.get("department", "")
-                if department and dept != department:
+                if department and normalize_department(dept) != normalize_department(department):
                     continue
                 rows.append({
                     "id": cap.id,
@@ -155,5 +204,10 @@ def build_master_register(
         "total": len(rows),
         "by_status": status_counts,
         "by_type": type_counts,
-        "filters": {"department": department, "assigned_to_uid": assigned_to_uid},
+        "filters": {
+            "department": department,
+            "assigned_to_uid": assigned_to_uid,
+            "assigned_to_email": assigned_to_email,
+            "user_department": user_department,
+        },
     }

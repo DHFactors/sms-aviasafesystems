@@ -210,3 +210,90 @@
 .srm-status { font-size: 0.78rem; margin-top: 0.6rem; display: none; }
 .srm-status.srm-ok { color: #2e7d32; display: block; }
 .srm-status.srm-err { color: #dc3545; display: block; }
+/* ── Barrier health tags (Effective / Degraded / Missing-Failed) ─────────── */
+.srm-health-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    margin-right: 0.35rem;
+}
+.srm-health-effective { background: #e6f4ea; color: #1e7e34; border: 1px solid #34a853; }
+.srm-health-degraded { background: #fef3c7; color: #b45309; border: 1px solid #d97706; }
+.srm-health-failed { background: #fde8e8; color: #b91c1c; border: 1px solid #dc3545; }
+.srm-health-unrated { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; }
+
+/* ── RCA methodology selector (CAP submit) ───────────────────────────────── */
+.rca-method-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+@media (max-width: 640px) { .rca-method-selector { grid-template-columns: 1fr; } }
+.rca-method-option {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.85rem 1rem;
+    border: 2px solid #dbe7f5;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rca-method-option:hover { border-color: #1a6b8a; }
+.rca-method-option.active {
+    border-color: #1a6b8a;
+    box-shadow: 0 0 0 3px rgba(26, 107, 138, 0.12);
+    background: #f4f9fc;
+}
+.rca-method-option input { position: absolute; opacity: 0; pointer-events: none; }
+.rca-method-title { font-size: 0.88rem; font-weight: 700; color: #0b2a42; display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.rca-method-sub { font-size: 0.72rem; color: #64748b; }
+.rca-badge {
+    display: inline-block;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: #e8f0fe;
+    color: #1a5fb4;
+    border: 1px solid #aecbfa;
+}
+.rca-recommended {
+    display: inline-block;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: #e6f4ea;
+    color: #1e7e34;
+    border: 1px solid #34a853;
+}
+
+/* ── Submitted-method badge (read-only RCA review) ───────────────────────── */
+.srm-submitted-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: #e8f0fe;
+    color: #1a5fb4;
+    border: 1px solid #aecbfa;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}

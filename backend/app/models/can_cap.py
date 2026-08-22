@@ -139,9 +139,23 @@ class CAPFormFields(BaseModel):
     # action_items: [{ id, description, root_cause_id, owner, target_date }]
     root_causes: Optional[list] = None
     action_items: Optional[list] = None
+    # Selected RCA methodology: 'bow_tie' (CAAN CAR-19 SRAM) or 'fishbone' (6M)
+    rca_method: Optional[str] = Field(None, pattern="^(bow_tie|fishbone)$")
     # ── CAAN CAR-19 SRM (Bow-Tie) block persisted with the CAP submission ──
     # sram_data: { analysis_mode, severity, barriers, risk_profile, bowtie, signoffs }
     sram_data: Optional[dict] = None
+    # Governance escalation — flags the CAP for Accountable Executive review
+    # (high residual risk / resource blockage).
+    escalated_to_ae: Optional[bool] = None
+    escalated_by: Optional[str] = None
+    escalated_at: Optional[datetime] = None
+    escalation_reason: Optional[str] = None
+    # Formal AE risk-acceptance sign-off (Doc 9859 §4.5 / CAR-19):
+    # typed executive signature, decision timestamp and mandatory review date.
+    ae_signature: Optional[str] = Field(None, max_length=200)
+    ae_signed_at: Optional[datetime] = None
+    ae_review_interval_days: Optional[int] = Field(None, ge=1, le=365)
+    ae_review_date: Optional[datetime] = None
     sag_sign: Optional[str] = None
     sag_signed_by: Optional[str] = None
     sag_signed_at: Optional[datetime] = None

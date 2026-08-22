@@ -20,7 +20,7 @@ on repeated runs unless --force is used.
 
 import sys
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from loguru import logger
 
@@ -118,18 +118,35 @@ def run(
     users_only: bool = False,
     tenant_ids: Optional[list] = None,
     tenants_only: bool = False,
+    with_regulator: bool = False,
+    archetype_ids: Optional[list] = None,
 ) -> dict:
     """Seed demo data.
+
+    ``archetype_ids`` activates Virtual Tenant Mirroring: only the master
+    archetype datasets (demo-fixed-wing / demo-rotary-wing) are seeded with
+    neutral FW-/RW- references plus the CAAN regulator aggregate view — no
+    individual operator data is written.
 
     `tenant_ids` restricts every step to the given operator tenants (users,
     tenant docs, surveys, reports, hazards/CANs, and the post-seed purge).
     When scoped, the CAAN state-regulator tenant and the global state-risk
-    reference are left untouched. When None, the full 13-tenant beta model is
-    seeded (12 providers + CAAN).
+    reference are left untouched. When None, the full 12-tenant beta model is
+    seeded (11 providers + CAAN).
 
     `tenants_only` seeds only the 3-tenant demo setup (Buddha Air, Yeti Airlines,
     Sita Air) with users and PSAOE assessments (Phase 3 Step 5).
     """
+    if archetype_ids:
+        from seed.archetype_config import archetype_seed_profiles
+
+        profiles = archetype_seed_profiles(archetype_ids)
+        tenant_ids = [p["id"] for p in profiles]
+        logger.info(f"Archetype mode: seeding virtual tenants {tenant_ids} "
+                    "(neutral FW-/RW- references; surveys/reports skipped)")
+    else:
+        profiles = None
+
     if not dry_run:
         if db is None:
             from app.firebase import get_db
@@ -167,6 +184,18 @@ def run(
         from seed.hazard_can import estimate_counts
         from seed.config import OPERATOR_PROFILES as _OP_PROFILES
 
+        if archetype_ids:
+            hc = estimate_counts(profiles=profiles)
+            counts["hazards"] = hc["hazards"]
+            counts["cans"] = hc["cans"]
+            counts["caps"] = hc["caps"]
+            counts["tenants"] = len(tenant_ids)
+            scope = f"archetype virtual tenants {tenant_ids}"
+            logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
+                        f"{counts['hazards']} hazards, {counts['cans']} CANs, "
+                        f"{counts['caps']} CAPs (surveys/reports skipped)")
+            return counts
+
         hc = estimate_counts(tenant_ids)
         counts["hazards"] = hc["hazards"]
         counts["cans"] = hc["cans"]
@@ -185,7 +214,7 @@ def run(
             counts["vsr_reports"] += p["vsr_count"]
             counts["mor_reports"] += p["mor_count"]
 
-        scope = "scoped" if (tenants_only or tenant_ids) else "12-tenant beta"
+        scope = "scoped" if (tenants_only or tenant_ids) else "11-tenant beta"
         logger.info(f"DRY RUN ({scope}): Would seed {counts['tenants']} tenants, "
                      f"{counts['surveys']} surveys, "
                      f"{counts['vsr_reports']} VSR, "
@@ -209,19 +238,25 @@ def run(
             create_caan_tenant,
             create_regulator_scoping,
         )
-        tenant_ids_created = create_all_tenants(db, tenant_ids)
+        tenant_ids_created = create_all_tenants(db, tenant_ids, profiles=profiles)
+        # Full seeds (and presets/archetypes) always include the CAAN
+        # state-regulator tenant + oversight scoping; scoped regulator creation
+        # covers only the seeded operator ids.
         if not tenant_ids:
             create_caan_tenant(db)
             create_regulator_scoping(db)
+        elif with_regulator or archetype_ids:
+            create_caan_tenant(db)
+            create_regulator_scoping(db, operator_ids=tenant_ids_created)
         counts["tenants"] = len(tenant_ids_created)
 
-    if all_doing_all or surveys_only:
+    if (all_doing_all or surveys_only) and not archetype_ids:
         logger.info("=== Seeding survey responses ===")
         from seed.surveys import create_all_surveys
         total_surveys = create_all_surveys(db, tenant_ids)
         counts["surveys"] = total_surveys
 
-    if all_doing_all or reports_only:
+    if (all_doing_all or reports_only) and not archetype_ids:
         logger.info("=== Seeding VSR reports ===")
         from seed.reports import create_all_vsr_reports
         total_vsr = create_all_vsr_reports(db, tenant_ids)
@@ -235,10 +270,17 @@ def run(
     if all_doing_all or reports_only:
         logger.info("=== Seeding hazards + CAN/CAP ===")
         from seed.hazard_can import create_all_hazard_can_data
-        hc = create_all_hazard_can_data(db, tenant_ids)
+        hc = create_all_hazard_can_data(db, tenant_ids, profiles=profiles)
         counts["hazards"] = hc["hazards"]
         counts["cans"] = hc["cans"]
         counts["caps"] = hc["caps"]
+
+    if archetype_ids:
+        # Virtual archetypes ship with baseline PSOE assessments (one
+        # COMPLETED ≥75% "Suitable & Operating" + one DRAFT each) so the AE
+        # dashboard maturity panel has data on first load.
+        logger.info("=== Seeding archetype PSOE baselines ===")
+        counts["psoe"] = _seed_archetype_psoe(db, sorted(archetype_ids))
 
     if all_doing_all and not tenant_ids:
         logger.info("=== Seeding state risk register reference ===")
@@ -320,7 +362,6 @@ def run(
         logger.info("=== Seeding PSAOE assessments ===")
         from app.firebase import get_db
         from app.services.psoe_service import load_template
-        from datetime import datetime, timezone
 
         db_firestore = get_db()
         template = load_template()
@@ -455,6 +496,78 @@ def run(
     return counts
 
 
+def _seed_archetype_psoe(db, tenant_ids: list) -> int:
+    """Write baseline PSOE assessments for virtual archetype tenants.
+
+    One COMPLETED (overall ~80% → Level 2 'Suitable & Operating') and one
+    DRAFT per tenant, written to the top-level `psoe_assessments` collection.
+    Idempotent via deterministic document ids."""
+    from app.models.psoe import PSOEAnswer
+    from app.services.psoe_service import load_template, score_assessment
+
+    template = load_template()
+    coll = db.collection("psoe_assessments")
+    now = datetime.now(timezone.utc)
+
+    completed_scores = {
+        "component_1": [3, 3, 3, 2, 3, 1],   # Policy ~83%
+        "component_2": [3, 3, 2, 3, 2, 1],   # SRM ~78%
+        "component_3": [3, 3, 2, 3, 1],      # Assurance ~80%
+        "component_4": [3, 3, 3, 1],         # Promotion ~83%
+    }
+    draft_scores = {
+        "component_1": [2, 2, 2, 3, 2, 1],
+        "component_2": [2, 2, 1, 2, 2, 1],
+        "component_3": [2, 2, 1, 2, 0],
+        "component_4": [2, 2, 1, None],
+    }
+
+    def _responses(template, plan):
+        out = []
+        for comp in template.components:
+            for q, score in zip(comp.questions, plan[comp.id]):
+                if score is None:
+                    out.append(PSOEAnswer(question_id=q.id, score=None, is_na=True))
+                else:
+                    out.append(PSOEAnswer(
+                        question_id=q.id, score=score, is_na=False,
+                        comment=f"Seasonal baseline evidence ({q.id}).",
+                        evidence="Archetype demo dataset",
+                    ))
+        return out
+
+    written = 0
+    for tid in tenant_ids:
+        for suffix, status, plan, date_off in (
+            ("baseline-completed", "completed", completed_scores, 1),
+            ("baseline-draft", "draft", draft_scores, 3),
+        ):
+            responses = _responses(template, plan)
+            scores = score_assessment(responses)
+            doc = {
+                "tenant_id": tid,
+                "title": f"{tid} — CAAN Appendix 10 {'Surveillance' if status == 'completed' else 'Self-Assessment (Draft)'}",
+                "status": status,
+                "department": "Safety",
+                "scope": "CAAN Appendix 10 SMS surveillance" if status == "completed" else "PSOE self-assessment",
+                "assessment_date": (now - timedelta(days=date_off)).date().isoformat(),
+                "template_version": template.version,
+                "responses": [r.model_dump() for r in responses],
+                "component_scores": scores["component_scores"],
+                "overall_score_pct": scores["overall_score_pct"],
+                "overall_level": scores["overall_level"],
+                "created_by": "seed.runner",
+                "created_at": now,
+                "updated_at": now,
+                "seed_version": SEED_VERSION,
+            }
+            coll.document(f"{tid}-{suffix}").set(doc)
+            written += 1
+
+    logger.info(f"Seeded {written} baseline PSOE assessments for archetypes")
+    return written
+
+
 def main():
     parser = argparse.ArgumentParser(description="AviaSAFE Demo Data Seeder")
     parser.add_argument("--force", action="store_true", help="Re-seed (overwrite + purge stale)")
@@ -463,8 +576,56 @@ def main():
     parser.add_argument("--reports-only", action="store_true", help="Only seed VSR + MOR data")
     parser.add_argument("--users-only", action="store_true", help="Only seed auth users")
     parser.add_argument("--tenants-only", action="store_true", help="Seed 3-tenant demo setup (Phase 3 Step 5)")
+    parser.add_argument("--preset", choices=["full", "lean", "dev"], default="full",
+                        help=(
+                            "Seeding preset: "
+                            "full = 365-day seasonal window across all 11 operators + CAAN "
+                            "(default / beta / prod staging); "
+                            "lean = 365-day window restricted to buddha-air + fishtail-air + CAAN; "
+                            "dev = 90-day lightweight window (2 operators) for fast local testing."
+                        ))
+    parser.add_argument("--archetypes", default=None,
+                        help=(
+                            "Virtual Tenant Mirroring: comma-separated virtual tenants to seed, "
+                            "e.g. 'demo-fixed-wing,demo-rotary-wing,caanepal'. Seeds the master "
+                            "archetype datasets with neutral FW-/RW- references (365-day seasonal) "
+                            "plus the CAAN regulator aggregate view. Mutually exclusive with --preset."
+                        ))
 
     args = parser.parse_args()
+
+    import seed.config as _cfg
+    from seed.archetype_config import (
+        ARCHETYPE_DATASETS,
+        REGULATOR_TIER_ID,
+        archetype_seed_profiles,
+    )
+
+    archetype_ids = None
+    if args.archetypes:
+        requested = [a.strip() for a in args.archetypes.split(",") if a.strip()]
+        unknown = [a for a in requested
+                   if a != REGULATOR_TIER_ID and a not in ARCHETYPE_DATASETS]
+        if unknown:
+            parser.error(f"Unknown archetype(s): {unknown}. "
+                         f"Known: {list(ARCHETYPE_DATASETS)} + {REGULATOR_TIER_ID}")
+        archetype_ids = [a for a in requested if a != REGULATOR_TIER_ID]
+        _cfg.SEED_WINDOW_DAYS = 365
+
+    # Preset strategy: window length + operator scope. The window is read
+    # dynamically by the generators, so mutate it before run().
+    if not archetype_ids:
+        if args.preset == "lean":
+            preset_tenant_ids = ["buddha-air", "fishtail-air"]
+            _cfg.SEED_WINDOW_DAYS = 365
+        elif args.preset == "dev":
+            preset_tenant_ids = ["buddha-air", "fishtail-air"]
+            _cfg.SEED_WINDOW_DAYS = 90
+        else:
+            preset_tenant_ids = None  # full: all OPERATOR_PROFILES
+            _cfg.SEED_WINDOW_DAYS = 365
+    else:
+        preset_tenant_ids = None
 
     from app.core.config import settings
     from app.firebase import initialize_firebase, get_db, get_auth
@@ -482,6 +643,9 @@ def main():
         reports_only=args.reports_only,
         users_only=args.users_only,
         tenants_only=args.tenants_only,
+        tenant_ids=preset_tenant_ids,
+        with_regulator=True,  # presets always include the CAAN state-regulator tier
+        archetype_ids=archetype_ids,
     )
     return result
 

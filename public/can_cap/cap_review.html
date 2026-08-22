@@ -4,14 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Review CAP - AviaSAFE</title>
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/can-cap-print.css">
+<link rel="stylesheet" href="/css/variables.css">
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/can-cap-print.css">
+<link rel="stylesheet" href="/css/srm.css">
+<link rel="stylesheet" href="/css/help-drawer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
         .page { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
         .cap-section { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; color: #0b2a42; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.35rem; margin: 1.1rem 0 0.6rem; }
+.help-link { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
+.help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         .btn-pdf { display: inline-flex; align-items: center; gap: 0.5rem; background: #b91c1c; color: #fff; border: none; padding: 0.6rem 1.1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
         .btn-pdf:hover { opacity: 0.85; }
         .cap-form td { white-space: pre-wrap; word-break: break-word; }
@@ -44,9 +48,10 @@
         .review-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
         .btn-review { padding: 0.75rem 1.5rem; border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
         .btn-review:hover { opacity: 0.85; }
-        .btn-accept { background: #2e7d32; color: #fff; }
-        .btn-revision { background: #e65100; color: #fff; }
-        .btn-overdue { background: #b91c1c; color: #fff; }
+.btn-accept { background: #2e7d32; color: #fff; }
+.btn-revision { background: #e65100; color: #fff; }
+.btn-overdue { background: #b91c1c; color: #fff; }
+.btn-escalate { background: #e8f0fe; color: #1a5fb4; border: 1px solid #aecbfa; }
         .btn-review:disabled { opacity: 0.4; cursor: not-allowed; }
         .loading-state { display: flex; align-items: center; justify-content: center; padding: 4rem; color: #64748b; }
         .loading-state i { font-size: 2rem; margin-right: 0.75rem; }
@@ -183,7 +188,16 @@
                 </div>
             </div>
 
-            <h3 class="cap-section">Root Cause Analysis — Fishbone (5M + Management)</h3>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+                <h3 class="cap-section" id="rcaSectionTitle" style="margin-bottom:0;">Root Cause Analysis</h3>
+                <button type="button" class="help-link" id="rcaGuideBtn" data-help-topic="sram_bowtie" title="Open RCA methodology guidance"><i class="fas fa-circle-question"></i> Guide</button>
+            </div>
+            <div id="rcaViewToggle" style="display:none;gap:0.5rem;align-items:center;margin-bottom:0.6rem;">
+                <span style="font-size:0.75rem;color:#64748b;font-weight:600;">Reviewer view:</span>
+                <button type="button" class="btn btn-outline btn-sm" id="rcaToggleBowtie" style="display:none;"><i class="fas fa-bow-arrow"></i> Bow-Tie</button>
+                <button type="button" class="btn btn-outline btn-sm" id="rcaToggleFishbone" style="display:none;"><i class="fas fa-diagnoses"></i> Fishbone</button>
+            </div>
+            <div id="bowtieView">-</div>
             <div id="fishboneView">-</div>
         </div>
 
@@ -204,14 +218,11 @@
             </div>
 
             <div id="reviewForm" style="display:none;">
-                <div class="form-group">
-                    <label>Review Decision</label>
-                    <select class="form-control" id="reviewDecision">
-                        <option value="Completed">Accept — CAP Complete</option>
-                        <option value="Revision Required">Request Revision</option>
-                        <option value="Overdue">Mark as Overdue</option>
-                    </select>
-                </div>
+                <p style="font-size:0.8rem;color:#64748b;margin:0 0 0.75rem;">
+                    Safety assurance decision (ICAO Doc 9859 / CAR-19): accept the plan to start
+                    implementation timeline tracking, return it to the postholder with mandatory
+                    feedback, or escalate it to the Accountable Executive.
+                </p>
                 <div class="form-row">
                     <div class="form-group">
                         <label>CA Acceptance (Accept / Reject)</label>
@@ -280,15 +291,20 @@
                     <label>Closing Remarks</label>
                     <textarea class="form-control" id="reviewClosingRemarks" placeholder="Final remarks on closure of the corrective action"></textarea>
                 </div>
-                <div class="form-group" id="revisionDeadlineGroup" style="display:none;">
-                    <label>Revision Deadline</label>
+                <div class="form-group" id="revisionDeadlineGroup">
+                    <label>Revision Deadline <span style="font-weight:400;color:#94a3b8;">(used when returning the CAP)</span></label>
                     <input class="form-control" id="revisionDeadline" type="date">
                 </div>
-                <div class="review-actions">
-                    <button class="btn-review btn-accept" onclick="submitReview('Completed')"><i class="fas fa-check"></i> Accept CAP</button>
-                    <button class="btn-review btn-revision" onclick="submitReview('Revision Required')"><i class="fas fa-undo"></i> Request Revision</button>
-                    <button class="btn-review btn-overdue" onclick="submitReview('Overdue')"><i class="fas fa-clock"></i> Mark Overdue</button>
+                <div class="review-actions" style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+                    <button class="btn-review btn-accept" onclick="submitGovernanceAction('accept')"><i class="fas fa-check"></i> Accept CAP</button>
+                    <button class="btn-review btn-revision" onclick="submitGovernanceAction('return')"><i class="fas fa-undo"></i> Return with Feedback</button>
+                    <button class="btn-review btn-escalate" onclick="submitGovernanceAction('escalate')"><i class="fas fa-user-shield"></i> Escalate to AE</button>
                 </div>
+                <p style="font-size:0.72rem;color:#64748b;margin-top:0.5rem;">
+                    Accept &rarr; APPROVED / IN PROGRESS (timeline tracking starts) ·
+                    Return &rarr; REVISION REQUIRED (feedback mandatory) ·
+                    Escalate &rarr; flagged for Accountable Executive review.
+                </p>
             </div>
         </div>
 
@@ -305,7 +321,9 @@
 <script src="/js/api/client.js"></script>
 <script src="/js/risk_matrix.js"></script>
 <script src="/js/fishbone.js"></script>
+<script src="/js/srm.js"></script>
 <script src="/js/can_cap.js"></script>
+<script src="/js/help-drawer.js"></script>
 <script>
 let capData = null;
 let currentUser = null;
@@ -319,11 +337,6 @@ firebase.auth().onAuthStateChanged(function(user) {
     const id = params.get('id');
     if (!id) { showError('No CAP ID provided'); return; }
     loadCap(id);
-
-    document.getElementById('reviewDecision').addEventListener('change', function() {
-        document.getElementById('revisionDeadlineGroup').style.display =
-            this.value === 'Revision Required' ? 'block' : 'none';
-    });
 });
 
 async function loadCap(id) {
@@ -406,7 +419,6 @@ function renderCap() {
 async function renderCapSraViews(c) {
     const initialEl = document.getElementById('initialSraView');
     const residualEl = document.getElementById('residualSraView');
-    const fishboneEl = document.getElementById('fishboneView');
 
     const residual = c.residual_sra || (c.residual_severity && c.residual_probability
         ? { severity: c.residual_severity, probability: c.residual_probability, risk_index: c.residual_risk_index, risk_level: c.residual_risk_level, risk_outcome: c.residual_risk_outcome }
@@ -427,11 +439,73 @@ async function renderCapSraViews(c) {
     }
     await renderCapSraCell(initialEl, initial);
 
-    if (c.root_causes && c.root_causes.length) {
-        Fishbone.renderViewer(fishboneEl, { root_causes: c.root_causes, action_items: c.action_items || [] });
-    } else {
+    renderRcaSection(c);
+}
+
+// ---------------------------------------------------------------------------
+// RCA methodology rendering: honours the submitter's chosen rca_method
+// ('bow_tie' | 'fishbone'), with a reviewer toggle when both datasets exist.
+// ---------------------------------------------------------------------------
+let rcaCurrentView = null;
+
+function renderRcaSection(c) {
+    const titleEl = document.getElementById('rcaSectionTitle');
+    const bowtieEl = document.getElementById('bowtieView');
+    const fishboneEl = document.getElementById('fishboneView');
+    const toggleWrap = document.getElementById('rcaViewToggle');
+    const btnBowtie = document.getElementById('rcaToggleBowtie');
+    const btnFishbone = document.getElementById('rcaToggleFishbone');
+
+    const hasSram = !!(c.sram_data && (c.sram_data.barriers || c.sram_data.bowtie));
+    const hasFishbone = !!(c.root_causes && c.root_causes.length);
+
+    // Resolve the effective method: explicit field first, then legacy inference.
+    let method = c.rca_method || (hasSram ? 'bow_tie' : (hasFishbone ? 'fishbone' : null));
+    if (!method) {
+        titleEl.textContent = 'Root Cause Analysis — not documented';
+        bowtieEl.textContent = '-';
         fishboneEl.textContent = '-';
+        toggleWrap.style.display = 'none';
+        return;
     }
+
+    rcaCurrentView = method;
+    const label = method === 'bow_tie'
+        ? 'Root Cause Analysis — Bow-Tie Barrier Analysis (CAAN CAR-19 SRAM)'
+        : 'Root Cause Analysis — Fishbone / Ishikawa (6M)';
+    const submittedBadge = method === 'bow_tie'
+        ? 'Submitted via: Bow-Tie SRAM'
+        : 'Submitted via: 6M Fishbone';
+    // Locked read-only rendering of exactly what the postholder submitted.
+    // (Label + badge are static strings — no user input interpolated.)
+    titleEl.innerHTML = label
+        + ' <span class="srm-submitted-badge">' + submittedBadge + '</span>';
+
+    const guideBtn = document.getElementById('rcaGuideBtn');
+    if (guideBtn) guideBtn.setAttribute('data-help-topic', method === 'bow_tie' ? 'sram_bowtie' : 'fishbone');
+
+    const show = (view) => {
+        rcaCurrentView = view;
+        const bowtieVisible = view === 'bow_tie' && hasSram;
+        const fishboneVisible = view === 'fishbone' && hasFishbone;
+        bowtieEl.style.display = bowtieVisible ? '' : 'none';
+        fishboneEl.style.display = fishboneVisible ? '' : 'none';
+        if (bowtieVisible) SRM.renderBowtieViewer(bowtieEl, c.sram_data);
+        if (fishboneVisible) Fishbone.renderViewer(fishboneEl, { root_causes: c.root_causes, action_items: c.action_items || [] });
+        btnBowtie.style.display = hasSram ? '' : 'none';
+        btnFishbone.style.display = hasFishbone ? '' : 'none';
+        btnBowtie.disabled = (view === 'bow_tie');
+        btnFishbone.disabled = (view === 'fishbone');
+    };
+
+    if (hasSram && hasFishbone) {
+        toggleWrap.style.display = 'flex';
+        btnBowtie.onclick = () => show('bow_tie');
+        btnFishbone.onclick = () => show('fishbone');
+    } else {
+        toggleWrap.style.display = 'none';
+    }
+    show(method);
 }
 
 async function renderCapSraCell(containerEl, sra) {
@@ -456,10 +530,41 @@ async function renderCapSraCell(containerEl, sra) {
     }
 }
 
-async function submitReview(decision) {
+async function submitGovernanceAction(action) {
     if (!capData) return;
     const comments = document.getElementById('reviewComments').value.trim();
     const revisionDeadline = document.getElementById('revisionDeadline').value;
+
+    // Governance decision mapping (ICAO Doc 9859 / CAR-19):
+    //   accept   -> 'In Progress'        (APPROVED — implementation timeline starts)
+    //   return   -> 'Revision Required'  (mandatory feedback; postholder reworks)
+    //   escalate -> 'Under Review'       (flagged for Accountable Executive review)
+    let status;
+    const data = {};
+
+    if (action === 'accept') {
+        status = 'In Progress';
+    } else if (action === 'return') {
+        if (!comments) {
+            showMessage('Feedback notes are mandatory when returning a CAP to the postholder.', 'error');
+            return;
+        }
+        status = 'Revision Required';
+        data.revision_deadline = revisionDeadline ? new Date(revisionDeadline).toISOString() : null;
+    } else if (action === 'escalate') {
+        const reason = prompt('Escalation reason (required) — e.g. high residual risk, resource blockage:');
+        if (!reason || !reason.trim()) {
+            showMessage('Escalation requires a documented reason.', 'error');
+            return;
+        }
+        status = 'Under Review';
+        data.escalated_to_ae = true;
+        data.escalated_by = (currentUser && currentUser.email) || null;
+        data.escalation_reason = reason.trim();
+        data.comments = ('[ESCALATED TO AE] ' + reason.trim());
+    } else {
+        return;
+    }
 
     const maName = document.getElementById('reviewMaName').value.trim();
     const maSignature = document.getElementById('reviewMaSignature').value.trim();
@@ -483,26 +588,27 @@ async function submitReview(decision) {
         }
         : null;
 
-    const data = {
-        status: decision,
-        comments: comments || null,
-        revision_deadline: (decision === 'Revision Required' && revisionDeadline)
-            ? new Date(revisionDeadline).toISOString() : null,
-        ca_acceptance: document.getElementById('reviewAcceptance').value || null,
-        manager_approval: document.getElementById('reviewManagerApproval').value || null,
-        sag_sign: document.getElementById('reviewSagSign').value.trim() || null,
-        sag_signed_by: document.getElementById('reviewSagSignedBy').value.trim() || null,
-        closing_remarks: document.getElementById('reviewClosingRemarks').value.trim() || null,
-        managerial_approval: managerialApproval,
-        caa_acceptance: caaAcceptance,
-    };
+    data.status = status;
+    if (action !== 'escalate') data.comments = comments || null;
+    data.ca_acceptance = document.getElementById('reviewAcceptance').value || null;
+    data.manager_approval = document.getElementById('reviewManagerApproval').value || null;
+    data.sag_sign = document.getElementById('reviewSagSign').value.trim() || null;
+    data.sag_signed_by = document.getElementById('reviewSagSignedBy').value.trim() || null;
+    data.closing_remarks = document.getElementById('reviewClosingRemarks').value.trim() || null;
+    data.managerial_approval = managerialApproval;
+    data.caa_acceptance = caaAcceptance;
 
     const btns = document.querySelectorAll('.btn-review');
     btns.forEach(b => b.disabled = true);
 
     try {
         await CanCapAPI.reviewCap(capData.id, data);
-        showMessage(`CAP ${decision === 'Completed' ? 'accepted' : decision === 'Revision Required' ? 'sent for revision' : 'marked overdue'}!`, 'success');
+        const label = action === 'accept'
+            ? 'CAP accepted — approved and moved to In Progress (timeline tracking started).'
+            : action === 'return'
+                ? 'CAP returned to the postholder with feedback.'
+                : 'CAP escalated to the Accountable Executive.';
+        showMessage(label, 'success');
         setTimeout(() => {
             window.location.href = `/can_cap/can_detail.html?id=${canIdFromCap}`;
         }, 1500);

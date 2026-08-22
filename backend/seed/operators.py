@@ -86,11 +86,18 @@ def create_tenant(db, profile: dict) -> dict:
     return tenant_id
 
 
-def create_all_tenants(db, tenant_ids=None) -> list:
+def create_all_tenants(db, tenant_ids=None, profiles=None) -> list:
     from app.core.config import settings
 
-    profiles = [p for p in OPERATOR_PROFILES if not tenant_ids or p["id"] in tenant_ids]
-    if not tenant_ids:
+    # Full-set mode (default) enforces service-provider type coverage and
+    # purges legacy tenants; explicit profiles (virtual archetypes) do not.
+    is_full_set = profiles is None and not tenant_ids
+
+    if profiles is None:
+        profiles = [p for p in OPERATOR_PROFILES
+                    if not tenant_ids or p["id"] in tenant_ids]
+
+    if is_full_set:
         profile_types = {p["tenant_type"] for p in profiles}
         missing_types = BETA_SERVICE_PROVIDER_TYPES - profile_types
         if missing_types:
@@ -104,11 +111,7 @@ def create_all_tenants(db, tenant_ids=None) -> list:
         tenant_ids_out.append(tid)
     logger.info(f"Seeded {len(tenant_ids_out)} tenants")
 
-    if not tenant_ids:
-        if len({p["tenant_type"] for p in profiles}) != len(BETA_SERVICE_PROVIDER_TYPES):
-            raise RuntimeError(
-                "OPERATOR_PROFILES must cover every service-provider tenant type"
-            )
+    if is_full_set:
         purge_legacy_tenants(db)
     return tenant_ids_out
 
@@ -232,7 +235,19 @@ def create_regulator_scoping(db, operator_ids: Optional[list] = None) -> dict:
         operator_ids = [p["id"] for p in OPERATOR_PROFILES]
 
     now = datetime.now(timezone.utc)
-    db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document("caan").set({
+    ref = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document("caan")
+
+    # Union-merge: virtual archetype tenants ADD themselves to the oversight
+    # set without evicting the real operators (and vice versa).
+    try:
+        snap = ref.get()
+        existing = (snap.to_dict() or {}) if getattr(snap, "exists", True) else {}
+    except Exception:
+        existing = {}
+    current_ids = set(existing.get("operator_tenant_ids") or [])
+    merged_ids = sorted(current_ids | set(operator_ids))
+
+    ref.set({
         "id": "caan",
         "type": "state_regulator",
         "name": CAAN_TENANT["name"],
@@ -240,17 +255,17 @@ def create_regulator_scoping(db, operator_ids: Optional[list] = None) -> dict:
         "country": "NP",
         "country_name": "Nepal",
         "domain": "ssp.caanepal.gov.np",
-        "operator_tenant_ids": sorted(operator_ids),
+        "operator_tenant_ids": merged_ids,
         "active": True,
         "updated_at": now,
     }, merge=True)
 
-    for tid in list(operator_ids) + [CAAN_TENANT["id"]]:
+    for tid in list(merged_ids) + [CAAN_TENANT["id"]]:
         db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set({
             "regulator_id": "caan",
             "country": "NP",
             "active": True,
         }, merge=True)
 
-    logger.info(f"Regulator scoping applied: caan oversees {sorted(operator_ids)}")
-    return {"regulator_id": "caan", "operator_tenant_ids": sorted(operator_ids)}
+    logger.info(f"Regulator scoping applied: caan oversees {merged_ids}")
+    return {"regulator_id": "caan", "operator_tenant_ids": merged_ids}

@@ -1,7 +1,7 @@
 /**
  * FOLDER/FILE PATH: public/survey/app.js
- * VERSION NO: 3.1.0
- * DATE: 2026-08-07
+ * VERSION NO: 4.0.0
+ * DATE: 2026-08-21
  * PURPOSE OF THE FILE: Core multi-tenant survey runtime engine. Dynamically resolves 
  * the active aviation tenant profile (airline or regulator) from subdomains or URL parameters,
  * renders bilingual ICAO-aligned questions from the master data contract, manages 
@@ -9,12 +9,13 @@
  * survey endpoint (POST /api/v1/surveys) which validates, scores, and persists them.
  */
 
-import { MASTER_QUESTIONS } from './default_q.js';
+import { MASTER_QUESTIONS, SURVEY_VERSION } from './default_q.js';
 
 // ── STATE MANAGEMENT ──
 let currentLang = 'en';
 let activeTenantId = 'unknown-tenant';
-const TOTAL_QUESTIONS = MASTER_QUESTIONS.length;
+const VERSION = SURVEY_VERSION;                       // "4.0.0"
+const TOTAL_QUESTIONS = MASTER_QUESTIONS.length;      // 31 (v4 contract)
 
 // Static localization bundles for application shell
 const i18n = {
@@ -22,7 +23,7 @@ const i18n = {
         aware: "Aware", unaware: "Unaware",
         agree5: "Strongly Agree", agree4: "Agree", opinion3: "No Opinion", disagree2: "Disagree", disagree1: "Strongly Disagree",
         progressOf: "of", progressAns: "answered",
-        validationErr: "⚠️ Please answer all 23 questions before submitting.",
+        validationErr: `⚠️ Please answer all ${TOTAL_QUESTIONS} questions before submitting.`,
         submitting: "Submitting response securely...",
         submitErr: "Submission failed. Please check your network connection.",
         successTitle: "Submission Successful",
@@ -34,7 +35,7 @@ const i18n = {
         aware: "जानकार", unaware: "अजानकार",
         agree5: "कडा सहमत", agree4: "सहमत", opinion3: "कुनै राय छैन", disagree2: "असहमत", disagree1: "कडा असहमत",
         progressOf: "मध्ये", progressAns: "उत्तर दिइएको",
-        validationErr: "⚠️ कृपया पेश गर्नुअघि सबै २३ प्रश्नहरूको उत्तर दिनुहोस्।",
+        validationErr: `⚠️ कृपया पेश गर्नुअघि सबै ${TOTAL_QUESTIONS} प्रश्नहरूको उत्तर दिनुहोस्।`,
         submitting: "विवरण सुरक्षित रूपमा पेश हुँदैछ...",
         submitErr: "त्रुटि! कृपया नेटवर्क जडान जाँच गर्नुहोस्।",
         successTitle: "सफलतापूर्वक पेश भयो",
@@ -478,7 +479,8 @@ async function executeSubmission(e) {
         department: document.getElementById('department')?.value || null,
         employee_category: document.getElementById('employee_category')?.value || null,
         years_experience: document.getElementById('years_experience')?.value || null,
-        language: currentLang
+        language: currentLang,
+        survey_version: VERSION
     };
 
     // Cloud transmission configuration context

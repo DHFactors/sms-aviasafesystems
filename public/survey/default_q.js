@@ -1,10 +1,14 @@
 /**
  * FOLDER/FILE PATH: public/survey/default_q.js
- * VERSION NO: 3.0.0
- * DATE: 2026-07-17
- * PURPOSE OF THE FILE: Defines the frozen master schema contract for all 23 bilingual 
- * SMS survey questions mapped to ICAO Annex 19 safety pillars and CAAN SSP mandates.
+ * VERSION NO: 4.0.0
+ * DATE: 2026-08-21
+ * PURPOSE OF THE FILE: Defines the frozen master schema contract for all 31 bilingual 
+ * SMS survey questions mapped to ICAO Annex 19 safety pillars, the 12 SMS elements 
+ * (E1–E12) and CAAN SSP mandates. v4 adds accountability, key-safety-personnel,
+ * documentation and management-of-change questions.
  */
+
+export const SURVEY_VERSION = "4.0.0";
 
 export const MASTER_QUESTIONS = [
     // ── PILLAR 1: SAFETY POLICY & OBJECTIVES ──
@@ -174,6 +178,72 @@ export const MASTER_QUESTIONS = [
         type: "likert", 
         text_en: "My colleagues take safety seriously in their day-to-day work.",
         text_ne: "मेरा सहकर्मीहरूले आफ्नो दैनिक कामलाई सुरक्षालाई गम्भीरतापूर्वक लिन्छन्।" 
+    },
+
+    // ── v4 ADDITIONS (31-question contract) ────────────────────────────────
+
+    // E2 — SAFETY ACCOUNTABILITY (Safety Policy & Objectives)
+    { 
+        id: "q24_accountability", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "Management is clearly accountable for the safety performance of the organisation.",
+        text_ne: "संस्थाको सुरक्षा प्रदर्शनका लागि व्यवस्थापन स्पष्ट रूपमा जवाफदेही छ।" 
+    },
+    { 
+        id: "q25_accountability_clear", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "My own safety responsibilities and accountabilities are clearly defined and communicated to me.",
+        text_ne: "मेरो आफ्नै सुरक्षा जिम्मेवारी र जवाफदेहिता स्पष्ट रूपमा परिभाषित गरी मलाई जनाइएको छ।" 
+    },
+
+    // E3 — APPOINTMENT OF KEY SAFETY PERSONNEL
+    { 
+        id: "q26_key_personnel", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "Key safety personnel (e.g. Safety Manager, CAMO postholder) are formally appointed and qualified for their roles.",
+        text_ne: "प्रमुख सुरक्षा कर्मचारीहरू (जस्तै सुरक्षा प्रबन्धक, CAMO पोस्टहोल्डर) औपचारिक रूपमा नियुक्त र आफ्ना भूमिकाका लागि योग्य छन्।" 
+    },
+    { 
+        id: "q27_key_personnel_access", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "I know who the key safety personnel are and I can contact them directly when needed.",
+        text_ne: "प्रमुख सुरक्षा कर्मचारीहरू को-को हुन् भनी मलाई थाहा छ र आवश्यक पर्दा म उहाँहरूलाई सीधै सम्पर्क गर्न सक्छु।" 
+    },
+
+    // E5 — SMS DOCUMENTATION (Safety Policy & Objectives)
+    { 
+        id: "q28_documentation", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "SMS documentation (manuals, procedures, safety guidance) is readily available to all employees.",
+        text_ne: "SMS कागजातहरू (म्यानुअल, प्रक्रियाहरू, सुरक्षा निर्देशन) सबै कर्मचारीहरूका लागि सजिलै उपलब्ध छन्।" 
+    },
+    { 
+        id: "q29_documentation_current", 
+        pillar: "Safety Policy & Objectives", 
+        type: "likert", 
+        text_en: "The SMS documentation I use is kept up to date and reviewed on a regular basis.",
+        text_ne: "मैले प्रयोग गर्ने SMS कागजातहरू अद्यावधिक राखिएका छन् र नियमित रूपमा पुनरावलोकन गरिन्छ।" 
+    },
+
+    // E9 — MANAGEMENT OF CHANGE (Safety Assurance)
+    { 
+        id: "q30_moc_process", 
+        pillar: "Safety Assurance", 
+        type: "likert", 
+        text_en: "Changes that could affect safety (new routes, equipment or procedures) go through a formal Management of Change process.",
+        text_ne: "सुरक्षालाई असर पार्न सक्ने परिवर्तनहरू (नयाँ रुट, उपकरण वा प्रक्रिया) औपचारिक परिवर्तन व्यवस्थापन प्रक्रियाबाट गरिन्छ।" 
+    },
+    { 
+        id: "q31_moc_risk", 
+        pillar: "Safety Assurance", 
+        type: "likert", 
+        text_en: "Risks introduced by operational changes are assessed before those changes take effect.",
+        text_ne: "परिचालन परिवर्तनले ल्याउने जोखिमहरू परिवर्तन लागू हुनुअघि नै मूल्याङ्कन गरिन्छ।" 
     }
 ];
 

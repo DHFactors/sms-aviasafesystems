@@ -75,7 +75,12 @@ def generate_timestamp(
     days_back_min: int = 1,
     days_back_max: int = 365,
 ) -> datetime:
-    days = rng.randint(days_back_min, days_back_max)
+    # Respect the active seeding window (runner presets may shrink it to 90
+    # days for the dev preset) so every generator stays inside the horizon.
+    from seed import config as _cfg
+
+    max_days = min(days_back_max, max(days_back_min, _cfg.SEED_WINDOW_DAYS))
+    days = rng.randint(days_back_min, max_days)
     hours = rng.randint(0, 23)
     minutes = rng.randint(0, 59)
     now = datetime.now(timezone.utc)

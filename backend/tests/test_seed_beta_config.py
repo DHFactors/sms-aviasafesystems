@@ -1,12 +1,13 @@
-"""12-Tenant Beta seed model (2026-08-17).
+"""11-Tenant Beta seed model (2026-08-21).
 
 Locks the invariants of the seed configuration:
 
-  * OPERATOR_PROFILES holds 12 active providers covering every service-provider
-    type (airline, helicopter-operator, mro, aerodrome, ground-handling,
-    caan-directorate), so a seed produces exactly 12 operator tenants + the
-    CAAN state-regulator tenant. Internal CAAN directorates (caan-fssd,
-    caan-assd) are treated like any external provider for oversight scoping.
+  * OPERATOR_PROFILES holds 11 active providers covering every service-provider
+    type (airline, helicopter-operator, mro, aerodrome, ground-handling), so a
+    seed produces exactly 11 operator tenants + the CAAN state-regulator
+    tenant. The former internal CAAN directorate tenants (caan-fssd,
+    caan-assd) were retired on 2026-08-21; oversight runs exclusively through
+    the single `caan` state-regulator tenant.
   * All tenant ids are lowercase, hyphenated (e.g. yeti-airlines).
   * Each provider seeds randomized realistic volumes: 25-40 total reports with
     ~70% VSR / 30% MOR, ~25-35% anonymous VSRs, 15-25 surveys, and flight
@@ -23,6 +24,11 @@ from seed.config import (
     CREDENTIAL_TENANT_CODES,
     build_simplified_role_plan,
     SIMPLIFIED_ROLE_ACCOUNTS,
+    EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS,
+    EXTENDED_ROLE_TENANT_IDS,
+    roles_for_tenant,
+    simplified_email,
+    simplified_password,
     VSR_ORIGINATOR_PERSONAS,
     FISHBONE_CATEGORIES,
 )
@@ -31,9 +37,11 @@ from seed.config import (
 def test_all_providers_cover_tenant_types():
     types = {p["tenant_type"] for p in OPERATOR_PROFILES}
     assert types == BETA_SERVICE_PROVIDER_TYPES
-    assert len(OPERATOR_PROFILES) == 12
+    assert len(OPERATOR_PROFILES) == 11
     ids = [p["id"] for p in OPERATOR_PROFILES]
     assert len(ids) == len(set(ids))
+    assert "caan-fssd" not in ids
+    assert "caan-assd" not in ids
 
 
 def test_all_tenant_ids_are_hyphenated_lowercase():
@@ -72,8 +80,38 @@ def test_credential_scheme_covers_active_providers_only():
     assert set(CREDENTIAL_EMAIL_DOMAINS) == active_ids
     assert set(CREDENTIAL_TENANT_CODES) == active_ids
     plan = build_simplified_role_plan()
-    assert len(plan) == 12 * len(SIMPLIFIED_ROLE_ACCOUNTS) == 48
+    expected_accounts = sum(len(roles_for_tenant(tid)) for tid in active_ids)
+    assert len(plan) == expected_accounts == 48  # 9 x 4 base + 2 x 6 extended
     assert {entry["op_id"] for entry in plan} == active_ids
+
+
+def test_extended_role_scheme_for_commercial_operators():
+    """fishtail-air / summit-air provision the six-role scheme (AE + Pilot)."""
+    for tid, code, domain in (
+        ("fishtail-air", "FISHTAIL", "fishtailair.com"),
+        ("summit-air", "SUMMIT", "summitair.com"),
+    ):
+        tokens = [r["token"] for r in roles_for_tenant(tid)]
+        assert tokens == ["safety", "camo", "145", "ops", "ae", "pilot"], tid
+
+        ae = next(r for r in EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS if r["token"] == "ae")
+        pilot = next(r for r in EXTENDED_SIMPLIFIED_ROLE_ACCOUNTS if r["token"] == "pilot")
+        assert ae["app_role"] == "AIRLINE_ADMIN" and ae["department"] == ""
+        assert pilot["app_role"] == "USER" and pilot["department"] == "Line Crew"
+
+        assert simplified_email("ae", tid) == f"ae@{domain}"
+        assert simplified_password("ae", tid) == f"{code}-AE-2026"
+        assert simplified_email("pilot", tid) == f"pilot@{domain}"
+        assert simplified_password("pilot", tid) == f"{code}-Pilot-2026"
+
+    # Base-only tenants never receive the extended accounts.
+    for p in OPERATOR_PROFILES:
+        if p["id"] in EXTENDED_ROLE_TENANT_IDS:
+            continue
+        assert len(roles_for_tenant(p["id"])) == len(SIMPLIFIED_ROLE_ACCOUNTS), p["id"]
+        plan_tokens = {e["token"] for e in build_simplified_role_plan()
+                       if e["op_id"] == p["id"]}
+        assert "ae" not in plan_tokens and "pilot" not in plan_tokens, p["id"]
 
 
 def test_vsr_originator_90_10_anonymity_ratio():
@@ -110,24 +148,65 @@ def test_mor_originators_are_compliance_authorities_only():
 
 
 def test_can_uses_corporate_safety_issuer_and_postholder_rotation():
-    from seed.config import CAN_ISSUED_BY, CAN_ASSIGNED_POSTHOLDERS
-    from seed.hazard_can import _can_doc
+    from seed.config import CAN_ISSUED_BY, CREDENTIAL_EMAIL_DOMAINS
+    from seed.hazard_can import POSTHOLDER_ACCOUNTS, _annual_can_count, _can_doc
     from seed.generator import SeededRandom
 
     profile = next(p for p in OPERATOR_PROFILES if p["id"] == "buddha-air")
+    domain = CREDENTIAL_EMAIL_DOMAINS["buddha-air"]
+    expected_assignees = {f"{a['token']}@{domain}" for a in POSTHOLDER_ACCOUNTS}
     rng = SeededRandom(seed=7)
-    postholders = set()
-    for i in range(profile["can_count"]):
+    assignees = set()
+    departments = set()
+    for i in range(_annual_can_count(profile)):
         rng.seed(40000 + sum(ord(c) for c in profile["id"]) + 5000 + i)
         can = _can_doc(rng, profile, i, f"haz-doc-{i}", f"hazard-{i}")
         assert can["issued_by"] == CAN_ISSUED_BY
-        assert can["assigned_to"] == can["addressed_function"]
-        postholders.add(can["assigned_to"])
-        assert can["initial_sra"]["severity_letter"] in {"B", "C", "D"}
+        # assigned_to carries the provisioned account email; the human
+        # postholder label lives on addressed_function.
+        assert can["assigned_to"] != can["addressed_function"]
+        assert "@" in can["assigned_to"]
+        assignees.add(can["assigned_to"])
+        departments.add(can["department"])
+        # Unmitigated baseline: at least Medium (index >= 6).
+        assert can["initial_sra"]["risk_index"] >= 6
         assert can["initial_sra"]["risk_index"] == (
             can["initial_sra"]["severity"] * can["initial_sra"]["probability"]
         )
-    assert postholders == {label for label, _ in CAN_ASSIGNED_POSTHOLDERS}
+    # Every provisioned postholder account receives assigned work, and the
+    # functional queues (145 / CAMO / Flight Ops) are all represented.
+    assert assignees == expected_assignees
+    assert {"Part-145", "CAMO", "Flight Operations"} <= departments
+
+
+def test_seed_sra_asymmetry_initial_vs_residual():
+    """Seeded CANs carry unmitigated initial risk (>= Medium); every linked CAP
+    residual sits strictly below its CAN's initial risk (no duplication)."""
+    from seed.hazard_can import _annual_can_count, _can_doc, _cap_doc, _fishbone_doc
+    from seed.generator import SeededRandom
+
+    profile = next(p for p in OPERATOR_PROFILES if p["id"] == "buddha-air")
+    base = 40000 + sum(ord(c) for c in profile["id"])
+    for i in range(min(_annual_can_count(profile), 8)):
+        rng = SeededRandom(seed=base + 5000 + i)
+        can = _can_doc(rng, profile, i, f"haz-doc-{i}", f"hazard-{i}")
+
+        # Unmitigated finding: at least Medium before any mitigation.
+        assert can["initial_sra"]["risk_index"] >= 6, can["initial_sra"]
+
+        for k in range(2):
+            rng.seed(base + 9000 + i * 10 + k)
+            fishbone = _fishbone_doc(rng, seed=base + 9500 + i * 10 + k, can_index=i,
+                                     submitted_by=can["assigned_to"])
+            cap = _cap_doc(
+                rng, can["can_reference"], f"can-doc-{i}", k, "Flight Operations",
+                submitted_by={"postholder": can["assigned_to"], "uid": can["assigned_to_uid"]},
+                fishbone=fishbone, initial_risk_index=can["initial_risk_index"],
+            )
+            assert cap["residual_sra"]["risk_index"] < can["initial_sra"]["risk_index"], (
+                f"CAN {i} CAP {k}: residual {cap['residual_sra']['risk_index']} "
+                f"not below initial {can['initial_sra']['risk_index']}"
+            )
 
 
 def test_cap_has_six_branch_fishbone_primary_and_1to1_actions():
@@ -189,7 +268,6 @@ def test_operational_profile_categories_match_tenant_types():
         CATEGORY_AMO,
         CATEGORY_AERODROME,
         CATEGORY_GROUND_HANDLING,
-        CATEGORY_CAAN,
     )
 
     type_to_category = {
@@ -198,7 +276,6 @@ def test_operational_profile_categories_match_tenant_types():
         "mro": CATEGORY_AMO,
         "aerodrome": CATEGORY_AERODROME,
         "ground-handling": CATEGORY_GROUND_HANDLING,
-        "caan-directorate": CATEGORY_CAAN,
     }
     for p in OPERATOR_PROFILES:
         profile = TENANT_OPERATIONAL_PROFILES[p["id"]]

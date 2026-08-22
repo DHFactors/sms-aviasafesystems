@@ -65,12 +65,22 @@ async def list_hazards(
     tenant_id: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
+    from app.services.archetype_scope import resolve_data_tenant
+
     svc_user = user
-    effective_tenant = user.get("tenant_id")
-    if user.get("role") in ["CAAN_SMD", "SUPER_ADMIN"] and tenant_id:
-        effective_tenant = tenant_id
+    # Archetype requests take precedence and scope to the virtual tenant.
+    if archetypeId and str(archetypeId).strip().startswith("demo-"):
+        effective_tenant = str(archetypeId).strip()
+        svc_user = dict(user)
+        svc_user["tenant_id"] = effective_tenant
+        svc_user["role"] = "AIRLINE_ADMIN"
+    else:
+        effective_tenant = user.get("tenant_id")
+        if user.get("role") in ["CAAN_SMD", "SUPER_ADMIN"] and tenant_id:
+            effective_tenant = tenant_id
 
     service = HazardService(effective_tenant)
     filters = {}

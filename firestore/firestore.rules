@@ -234,5 +234,27 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() &&
         (request.auth.uid == uid || isSuperAdmin());
     }
+
+    // ========================================================================
+    // DEMO SESSION ISOLATION & ANALYTICS (Virtual Tenant Mirroring)
+    // ========================================================================
+    // Prospect AE actions/decisions and demo telemetry are written ONLY by
+    // the backend via the Firebase Admin SDK, which bypasses these rules.
+    // Clients (including the prospect AEs themselves) get no direct access:
+    // master archetype data stays immutable from the browser.
+
+    match /demo_sessions/{sessionId} {
+      allow read, write: if false;
+      match /{sub=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /demo_analytics/{email} {
+      allow read, write: if false;
+      match /events/{eventId} {
+        allow read, write: if false;
+      }
+    }
   }
 }

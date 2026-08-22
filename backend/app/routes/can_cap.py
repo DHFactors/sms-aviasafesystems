@@ -50,9 +50,12 @@ async def list_cans(
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     days: Optional[int] = Query(None, ge=0, description="Only CANs issued within the last N days. 0 or omitted = All Time."),
+    archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    effective_tenant = user.get("tenant_id", "default")
+    from app.services.archetype_scope import resolve_data_tenant
+
+    effective_tenant = resolve_data_tenant(archetypeId, user)
     service = CanCapService(effective_tenant)
     filters = {}
     if hazard_id:
@@ -98,11 +101,14 @@ async def list_all_caps(
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     days: Optional[int] = Query(None, ge=0, description="Only CAPs submitted within the last N days. 0 or omitted = All Time."),
+    archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """List all CAPs for the current tenant, each joined with the CAN it refers
     to (reference + issued date) for the CAP register page."""
-    effective_tenant = user.get("tenant_id", "default")
+    from app.services.archetype_scope import resolve_data_tenant
+
+    effective_tenant = resolve_data_tenant(archetypeId, user)
     service = CanCapService(effective_tenant)
     filters = {}
     if status:
@@ -260,6 +266,13 @@ async def review_cap(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     tenant_id = user["tenant_id"]
+    # Session isolation: master archetype tenants are immutable from the CAP
+    # review path — demo AEs must use /api/v1/demo/session/decision.
+    if str(tenant_id).startswith("demo-"):
+        raise HTTPException(
+            status_code=403,
+            detail="Demo archetype data is read-only. Use /api/v1/demo/session/decision.",
+        )
     service = CanCapService(tenant_id)
     updated = service.review_cap(cap_id, review.model_dump(), user)
     if not updated:
@@ -341,6 +354,18 @@ def _to_can_response(data: dict) -> dict:
         "closed_by": data.get("closed_by"),
         "closed_at": data.get("closed_at"),
         "closed_signature": data.get("closed_signature"),
+        # RCA methodology + AE governance escalation
+        # RCA methodology + AE governance escalation
+        "rca_method": data.get("rca_method"),
+        "escalated_to_ae": data.get("escalated_to_ae"),
+        "escalated_by": data.get("escalated_by"),
+        "escalated_at": data.get("escalated_at"),
+        "escalation_reason": data.get("escalation_reason"),
+        "ae_signature": data.get("ae_signature"),
+        "ae_signed_at": data.get("ae_signed_at"),
+        "ae_review_interval_days": data.get("ae_review_interval_days"),
+        "ae_review_date": data.get("ae_review_date"),
+        "sram_data": data.get("sram_data"),
     }
 
 
@@ -451,4 +476,38 @@ def _to_cap_list_item(data: dict) -> dict:
         "root_causes": data.get("root_causes"),
         "action_items": data.get("action_items"),
         "ca_acceptance": data.get("ca_acceptance"),
+        # RCA methodology + AE governance escalation (executive dashboard)
+        "rca_method": data.get("rca_method"),
+        "escalated_to_ae": data.get("escalated_to_ae"),
+        "escalated_by": data.get("escalated_by"),
+        "escalated_at": data.get("escalated_at"),
+        "escalation_reason": data.get("escalation_reason"),
+        "ae_signature": bool(data.get("ae_signature")),
+        "ae_review_date": data.get("ae_review_date"),
+        # Aggregate barrier health from the persisted Bow-Tie SRAM block
+        "barrier_health": _barrier_health_summary(data),
     }
+
+
+def _barrier_health_summary(data: dict) -> dict:
+    """Count barrier health states across the CAP's persisted SRAM block.
+
+    Returns {"effective": n, "degraded": n, "failed": n, "unrated": n} —
+    drives the executive Barrier Health Ratio SPI without shipping the full
+    sram_data payload in list responses.
+    """
+    summary = {"effective": 0, "degraded": 0, "failed": 0, "unrated": 0}
+    sram = data.get("sram_data") or {}
+    barriers = (sram.get("barriers") or {}) if isinstance(sram, dict) else {}
+    for key in ("ecb", "erb", "ncb", "nrb"):
+        for b in (barriers.get(key) or []):
+            rob = str((b or {}).get("robustness") or "").lower()
+            if not rob:
+                summary["unrated"] += 1
+            elif rob in ("excellent", "very good", "good"):
+                summary["effective"] += 1
+            elif rob == "fair":
+                summary["degraded"] += 1
+            else:
+                summary["failed"] += 1
+    return summary

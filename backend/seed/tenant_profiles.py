@@ -76,7 +76,7 @@ _ROUTE_CODE_TO_AIRPORT = {
     "TPJ": "Taplejung (VNTJ)",
 }
 
-# Explicit profiles for the twelve active OPERATOR_PROFILES tenants. Values follow
+# Explicit profiles for the eleven active OPERATOR_PROFILES tenants. Values follow
 # each tenant's real aircraft_types / routes in seed/config.py so the registry
 # stays consistent with the credential + operator metadata already seeded.
 TENANT_OPERATIONAL_PROFILES = {
@@ -200,7 +200,7 @@ TENANT_OPERATIONAL_PROFILES = {
         category=CATEGORY_FIXED_WING,
         scope=OperationalScope.AIRLINE_FIXED_WING,
         operation_type="STOL / mountain cargo + passenger",
-        fleet=["Dornier Do 228", "Let L-410 Turbolet", "de Havilland DHC-6 Twin Otter"],
+        fleet=["Let L-410 UVP-E20"],
         base_hub="Kathmandu (VNKT)",
         authorized_destinations=[
             "Kathmandu (VNKT)", "Simikot (VNSK)", "Dolpa (VNDP)", "Lukla (VNLK)",
@@ -268,42 +268,23 @@ TENANT_OPERATIONAL_PROFILES = {
             "Density Altitude", "Short Runway Braking",
         ],
     ),
-    "caan-fssd": TenantOperationalProfile(
-        tenant_id="caan-fssd",
-        slug="caan-fssd",
-        tenant_name="CAAN Flight Safety Standards Dept",
-        email=_operator_email("caan-fssd"),
-        category=CATEGORY_CAAN,
-        scope=OperationalScope.REGULATOR,
-        operation_type="Flight safety standards oversight",
-        fleet=["Flight Inspection Aircraft", "Audit Instrumentation Kits", "Surveillance Drones"],
-        base_hub="Kathmandu (VNKT)",
+    "fishtail-air": TenantOperationalProfile(
+        tenant_id="fishtail-air",
+        slug="fishtail-air",
+        tenant_name="Fishtail Air",
+        email=_operator_email("fishtail-air"),
+        category=CATEGORY_ROTOR_WING,
+        scope=OperationalScope.AIRLINE_ROTARY,
+        operation_type="Charter / HEMS / mountain LZ",
+        fleet=["Airbus AS350 B3e", "Bell 206"],
+        base_hub="Kathmandu (VNKT) Helipad",
         authorized_destinations=[
-            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Bharatpur (VNBG)",
-            "Simara (VNSI)", "Nepalgunj (VNKG)",
+            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Jomsom (VNJS)",
+            "Lukla (VNLK)", "Dolpa (VNDP)", "Syangboche (VNSB)",
         ],
         hazard_domains=[
-            "Density Altitude", "Mountain Ridge Turbulence", "Short Runway Braking",
-            "Micro-climate Fog", "Wake Turbulence",
-        ],
-    ),
-    "caan-assd": TenantOperationalProfile(
-        tenant_id="caan-assd",
-        slug="caan-assd",
-        tenant_name="CAAN Aerodrome Safety Standards Dept",
-        email=_operator_email("caan-assd"),
-        category=CATEGORY_CAAN,
-        scope=OperationalScope.REGULATOR,
-        operation_type="Aerodrome certification & ground safety oversight",
-        fleet=["ARFF Audit Vehicles", "Runway Friction Testers", "Visual Aid Inspection Kits"],
-        base_hub="Kathmandu (VNKT)",
-        authorized_destinations=[
-            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Bharatpur (VNBG)",
-            "Simara (VNSI)", "Nepalgunj (VNKG)",
-        ],
-        hazard_domains=[
-            "Runway Incursion", "Runway Excursion", "Wildlife & Bird Control",
-            "Apron GSE", "Runway Rubber Deposition", "FOD on Apron",
+            "Density Altitude", "Mountain Valley Clouding", "Sling Load Operations",
+            "High-Altitude HEMS",
         ],
     ),
 }

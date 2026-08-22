@@ -367,23 +367,25 @@ def test_master_register_department_filter(monkeypatch):
 
 
 def test_master_register_assignee_filter(monkeypatch):
-    hazards = [
-        _MRDoc("h1", {
-            "hazard_id": "T1-HZ-ORG-01-26",
+    # Assignee filtering applies to CANs/CAPs; hazards are tenant-wide and
+    # intentionally bypass the assignee dimensions.
+    cans = [
+        _MRDoc("c1", {
+            "can_reference": "CAN-001",
             "title": "Mine",
             "status": "Open",
             "assigned_to_uid": "u2",
             "created_at": _dt(1),
         }),
-        _MRDoc("h2", {
-            "hazard_id": "T1-HZ-ORG-02-26",
+        _MRDoc("c2", {
+            "can_reference": "CAN-002",
             "title": "Someone else's",
             "status": "Open",
             "assigned_to_uid": "u9",
             "created_at": _dt(1),
         }),
     ]
-    db = _MRDB(hazards, [])
+    db = _MRDB([], cans)
     user = {"role": "AIRLINE_ADMIN", "tenant_id": "t1", "uid": "u1", "email": "a@t1.com"}
     _patch_mr(monkeypatch, db, user)
 

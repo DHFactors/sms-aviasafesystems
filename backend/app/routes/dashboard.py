@@ -168,25 +168,65 @@ async def get_actions_summary(
 async def get_master_register(
     department: Optional[str] = Query(None),
     assigned_to_uid: Optional[str] = Query(None),
+    assigned_to: Optional[str] = Query(None),
+    user_department: Optional[str] = Query(None),
+    archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """Unified Master Register: hazards + CANs + CAPs in one scoped view.
 
     Supports department and assignee filtering. Available to any authenticated
     tenant user (their own tenant) and to CAAN/SUPER_ADMIN (all tenants).
+
+    Assignee matching is flexible: a task matches on uid OR email OR
+    normalized department (e.g. '145' resolves to 'Part-145').
+
+    `archetypeId` (demo-* values only) scopes the register to a virtual
+    archetype tenant for prospect demonstrations — safe fallback returns the
+    caller's own tenant for any other value.
     """
+    from app.services.archetype_scope import is_archetype_id
     from app.services.master_register import build_master_register
     from app.middleware.auth import get_department_scope
 
     # 145 / CAMO accounts are restricted to their own department. Force the
-    # department scope and ignore any personal assignee filter so they see the
-    # whole department's CANs/CAPs rather than only items assigned to them.
+    # normalized department scope but keep their personal identity so they see
+    # the whole department's CANs/CAPs plus anything assigned directly to them.
     scope = get_department_scope(user)
     if scope:
         department = scope
-        assigned_to_uid = None
 
-    data = build_master_register(user, department=department, assigned_to_uid=assigned_to_uid)
+    if is_archetype_id(archetypeId):
+        # Prospect demo: scope strictly to the virtual archetype tenant, then
+        # merge the caller's session overlays (masters stay immutable).
+        scoped_user = dict(user)
+        scoped_user["tenant_id"] = str(archetypeId).strip()
+        scoped_user["role"] = "AIRLINE_ADMIN"
+        data = build_master_register(
+            scoped_user,
+            department=department,
+            assigned_to_uid=assigned_to_uid,
+            assigned_to_email=assigned_to or user.get("email"),
+            user_department=user_department,
+        )
+        try:
+            from app.firebase import get_db
+            from demo.session_manager import apply_overlay, load_cap_overlays
+
+            overlays = load_cap_overlays(get_db(), user.get("email"))
+            if overlays:
+                data["rows"] = apply_overlay(data["rows"], overlays)
+                data["demo_overlays_applied"] = len(overlays)
+        except Exception:
+            pass  # overlay merge is best-effort; master rows still render
+    else:
+        data = build_master_register(
+            user,
+            department=department,
+            assigned_to_uid=assigned_to_uid,
+            assigned_to_email=assigned_to,
+            user_department=user_department,
+        )
     return _envelope(data)
 
 

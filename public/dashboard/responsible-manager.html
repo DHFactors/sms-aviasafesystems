@@ -139,6 +139,8 @@
 let currentUser = null;
 let allRows = [];
 let myUid = null;
+let myEmail = null;
+let myDepartment = null;
 
 firebase.auth().onAuthStateChanged(async function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -152,6 +154,8 @@ firebase.auth().onAuthStateChanged(async function(user) {
     try {
         const tokenResult = await user.getIdTokenResult();
         myUid = user.uid;
+        myEmail = user.email;
+        myDepartment = (tokenResult.claims && tokenResult.claims.department) || '';
         if (heroTitle) {
             const t = (tokenResult.claims && tokenResult.claims.tenant_id) || '';
             if (t) heroTitle.textContent = t.replace(/-/g, ' ').toUpperCase();
@@ -159,13 +163,13 @@ firebase.auth().onAuthStateChanged(async function(user) {
         if (heroUser && typeof getDepartmentLabel === 'function') {
             heroUser.textContent = getDepartmentLabel(tokenResult.claims) || '—';
         }
-        const department = (tokenResult.claims && tokenResult.claims.department) || '';
-        if (department) {
+        if (myDepartment) {
             document.getElementById('infoBanner').style.display = 'flex';
-            document.getElementById('assigneeLabel').textContent = 'you (' + department + ')';
+            document.getElementById('assigneeLabel').textContent = 'you (' + myDepartment + ')';
         }
     } catch (e) {
         myUid = user.uid;
+        myEmail = user.email;
     }
     loadTasks();
 });
@@ -211,12 +215,14 @@ async function loadTasks() {
     try {
         const params = new URLSearchParams();
         if (myUid) params.set('assigned_to_uid', myUid);
+        if (myEmail) params.set('assigned_to', myEmail);
+        if (myDepartment) params.set('user_department', myDepartment);
         const qs = params.toString() ? '?' + params.toString() : '';
         const payload = await ApiClient.get('/api/v1/dashboard/master-register' + qs);
         const data = payload || {};
-        allRows = (data.rows || []).filter(function(r) {
-            return r.type === 'CAN' || r.type === 'CAP';
-        });
+        // Keep the full row set for the KPI cards (incl. hazards); the table
+        // below renders the CAN/CAP task list only.
+        allRows = data.rows || [];
 
         const current = statusSel.value;
         statusSel.innerHTML = '<option value="">All</option>';
@@ -236,15 +242,35 @@ async function loadTasks() {
     }
 }
 
+function normType(r) {
+    return String(r && r.type || '').trim().toUpperCase();
+}
+
 function renderStats(rows) {
     const container = document.getElementById('statsRow');
+
+    // Case-insensitive type buckets (guards against 'can'/'CAN' drift).
+    const hazards = rows.filter(function(r) { return normType(r) === 'HAZARD'; });
+    const cans = rows.filter(function(r) { return normType(r) === 'CAN'; });
+    const caps = rows.filter(function(r) { return normType(r) === 'CAP'; });
+
+    const activeCans = cans.filter(function(r) {
+        return String(r.status || '').toLowerCase() !== 'closed';
+    }).length;
+    const pendingCaps = caps.filter(function(r) {
+        const s = String(r.status || '').toLowerCase();
+        return s !== 'completed' && s !== 'closed';
+    }).length;
+
     const byStatus = {};
     rows.forEach(function(r) { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
     const overdue = (byStatus['Overdue'] || 0) + (byStatus['Escalated'] || 0);
-    let html = '<div class="stat-card"><div class="num">' + rows.length + '</div><div class="lbl">Total Tasks</div></div>';
-    Object.keys(byStatus).sort().forEach(function(s) {
-        html += '<div class="stat-card"><div class="num">' + byStatus[s] + '</div><div class="lbl">' + s + '</div></div>';
-    });
+
+    let html = '';
+    html += '<div class="stat-card"><div class="num">' + rows.length + '</div><div class="lbl">Total Records</div></div>';
+    html += '<div class="stat-card"><div class="num">' + hazards.length + '</div><div class="lbl">Total Hazards</div></div>';
+    html += '<div class="stat-card"><div class="num">' + activeCans + '</div><div class="lbl">Active CANs</div></div>';
+    html += '<div class="stat-card"><div class="num">' + pendingCaps + '</div><div class="lbl">Pending / Active CAPs</div></div>';
     html += '<div class="stat-card red"><div class="num">' + overdue + '</div><div class="lbl">Overdue / Escalated</div></div>';
     container.innerHTML = html;
 }
@@ -252,11 +278,11 @@ function renderStats(rows) {
 function renderTable() {
     const tbody = document.getElementById('tasksBody');
     const empty = document.getElementById('emptyIndicator');
-    let rows = allRows;
+    let rows = allRows.filter(function(r) { return normType(r) === 'CAN' || normType(r) === 'CAP'; });
     const statusFilter = document.getElementById('filterStatus').value;
     if (statusFilter) rows = rows.filter(function(r) { return r.status === statusFilter; });
     const typeFilter = document.getElementById('filterType').value;
-    if (typeFilter) rows = rows.filter(function(r) { return r.type === typeFilter; });
+    if (typeFilter) rows = rows.filter(function(r) { return normType(r) === typeFilter; });
 
     tbody.innerHTML = '';
     if (rows.length === 0) {

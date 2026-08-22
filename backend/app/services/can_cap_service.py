@@ -420,6 +420,8 @@ class CanCapService:
             # Structured RCA (Fishbone / Ishikawa 5M + Management)
             "root_causes": payload.get("root_causes") or None,
             "action_items": payload.get("action_items") or None,
+            # Selected RCA methodology ('bow_tie' | 'fishbone')
+            "rca_method": payload.get("rca_method"),
             "process_owner": payload.get("process_owner"),
             # CAAN CAR-19 SRM (Bow-Tie) block
             "sram_data": payload.get("sram_data") or None,
@@ -641,6 +643,13 @@ class CanCapService:
                             "manager_confirmation": review.get("manager_confirmation"),
                             "closing_remarks": review.get("closing_remarks"),
                             "sag_sign": review.get("sag_sign"),
+                            # Governance escalation (Accountable Executive review)
+                            "escalated_to_ae": review.get("escalated_to_ae"),
+                            "escalated_by": review.get("escalated_by"),
+                            "escalation_reason": review.get("escalation_reason"),
+                            # Formal AE risk-acceptance sign-off record
+                            "ae_signature": review.get("ae_signature"),
+                            "ae_review_interval_days": review.get("ae_review_interval_days"),
                         }
                         # Server-side Residual SRA canonicalisation on review.
                         residual_sra = self._sra_block(
@@ -676,6 +685,17 @@ class CanCapService:
                             update_data["sag_signed_at"] = review.get("sag_signed_at") or now
                         if review.get("revision_deadline"):
                             update_data["revision_deadline"] = review["revision_deadline"]
+
+                        if review.get("escalated_to_ae"):
+                            update_data["escalated_at"] = review.get("escalated_at") or now
+
+                        # AE risk-acceptance: stamp decision time + mandatory
+                        # review date derived from the chosen interval.
+                        if review.get("ae_signature"):
+                            update_data["ae_signed_at"] = review.get("ae_signed_at") or now
+                            interval = review.get("ae_review_interval_days")
+                            if interval:
+                                update_data["ae_review_date"] = now + timedelta(days=int(interval))
 
                         if review["status"] == "Completed":
                             update_data["closed_by"] = review.get("closed_by") or user.get("email", user["uid"])

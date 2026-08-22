@@ -321,7 +321,7 @@ def test_put_config_full_survey_management(monkeypatch):
 def test_put_config_auto_opens_for_current_window(monkeypatch):
     """Dates straddling today auto-derive is_survey_active=True (no override)."""
     from datetime import date, timedelta
-    today = date.today()
+    today = datetime.now(timezone.utc).date()  # UTC-consistent with _auto_survey_active
     open_d = (today - timedelta(days=5)).isoformat()
     close_d = (today + timedelta(days=5)).isoformat()
 
@@ -351,7 +351,7 @@ def test_put_config_auto_opens_for_current_window(monkeypatch):
 def test_put_config_auto_closes_when_close_date_passed(monkeypatch):
     """A close date in the past auto-derives is_survey_active=False."""
     from datetime import date, timedelta
-    today = date.today()
+    today = datetime.now(timezone.utc).date()  # UTC-consistent with _auto_survey_active
     open_d = (today - timedelta(days=20)).isoformat()
     close_d = (today - timedelta(days=1)).isoformat()
 
@@ -375,7 +375,7 @@ def test_put_config_auto_closes_when_close_date_passed(monkeypatch):
 def test_put_config_auto_waits_when_open_date_future(monkeypatch):
     """An open date in the future auto-derives is_survey_active=False."""
     from datetime import date, timedelta
-    today = date.today()
+    today = datetime.now(timezone.utc).date()  # UTC-consistent with _auto_survey_active
     open_d = (today + timedelta(days=7)).isoformat()
     close_d = (today + timedelta(days=20)).isoformat()
 
@@ -609,3 +609,4 @@ def test_get_config_unknown_tenant(monkeypatch):
 
     resp = _get("ghost-air")
     assert resp.status_code == 404
+

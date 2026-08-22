@@ -1,8 +1,9 @@
 // ============================================================================
 // FILE: fishbone.js
-// PURPOSE: Reusable 6-category Fishbone (Ishikawa / 5M + Management) Root Cause
-//          Analysis editor and viewer for the CAN/CAP workflow.
-// CATEGORIES: Man, Machine, Method, Medium (Environment), Management, Material.
+// PURPOSE: Reusable 6-category Fishbone (Ishikawa / aviation human factors 6M)
+//          Root Cause Analysis editor and viewer for the CAN/CAP workflow.
+// CATEGORIES: Man, Machine, Medium (Environment), Mission, Management,
+//             Measurement — mirrors backend/seed/config.py FISHBONE_CATEGORIES.
 // FEATURES:
 //   - dynamic add/remove of cause items per category
 //   - radio selection of exactly ONE 'Primary Root Cause'
@@ -15,14 +16,14 @@
 // ============================================================================
 
 const Fishbone = (() => {
-    const CATEGORIES = ['Man', 'Machine', 'Method', 'Medium', 'Management', 'Material'];
+    const CATEGORIES = ['Man', 'Machine', 'Medium', 'Mission', 'Management', 'Measurement'];
     const DEFAULT_ACTION = {
         Man: 'People, staffing, training, fatigue, human performance',
         Machine: 'Equipment, tools, aircraft/component condition, technology',
-        Method: 'Procedures, processes, documentation, compliance',
         Medium: 'Environment (weather, facilities, noise, workspace)',
+        Mission: 'Mission objective / profile risk, crew-resource alignment',
         Management: 'Policies, oversight, supervision, accountability, culture',
-        Material: 'Parts, materials, consumables, specifications',
+        Measurement: 'Safety performance monitoring, KPIs, data analysis',
     };
 
     function uid(prefix) {
@@ -85,7 +86,7 @@ const Fishbone = (() => {
         const head = document.createElement('div');
         head.className = 'fishbone-head';
         head.innerHTML = `
-            <div class="fishbone-title"><i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (5M + Management)</div>
+            <div class="fishbone-title"><i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (6M)</div>
             <div class="fishbone-hint">Add causes under each category. Designate exactly one <strong>Primary Root Cause</strong>.</div>
         `;
         wrap.appendChild(head);
@@ -321,7 +322,7 @@ const Fishbone = (() => {
         const head = document.createElement('div');
         head.className = 'fishbone-head';
         head.innerHTML = `
-            <div class="fishbone-title"><i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (5M + Management)</div>
+            <div class="fishbone-title"><i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (6M)</div>
         `;
         wrap.appendChild(head);
 

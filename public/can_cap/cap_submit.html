@@ -44,6 +44,8 @@
         .badge-default { background: #f1f5f9; color: #64748b; }
         .card h2 .help-link { margin-left: 0.5rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; }
         .card h2 .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
+        .help-link { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600; color: #1a6b8a; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 999px; padding: 0.15rem 0.6rem; background: #fff; text-transform: none; letter-spacing: 0; }
+        .help-link:hover { background: #e8f0f8; border-color: #1a6b8a; }
         @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -147,15 +149,39 @@
                 </tr>
             </table>
 
-            <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
-                <i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (5M + Management)
+            <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
+                <button type="button" class="help-link" id="rcaMethodHelpBtn" data-help-topic="sram_bowtie" title="RCA methodology guidance"><i class="fas fa-circle-question"></i> Guide</button>
+                <span><i class="fas fa-diagram-project"></i> Root Cause Analysis Method</span>
             </div>
-            <div id="fishboneEditor"></div>
+            <div class="rca-method-selector" id="rcaMethodSelector">
+                <label class="rca-method-option active" data-method="bow_tie">
+                    <input type="radio" name="rca_method" value="bow_tie" checked>
+                    <span class="rca-method-title"><i class="fas fa-bow-arrow"></i> Bow-Tie Barrier Analysis (CAAN CAR-19 SRAM)
+                        <span class="rca-badge">Regulator Aligned (CAR-19)</span>
+                        <span class="rca-recommended">Recommended</span>
+                    </span>
+                    <span class="rca-method-sub">Threats &rarr; Preventive Barriers (ECM) &rarr; Top Event &rarr; Recovery Barriers (ERB) &rarr; Consequences, with barrier quality ratings.</span>
+                </label>
+                <label class="rca-method-option" data-method="fishbone">
+                    <input type="radio" name="rca_method" value="fishbone">
+                    <span class="rca-method-title"><i class="fas fa-diagnoses"></i> 6M Fishbone Root Cause Analysis (Ishikawa)</span>
+                    <span class="rca-method-sub">Man · Machine · Medium · Mission · Management · Measurement, with primary root cause designation.</span>
+                </label>
+            </div>
 
-            <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
-                <i class="fas fa-bow-arrow"></i> CAAN CAR-19 SRM — Combined RCA + SRAM
+            <div id="rcaFishboneBlock" style="display:none;">
+                <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
+                    <i class="fas fa-diagnoses"></i> Root Cause Analysis — Fishbone / Ishikawa (6M)
+                </div>
+                <div id="fishboneEditor"></div>
             </div>
-            <div id="srmCombinedPanel"></div>
+
+            <div id="rcaBowtieBlock">
+                <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
+                    <i class="fas fa-bow-arrow"></i> CAAN CAR-19 SRM — Bow-Tie Barrier Analysis
+                </div>
+                <div id="srmCombinedPanel"></div>
+            </div>
 
             <div style="font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
                 <i class="fas fa-th"></i> Residual Safety Risk Assessment (Severity A–E × Probability 1–5)
@@ -199,6 +225,7 @@ let canId = null;
 let fishboneController = null;
 let residualSraController = null;
 let srmCombined = null;
+let rcaMethod = 'bow_tie';
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -207,8 +234,38 @@ firebase.auth().onAuthStateChanged(function(user) {
     if (!canId) { showMessage('No CAN ID provided', 'error'); return; }
     loadCanInfo(canId);
     initResidualSra();
+    // Independent initialisation: a failure in one RCA editor must never
+    // disable the other method's panel (selector stays universal for every
+    // tenant / postholder role).
     initFishbone();
+    initSrmCombined();
+    initRcaMethodSelector();
 });
+
+function initRcaMethodSelector() {
+    const selector = document.getElementById('rcaMethodSelector');
+    if (!selector) return;
+    selector.querySelectorAll('input[name="rca_method"]').forEach(radio => {
+        radio.addEventListener('change', () => setRcaMethod(radio.value));
+    });
+    setRcaMethod('bow_tie');
+}
+
+function setRcaMethod(method) {
+    rcaMethod = (method === 'fishbone') ? 'fishbone' : 'bow_tie';
+    const fishBlock = document.getElementById('rcaFishboneBlock');
+    const bowBlock = document.getElementById('rcaBowtieBlock');
+    if (fishBlock) fishBlock.style.display = rcaMethod === 'fishbone' ? '' : 'none';
+    if (bowBlock) bowBlock.style.display = rcaMethod === 'bow_tie' ? '' : 'none';
+    document.querySelectorAll('#rcaMethodSelector .rca-method-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.method === rcaMethod);
+        const radio = opt.querySelector('input[name="rca_method"]');
+        if (radio) radio.checked = (opt.dataset.method === rcaMethod);
+    });
+    // Guide button follows the selected methodology's help topic.
+    const helpBtn = document.getElementById('rcaMethodHelpBtn');
+    if (helpBtn) helpBtn.setAttribute('data-help-topic', rcaMethod === 'fishbone' ? 'fishbone' : 'sram_bowtie');
+}
 
 function initFishbone() {
     try {
@@ -220,9 +277,15 @@ function initFishbone() {
                 }
             },
         });
-        initSrmCombined();
     } catch (err) {
         console.error('Fishbone init failed:', err);
+        const block = document.getElementById('rcaFishboneBlock');
+        if (block) {
+            const note = document.createElement('p');
+            note.style.cssText = 'font-size:0.85rem;color:#dc3545;';
+            note.textContent = '6M Fishbone editor could not be initialised. The Bow-Tie SRAM method remains available.';
+            block.appendChild(note);
+        }
     }
 }
 
@@ -236,7 +299,7 @@ function initSrmCombined() {
         });
     } catch (err) {
         console.error('SRM combined init failed:', err);
-        el.innerHTML = '<p style="font-size:0.85rem;color:#dc3545;">SRM Combined panel could not be initialised.</p>';
+        el.innerHTML = '<p style="font-size:0.85rem;color:#dc3545;">Bow-Tie SRAM panel could not be initialised. <button type="button" class="btn btn-outline btn-sm" onclick="initSrmCombined()">Retry</button></p>';
     }
 }
 
@@ -276,12 +339,32 @@ async function submitCap() {
     if (!timeline) { showMessage('Timeline is required', 'error'); return; }
     if (!targetDate) { showMessage('Target completion date is required', 'error'); return; }
 
-    const fishErrors = fishboneController ? fishboneController.validate() : ['Fishbone editor unavailable'];
-    if (fishErrors && fishErrors.length) {
-        showMessage(fishErrors.join(' '), 'error');
-        return;
+    // RCA data is method-dependent: fishbone requires a valid 6M analysis,
+    // bow-tie requires the SRM panel and auto-links action items to any
+    // degraded / failed barriers.
+    let rootCauses = null;
+    let actionItems = null;
+    let sramData = null;
+
+    if (rcaMethod === 'fishbone') {
+        const fishErrors = fishboneController ? fishboneController.validate() : ['Fishbone editor unavailable'];
+        if (fishErrors && fishErrors.length) {
+            showMessage(fishErrors.join(' '), 'error');
+            return;
+        }
+        const fishData = fishboneController ? fishboneController.getData() : { root_causes: [], action_items: [] };
+        rootCauses = fishData.root_causes && fishData.root_causes.length ? fishData.root_causes : null;
+        actionItems = fishData.action_items && fishData.action_items.length ? fishData.action_items : null;
+    } else {
+        if (!srmCombined || typeof srmCombined.getSramData !== 'function') {
+            showMessage('Bow-Tie SRAM panel is unavailable. Switch to the 6M Fishbone method or reload the page.', 'error');
+            return;
+        }
+        sramData = srmCombined.getSramData();
+        // Auto-link corrective actions to degraded / failed barriers.
+        const barrierActions = srmCombined.getBarrierActionItems ? srmCombined.getBarrierActionItems() : [];
+        actionItems = barrierActions.length ? barrierActions : null;
     }
-    const fishData = fishboneController ? fishboneController.getData() : { root_causes: [], action_items: [] };
 
     const rSra = residualSraController ? residualSraController.getValue() : { severity: null, probability: null, index: null, level: null, outcome: null };
     const rSev = rSra.severity;
@@ -318,9 +401,10 @@ async function submitCap() {
         implementation_timeline: document.getElementById('fieldImplementationTimeline').value.trim() || null,
         process_owner: document.getElementById('fieldProcessOwner').value.trim() || null,
         managerial_approval: managerialApproval,
-        root_causes: fishData.root_causes && fishData.root_causes.length ? fishData.root_causes : null,
-        action_items: fishData.action_items && fishData.action_items.length ? fishData.action_items : null,
-        sram_data: srmCombined && srmCombined.getSramData ? srmCombined.getSramData() : null,
+        rca_method: rcaMethod,
+        root_causes: rootCauses,
+        action_items: actionItems,
+        sram_data: sramData,
         residual_severity: rSev || null,
         residual_probability: rProb || null,
         residual_risk_index: residualRiskIndex,

@@ -61,7 +61,7 @@ def build_user_specs():
     from seed.config import (
         DEMO_USERS,
         OPERATOR_PROFILES,
-        SIMPLIFIED_ROLE_ACCOUNTS,
+        roles_for_tenant,
         simplified_email,
         simplified_password,
         CREDENTIAL_TENANT_CODES,
@@ -91,7 +91,8 @@ def build_user_specs():
         op_id = profile["id"]
         tenant_name = profile["name"]
         # Simplified role accounts: {role}@{tenant}.com / {CODE}-{ROLE}-2026
-        for role in SIMPLIFIED_ROLE_ACCOUNTS:
+        # (fishtail-air / summit-air additionally get AE + Line Pilot accounts)
+        for role in roles_for_tenant(op_id):
             token = role["token"]
             specs.append(
                 {

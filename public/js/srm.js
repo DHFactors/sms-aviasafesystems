@@ -110,7 +110,7 @@ const SRM = (() => {
         return 'HIGH';
     }
 
-    const FISHBONE_CATEGORIES = ['Man', 'Machine', 'Method', 'Medium', 'Management', 'Material'];
+    const FISHBONE_CATEGORIES = ['Man', 'Machine', 'Medium', 'Mission', 'Management', 'Measurement'];
 
     // ── Helpers ─────────────────────────────────────────────────────────────
     function esc(v) {
@@ -276,13 +276,31 @@ const SRM = (() => {
         document.body.appendChild(overlay);
     }
 
+    // ── Barrier health tagging ─────────────────────────────────────────────
+    // Maps the BQV robustness band onto a 3-state CAAN barrier-health tag:
+    //   Effective (green) · Degraded (amber) · Missing/Failed (red)
+    function barrierHealth(barrier) {
+        const rob = (barrier && barrier.robustness) || null;
+        if (!rob) return { label: 'Not Rated', cls: 'srm-health-unrated', state: 'unrated' };
+        const norm = String(rob).toLowerCase();
+        if (norm === 'excellent' || norm === 'very good' || norm === 'good') {
+            return { label: 'Effective', cls: 'srm-health-effective', state: 'effective' };
+        }
+        if (norm === 'fair') {
+            return { label: 'Degraded', cls: 'srm-health-degraded', state: 'degraded' };
+        }
+        return { label: 'Missing / Failed', cls: 'srm-health-failed', state: 'failed' };
+    }
+
     // ── Barrier pill rendering ──────────────────────────────────────────────
     function barrierPillHtml(barrier, cls) {
         const bsv = barrier.bsv != null ? barrier.bsv : 0;
         const name = barrier.name || '(unnamed)';
         const robNote = barrier.robustness ? ` · ${esc(barrier.robustness)}` : '';
+        const health = barrierHealth(barrier);
         return `
             <div class="srm-barrier-pill ${cls}" data-barrier-id="${esc(barrier.id || '')}">
+                <span class="srm-health-tag ${health.cls}" data-health-tag title="Barrier health: ${esc(health.label)}">${esc(health.label)}</span>
                 <span class="srm-pill-name" title="${esc(name)}${robNote}">${esc(name)}</span>
                 <span class="srm-bsv-badge" title="Barrier Score Value (BSV)">BSV ${bsv}</span>
                 <button type="button" class="srm-pill-remove" title="Remove barrier" data-pill-remove><i class="fas fa-times"></i></button>
@@ -743,17 +761,17 @@ const SRM = (() => {
         }
 
         _renderComparison(profile) {
-            const setIndex = (sel, risk) => {
-                const idx = this.el.querySelector(sel + '-index');
-                const tol = this.el.querySelector(sel + '-tol');
-                const bsv = this.el.querySelector(sel + '-bsv');
+            const setIndex = (base, risk) => {
+                const idx = this.el.querySelector(`[data-srm-${base}-index]`);
+                const tol = this.el.querySelector(`[data-srm-${base}-tol]`);
+                const bsv = this.el.querySelector(`[data-srm-${base}-bsv]`);
                 idx.textContent = risk.index;
                 tol.textContent = `${risk.tolerability} · ${TIER_LEVELS[risk.tier] || risk.tier}`;
                 tol.className = 'srm-risk-tol ' + (risk.tolerability === 'Intolerable' ? 'srm-tol-intolerable' : risk.tolerability === 'Tolerable' ? 'srm-tol-tolerable' : 'srm-tol-acceptable');
                 bsv.textContent = '';
             };
-            setIndex('[data-srm-initial]', profile.initial_risk);
-            setIndex('[data-srm-resultant]', profile.resultant_risk);
+            setIndex('initial', profile.initial_risk);
+            setIndex('resultant', profile.resultant_risk);
             this.el.querySelector('[data-srm-initial-bsv]').textContent =
                 `Existing BSV ${profile.existing_bsv}`;
             this.el.querySelector('[data-srm-resultant-bsv]').textContent =
@@ -883,11 +901,120 @@ const SRM = (() => {
         const initialSeverityLetter = opts.severityLetter || null;
 
         const state = {
-            mode: 'COMBINED',
+            mode: 'BOWTIE_SRAM',
             severityLetter: initialSeverityLetter || 'E',
-            ncm: (opts.saved && opts.saved.barriers && opts.saved.barriers.ncb) || [],
+            barriers: {
+                ecb: (opts.saved && opts.saved.barriers && opts.saved.barriers.ecb) || [],
+                erb: (opts.saved && opts.saved.barriers && opts.saved.barriers.erb) || [],
+                ncb: (opts.saved && opts.saved.barriers && opts.saved.barriers.ncb) || [],
+                nrb: (opts.saved && opts.saved.barriers && opts.saved.barriers.nrb) || [],
+            },
+            bowtie: Object.assign(
+                { threats: [], top_event: '', consequences: [] },
+                (opts.saved && opts.saved.bowtie) || {}
+            ),
             signoffs: Object.assign({ name: '', role: '', date: '' }, (opts.saved && opts.saved.signoffs) || {}),
         };
+
+        const BARRIER_LISTS = [
+            ['ecb', '[data-srm-ecm]', 'srm-ecb', 'Existing Control Measure'],
+            ['erb', '[data-srm-erb]', 'srm-erb', 'Existing Recovery Barrier'],
+            ['ncb', '[data-srm-ncb]', 'srm-ncb', 'New Control Measure'],
+            ['nrb', '[data-srm-nrb]', 'srm-nrb', 'New Recovery Barrier'],
+        ];
+
+        function _addBarrier(listKey, cls, kindLabel) {
+            const barrier = {
+                id: uid('bt'), name: '', description: '', category: kindLabel,
+                quality: defaultQuality(),
+            };
+            const res = computeBqv(barrier.quality);
+            barrier.bqv = res.bqv; barrier.bsv = res.bsv; barrier.robustness = res.robustness;
+            state.barriers[listKey].push(barrier);
+            renderBarriers();
+            update();
+        }
+
+        function _addBowtieItem(kind) {
+            state.bowtie[kind].push({ id: uid('bt'), label: '', barrier_ids: [] });
+            renderBowtieLists();
+        }
+
+        function renderBowtieLists() {
+            const threatsEl = el.querySelector('[data-srm-threats]');
+            const consEl = el.querySelector('[data-srm-consequences]');
+            if (!threatsEl || !consEl) return;
+
+            const ecm = state.barriers.ecb;
+            const erb = state.barriers.erb;
+
+            const renderItem = (item, placeholder, barrierOpts, linkAttr) => `
+                <div class="srm-card srm-threat">
+                    <input type="text" value="${esc(item.label || '')}" placeholder="${placeholder}" data-bt-label="${esc(item.id)}">
+                    <select ${linkAttr}="${esc(item.id)}">
+                        <option value="">— link barrier —</option>
+                        ${(barrierOpts || []).map(b => `<option value="${esc(b.id)}" ${(item.barrier_ids || []).indexOf(b.id) >= 0 ? 'selected' : ''}>${esc(b.name || 'Barrier')}</option>`).join('')}
+                    </select>
+                    <button type="button" class="srm-pill-remove" title="Remove" data-bt-remove="${esc(item.id)}"><i class="fas fa-times"></i></button>
+                </div>`;
+
+            threatsEl.innerHTML = (state.bowtie.threats || []).map(t => renderItem(t, 'e.g. Unsafe apron surface', ecm, 'data-bt-ecm')).join('')
+                || '<div class="srm-hint">Add a threat to build the left side of the Bow-Tie.</div>';
+            consEl.innerHTML = (state.bowtie.consequences || []).map(c => renderItem(c, 'e.g. Aircraft/crew injury', erb, 'data-bt-erb')).join('')
+                || '<div class="srm-hint">Add a consequence to build the right side of the Bow-Tie.</div>';
+
+            threatsEl.querySelectorAll('[data-bt-label]').forEach(inp => {
+                inp.addEventListener('input', () => {
+                    const item = state.bowtie.threats.find(t => t.id === inp.dataset.btLabel);
+                    if (item) item.label = inp.value;
+                });
+            });
+            threatsEl.querySelectorAll('[data-bt-ecm]').forEach(sel => {
+                sel.addEventListener('change', () => {
+                    const item = state.bowtie.threats.find(t => t.id === sel.dataset.btEcm);
+                    if (item) item.barrier_ids = sel.value ? [sel.value] : [];
+                });
+            });
+            consEl.querySelectorAll('[data-bt-label]').forEach(inp => {
+                inp.addEventListener('input', () => {
+                    const item = state.bowtie.consequences.find(c => c.id === inp.dataset.btLabel);
+                    if (item) item.label = inp.value;
+                });
+            });
+            consEl.querySelectorAll('[data-bt-erb]').forEach(sel => {
+                sel.addEventListener('change', () => {
+                    const item = state.bowtie.consequences.find(c => c.id === sel.dataset.btErb);
+                    if (item) item.barrier_ids = sel.value ? [sel.value] : [];
+                });
+            });
+            threatsEl.querySelectorAll('[data-bt-remove]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.bowtie.threats = state.bowtie.threats.filter(t => t.id !== btn.dataset.btRemove);
+                    renderBowtieLists();
+                });
+            });
+            consEl.querySelectorAll('[data-bt-remove]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.bowtie.consequences = state.bowtie.consequences.filter(c => c.id !== btn.dataset.btRemove);
+                    renderBowtieLists();
+                });
+            });
+        }
+
+        function renderBarriers() {
+            BARRIER_LISTS.forEach(([key, sel]) => {
+                const listEl = el.querySelector(sel);
+                if (!listEl) return;
+                const barriers = state.barriers[key];
+                listEl.innerHTML = barriers.length
+                    ? barriers.map(b => barrierPillHtml(b, 'srm-' + key)).join('')
+                    : '<div class="srm-hint">No barriers added.</div>';
+                bindBarrierPills(listEl, barriers, 'srm-' + key, {
+                    renderBarriers: () => { renderBarriers(); renderBowtieLists(); },
+                    updateLive: update,
+                });
+            });
+        }
 
         function promoteCauses() {
             const list = el.querySelector('[data-srm-promotion-list]');
@@ -896,7 +1023,7 @@ const SRM = (() => {
             if (fishboneController && typeof fishboneController.getData === 'function') {
                 causes = fishboneController.getData().root_causes || [];
             }
-            const promotedIds = state.ncm.map(b => b.source_root_cause_id).filter(Boolean);
+            const promotedIds = state.barriers.ncb.map(b => b.source_root_cause_id).filter(Boolean);
             if (!causes.length) {
                 list.innerHTML = '<div class="srm-promoted-note">Root causes added above appear here for promotion to NCM.</div>';
                 return;
@@ -922,59 +1049,75 @@ const SRM = (() => {
                     };
                     const res = computeBqv(barrier.quality);
                     barrier.bqv = res.bqv; barrier.bsv = res.bsv; barrier.robustness = res.robustness;
-                    state.ncm.push(barrier);
-                    renderNcm();
+                    state.barriers.ncb.push(barrier);
+                    renderBarriers();
                     promoteCauses();
                     update();
                 });
             });
         }
 
-        function renderNcm() {
-            const list = el.querySelector('[data-srm-ncm-list]');
-            if (!list) return;
-            if (!state.ncm.length) {
-                list.innerHTML = '<div class="srm-hint">No New Control Measures promoted yet.</div>';
-                return;
-            }
-            list.innerHTML = state.ncm.map(b => barrierPillHtml(b, 'srm-ncb')).join('');
-            bindBarrierPills(list, state.ncm, 'srm-ncb', {
-                renderBarriers: renderNcm,
-                updateLive: update,
-            });
-        }
-
         function update() {
             const severity = { severity_letter: state.severityLetter, descriptor: '' };
-            const profile = evaluateRiskProfile(severity, { ecb: [], erb: [], ncb: state.ncm, nrb: [] });
+            const profile = evaluateRiskProfile(severity, state.barriers);
 
             el.querySelector('[data-srm-initial-index]').textContent = profile.initial_risk.index;
             el.querySelector('[data-srm-initial-tol]').textContent = `${profile.initial_risk.tolerability} · ${TIER_LEVELS[profile.initial_risk.tier] || profile.initial_risk.tier}`;
             el.querySelector('[data-srm-resultant-index]').textContent = profile.resultant_risk.index;
             el.querySelector('[data-srm-resultant-tol]').textContent = `${profile.resultant_risk.tolerability} · ${TIER_LEVELS[profile.resultant_risk.tier] || profile.resultant_risk.tier}`;
-            el.querySelector('[data-srm-resultant-bsv]').textContent = `NCM BSV ${profile.consolidated_bsv}`;
+            el.querySelector('[data-srm-resultant-bsv]').textContent = `Consolidated BSV ${profile.consolidated_bsv}`;
             el.querySelector('[data-srm-authority]').innerHTML =
                 `<i class="fas fa-user-shield"></i> Required: ${esc(profile.signoff.authority)}`;
         }
 
         el.innerHTML = `
             <div class="srm-workspace">
-                <div class="srm-mode-selector">
-                    <span class="srm-mode-title"><i class="fas fa-arrows-left-right"></i> Analysis Model Selector</span>
-                    <label data-mode="FISHBONE_ONLY"><input type="radio" name="cap_srm_mode" value="FISHBONE_ONLY"> Fish-Bone RCA</label>
-                    <label data-mode="BOWTIE_SRAM"><input type="radio" name="cap_srm_mode" value="BOWTIE_SRAM"> Bow-Tie SRAM</label>
-                    <label data-mode="COMBINED"><input type="radio" name="cap_srm_mode" value="COMBINED" checked> Combined RCA + SRAM</label>
+                <div class="srm-section" data-cap-part="bowtie">
+                    <h3><i class="fas fa-bow-arrow"></i> Interactive Bow-Tie — Threats → Barriers → Top Event → Recovery → Consequences</h3>
+                    <div class="srm-bowtie">
+                        <div class="srm-col">
+                            <div class="srm-col-head">Threats</div>
+                            <div data-srm-threats></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-threat><i class="fas fa-plus"></i> Add Threat</button>
+                        </div>
+                        <div class="srm-col">
+                            <div class="srm-col-head">Preventive Barriers (ECM)</div>
+                            <div data-srm-ecm></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-ecm><i class="fas fa-plus"></i> Add ECM</button>
+                        </div>
+                        <div class="srm-top-event">
+                            <span>TOP EVENT</span>
+                            <input type="text" placeholder="e.g. Wheel jack sinks into apron" data-srm-top-event>
+                        </div>
+                        <div class="srm-col">
+                            <div class="srm-col-head">Recovery Barriers (ERB)</div>
+                            <div data-srm-erb></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-erb><i class="fas fa-plus"></i> Add ERB</button>
+                        </div>
+                        <div class="srm-col">
+                            <div class="srm-col-head">Consequences</div>
+                            <div data-srm-consequences></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-consequence><i class="fas fa-plus"></i> Add Consequence</button>
+                        </div>
+                    </div>
+                    <div class="srm-new-barriers" style="margin-top:0.7rem;">
+                        <div class="srm-col">
+                            <div class="srm-col-head">New Control Measures (NCM) <span style="font-weight:400;text-transform:none;">— click a pill to rate its Barrier Quality</span></div>
+                            <div data-srm-ncb></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-ncb><i class="fas fa-plus"></i> Add NCM</button>
+                        </div>
+                        <div class="srm-col">
+                            <div class="srm-col-head">New Recovery Barriers (NRB)</div>
+                            <div data-srm-nrb></div>
+                            <button type="button" class="srm-add-btn" data-srm-add-nrb2><i class="fas fa-plus"></i> Add NRB</button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="srm-section" data-cap-part="bowtie">
-                    <h3><i class="fas fa-bow-arrow"></i> Bow-Tie SRAM — New Control Measures from Root Causes</h3>
+                <div class="srm-section" data-cap-part="promotion">
                     <div class="srm-promotion">
                         <div class="srm-promotion-head"><i class="fas fa-arrow-up"></i> Promote Fish-Bone Root Causes to New Control Measures (NCM)</div>
                         <div data-srm-promotion-list></div>
-                    </div>
-                    <div style="margin-top:0.7rem;">
-                        <div class="srm-col-head">New Control Measures (NCM) <span style="font-weight:400;text-transform:none;">— click a pill to rate its Barrier Quality</span></div>
-                        <div data-srm-ncm-list></div>
                     </div>
                 </div>
 
@@ -1012,21 +1155,24 @@ const SRM = (() => {
                 </div>
             </div>`;
 
-        // Mode selector (banner only — Combined is the CAP default).
-        el.querySelectorAll('[data-mode] input').forEach(radio => {
-            radio.addEventListener('change', () => {
-                state.mode = radio.value;
-                el.querySelectorAll('[data-mode]').forEach(l => l.classList.toggle('srm-mode-active', l.dataset.mode === state.mode));
-                el.querySelector('[data-cap-part="bowtie"]').style.display = state.mode === 'FISHBONE_ONLY' ? 'none' : 'block';
-            });
-        });
-        el.querySelector('[data-mode="COMBINED"]').classList.add('srm-mode-active');
+        // Bow-Tie structure bindings.
+        el.querySelector('[data-srm-add-threat]').addEventListener('click', () => _addBowtieItem('threats'));
+        el.querySelector('[data-srm-add-consequence]').addEventListener('click', () => _addBowtieItem('consequences'));
+        el.querySelector('[data-srm-add-ecm]').addEventListener('click', () => _addBarrier('ecb', 'srm-ecb', 'Existing Control Measure'));
+        el.querySelector('[data-srm-add-erb]').addEventListener('click', () => _addBarrier('erb', 'srm-erb', 'Existing Recovery Barrier'));
+        el.querySelector('[data-srm-add-ncb]').addEventListener('click', () => _addBarrier('ncb', 'srm-ncb', 'New Control Measure'));
+        el.querySelector('[data-srm-add-nrb2]').addEventListener('click', () => _addBarrier('nrb', 'srm-nrb', 'New Recovery Barrier'));
+
+        const topEventInput = el.querySelector('[data-srm-top-event]');
+        topEventInput.value = state.bowtie.top_event || '';
+        topEventInput.addEventListener('input', () => { state.bowtie.top_event = topEventInput.value; });
 
         el.querySelector('[data-srm-sign-name]').addEventListener('input', e => { state.signoffs.name = e.target.value; });
         el.querySelector('[data-srm-sign-role]').addEventListener('input', e => { state.signoffs.role = e.target.value; });
         el.querySelector('[data-srm-sign-date]').addEventListener('change', e => { state.signoffs.date = e.target.value; });
 
-        renderNcm();
+        renderBarriers();
+        renderBowtieLists();
         promoteCauses();
         update();
 
@@ -1043,14 +1189,39 @@ const SRM = (() => {
             getMode: () => state.mode,
             setSeverityLetter,
             refreshPromotion: promoteCauses,
+            // Barrier health across all four lists (for action-item auto-linking).
+            getBarrierActionItems: () => {
+                const KIND = { ecb: 'ECM', erb: 'ERB', ncb: 'NCM', nrb: 'NRB' };
+                const items = [];
+                Object.keys(state.barriers).forEach(key => {
+                    state.barriers[key].forEach(b => {
+                        const health = barrierHealth(b);
+                        if (health.state === 'effective') return;
+                        items.push({
+                            id: uid('ai'),
+                            description: `${health.state === 'failed' ? 'Restore / replace' : 'Strengthen'} ${KIND[key]} barrier: ${(b.name || '(unnamed)').trim()} (BSV ${b.bsv != null ? b.bsv : 0})`,
+                            root_cause_id: b.source_root_cause_id || null,
+                            barrier_id: b.id,
+                            barrier_kind: KIND[key],
+                            barrier_health: health.label,
+                            owner: '',
+                            target_date: null,
+                        });
+                    });
+                });
+                return items;
+            },
             getSramData: () => {
-                if (state.mode === 'FISHBONE_ONLY') return null;
                 const severity = { severity_letter: state.severityLetter, descriptor: '' };
-                const profile = evaluateRiskProfile(severity, { ecb: [], erb: [], ncb: state.ncm, nrb: [] });
+                const profile = evaluateRiskProfile(severity, state.barriers);
                 return {
                     analysis_mode: state.mode,
                     severity,
-                    barriers: { ecb: [], erb: [], ncb: state.ncm, nrb: [] },
+                    barriers: {
+                        ecb: state.barriers.ecb, erb: state.barriers.erb,
+                        ncb: state.barriers.ncb, nrb: state.barriers.nrb,
+                    },
+                    bowtie: state.bowtie,
                     risk_profile: profile,
                     signoffs: {
                         name: state.signoffs.name || null,
@@ -1061,6 +1232,94 @@ const SRM = (() => {
                 };
             },
         };
+    }
+
+    // ── Read-only Bow-Tie viewer (CAP review / hazard detail) ───────────────
+    function renderBowtieViewer(container, sramData) {
+        const el = typeof container === 'string' ? document.getElementById(container) : container;
+        if (!el) throw new Error('[SRM] container not found: ' + container);
+        const data = sramData || {};
+        const barriers = Object.assign({ ecb: [], erb: [], ncb: [], nrb: [] }, data.barriers || {});
+        const bowtie = Object.assign({ threats: [], top_event: '', consequences: [] }, data.bowtie || {});
+        const profile = data.risk_profile || {};
+
+        const findBarrier = (id) => {
+            for (const key of Object.keys(barriers)) {
+                const b = (barriers[key] || []).find(x => x.id === id);
+                if (b) return b;
+            }
+            return null;
+        };
+        const linkedNames = (item) => (item.barrier_ids || [])
+            .map(id => { const b = findBarrier(id); return b ? (b.name || '(unnamed)') : null; })
+            .filter(Boolean).join(', ') || '—';
+
+        const col = (title, cls, items, linkAttr) => `
+            <div class="srm-col">
+                <div class="srm-col-head">${esc(title)}</div>
+                ${(items || []).length ? items.map(item => `
+                    <div class="srm-card ${cls}">
+                        <div>${esc(item.label || '(unlabelled)')}</div>
+                        ${linkAttr ? `<div class="srm-hint">Barrier: ${esc(linkedNames(item))}</div>` : ''}
+                    </div>`).join('') : '<div class="srm-hint">None recorded.</div>'}
+            </div>`;
+
+        const barrierCol = (title, list) => `
+            <div class="srm-col">
+                <div class="srm-col-head">${esc(title)}</div>
+                ${(list || []).length ? list.map(b => {
+                    const h = barrierHealth(b);
+                    return `<div class="srm-barrier-pill" data-barrier-id="${esc(b.id || '')}">
+                        <span class="srm-health-tag ${h.cls}">${esc(h.label)}</span>
+                        <span class="srm-pill-name" title="${esc(b.name || '')}">${esc(b.name || '(unnamed)')}</span>
+                        <span class="srm-bsv-badge">BSV ${b.bsv != null ? b.bsv : 0}</span>
+                    </div>`;
+                }).join('') : '<div class="srm-hint">None recorded.</div>'}
+            </div>`;
+
+        el.innerHTML = `
+            <div class="srm-workspace srm-bowtie-viewer">
+                <div class="srm-section">
+                    <h3><i class="fas fa-bow-arrow"></i> Bow-Tie Barrier Analysis (CAAN CAR-19 SRAM)</h3>
+                    <div class="srm-bowtie">
+                        ${col('Threats', 'srm-threat', bowtie.threats, true)}
+                        ${barrierCol('Preventive Barriers (ECM)', barriers.ecb)}
+                        <div class="srm-top-event"><span>TOP EVENT</span><div>${esc(bowtie.top_event || '—')}</div></div>
+                        ${barrierCol('Recovery Barriers (ERB)', barriers.erb)}
+                        ${col('Consequences', 'srm-consequence', bowtie.consequences, true)}
+                    </div>
+                    <div class="srm-new-barriers" style="margin-top:0.7rem;">
+                        ${barrierCol('New Control Measures (NCM)', barriers.ncb)}
+                        ${barrierCol('New Recovery Barriers (NRB)', barriers.nrb)}
+                    </div>
+                </div>
+                <div class="srm-section">
+                    <h3><i class="fas fa-th-large"></i> Risk Comparison</h3>
+                    <div class="srm-risk-comparison">
+                        <div class="srm-risk-box">
+                            <div class="srm-risk-label">Initial Risk</div>
+                            <div class="srm-risk-index">${esc(profile.initial_risk ? profile.initial_risk.index : '—')}</div>
+                            <div class="srm-risk-tol">${profile.initial_risk ? esc(profile.initial_risk.tolerability) : ''}</div>
+                        </div>
+                        <div class="srm-risk-arrow"><i class="fas fa-arrow-right"></i></div>
+                        <div class="srm-risk-box">
+                            <div class="srm-risk-label">Resultant Risk</div>
+                            <div class="srm-risk-index">${esc(profile.resultant_risk ? profile.resultant_risk.index : '—')}</div>
+                            <div class="srm-risk-tol">${profile.resultant_risk ? esc(profile.resultant_risk.tolerability) : ''}</div>
+                        </div>
+                    </div>
+                </div>
+                ${data.signoffs ? `
+                <div class="srm-section">
+                    <h3><i class="fas fa-file-signature"></i> Postholder Sign-Off</h3>
+                    <div class="srm-hint">
+                        ${esc(data.signoffs.name || '—')} (${esc(data.signoffs.role || '—')})
+                        ${data.signoffs.date ? ' · ' + esc(data.signoffs.date) : ''}
+                        ${data.signoffs.authority ? ' · Authority: ' + esc(data.signoffs.authority) : ''}
+                    </div>
+                </div>` : ''}
+            </div>`;
+        return { element: el };
     }
 
     // ── Public API ──────────────────────────────────────────────────────────
@@ -1083,6 +1342,8 @@ const SRM = (() => {
         computeProbability,
         evaluateRiskProfile,
         openBarrierQualityModal,
+        barrierHealth,
+        renderBowtieViewer,
         createWorkspace: (container, opts) => new SrmWorkspace(container, opts),
         attachCombined,
     };

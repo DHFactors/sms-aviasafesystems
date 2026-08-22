@@ -505,10 +505,127 @@ window.getDepartmentLabel = getDepartmentLabel;
 // ROLE-BASED ROUTING — where should a signed-in user land after login?
 // ============================================================================
 
+// ── Virtual Tenant Mirroring (demo-prospects.js integration) ────────────────
+// public/js/demo-prospects.js must be included BEFORE this file on routing
+// pages (login.html). All lookups are lazy so load order cannot throw.
+
+function _demoProspects() {
+    return (typeof window !== 'undefined' && window.DEMO_PROSPECTS) ? window.DEMO_PROSPECTS : null;
+}
+
+function _isAeEmail(email) {
+    var e = String(email || '').toLowerCase();
+    return e.indexOf('ae@') === 0 || e.indexOf('ae.') === 0;
+}
+
+function _isProspectAe(email) {
+    if (!_isAeEmail(email)) return false;
+    var dp = _demoProspects();
+    return dp ? !!dp.getArchetypeId(email) : true; // unregistered ae@ still routes as AE
+}
+
+var DEMO_CONTEXT_STORAGE_KEY = 'demo_context';       // refined spec key
+var DEMO_CONTEXT_LEGACY_KEY = 'demoContext';         // pre-referral fallback
+var AE_ARCHETYPE_STORAGE_KEY = 'aeArchetypeId';
+
+function _writeDemoContextStorage(json) {
+    try {
+        localStorage.setItem(DEMO_CONTEXT_STORAGE_KEY, json);
+        localStorage.setItem(DEMO_CONTEXT_LEGACY_KEY, json);
+        localStorage.setItem(AE_ARCHETYPE_STORAGE_KEY, ctx_archetype_of(json));
+    } catch (e) { /* non-fatal */ }
+}
+function ctx_archetype_of(json) {
+    try { return (JSON.parse(json) || {}).archetypeId || ''; } catch (e) { return ''; }
+}
+
+/**
+ * Resolve the Virtual Tenant Mirroring context for a signed-in AE:
+ * reads the email, looks up PROSPECT_REGISTRY, persists the context to
+ * window.DEMO_CONTEXT + localStorage, and binds the reference formatter to
+ * the prospect's IATA code.
+ * Accepts either a bare email string or a user-like object ({email}).
+ * @param {string|{email?:string}} userLike
+ * @returns {object|null} { archetypeId, companyName, aeName, fleetType,
+ *                         baseLocation, iataCode, email }
+ */
+function resolveTenantContext(userLike) {
+    var dp = _demoProspects();
+    var email = String(
+        (typeof userLike === 'string') ? userLike : ((userLike && userLike.email) || '')
+    ).toLowerCase();
+
+    var prospect = dp ? dp.getProspectByEmail(email) : null;
+    var archetypeId = prospect ? prospect.archetypeId
+        : (_isAeEmail(email) ? 'demo-fixed-wing' : null); // defensive fallback
+
+    if (!archetypeId) return null;
+
+    var ctx = {
+        archetypeId: archetypeId,
+        companyName: (prospect && prospect.companyName) || 'Accountable Executive Demo',
+        aeName: (prospect && prospect.aeName) || 'Accountable Executive',
+        fleetType: (prospect && prospect.fleetType) || '',
+        baseLocation: (prospect && prospect.baseLocation) || '',
+        iataCode: (prospect && prospect.iataCode) || 'AE',
+        email: email,
+    };
+
+    window.DEMO_CONTEXT = ctx;
+    _writeDemoContextStorage(JSON.stringify(ctx));
+
+    // Initialize the reference formatter with the prospect's IATA code.
+    window.formatReference = function (refString, iataCode) {
+        var code = iataCode || ctx.iataCode;
+        if (!refString) return refString || '';
+        if (!code) return refString;
+        return String(refString).replace(/^(FW|RW)-/, code.trim().toUpperCase() + '-');
+    };
+    return ctx;
+}
+
+/** Stored context (survives navigation), or null. Reads both storage keys. */
+function getStoredDemoContext() {
+    try {
+        var raw = localStorage.getItem(DEMO_CONTEXT_STORAGE_KEY) ||
+                  localStorage.getItem(DEMO_CONTEXT_LEGACY_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+}
+
+/**
+ * Reference formatter convenience — uses the active DEMO_CONTEXT IATA code
+ * unless an explicit code is passed.
+ */
+function formatReference(refString, iataCode) {
+    var ctx = window.DEMO_CONTEXT || getStoredDemoContext() || {};
+    var dp = _demoProspects();
+    if (dp && dp.formatReference) return dp.formatReference(refString, iataCode || ctx.iataCode);
+    var code = (iataCode || ctx.iataCode || '').trim().toUpperCase();
+    if (!code || !refString) return refString || '';
+    return String(refString).replace(/^(FW|RW)-/, code + '-');
+}
+
+window.resolveTenantContext = resolveTenantContext;
+window.formatReference = formatReference;
+window.getStoredDemoContext = getStoredDemoContext;
+
 function getRoleDestination(user) {
     var role = (user && user.role) || 'USER';
     if (role === 'SUPER_ADMIN') return '/admin/production-setup.html';
     if (role === 'CAAN_SMD') return '/caan.html';
+    // Accountable Executive accounts (ae@{domain}) get the executive
+    // governance dashboard — top-level SMS oversight per ICAO Annex 19 /
+    // Doc 10159. Safety Managers (safety@) keep the operational workspace.
+    if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN') {
+        var email = ((user && user.email) || '').toLowerCase();
+        if (_isAeEmail(email)) {
+            // Resolve + persist the mirroring context BEFORE the dashboard
+            // loads so panels render with the prospect's branding/formatter.
+            try { resolveTenantContext({ email: email }); } catch (e) { /* non-fatal */ }
+            return '/dashboard/ae-dashboard.html';
+        }
+    }
     if (role === 'USER') {
         var claims = (user && (user.claims || {})) || {};
         var department = claims.department || (user && user.department) || '';
@@ -516,6 +633,127 @@ function getRoleDestination(user) {
         return '/safety.html';
     }
     return '/safety.html';
+}
+
+// ── Auth-state sync for the mirroring context ───────────────────────────────
+// Runs alongside each page's own observer: keeps window.DEMO_CONTEXT fresh
+// for AEs and clears stale contexts for everyone else / on sign-out.
+if (typeof firebase !== 'undefined' && firebase.auth) {
+    firebase.auth().onAuthStateChanged(function (u) {
+        try {
+            if (u && _isProspectAe(u.email)) {
+                resolveTenantContext({ email: u.email });
+            } else if (!u || !_isAeEmail(u.email)) {
+                window.DEMO_CONTEXT = null;
+                localStorage.removeItem(DEMO_CONTEXT_STORAGE_KEY);
+                localStorage.removeItem(DEMO_CONTEXT_LEGACY_KEY);
+                localStorage.removeItem(AE_ARCHETYPE_STORAGE_KEY);
+            }
+        } catch (e) { /* storage errors are non-fatal */ }
+    });
+}
+
+// ── Quick-Switch Demo Toolbar (?demo=true) ──────────────────────────────────
+// Floating prospect switcher for sales demos. Enabled only when ?demo=true is
+// present (persisted for the browser session); hidden for all other sessions.
+function initDemoToolbar() {
+    try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('demo') === 'true') sessionStorage.setItem('demoToolbar', '1');
+        if (sessionStorage.getItem('demoToolbar') !== '1') return;
+
+        var dp = _demoProspects();
+        if (!dp) return;
+        var options = [
+            { key: 'ae@buddha-air.com', label: 'Buddha Air — ATR 72 Fleet (Fixed-Wing)' },
+            { key: 'ae@fishtailair.com', label: 'Fishtail Air — H125 Fleet (Rotary-Wing)' },
+        ];
+
+        var wrap = document.createElement('div');
+        wrap.id = 'demoToolbar';
+        wrap.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9999;display:flex;' +
+            'align-items:center;gap:0.45rem;background:#081f33;color:#fff;padding:0.5rem 0.7rem;' +
+            'border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.35);font-family:Inter,Arial,sans-serif;';
+        wrap.innerHTML = '<span style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#8fa8bd;">Demo</span>';
+
+        var sel = document.createElement('select');
+        sel.style.cssText = 'background:#123a5c;color:#fff;border:1px solid rgba(255,255,255,0.3);' +
+            'border-radius:6px;padding:0.3rem 0.5rem;font-size:0.78rem;';
+        options.forEach(function (o) {
+            var opt = document.createElement('option');
+            opt.value = o.key;
+            opt.textContent = o.label;
+            sel.appendChild(opt);
+        });
+
+        var current = getStoredDemoContext();
+        if (current && current.email) sel.value = current.email.toLowerCase();
+
+        sel.addEventListener('change', function () {
+            var fromCtx = getStoredDemoContext() || {};
+            var ctx = resolveTenantContext({ email: sel.value });
+            if (!ctx) return;
+            // Analytics: archetype switch signal (Chunk 7).
+            try {
+                document.dispatchEvent(new CustomEvent('demoSwitch', { detail: {
+                    from: fromCtx.archetypeId || null,
+                    to: ctx.archetypeId || null,
+                    fromCompany: fromCtx.companyName || null,
+                    toCompany: ctx.companyName || null,
+                    timestamp: new Date().toISOString(),
+                }}));
+            } catch (e) { /* non-fatal */ }
+            // Preferred: live re-fetch + re-format on AE dashboards that
+            // expose a refresh hook; fallback to a full reload elsewhere.
+            if (typeof window.__aeRefresh === 'function') {
+                try { window.__aeRefresh(); } catch (e) { window.location.reload(); }
+            } else {
+                window.location.reload();
+            }
+        });
+
+        wrap.appendChild(sel);
+        document.body.appendChild(wrap);
+
+        // Demo-mode indicator: subtle badge in the top-right header area
+        // (falls back to a fixed corner chip when no header is present).
+        var enabledAt = parseInt(sessionStorage.getItem('demoEnabledAt') || '0', 10);
+        if (!enabledAt) {
+            enabledAt = Date.now();
+            sessionStorage.setItem('demoEnabledAt', String(enabledAt));
+        }
+        var expiresAt = enabledAt + 8 * 3600 * 1000; // 8-hour demo session
+        var expiresLabel = new Date(expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        var indicatorText = '\uD83D\uDD2C Demo Environment \u2014 Simulated Data \u00B7 expires ' + expiresLabel;
+
+        var host = document.querySelector('.nav .nav-actions');
+        if (host) {
+            var badge = document.createElement('span');
+            badge.className = 'badge badge-subtle-secondary';
+            badge.id = 'demoModeIndicator';
+            badge.title = 'Session expires ' + expiresLabel;
+            badge.style.cssText = 'font-size:0.75rem;opacity:0.85;background:#f1f5f9;color:#94a3b8;' +
+                'border:1px solid #e2e8f0;border-radius:999px;padding:0.25rem 0.7rem;';
+            badge.textContent = indicatorText.replace(' \u00B7 expires ' + expiresLabel, '');
+            host.insertBefore(badge, host.firstChild);
+        } else {
+            var chipEl = document.createElement('div');
+            chipEl.id = 'demoModeIndicator';
+            chipEl.style.cssText = 'position:fixed;top:14px;right:14px;z-index:9998;background:#f1f5f9;' +
+                'color:#94a3b8;border:1px solid #e2e8f0;border-radius:999px;padding:0.25rem 0.7rem;' +
+                'font-size:0.66rem;font-family:Inter,Arial,sans-serif;';
+            chipEl.textContent = indicatorText;
+            document.body.appendChild(chipEl);
+        }
+    } catch (e) { /* toolbar is cosmetic — never block the page */ }
+}
+
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDemoToolbar);
+    } else {
+        initDemoToolbar();
+    }
 }
 
 function redirectByRole(user) {

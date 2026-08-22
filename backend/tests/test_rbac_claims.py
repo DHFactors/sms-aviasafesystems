@@ -7,6 +7,10 @@ Verifies the security-domain rules applied by seed config + provisioning:
   145@{tenant}.com     -> USER  / Part-145
   ops@{tenant}.com     -> USER  / Flight Operations
 
+Extended six-role scheme (2026-08-21) for fishtail-air / summit-air:
+  ae@{domain}          -> AIRLINE_ADMIN (Accountable Executive)
+  pilot@{domain}       -> USER  / Line Crew
+
 and the resulting frontend routing contract (getRoleDestination in
 public/js/firebase.js): USER accounts with a department claim route to the
 responsible-manager dashboard, everything else to the full dashboard.
@@ -17,8 +21,10 @@ import pytest
 from seed.config import (
     OPERATOR_PROFILES,
     SIMPLIFIED_ROLE_ACCOUNTS,
+    EXTENDED_ROLE_TENANT_IDS,
     CREDENTIAL_EMAIL_DOMAINS,
     simplified_email,
+    roles_for_tenant,
     build_simplified_role_plan,
 )
 
@@ -49,13 +55,36 @@ def test_simplified_role_accounts_match_security_domain():
 
 def test_every_operator_has_all_role_accounts():
     assert set(CREDENTIAL_EMAIL_DOMAINS) == {op["id"] for op in OPERATOR_PROFILES}
-    assert len(OPERATOR_PROFILES) == 12
+    assert len(OPERATOR_PROFILES) == 11
     plan = build_simplified_role_plan()
-    assert len(plan) == len(OPERATOR_PROFILES) * len(SIMPLIFIED_ROLE_ACCOUNTS)
+    expected_accounts = sum(len(roles_for_tenant(op["id"])) for op in OPERATOR_PROFILES)
+    assert len(plan) == expected_accounts
     for op in OPERATOR_PROFILES:
         for token in EXPECTED_ROLE_RULES:
             email = simplified_email(token, op["id"])
             assert email == f"{token}@{CREDENTIAL_EMAIL_DOMAINS[op['id']]}"
+
+
+def test_extended_operators_provision_ae_and_pilot_accounts():
+    """fishtail-air / summit-air carry the six-role scheme (AE + Line Pilot)."""
+    plan = build_simplified_role_plan()
+    for tid in EXTENDED_ROLE_TENANT_IDS:
+        entries = {e["token"]: e for e in plan if e["op_id"] == tid}
+        assert {"ae", "pilot"} <= set(entries), tid
+
+        ae = entries["ae"]
+        assert ae["app_role"] == "AIRLINE_ADMIN"
+        assert ae["department"] == ""
+        pilot = entries["pilot"]
+        assert pilot["app_role"] == "USER"
+        assert pilot["department"] == "Line Crew"
+
+    # Non-extended operators never receive AE / Pilot accounts.
+    for op in OPERATOR_PROFILES:
+        if op["id"] in EXTENDED_ROLE_TENANT_IDS:
+            continue
+        tokens = {e["token"] for e in plan if e["op_id"] == op["id"]}
+        assert tokens == set(EXPECTED_ROLE_RULES), op["id"]
 
 
 def test_example_accounts_from_scheme_doc():
