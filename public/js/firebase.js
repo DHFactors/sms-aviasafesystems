@@ -313,6 +313,58 @@ function initServices() {
 // APP CHECK
 // ============================================================================
 
+export function initAppCheckSafe(app) {
+  try {
+    const siteKey = window.RECAPTCHA_SITE_KEY || "";
+    // Only attempt App Check if an explicit site key exists
+    if (!siteKey || siteKey === "YOUR_RECAPTCHA_SITE_KEY") {
+      console.warn("[AppCheck] No valid reCAPTCHA site key found; bypassing App Check.");
+      // Clear any stored throttle timestamp from prior runs
+      clearAppCheckThrottle();
+      return null;
+    }
+
+    // Handle debug tokens for localhost / custom staging domains
+    if (
+      location.hostname === "localhost" ||
+      location.hostname === "127.0.0.1" ||
+      location.hostname.includes("beta") ||
+      IS_BETA_ENV
+    ) {
+      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    }
+
+    const appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: false // Prevent continuous 403 retry spam
+    });
+    return appCheck;
+  } catch (err) {
+    console.warn("[AppCheck] Safe fallback activated; proceeding without App Check:", err);
+    // Clear any stored throttle timestamp on failure
+    clearAppCheckThrottle();
+    return null;
+  }
+}
+
+function clearAppCheckThrottle() {
+  // Clear any stored throttling timestamp from localStorage/sessionStorage
+  const keys = ["firebase:app-check", "app-check-throttle", "fb_app_check"];
+  for (const key of keys) {
+    try {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    } catch (e) { /* Ignore storage errors in incognito/private windows */ }
+  }
+  // Also attempt IndexedDB cleanup if available
+  if (typeof indexedDB !== "undefined") {
+    try {
+      const dbRequest = indexedDB.deleteDatabase("firebase-app-check");
+      dbRequest.onsuccess = () => { /* Database deleted successfully */ };
+    } catch (e) { /* IndexedDB not available or error */ }
+  }
+}
+
 function initAppCheck() {
     if (typeof firebase === 'undefined' || !firebase.appCheck) return;
     const urlParams = new URLSearchParams(window.location.search);
@@ -324,18 +376,11 @@ function initAppCheck() {
         console.log('ℹ️ App Check skipped (localhost)');
         return;
     }
-    // Debug bypass for beta environments when reCAPTCHA keys are not fully configured
-    if (IS_BETA_ENV) {
-        console.log('ℹ️ App Check beta debug mode — using development token');
-        try {
-            firebase.appCheck().activate(
-                new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-                /* autoRefresh */ false
-            );
-        } catch (e) {
-            console.warn('ℹ️ App Check beta debug activation failed, continuing without:', e);
-        }
-        return;
+    // Attempt safe App Check initialization — never blocks Auth/Firestore
+    try {
+        initAppCheckSafe(firebase.app());
+    } catch (e) {
+        console.warn("App Check initialization error, continuing gracefully:", e);
     }
     // Admin pages are SUPER_ADMIN + SETUP_SECRET gated; the reCAPTCHA provider
     // must not be able to break their auth requests.
@@ -347,12 +392,6 @@ function initAppCheck() {
         console.warn('⚠️ App Check skipped — no reCAPTCHA site key configured for this environment (' +
             APP_CONFIG.environment + '). Register one in the Firebase console (Security > App Check).');
         return;
-    }
-    try {
-        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_SITE_KEY), true);
-        console.log('✅ App Check activated');
-    } catch (e) {
-        console.warn('⚠️ App Check activation failed (likely throttled/403), continuing gracefully:', e);
     }
 }
 
@@ -395,7 +434,8 @@ window.getAppCheckToken = getAppCheckToken;
     // Check if Firebase is already available (from CDN in HTML)
     if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         initializeFirebase();
-        initAppCheck();
+        // Use safe App Check initialization — never blocks Auth/Firestore
+        initAppCheckSafe(firebase.app());
         initServices().then(function() {
             window.firebase = firebase;
             window.auth = auth;
@@ -409,6 +449,8 @@ window.getAppCheckToken = getAppCheckToken;
                 return initServices();
             })
             .then(function() {
+                // Clear any stored throttle timestamp on fresh load
+                clearAppCheckThrottle();
                 window.firebase = firebase;
                 window.auth = auth;
                 window.db = db;
