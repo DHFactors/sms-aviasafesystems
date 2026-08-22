@@ -52,3 +52,4 @@ python-dateutil==2.8.2
 
 # PDF report generation
 reportlab==4.1.0
+jinja2==3.1.4
