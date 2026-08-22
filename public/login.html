@@ -1,585 +1,112 @@
-<!-- ============================================================================
-FILE: login.html
-PATH: public/login.html
-VERSION: 2.0.0
-DATE CREATED: 2026-07-26
-DATE REVISED: 2026-07-26
-PURPOSE: Authentication page with Firebase Auth and role-based redirects.
-AUTHOR: AviaSAFE Systems
-============================================================================ -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AviaSAFE SSP</title>
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/tenant-overrides.css">
+    <title>AviaSAFE SMS — Aviation Safety Management & State Oversight Platform</title>
+    <meta name="description" content="AviaSAFE SMS is an aviation safety management and state oversight platform engineered for ICAO Annex 19 (3rd Edition), Doc 9859 and Doc 10159 compliance — turning safety data into safety intelligence.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AviaSAFESMS — From Safety Data to Safety Intelligence">
+    <meta property="og:description" content="One connected safety intelligence ecosystem for airlines, operators and regulators — ICAO Annex 19, Doc 10159 aligned.">
+    <meta property="og:url" content="https://betasms.aviasafesystems.com/">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        deepTeal: {
+                            900: '#072535',
+                            800: '#0A3A50',
+                            700: '#0E4E6C',
+                            600: '#12648A',
+                        },
+                        brand: {
+                            50: '#F0F9FF',
+                            100: '#E0F2FE',
+                            300: '#7DD3FC',
+                            400: '#38BDF8',
+                            500: '#0284C7',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            800: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* ========== LAYOUT ONLY — colors handled by /styles/global.css ========== */
-        .login-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: var(--spacing-lg);
+        html { scroll-behavior: smooth; }
+
+        /* Fixed-header anchor offset: keep every section id clear of the 80px
+           sticky nav so #why-it-matters / #capabilities / #ecosystem / #onboarding
+           land correctly. */
+        section[id] { scroll-margin-top: 96px; }
+
+        /* Auto-Scrolling Gallery */
+        @keyframes scrollGallery {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-50%); }
         }
-        .login-container {
-            max-width: 420px;
-            width: 100%;
-            padding: var(--spacing-2xl);
+        .animated-gallery {
+            animation: scrollGallery 28s linear infinite;
         }
-        .login-container .logo {
-            text-align: center;
-            margin-bottom: var(--spacing-xl);
+        .animated-gallery:hover {
+            animation-play-state: paused;
         }
-        .login-container .logo i { font-size: 3rem; }
-        .login-container .logo h1 { margin-bottom: var(--spacing-xs); }
-        .login-container .logo p#tenantHeaderName.is-tenant {
-            font-weight: 600;
-            color: var(--color-accent);
+
+        /* Light Card Hover Effects */
+        .light-card {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+            transition: all 0.25s ease-in-out;
         }
-        .form-group .form-control {
-            width: 100%;
-            padding: var(--spacing-md);
-            border-radius: var(--border-radius-md);
-            font-size: var(--font-size-base);
-        }
-        .btn-login {
-            width: 100%;
-            padding: var(--spacing-md);
-            font-size: var(--font-size-base);
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .error-message {
-            font-size: var(--font-size-sm);
-            margin-top: var(--spacing-md);
-            display: none;
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--border-radius-sm);
-        }
-        .role-hint {
-            margin-top: var(--spacing-lg);
-            padding: var(--spacing-md);
-            border-radius: var(--border-radius-md);
-            font-size: var(--font-size-sm);
-        }
-        .role-hint strong { color: var(--color-gray-900); }
-        .role-hint .hint-row {
-            display: flex;
-            justify-content: space-between;
-            padding: var(--spacing-xs) 0;
-            border-bottom: 1px solid var(--color-gray-200);
-        }
-        .role-hint .hint-row:last-child { border-bottom: none; }
-        .role-hint .badge { font-size: var(--font-size-xs); }
-        .badge-admin { background: var(--color-danger-bg); color: var(--color-danger); }
-        .badge-caan { background: var(--color-info-bg); color: var(--color-info); }
-        .badge-airline { background: var(--color-success-bg); color: var(--color-success); }
-        .footer-links {
-            text-align: center;
-            margin-top: var(--spacing-lg);
-            font-size: var(--font-size-sm);
+        .light-card:hover {
+            border-color: #0284C7;
+            box-shadow: 0 12px 24px -8px rgba(2, 132, 199, 0.15);
         }
     </style>
-    <link rel="stylesheet" href="/styles/global.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="css/theme.css">
-    </head>
+    <link rel="stylesheet" href="/css/copilot-widget.css">
+</head>
 <body>
-
-<div class="login-page">
     <div class="login-container">
-        <div class="logo">
-            <i class="fas fa-shield-alt"></i>
-            <h1>AviaSAFE</h1>
-            <p id="tenantHeaderName">Safety Data to Safety Intelligence</p>
-        </div>
-
-        <div id="demoPersonaSection" class="demo-persona" style="display:none;">
-            <label for="demoPersonaSelect" style="font-size: var(--font-size-sm); font-weight: 600; display: block; margin-bottom: var(--spacing-xs);">
-                <i class="fas fa-flask"></i> Demo Persona
-            </label>
-            <select id="demoPersonaSelect" class="form-control" onchange="onDemoPersonaChange(this.value)">
-                <option value="">— Select a demo persona —</option>
-            </select>
-            <p style="font-size: var(--font-size-xs); color: var(--color-gray-600); margin-top: var(--spacing-sm);">
-                Choose a demo persona to scope this login to its tenant &amp; department.
-            </p>
-        </div>
-
-        <form id="loginForm" autocomplete="off">
+        <h2>AviaSAFE SMS — Login</h2>
+        <p class="subtitle">Enter your credentials to access the safety dashboard</p>
+        <form id="login-form">
             <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" class="form-control" placeholder="your@email.com" required autofocus>
+                <label for="email">Email</label>
+                <input type="email" id="email" required>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                <input type="password" id="password" required>
             </div>
-
-            <!-- Honeypot anti-bot trap: invisible to humans, silent kill-switch
-                 for form-filling bots. Must stay name="company_website_url". -->
-            <input type="text" name="company_website_url" class="hp-field" style="opacity:0;position:absolute;top:0;left:-9999px;height:1px;width:1px;z-index:-1;" tabindex="-1" autocomplete="off" aria-hidden="true">
-
-            <div id="errorMessage" class="error-message"></div>
-
-            <button type="submit" class="btn-login" id="loginBtn">
-                <i class="fas fa-sign-in-alt"></i> Sign In
-            </button>
+            <button type="submit" id="login-btn" class="btn-primary">Sign In</button>
         </form>
-
-        <div class="role-hint">
-            <p><strong><i class="fas fa-shield-alt"></i> Authorized Personnel Only</strong></p>
-            <p style="font-size: var(--font-size-xs); color: var(--color-gray-600); margin-top: var(--spacing-sm);">
-                This portal is restricted to registered aviation safety personnel.
-                Contact your system administrator for access.
-            </p>
-        </div>
-
-        <div class="footer-links">
-            <a href="/">← Back to Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/join.html">Join Your Team</a>
-        </div>
+        <p class="switch-text">
+            Not an organization yet? 
+            <a href="https://sms-aviasafesystems-beta.web.app/login.html" class="text-blue-600 hover:underline">
+                Demo / Beta Sandbox (Buddha Air & 19 operator datasets)
+            </a>
+        </p>
     </div>
-</div>
-
-<!-- ===== FIREBASE SDK ===== -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
-
-<!-- ===== SHARED FIREBASE CONFIG ===== -->
-<script src="/js/demo-prospects.js"></script>
-<script src="/js/firebase.js"></script>
-<script src="/js/tenant_context.js"></script>
-<script src="/js/department_resolver.js"></script>
-<script src="/js/input_guard.js"></script>
-
-<!-- ===== LOGIN LOGIC ===== -->
-<script>
-// ============================================================================
-// WAIT FOR FIREBASE SDK
-// ============================================================================
-
-function waitForFirebase() {
-    return new Promise(function(resolve) {
-        if (typeof firebase !== 'undefined' && firebase.auth) {
-            resolve();
-            return;
-        }
-        var check = setInterval(function() {
-            if (typeof firebase !== 'undefined' && firebase.auth) {
-                clearInterval(check);
-                resolve();
-            }
-        }, 30);
-        setTimeout(function() {
-            clearInterval(check);
-            resolve();
-        }, 10000);
-    });
-}
-
-// ============================================================================
-// SIGN IN FUNCTION — server-side credential verification + session restore
-// ============================================================================
-
-function getApiBaseUrl() {
-    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
-    var host = window.location.hostname;
-    var isBeta = host.indexOf('beta') !== -1 ||
-        host === 'localhost' || host === '127.0.0.1';
-    return isBeta
-        ? 'https://sms-aviasafesystems-beta.onrender.com'
-        : 'https://aviasafe-unified-platform.onrender.com';
-}
-
-// Attach a fresh App Check token when available (best-effort).
-async function getAppCheckHeader() {
-    try {
-        if (typeof window.getAppCheckToken === 'function') {
-            var token = await window.getAppCheckToken();
-            if (token) return { 'X-Firebase-AppCheck': token };
-        }
-    } catch (e) { /* best-effort */ }
-    return {};
-}
-
-// Credentials are verified server-side (POST /api/v1/auth/login) which enforces
-// a strict per-IP failed-attempt sliding window (5 / 15 min). On success the
-// backend returns a one-time custom token we exchange through the Firebase SDK,
-// so the existing onAuthStateChanged session flow (fresh claims, role-based
-// redirect) continues to work unchanged.
-async function signIn(email, password) {
-    var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/login', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, await getAppCheckHeader()),
-        body: JSON.stringify({ email: email, password: password })
-    });
-    var data = await resp.json().catch(function () { return {}; });
-
-    if (!resp.ok) {
-        if (resp.status === 429) {
-            var rateErr = new Error(
-                (data && (data.detail || data.message)) ||
-                'Too many login attempts from this network. Please wait a few minutes and try again.'
-            );
-            rateErr.code = 'rate_limited';
-            throw rateErr;
-        }
-        var credErr = new Error(
-            (data && data.detail) || 'Invalid email or password. Please try again.'
-        );
-        credErr.code = 'invalid_credentials';
-        throw credErr;
-    }
-
-    await waitForFirebase();
-    await firebase.auth().signInWithCustomToken(data.custom_token);
-    var user = await getCurrentUser();
-    return user;
-}
-
-// ============================================================================
-// TENANT RESOLUTION
-// ============================================================================
-
-function getTenantFromSubdomain() {
-    if (typeof TenantResolver !== 'undefined' && TenantResolver.getTenantFromSubdomain) {
-        return TenantResolver.getTenantFromSubdomain();
-    }
-    var hostname = window.location.hostname;
-    var parts = hostname.split('.');
     
-    if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
-        var subdomain = parts[0];
-        var reserved = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
-        if (reserved.indexOf(subdomain) === -1) {
-            return subdomain;
-        }
-    }
-    return null;
-}
-
-// ============================================================================
-// DEMO PERSONA SELECTOR — beta/demo hosts only; hidden on production subdomains
-// ============================================================================
-
-function renderDemoPersonaSelector() {
-    var section = document.getElementById('demoPersonaSection');
-    var select = document.getElementById('demoPersonaSelect');
-    if (!section || !select) return;
-
-    var isDemo = (typeof TenantResolver !== 'undefined') && TenantResolver.isDemoEnvironment();
-    if (!isDemo) {
-        // Production tenant subdomains are strictly scoped — never show switching.
-        section.style.display = 'none';
-        return;
-    }
-
-    section.style.display = 'block';
-    var personas = (TenantResolver.DEMO_PERSONAS || []);
-    select.innerHTML = '<option value="">— Select a demo persona —</option>' +
-        personas.map(function (p) {
-            return '<option value="' + p.tenant + '">' + p.label + '</option>';
-        }).join('');
-
-    var current = TenantResolver.getCurrentTenant();
-    var active = personas.filter(function (p) { return p.tenant === current; })[0];
-    if (active) select.value = active.tenant;
-}
-
-var developerPersonaActive = false;
-
-function onDemoPersonaChange(value) {
-    if (!value) return;
-
-    // Developer / Super-Admin persona: cross-tenant, no tenant scoping. Autofill
-    // the developer credentials so sign-in targets Firebase Auth directly and the
-    // role-based router sends SUPER_ADMIN to the admin panel.
-    if (value === 'developer') {
-        developerPersonaActive = true;
-        if (typeof TenantResolver !== 'undefined' && TenantResolver.clearDemoTenant) {
-            TenantResolver.clearDemoTenant();
-        }
-        var emailInput = document.getElementById('email');
-        var passwordInput = document.getElementById('password');
-        if (emailInput) emailInput.value = 'ezondiza.dhf@gmail.com';
-        if (passwordInput) passwordInput.value = 'DEV-Aviasafe-2026';
-        updateTenantDisplay();
-        return;
-    }
-
-    // CAAN SMD persona: scope to the regulator tenant and autofill the State
-    // Safety Management Department account. Role-based routing lands on the
-    // State Aviation Safety Oversight dashboard (/caan.html).
-    if (value === 'smd') {
-        developerPersonaActive = false;
-        if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
-            TenantResolver.setDemoTenant('caan');
-        }
-        var smdEmail = document.getElementById('email');
-        var smdPassword = document.getElementById('password');
-        if (smdEmail) smdEmail.value = 'smd@caanepal.gov.np';
-        if (smdPassword) smdPassword.value = 'CAAN-Safety-2026';
-        updateTenantDisplay();
-        return;
-    }
-
-    developerPersonaActive = false;
-    if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
-        TenantResolver.setDemoTenant(value);
-        updateTenantDisplay();
-    }
-}
-
-// Reserved platform keywords must never render as an active tenant scope,
-// even when passed explicitly via ?tenant=.
-var RESERVED_TENANT_KEYWORDS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
-
-function prettifyTenantName(slug) {
-    if (typeof TenantResolver !== 'undefined' && TenantResolver.prettifySlug) {
-        return TenantResolver.prettifySlug(slug);
-    }
-    return String(slug || '').replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
-}
-
-function getActiveTenant() {
-    var tenantId = null;
-    if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
-        tenantId = TenantResolver.getCurrentTenant();
-    } else {
-        tenantId = getTenantFromSubdomain();
-    }
-    if (tenantId && RESERVED_TENANT_KEYWORDS.indexOf(tenantId) !== -1) return null;
-    return tenantId || null;
-}
-
-async function updateTenantDisplay() {
-    var displayEl = document.getElementById('tenantHeaderName');
-    if (!displayEl) return;
-    if (developerPersonaActive) {
-        displayEl.textContent = 'Developer Console (Super-Admin)';
-        displayEl.classList.add('is-tenant');
-        return;
-    }
-    var tenantId = getActiveTenant();
-    if (!tenantId) {
-        // Root / default platform host — no active tenant scope.
-        displayEl.textContent = 'Safety Data to Safety Intelligence';
-        displayEl.classList.remove('is-tenant');
-        return;
-    }
-    var title = null;
-    if (typeof TenantResolver !== 'undefined' && TenantResolver.resolveTenantTitle) {
-        title = await TenantResolver.resolveTenantTitle(tenantId);
-    }
-    displayEl.textContent = title || prettifyTenantName(tenantId);
-    displayEl.classList.add('is-tenant');
-}
-
-// ============================================================================
-// PRODUCTION TENANT-MEMBERSHIP VERIFICATION — a signed-in user must belong to
-// the tenant this subdomain is scoped to. SUPER_ADMIN / CAAN_SMD are
-// cross-tenant by design and always allowed. Demo hosts (beta) are exempt so
-// persona switching keeps working.
-// ============================================================================
-
-function isProductionHost() {
-    if (window.APP_CONFIG && window.APP_CONFIG.environment) {
-        return window.APP_CONFIG.environment === 'production';
-    }
-    var host = window.location.hostname || '';
-    return host.indexOf('beta') === -1 && host !== 'localhost' && host !== '127.0.0.1';
-}
-
-function tenantMembershipError(user) {
-    if (!isProductionHost()) return null;
-    var role = (user && user.role) || '';
-    if (role === 'SUPER_ADMIN' || role === 'CAAN_SMD') return null;
-    var activeTenant = getActiveTenant();
-    if (!activeTenant) return null; // root production host — no subdomain scope
-    if (user.tenantId && user.tenantId !== activeTenant) {
-        return 'Your account is registered under "' + user.tenantId + '". This portal is scoped to "' +
-            activeTenant + '". Please sign in through your own organization\'s portal.';
-    }
-    return null;
-}
-
-// ============================================================================
-// REDIRECT BASED ON ROLE
-// ============================================================================
-
-function redirectBasedOnRole(user) {
-    var redirectUrl = getRoleDestination(user);
-    console.log('Redirecting to ' + redirectUrl + ' (role=' + (user.role || 'USER') + ')');
-    window.location.href = redirectUrl;
-}
-
-// ============================================================================
-// PERSISTENT AUTH LISTENER — handles all auth transitions
-// ============================================================================
-
-var authRedirectInProgress = false;
-
-function onAuthStateChanged(user) {
-    // Prevent multiple simultaneous redirects
-    if (authRedirectInProgress) return;
-    
-    var statusBox = document.getElementById('statusBox');
-    var errorDiv = document.getElementById('errorMessage');
-    var loginBtn = document.getElementById('loginBtn');
-    var loginForm = document.getElementById('loginForm');
-    
-    if (!user) {
-        // Show login form, hide any errors
-        if (loginForm) loginForm.style.display = 'block';
-        if (errorDiv) errorDiv.style.display = 'none';
-        if (loginBtn) loginBtn.disabled = false;
-        return;
-    }
-    
-    // User is signed in — fetch fresh claims before redirecting
-    authRedirectInProgress = true;
-    user.getIdTokenResult(true).then(function(tokenResult) {
-        var claims = tokenResult.claims || {};
-        var role = claims.role || 'USER';
-        var tenantId = claims.tenant_id || null;
-        
-        console.log('Authenticated as:', user.email, 'role:', role, 'tenant:', tenantId);
-
-        // Production tenant-membership check: block cross-tenant sessions on a
-        // tenant-scoped subdomain (SUPER_ADMIN / CAAN_SMD are cross-tenant).
-        var membershipErr = tenantMembershipError({ uid: user.uid, email: user.email, role: role, tenantId: tenantId, claims: claims });
-        if (membershipErr) {
-            authRedirectInProgress = false;
-            if (errorDiv) {
-                errorDiv.textContent = membershipErr;
-                errorDiv.style.display = 'block';
-            }
-            if (loginForm) loginForm.style.display = 'block';
-            if (loginBtn) loginBtn.disabled = false;
-            firebase.auth().signOut().catch(function() {});
-            return;
-        }
-        
-        // Check if we should redirect (skip if already on a target page)
-        var currentPath = window.location.pathname;
-        var isOnLoginPage = currentPath === '/login.html' || currentPath === '/';
-        
-        if (isOnLoginPage) {
-            redirectBasedOnRole({ uid: user.uid, email: user.email, role: role, tenantId: tenantId, claims: claims });
-        }
-    }).catch(function(error) {
-        authRedirectInProgress = false;
-        // A saved session whose token can no longer be refreshed (stale or
-        // invalidated refresh token, disabled user, etc.) must be cleared
-        // locally — otherwise the auto-redirect keeps bouncing between the
-        // login page and the dashboard forever. Network failures are NOT
-        // cleared, so a transient outage cannot log anyone out.
-        var code = (error && error.code) || '';
-        var stale = [
-            'auth/invalid-login-credentials',
-            'auth/invalid-refresh-token',
-            'auth/user-token-expired',
-            'auth/user-disabled',
-            'auth/user-not-found'
-        ].indexOf(code) !== -1;
-        if (stale && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().signOut) {
-            console.log('Clearing stale session (' + code + ') to break redirect loop');
-            firebase.auth().signOut().catch(function() {});
-        }
-    });
-}
-
-// ============================================================================
-// PAGE LOAD
-// ============================================================================
-
-document.addEventListener('DOMContentLoaded', async function() {
-    // Demo persona selector (beta/demo hosts only) + tenant display resolution
-    renderDemoPersonaSelector();
-    await updateTenantDisplay();
-    
-    // Wait for Firebase SDK to be ready, then register persistent listener
-    await waitForFirebase();
-    firebase.auth().onAuthStateChanged(onAuthStateChanged);
-});
-
-// ============================================================================
-// FORM HANDLER
-// ============================================================================
-
-document.getElementById('loginForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-
-    // Anti-bot honeypot: bots that autofill the hidden field are silently
-    // dropped — no error, no redirect, no server hit.
-    if (typeof InputGuard !== 'undefined' && InputGuard.honeypotTrap(this)) {
-        return;
-    }
-
-    var email = document.getElementById('email').value.trim();
-    var password = document.getElementById('password').value;
-    var loginBtn = document.getElementById('loginBtn');
-    var errorDiv = document.getElementById('errorMessage');
-    
-    errorDiv.style.display = 'none';
-    loginBtn.disabled = true;
-    loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
-    
-    try {
-        var user = await signIn(email, password);
-        
-        if (user) {
-            console.log('✅ Logged in as:', user.email);
-            console.log('   Role:', user.role);
-            console.log('   Tenant:', user.tenantId || 'None');
-
-            // Production tenant-membership verification (blocked before redirect).
-            var membershipErr = tenantMembershipError(user);
-            if (membershipErr) {
-                errorDiv.textContent = membershipErr;
-                errorDiv.style.display = 'block';
-                if (firebase && firebase.auth && firebase.auth().signOut) {
-                    firebase.auth().signOut().catch(function() {});
-                }
-                return;
-            }
-
-            // The onAuthStateChanged listener will handle the redirect with fresh claims,
-            // but call it directly here for immediate response
-            if (developerPersonaActive) {
-                // Developer / Super-Admin: always land on the admin panel regardless of
-                // tenant scoping (role claim SUPER_ADMIN is verified by the panel guard).
-                window.location.href = '/admin/production-setup.html';
-                return;
-            }
-            redirectBasedOnRole(user);
-        }
-        
-    } catch (error) {
-        errorDiv.textContent = error.message || 'Invalid email or password. Please try again.';
-        errorDiv.style.display = 'block';
-    } finally {
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-    }
-});
-
-</script>
-
-<script src="/js/main.js"></script>
-
+    <!-- Firebase SDK -->
+    <script src="/js/firebase.js?v=2.1.0"></script>
+    <script src="/js/app.js"></script>
 </body>
-</html><script src="/js/firebase.js?v=2.1.0"></script>
+</html>
