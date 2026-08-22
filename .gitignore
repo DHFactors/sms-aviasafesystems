@@ -49,3 +49,11 @@ logs/
 .vscode/
 .idea/
 Thumbs.db
+
+# Environment & credentials (Chunk 17)
+.env.local
+*.pem
+*serviceAccount*.json
+docs/.env.local
+
+docs/tenant_details.txt
