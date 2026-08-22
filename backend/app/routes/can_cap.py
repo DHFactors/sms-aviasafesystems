@@ -24,6 +24,13 @@ async def issue_can(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     stored = service.issue_can(can.model_dump(), user)
@@ -152,6 +159,13 @@ async def update_can_status(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     updated = service.update_can_status(can_id, status.value, user)
@@ -168,6 +182,13 @@ async def delete_can(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     deleted = service.delete_can(can_id)
@@ -196,6 +217,13 @@ async def submit_cap(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     try:
@@ -248,6 +276,13 @@ async def update_cap(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     payload = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -265,6 +300,13 @@ async def review_cap(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     # Session isolation: master archetype tenants are immutable from the CAP
     # review path — demo AEs must use /api/v1/demo/session/decision.
@@ -288,6 +330,13 @@ async def update_cap_status(
 ):
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
+    # CAAN inspectors hold READ-ONLY access to operator records
+    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(
+            status_code=403,
+            detail="CAAN inspectors have READ-ONLY access to operator CAN/CAP records",
+        )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
     updated = service.update_cap(cap_id, {"status": status.value}, user)
