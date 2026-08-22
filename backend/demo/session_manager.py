@@ -92,6 +92,7 @@ def get_or_create_session(db, email: str, uid: str = None):
         "session_id": session_id,
         "email": email_key,
         "session_owner_id": uid or email_key,
+        "owner_uid": uid or email_key,
         "archetype": None,
         "created_at": now,
         "expires_at": expires_at,
@@ -126,6 +127,7 @@ def log_action(db, email: str, action_type: str, payload: dict = None, uid: str 
     ref.set({
         "action_type": action_type,
         "payload": payload or {},
+        "owner_uid": uid,
         "email": str(email).lower(),
         "created_at": now,
     })
@@ -146,6 +148,7 @@ def log_decision(db, email: str, decision: dict, uid: str = None):
     doc = {
         "decision_id": ref.id,
         "email": str(email).lower(),
+        "owner_uid": uid,
         "created_at": now,
         **(decision or {}),
     }

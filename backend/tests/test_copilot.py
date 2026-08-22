@@ -232,7 +232,7 @@ def test_build_messages_payload_structure(monkeypatch):
     )
     assert messages[0]["role"] == "system"
     # Quarantine directive is prepended ahead of the core identity prompt.
-    assert "UNTRUSTED OPERATIONAL DATA" in messages[0]["content"]
+    assert "UNTRUSTED CONTENT HANDLING" in messages[0]["content"]
     assert "You are" in messages[0]["content"]
     assert messages[1] == {"role": "user", "content": "previous turn"}
     assert messages[-1]["role"] == "user"

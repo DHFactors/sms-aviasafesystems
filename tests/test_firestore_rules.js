@@ -65,15 +65,30 @@ ok(/psoe_assessments[\s\S]*?request\.auth\.token\.tenant_id == resource\.data\.t
    /tenant_id == resource\.data\.tenant_id/.test(rules),
    'PSOE enforces stored-tenant match');
 
-// ── Demo session ownership ──────────────────────────────────────────────────
+// ── Demo session ownership (owner_uid per Headway §1.1) ────────────────────
 ok(/function sessionOwner\(\)/.test(rules), 'demo_sessions ownership helper defined');
-ok(/request\.auth\.uid == resource\.data\.session_owner_id/.test(rules),
-   'demo_sessions enforce uid == session_owner_id');
+ok(/request\.auth\.uid == resource\.data\.owner_uid/.test(rules),
+   'demo_sessions enforce uid == owner_uid');
+ok(/request\.auth\.uid == request\.resource\.data\.owner_uid/.test(rules),
+   'demo_sessions create enforces uid == incoming owner_uid');
 ok(/match \/demo_analytics\/\{email\}[\s\S]{0,200}allow read, write: if false/.test(rules),
    'demo_analytics locked to Admin SDK');
 
 // ── SRAs are embedded (initial_sra/residual_sra on CAN/CAP docs) ───────────
 ok(/can_cap\/\{canId\}/.test(rules), 'SRA data inherits CAN/CAP doc protection');
+
+// ── Headway audit additions (top-level guard rails + owner_uid) ───────────
+for (const coll of ['hazards', 'cans', 'caps', 'sras', 'surveys']) {
+  const re = new RegExp(`match \\/${coll}\\/\\{id\\}\\s*\\{[\\s\\S]*?allow read, write: if false`);
+  ok(re.test(rules), `top-level /${coll} mirror is explicitly denied`);
+}
+ok(/owner_uid == resource\.data\.owner_uid/.test(rules) ||
+   /resource\.data\.owner_uid/.test(rules),
+   'demo_sessions subcollections enforce owner_uid');
+ok(/match \/caan_oversight\/\{docId\}/.test(rules) &&
+   /isCaanInspector\(\) \|\| isSuperAdmin\(\)/.test(rules) &&
+   /caan_oversight[\s\S]{0,400}allow write: if false/.test(rules),
+   'caan_oversight is inspector read-only, write-denied');
 
 console.log(`\nRULE-LINT PASSED: ${passed} assertions`);
 

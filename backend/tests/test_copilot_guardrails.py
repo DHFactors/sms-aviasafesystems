@@ -63,9 +63,9 @@ def test_user_message_is_quarantined():
 def test_system_prompt_carries_anti_injection_directive():
     msgs = gc.build_messages("What is a hazard report?", role="AIRLINE_ADMIN")
     system = msgs[0]["content"]
-    assert "UNTRUSTED OPERATIONAL DATA" in system
+    assert "UNTRUSTED CONTENT HANDLING" in system
     assert "prompt-injection" in system.lower()
-    assert "<user_report>" in system
+    assert "<untrusted_operational_report>" in system
 
 
 def test_injection_payload_stays_inside_quarantine():

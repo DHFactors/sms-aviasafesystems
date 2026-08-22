@@ -232,6 +232,22 @@ service cloud.firestore {
     }
 
     // ========================================================================
+    // TOP-LEVEL GUARD RAILS (Headway audit §1.1)
+    //
+    // All live operational data is partitioned under /tenants/{tenantId}/…
+    // These explicit blocks deny any stray top-level write of the logical
+    // collections so a future code path can never bypass path partitioning.
+    // SRAs are embedded fields on CAN/CAP docs (initial_sra / residual_sra)
+    // and inherit that protection.
+    // ========================================================================
+
+    match /hazards/{id}   { allow read, write: if false; }
+    match /cans/{id}      { allow read, write: if false; }
+    match /caps/{id}      { allow read, write: if false; }
+    match /sras/{id}      { allow read, write: if false; }
+    match /surveys/{id}   { allow read, write: if false; }
+
+    // ========================================================================
     // PSOE ASSESSMENTS (top-level collection, tenant_id on every doc)
     // Dual tenant condition: caller claim must equal the stored OR incoming
     // document tenant. CAAN inspector = read-only aggregate access.
@@ -256,21 +272,42 @@ service cloud.firestore {
     match /demo_sessions/{sessionId} {
       function sessionOwner() {
         return isAuthenticated() &&
-          request.auth.uid == resource.data.session_owner_id;
+          (request.auth.uid == resource.data.owner_uid ||
+           request.auth.uid == request.resource.data.owner_uid);
       }
       function sessionOwnerNew() {
         return isAuthenticated() &&
-          request.resource.data.session_owner_id == request.auth.uid;
+          request.resource.data.owner_uid == request.auth.uid;
       }
 
-      allow read: if sessionOwner();
+      allow read:   if sessionOwner();
       allow create: if sessionOwnerNew();
       allow update: if sessionOwner();
       allow delete: if sessionOwner() || isSuperAdmin();
 
-      match /{sub=**} {
-        allow read, write: if false;
+      // Per-session overlays (actions/decisions): owner_uid stamped on every
+      // doc by the backend; clients can only touch their own rows.
+      match /{subCollection=**} {
+        function subOwner() {
+          return isAuthenticated() &&
+            (request.auth.uid == resource.data.owner_uid ||
+             request.auth.uid == request.resource.data.owner_uid);
+        }
+        allow read:  if subOwner();
+        allow write: if subOwner();
       }
+    }
+
+    // ========================================================================
+    // CAAN OVERSIGHT — aggregate snapshots for the state inspector.
+    // Written by the Admin SDK; inspectors get READ-ONLY access. Just
+    // Culture identity masking is applied server-side before publication.
+    // ========================================================================
+
+    match /caan_oversight/{docId} {
+      allow read:  if isAuthenticated() &&
+        (isCaanInspector() || isSuperAdmin());
+      allow write: if false;
     }
 
     // ========================================================================
