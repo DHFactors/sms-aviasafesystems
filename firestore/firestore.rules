@@ -51,15 +51,6 @@ service cloud.firestore {
     // (/tenants/{tenantId}/...) so a client-side query filter can never
     // widen visibility — path isolation is enforced by these rules alone.
 
-    // Headway audit alias: state-inspector aggregate READ-ONLY role.
-    // CAAN_SMD is the deployed role token; CAAN_INSPECTOR accepted for
-    // forward-compatibility with the SSP inspector provisioning spec.
-    function isCaanInspector() {
-      return isAuthenticated() &&
-        (request.auth.token.role == 'CAAN_SMD' ||
-         request.auth.token.role == 'CAAN_INSPECTOR');
-    }
-
     // Dual tenant condition mandated by the security audit: a principal may
     // touch a document when its OWN claim matches either the stored doc's
     // tenant or the incoming request body's tenant.
