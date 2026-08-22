@@ -58,7 +58,7 @@ def make_session_id(email: str, ts: datetime = None) -> str:
 
 # ── Core API ────────────────────────────────────────────────────────────────
 
-def get_or_create_session(db, email: str):
+def get_or_create_session(db, email: str, uid: str = None):
     """Return the active session doc id for a demo AE, creating one when
     absent. Returns None for non-demo callers (safe fallback) — no writes."""
     if not db or not is_demo_ae(email):
@@ -86,9 +86,12 @@ def get_or_create_session(db, email: str):
 
     session_id = make_session_id(email_key, now)
     expires_at = now + timedelta(hours=SESSION_TTL_HOURS)
+    # session_owner_id powers the firestore.rules ownership check
+    # (request.auth.uid == resource.data.session_owner_id).
     sessions_ref.document(session_id).set({
         "session_id": session_id,
         "email": email_key,
+        "session_owner_id": uid or email_key,
         "archetype": None,
         "created_at": now,
         "expires_at": expires_at,
@@ -109,12 +112,12 @@ def get_active_session_id(db, email: str):
     return None
 
 
-def log_action(db, email: str, action_type: str, payload: dict = None):
+def log_action(db, email: str, action_type: str, payload: dict = None, uid: str = None):
     """Record a generic AE action into the active session's actions log.
     Safe fallback: returns None for non-demo callers."""
     if not db or not is_demo_ae(email):
         return None
-    sid = get_or_create_session(db, email)
+    sid = get_or_create_session(db, email, uid=uid)
     if not sid:
         return None
     now = _now()
@@ -129,12 +132,12 @@ def log_action(db, email: str, action_type: str, payload: dict = None):
     return ref.id
 
 
-def log_decision(db, email: str, decision: dict):
+def log_decision(db, email: str, decision: dict, uid: str = None):
     """Record a formal governance decision. Returns the display overlay that
     the client merges onto master rows (masters are never modified)."""
     if not db or not is_demo_ae(email):
         return None
-    sid = get_or_create_session(db, email)
+    sid = get_or_create_session(db, email, uid=uid)
     if not sid:
         return None
     now = _now()
@@ -189,3 +192,4 @@ def apply_overlay(rows: list, overlays: dict) -> list:
             row["_overlay"] = True
         merged.append(row)
     return merged
+

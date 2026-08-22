@@ -73,7 +73,7 @@ async def start_session(body: SessionStart, user: Dict[str, Any] = Depends(get_c
         raise HTTPException(status_code=403, detail="Email mismatch")
     from app.firebase import get_db
 
-    sid = session_manager.get_or_create_session(get_db(), body.email)
+    sid = session_manager.get_or_create_session(get_db(), body.email, uid=user.get("uid"))
     return {"ok": bool(sid), "session_id": sid}
 
 
@@ -84,7 +84,7 @@ async def log_action(body: ActionEvent, user: Dict[str, Any] = Depends(get_curre
         raise HTTPException(status_code=403, detail="Email mismatch")
     from app.firebase import get_db
 
-    action_id = session_manager.log_action(get_db(), body.email, body.action_type, body.payload)
+    action_id = session_manager.log_action(get_db(), body.email, body.action_type, body.payload, uid=user.get("uid"))
     return {"ok": action_id is not None, "action_id": action_id}
 
 
@@ -110,7 +110,7 @@ async def log_decision(body: DecisionEvent, user: Dict[str, Any] = Depends(get_c
     interval = body.interval_days or (60 if body.decision == "accept_risk" else None)
     review_date = (now + timedelta(days=interval)).isoformat() if interval else None
 
-    overlay = session_manager.log_decision(get_db(), body.email, {
+    overlay = session_manager.log_decision(get_db(), body.email, uid=user.get("uid"), decision={
         "target": {"kind": "cap", "id": body.cap_id},
         "decision": body.decision,
         "result_status": "In Progress",
@@ -165,3 +165,6 @@ async def track_analytics_batch(body: AnalyticsBatch, user: Dict[str, Any] = Dep
         [e.model_dump() for e in body.events],
     )
     return {"ok": True, "written": written}
+
+
+

@@ -181,7 +181,10 @@ def test_chat_injects_context_into_groq_payload(monkeypatch):
     assert "AIRLINE_ADMIN" in system_content
     assert "safety" in system_content
     assert "Corrective Action Plans" in system_content
-    assert messages[-1] == {"role": "user", "content": "What CAP timeline is acceptable?"}
+    assert messages[-1]["role"] == "user"
+    # Live user turn is quarantined (Chunk 17 AI guardrails).
+    assert messages[-1]["content"].startswith(groq_copilot.QUARANTINE_OPEN)
+    assert "What CAP timeline is acceptable?" in messages[-1]["content"]
     assert kwargs["model"] == "openai/gpt-oss-120b"
     assert kwargs["temperature"] == groq_copilot.settings.GROQ_TEMPERATURE
 
@@ -228,9 +231,12 @@ def test_build_messages_payload_structure(monkeypatch):
         page_context="register.html",
     )
     assert messages[0]["role"] == "system"
-    assert messages[0]["content"].lstrip().startswith("You are")
+    # Quarantine directive is prepended ahead of the core identity prompt.
+    assert "UNTRUSTED OPERATIONAL DATA" in messages[0]["content"]
+    assert "You are" in messages[0]["content"]
     assert messages[1] == {"role": "user", "content": "previous turn"}
-    assert messages[-1] == {"role": "user", "content": "user question"}
+    assert messages[-1]["role"] == "user"
+    assert "user question" in messages[-1]["content"]
 
 
 def test_chat_logs_groq_error_status_code(monkeypatch):

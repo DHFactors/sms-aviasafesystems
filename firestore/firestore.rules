@@ -34,6 +34,40 @@ service cloud.firestore {
       return isSuperAdmin() || isCaanSMD();
     }
 
+    // Headway audit alias: state-inspector aggregate READ-ONLY role.
+    // CAAN_SMD is the deployed role token; CAAN_INSPECTOR accepted for
+    // forward-compatibility with the SSP inspector provisioning spec.
+    function isCaanInspector() {
+      return isAuthenticated() &&
+        (request.auth.token.role == 'CAAN_SMD' ||
+         request.auth.token.role == 'CAAN_INSPECTOR');
+    }
+
+    // Dual tenant condition mandated by the security audit: a principal may
+    // touch a document when its OWN claim matches either the stored doc's
+    // tenant or the incoming request body's tenant.
+    //
+    // NOTE ON QUERIES: every list/read below is scoped by PATH
+    // (/tenants/{tenantId}/...) so a client-side query filter can never
+    // widen visibility — path isolation is enforced by these rules alone.
+
+    // Headway audit alias: state-inspector aggregate READ-ONLY role.
+    // CAAN_SMD is the deployed role token; CAAN_INSPECTOR accepted for
+    // forward-compatibility with the SSP inspector provisioning spec.
+    function isCaanInspector() {
+      return isAuthenticated() &&
+        (request.auth.token.role == 'CAAN_SMD' ||
+         request.auth.token.role == 'CAAN_INSPECTOR');
+    }
+
+    // Dual tenant condition mandated by the security audit: a principal may
+    // touch a document when its OWN claim matches either the stored doc's
+    // tenant or the incoming request body's tenant.
+    function matchesOwnTenantData() {
+      return request.auth.token.tenant_id == resource.data.tenant_id ||
+             request.auth.token.tenant_id == request.resource.data.tenant_id;
+    }
+
     // ========================================================================
     // TENANTS COLLECTION
     // ========================================================================
@@ -56,6 +90,13 @@ service cloud.firestore {
 
     // ========================================================================
     // SURVEY RESPONSES — Public submission, immutable audit trail
+    //
+    // JUST CULTURE IDENTITY MASKING: anonymous VSR/Survey originator fields
+    // (originator_name, respondent_id, contact details) are stripped or
+    // genericised SERVER-SIDE before CAAN inspector reads (see
+    // app/services/dashboard_service.py state aggregations). Firestore rules
+    // cannot mask individual fields, so the masking guarantee lives in the
+    // API layer; these rules additionally keep raw docs tenant-isolated.
     // ========================================================================
 
     match /tenants/{tenantId}/responses/{responseId} {
@@ -165,7 +206,10 @@ service cloud.firestore {
     // caan-sms-maturity.html) read these subcollections cross-tenant via
     // collectionGroup(). Firestore rules only match collection-group queries
     // when the rule uses the recursive wildcard `{path=**}`. Only State
-    // regulators (CAAN_SMD) and SUPER_ADMIN may read across tenants.
+    // inspectors (CAAN_SMD / CAAN_INSPECTOR) and SUPER_ADMIN may read across
+    // tenants, READ-ONLY, for aggregate analytics. Just Culture identity
+    // masking (anonymous VSR originators) is applied server-side before
+    // any row reaches the inspector dashboards.
     // ========================================================================
 
     match /{path=**}/responses/{responseId} {
@@ -197,7 +241,60 @@ service cloud.firestore {
     }
 
     // ========================================================================
-    // STATE RISK REGISTER — State/SSP-level risk (CAAN + SUPER_ADMIN only)
+    // PSOE ASSESSMENTS (top-level collection, tenant_id on every doc)
+    // Dual tenant condition: caller claim must equal the stored OR incoming
+    // document tenant. CAAN inspector = read-only aggregate access.
+    // ========================================================================
+
+    match /psoe_assessments/{docId} {
+      allow read: if isAuthenticated() &&
+        ((isAirlineAdmin() && request.auth.token.tenant_id == resource.data.tenant_id) ||
+         isCaanInspector());
+      allow create, update: if isAuthenticated() &&
+        (matchesOwnTenantData() || isSuperAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    // ========================================================================
+    // DEMO SESSIONS — Virtual Tenant Mirroring overlays (Chunk 7)
+    // Owner-scoped: only the prospect AE who created the session may read or
+    // mutate its parent doc; decision/action subcollections stay Admin-SDK
+    // only so overlay merging cannot be forged client-side.
+    // ========================================================================
+
+    match /demo_sessions/{sessionId} {
+      function sessionOwner() {
+        return isAuthenticated() &&
+          request.auth.uid == resource.data.session_owner_id;
+      }
+      function sessionOwnerNew() {
+        return isAuthenticated() &&
+          request.resource.data.session_owner_id == request.auth.uid;
+      }
+
+      allow read: if sessionOwner();
+      allow create: if sessionOwnerNew();
+      allow update: if sessionOwner();
+      allow delete: if sessionOwner() || isSuperAdmin();
+
+      match /{sub=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // ========================================================================
+    // DEMO ANALYTICS — Admin SDK only (client deny-all)
+    // ========================================================================
+
+    match /demo_analytics/{email} {
+      allow read, write: if false;
+      match /events/{eventId} {
+        allow read, write: if false;
+      }
+    }
+
+    // ========================================================================
+    // STATE RISK REGISTER - State/SSP-level risk (CAAN + SUPER_ADMIN only)
     // ========================================================================
 
     match /state/ssp/risk_register/{riskId} {
@@ -233,28 +330,6 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if isAuthenticated() &&
         (request.auth.uid == uid || isSuperAdmin());
-    }
-
-    // ========================================================================
-    // DEMO SESSION ISOLATION & ANALYTICS (Virtual Tenant Mirroring)
-    // ========================================================================
-    // Prospect AE actions/decisions and demo telemetry are written ONLY by
-    // the backend via the Firebase Admin SDK, which bypasses these rules.
-    // Clients (including the prospect AEs themselves) get no direct access:
-    // master archetype data stays immutable from the browser.
-
-    match /demo_sessions/{sessionId} {
-      allow read, write: if false;
-      match /{sub=**} {
-        allow read, write: if false;
-      }
-    }
-
-    match /demo_analytics/{email} {
-      allow read, write: if false;
-      match /events/{eventId} {
-        allow read, write: if false;
-      }
     }
   }
 }

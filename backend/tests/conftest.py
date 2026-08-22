@@ -59,3 +59,10 @@ def sample_reports():
             "investigation_status": "INVESTIGATING",
         },
     ]
+
+
+@pytest.fixture(autouse=True)
+def _no_leaked_auth_overrides():
+    yield
+    app.dependency_overrides.clear()
+

@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ============================================================================
+// AviaSAFE — Firebase Storage tenant isolation (Headway audit, Phase 4)
+//
+// Objects are partitioned strictly by tenant path:
+//     /tenants/{tenantId}/<allPaths>
+// A principal may read/write only inside the tenant matching their
+// tenant_id custom-claim. CAAN_SMD / CAAN_INSPECTOR get READ-ONLY access
+// across tenants for oversight evidence review; SUPER_ADMIN full access.
+//
+// Download URLs: objects are NOT public. Any shareable link must be a
+// Firebase SDK download URL carrying a short-lived auth token (v4 token in
+// the object metadata), or a signed URL issued by the backend. Guessing the
+// path without the token fails with 403.
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function ownTenant(tenantId) {
+      return isAuthenticated() &&
+        request.auth.token.tenant_id == tenantId;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+        request.auth.token.role == 'SUPER_ADMIN';
+    }
+
+    function isCaanInspector() {
+      return isAuthenticated() &&
+        (request.auth.token.role == 'CAAN_SMD' ||
+         request.auth.token.role == 'CAAN_INSPECTOR');
+    }
+
+    // ── Tenant-partitioned attachments (hazard photos, CAP evidence) ──────
+    match /tenants/{tenantId}/{allPaths=**} {
+      allow read: if isAuthenticated() &&
+        (ownTenant(tenantId) || isCaanInspector());
+      allow write: if isAuthenticated() && ownTenant(tenantId) &&
+        request.resource.size < 10 * 1024 * 1024;           // 10 MB cap
+      allow delete: if isAuthenticated() &&
+        (ownTenant(tenantId) || isSuperAdmin());
+    }
+
+    // ── Deny everything else (no public bucket root, no avatars leak) ─────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

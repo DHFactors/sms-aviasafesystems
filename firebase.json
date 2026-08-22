@@ -159,4 +159,8 @@
       ]
     }
   ]
+,
+  "storage": {
+    "rules": "storage/storage.rules"
+  }
 }
