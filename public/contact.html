@@ -3,174 +3,255 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contact | AviaSAFE SMS</title>
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="/css/tenant-overrides.css">
+    <title>AviaSAFE-SMS — Request a Demo</title>
+    <meta name="description" content="AviaSAFE-SMS demo request form — contact us at support@aviasafesystems.com to request a personalized safety intelligence platform demonstration.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AviaSAFE-SMS — Request a Demo">
+    <meta property="og:description" content="Request a demo of the AviaSAFE-SMS aviation safety management platform.">
+    <meta property="og:url" content="https://betasms.aviasafesystems.com/contact.html">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/styles/global.css">
-    <link rel="stylesheet" href="/css/contact.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="css/theme.css">
-    </head>
-<body>
-
-<!-- ========== HEADER ========== -->
-<header class="app-header">
-    <div class="container header-content">
-        <div class="logo">
-            <i class="fas fa-shield-alt"></i>
-            <span>Avia<span style="color: var(--color-accent);">SAFE</span>system</span>
-        </div>
-        <nav>
-            <ul>
-                <li><a href="/">Home</a></li>
-                <li><a href="/#features">Features</a></li>
-                <li><a href="/#onboarding">Beta Access</a></li>
-                <li><a href="contact.html" class="active">Contact</a></li>
-                <li><a href="login.html" class="btn-login">Sign In</a></li>
-            </ul>
-        </nav>
-    </div>
-</header>
-
-<!-- ========== CONTACT ========== -->
-<section class="contact-section">
-    <div class="container">
-        <h1><i class="fas fa-envelope-open-text"></i> Contact Us</h1>
-        <p>Have questions about AviaSAFE SMS? Reach out to our team — we usually respond within one business day.</p>
-
-        <div id="contactStatus" class="contact-status" role="alert" hidden></div>
-
-        <form class="contact-form" id="contactForm" novalidate>
-            <div class="form-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" placeholder="Your full name" required>
-            </div>
-            <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" placeholder="you@example.com" required>
-            </div>
-            <div class="form-group">
-                <label for="subject">Subject</label>
-                <input type="text" id="subject" name="subject" placeholder="How can we help?">
-            </div>
-            <div class="form-group">
-                <label for="message">Message</label>
-                <textarea id="message" name="message" rows="5" placeholder="Tell us a little about your query…" required></textarea>
-            </div>
-            <button type="submit" id="contactSubmitBtn" class="btn-primary">
-                <i class="fas fa-paper-plane"></i> Send Message
-            </button>
-        </form>
-
-        <div class="contact-alt">
-            <p><i class="fas fa-at"></i> Prefer email? Write to us at
-                <a href="mailto:info@aviasafesystems.com">info@aviasafesystems.com</a></p>
-        </div>
-    </div>
-</section>
-
-<!-- ========== FOOTER ========== -->
-<footer class="app-footer">
-    <div class="container">
-        <div class="footer-links">
-            <a href="/">Home</a>
-            <span class="footer-divider">|</span>
-            <a href="/survey/">Survey</a>
-            <span class="footer-divider">|</span>
-            <a href="login.html">Login</a>
-            <span class="footer-divider">|</span>
-            <a href="privacy.html">Privacy Policy</a>
-            <span class="footer-divider">|</span>
-            <a href="terms.html">Terms of Service</a>
-            <span class="footer-divider">|</span>
-            <a href="contact.html">Contact</a>
-            <span class="footer-divider">|</span>
-            <a href="/admin/login.html">Developer Login</a>
-        </div>
-
-        <div style="margin-top: var(--spacing-sm);">
-            <p style="margin: 0; font-size: var(--font-size-sm); font-weight: 500; opacity: 0.9; line-height: 1.3;">
-                A Project by <strong>Ghanshyam Acharya</strong>
-            </p>
-            <p style="margin: var(--spacing-xs) 0 0; font-size: var(--font-size-xs); opacity: 0.65; line-height: 1.3;">
-                &copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.
-            </p>
-        </div>
-    </div>
-</footer>
-
-<script>
-// ============================================================================
-// CONTACT PAGE - Sender.net integration via the backend contact endpoint.
-// The Sender API key lives on the server (env var) and is never exposed here.
-// ============================================================================
-
-function getApiBaseUrl() {
-    if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
-    var host = window.location.hostname;
-    return (host.indexOf('beta') !== -1 || host === 'localhost' || host === '127.0.0.1')
-        ? 'https://sms-aviasafesystems-beta.onrender.com'
-        : 'https://aviasafe-unified-platform.onrender.com';
-}
-
-function showStatus(message, type) {
-    var el = document.getElementById('contactStatus');
-    el.textContent = message;
-    el.className = 'contact-status ' + (type === 'error' ? 'contact-status-error' : 'contact-status-success');
-    el.hidden = false;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
-document.getElementById('contactForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-
-    var name = document.getElementById('name').value.trim();
-    var email = document.getElementById('email').value.trim();
-    var subject = document.getElementById('subject').value.trim();
-    var message = document.getElementById('message').value.trim();
-
-    if (!name || !email || !message) {
-        showStatus('Please fill in your name, email and message.', 'error');
-        return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showStatus('Please enter a valid email address.', 'error');
-        return;
-    }
-
-    var btn = document.getElementById('contactSubmitBtn');
-    var original = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Sending…';
-
-    try {
-        var resp = await fetch(getApiBaseUrl() + '/api/v1/contact', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, email: email, subject: subject, message: message })
-        });
-        var data = await resp.json().catch(function () { return {}; });
-
-        if (resp.ok && data.status === 'success') {
-            showStatus('Thank you! Your message has been received. We will get back to you shortly.', 'success');
-            document.getElementById('contactForm').reset();
-        } else {
-            var detail = (data && data.detail) || 'Something went wrong. Please try again.';
-            showStatus(detail, 'error');
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        deepTeal: {
+                            900: '#072535',
+                            800: '#0A3A50',
+                            700: '#0E4E6C',
+                            600: '#12648A',
+                        },
+                        brand: {
+                            50: '#F0F9FF',
+                            100: '#E0F2FE',
+                            300: '#7DD3FC',
+                            400: '#38BDF8',
+                            500: '#0284C7',
+                            600: '#0284C7',
+                            700: '#0369A1',
+                            800: '#075985',
+                        }
+                    }
+                }
+            }
         }
-    } catch (err) {
-        showStatus('Network error — could not reach the server. Please try again later.', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = original;
-    }
-});
-</script>
+    </script>
+    <style>
+        html { scroll-behavior: smooth; }
+
+        /* Fixed-header anchor offset */
+        section[id] { scroll-margin-top: 96px; }
+
+        /* Light Card Hover Effects */
+        .light-card {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+            transition: all 0.25s ease-in-out;
+        }
+        .light-card:hover {
+            border-color: #0284C7;
+            box-shadow: 0 12px 24px -8px rgba(2, 132, 199, 0.15);
+        }
+
+        /* Form input styles */
+        .form-input {
+            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors;
+        }
+        .form-input:focus {
+            border-color: #0284C7;
+        }
+
+        /* Select styles */
+        .select-input {
+            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors appearance-none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%236B7280' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-right: 0.5rem;
+            background-center: 2rem;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- TOP NAVIGATION BAR (Same as index.html) -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <a href="#" class="flex items-center gap-3 group">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-deepTeal-800 to-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid font-bold text-xl fa-shield-halved"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black tracking-tight text-slate-900 group-hover:text-brand-600 transition-colors">
+                        Avia<span class="text-brand-600">SAFE</span><span class="text-[10px] uppercase ml-1.5 px-1.5 py-0.5 rounded bg-brand-50 text-brand-700 border border-brand-200 font-mono font-bold">SMS</span>
+                    </span>
+                    <span class="text-[10px] text-slate-500 font-semibold tracking-widest uppercase">Safety Intelligence Platform</span>
+                </div>
+            </a>
+
+            <!-- Navigation Links -->
+            <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+                <a href="#why-it-matters" class="hover:text-brand-600 transition-colors">Why It Matters</a>
+                <a href="#capabilities" class="hover:text-brand-600 transition-colors">Capabilities</a>
+                <a href="#ecosystem" class="hover:text-brand-600 transition-colors">Who It's For</a>
+                <a href="/index.html" class="hover:text-brand-600 transition-colors">Home</a>
+            </nav>
+
+            <!-- Navigation Actions -->
+            <div class="flex items-center gap-3 shrink-0">
+                <a href="/login.html" class="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-brand-600 transition-colors">
+                    <i class="fa-solid fa-lock text-xs mr-1.5 text-brand-600"></i> Login
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="pt-20 flex-grow flex-shrink-0 basis-auto pb-12">
+
+        <!-- Hero Section: Demo Request -->
+        <section class="relative min-h-[80vh] flex items-center pt-12 pb-20 overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-700 text-white border-b border-slate-700">
+            <div class="absolute top-0 right-1/3 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
+                <div class="pt-20">
+
+                    <!-- Heading -->
+                    <div class="text-center mb-12">
+                        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15] mb-4 text-white">
+                            Request a Demo
+                        </h1>
+                        <p class="text-base sm:text-lg text-slate-200 mb-8 font-normal leading-relaxed">
+                            Get in touch to see how AviaSAFE-SMS can transform your organization's safety intelligence.
+                        </p>
+                    </div>
+
+                    <!-- Contact Form Card -->
+                    <div class="max-w-md mx-auto bg-white rounded-2xl p-8 shadow-2xl max-w-mp shadow-lg">
+
+                        <!-- Form -->
+                        <form action="mailto:support@aviasafesystems.com" method="POST" enctype="text/plain">
+
+                            <div class="grid grid-cols-1 gap-4 mb-6">
+                                <!-- Full Name -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
+                                    <input type="text" name="fullname" class="form-input" placeholder="John Doe" required>
+                                </div>
+
+                                <!-- Organization / Airline -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Organization / Airline</label>
+                                    <input type="text" name="organization" class="form-input" placeholder="Buddha Air" />
+                                </div>
+
+                                <!-- Work Email -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Work Email <span class="text-red-500">*</span></label>
+                                    <input type="email" name="email" class="form-input" placeholder="john@buddha-air.com" required>
+                                </div>
+
+                                <!-- Primary Domain of Interest -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Primary Domain of Interest</label>
+                                    <select name="domain" class="select-input">
+                                        <option value="" disabled selected>Select an option</option>
+                                        <option value="airline">Airline</option>
+                                        <option value="aerodrome">Aerodrome</option>
+                                        <option value="amo">AMO / MRO</option>
+                                        <option value="regulator">Regulator / CAA</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Message -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Message</label>
+                                <textarea name="message" rows="4" class="form-input w-full py-3 resize-none" placeholder="Briefly describe your safety intelligence needs..."></textarea>
+                            </div>
+
+                            <!-- Submit Button -->
+                            <div class="mt-8">
+                                <button type="submit" class="w-full py-3 px-8 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-md shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-paper-plane text-xs"></i> Send Request
+                                </button>
+                            </div>
+
+                        </form>
+
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Sticky footer -->
+    <footer class="flex-shrink-0 w-full py-4 text-center border-t border-slate-200 space-y-1.5 bg-slate-100">
+        <p class="text-sm font-medium text-slate-600">
+            Made with love ❤️ from Nepal
+        </p>
+        <p class="text-xs text-slate-500">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.</p>
+    </footer>
+
+    <script>
+    // Subdomain redirect: route non-reserved tenant subdomains of
+    // *.aviasafesystems.com to their tenant login / dashboard.
+    (function() {
+        const hostname = window.location.hostname;
+        const parts = hostname.split('.');
+
+        if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
+            const subdomain = parts[0];
+            const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+
+            if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
+                // Storage keys are env-prefixed (aviasafe:{env}:user) so beta
+                // state can never leak onto production tenant subdomains.
+                const isBetaHost = /beta/.test(hostname) || hostname === 'localhost' || hostname === '127.0.0.1';
+                const user = localStorage.getItem('aviasafe:' + (isBetaHost ? 'beta' : 'prod') + ':user');
+                if (user) {
+                    window.location.href = '/safety.html';
+                } else {
+                    window.location.href = '/login.html?tenant=' + subdomain;
+                }
+            }
+        }
+    })();
+    </script>
+
+    <script>
+    // Scroll-to-top: reveal the button after scrolling 300px, then smooth-scroll back.
+    (function() {
+        const scrollBtn = document.getElementById('scrollToTopBtn');
+        if (!scrollBtn) return;
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollBtn.classList.remove('hidden');
+            } else {
+                scrollBtn.classList.add('hidden');
+            }
+        });
+        scrollBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    })();
+    </script>
+
+    <!-- Floating Scroll-to-Top Button -->
+    <button id="scrollToTopBtn" aria-label="Scroll to top" class="fixed bottom-20 right-6 z-40 hidden p-3 rounded-full bg-brand-600 hover:bg-brand-500 text-white shadow-lg transition-all duration-300 hover:scale-110 focus:outline-none">
+        <i class="fa-solid fa-arrow-up text-sm"></i>
+    </button>
 
 </body>
 </html>
