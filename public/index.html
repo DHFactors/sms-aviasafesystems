@@ -116,6 +116,9 @@
                 <a href="/login.html" class="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-brand-600 transition-colors">
                     <i class="fa-solid fa-lock text-xs mr-1.5 text-brand-600"></i> Login
                 </a>
+                <a onclick="toggleModal()" class="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-brand-600 transition-colors">
+                    <i class="fa-solid fa-rocket text-xs"></i> Request Demo
+                </a>
             </div>
         </div>
     </header>
@@ -169,9 +172,9 @@
 
 <!-- Hero Action Buttons -->
 <div class="flex flex-col sm:flex-row items-center justify-end lg:justify-end gap-4">
-<a href="/contact.html" class="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
-    <i class="fa-solid fa-rocket text-lg"></i> Request Demo
-</a>
+    <a class="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-3" onclick="toggleModal()">
+        <i class="fa-solid fa-rocket text-lg"></i> Request Demo
+    </a>
 </div>
                     </div>
 
@@ -612,7 +615,7 @@
     <!-- Sticky footer: anchored to the bottom when page content is short -->
     <footer class="flex-shrink-0 w-full py-4 text-center border-t border-slate-200 space-y-1.5 bg-slate-100">
         <p class="text-sm font-medium text-slate-600">
-            Made with love ‚ù§Ô∏è from Nepal
+            Made with love ‚?§Ô∏? from Nepal
         </p>
         <p class="text-xs text-slate-500">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
     </footer>
@@ -666,8 +669,85 @@
     })();
     </script>
 
-    <!-- ===== GHANSHYAM EXECUTIVE SAFETY COPILOT (guest mode ‚Äî no sign-in required) ===== -->
-    <script src="/js/components/copilot-widget.js"></script>
+    <!-- ========== DEMO REQUEST MODAL ========== -->
+<div id="demo-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
+    <div class="relative w-96 md:w-max max-w-full bg-white rounded-2xl shadow-2xl border border-slate-200 transform-ease-scale">
+        <!-- Close button -->
+        <button class="absolute top-3 right-3 text-slate-600 hover:text-slate-900 rounded-full p-1" onclick="toggleModal()" aria-label="Close modal">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        
+        <!-- Modal content -->
+        <div class="p-6">
+            <!-- Product pitch -->
+            <div class="text-center mb-6">
+                <h3 class="text-xl font-bold text-slate-900 mb-2">
+                    Transform Your Safety Data into Predictive Intelligence
+                </h3>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    AviaSAFE-SMS is a secure, multi-tenant safety management platform engineered to support ICAO Annex 19 compliance and State Safety Programme (SSP) oversight. Request a personalized demo to see how we help operators automate compliance workflows, protect Just Culture, and proactively identify systemic risks before they escalate.
+                </p>
+            </div>
+            
+            <!-- Form -->
+            <form class="contact-form" action="/api/submit-demo" method="POST" novalidate>
+                <!-- Anti-bot honeypot -->
+                <input type="text" name="anti_bot" class="anti-bot hidden" aria-hidden="true">
+                
+                <div class="grid grid-cols-1 gap-4 mb-6">
+                    <!-- Contact Person -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Contact Person</label>
+                        <input type="text" name="contact_person" class="form-input" placeholder="John Doe" required>
+                    </div>
+                    
+                    <!-- Airline / Organization -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Airline / Organization Name</label>
+                        <input type="text" name="organization" class="form-input" placeholder="Buddha Air" required>
+                    </div>
+                    
+                    <!-- Work Email -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Work Email</label>
+                        <input type="email" name="work_email" class="form-input" placeholder="john@buddha-air.com" required>
+                    </div>
+                </div>
+                
+                <!-- Submit button -->
+                <div class="mt-6">
+                    <button type="submit" class="w-full py-3 px-8 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-md shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-xs"></i> Send Demo Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
+
+<script>
+    // ============================================================================
+    // DEMO MODAL TOGGLE
+    // ============================================================================
+    function toggleModal() {
+        var modal = document.getElementById('demo-modal');
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+
+    // Close modal when clicking outside the card (on the backdrop)
+    document.addEventListener('click', function(e) {
+        var modal = document.getElementById('demo-modal');
+        var modalCard = modal.querySelector('.relative');
+        
+        if (modal.classList.contains('hidden') === false && !modalCard.contains(e.target) && e.target !== modal) {
+            modal.classList.add('hidden');
+        }
+    });
+</script>
 </body>
 </html>
