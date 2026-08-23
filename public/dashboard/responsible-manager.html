@@ -81,7 +81,6 @@
     <div class="header-bar">
         <h2><i class="fas fa-list-check"></i> Assigned CANs & CAPs</h2>
         <div>
-            <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
             <a href="/dashboard/master-register.html" class="btn btn-outline btn-sm"><i class="fas fa-table"></i> Master Register</a>
         </div>
     </div>
@@ -267,10 +266,9 @@ function renderStats(rows) {
     const overdue = (byStatus['Overdue'] || 0) + (byStatus['Escalated'] || 0);
 
     let html = '';
-    html += '<div class="stat-card"><div class="num">' + rows.length + '</div><div class="lbl">Total Records</div></div>';
+    html += '<div class="stat-card"><div class="num">' + (activeCans + pendingCaps) + '</div><div class="lbl">Total Actionable Tasks</div></div>';
     html += '<div class="stat-card"><div class="num">' + hazards.length + '</div><div class="lbl">Total Hazards</div></div>';
     html += '<div class="stat-card"><div class="num">' + activeCans + '</div><div class="lbl">Active CANs</div></div>';
-    html += '<div class="stat-card"><div class="num">' + pendingCaps + '</div><div class="lbl">Pending / Active CAPs</div></div>';
     html += '<div class="stat-card red"><div class="num">' + overdue + '</div><div class="lbl">Overdue / Escalated</div></div>';
     container.innerHTML = html;
 }
@@ -321,7 +319,7 @@ async function logout() {
     <span style="margin: 0 0.5rem; color: var(--color-gray-400);">|</span>
     <a href="/terms.html" style="color: var(--color-text-muted); text-decoration: none;">Terms of Service</a>
   </p>
-  <p class="mb-0 text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">Made with love ?? from Nepal</p>
+  <p class="mb-0 text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">Made with love <span class="text-red-500">&hearts;</span> from Nepal</p>
   <p class="mb-0 text-muted" style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
 </footer>
 

@@ -612,7 +612,7 @@
     <!-- Sticky footer: anchored to the bottom when page content is short -->
     <footer class="flex-shrink-0 w-full py-4 text-center border-t border-slate-200 space-y-1.5 bg-slate-100">
         <p class="text-sm font-medium text-slate-600">
-            Made with love �?��? from Nepal
+            Made with love <span class="text-red-500">&hearts;</span> from Nepal
         </p>
         <p class="text-xs text-slate-500">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
     </footer>
@@ -732,6 +732,13 @@ function toggleDemoModal() {
         modal.classList.add('hidden');
     }
 }
+</script>
+
+<script>
+  if (window.location.search.includes('demo_requested=success')) {
+    // Clean the URL so navigation unlocks
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 </script>
 </body>
 </html>
