@@ -169,7 +169,7 @@
 
 <!-- Hero Action Buttons -->
 <div class="flex flex-col sm:flex-row items-center justify-end lg:justify-end gap-4">
-    <a class="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-3" onclick="document.getElementById('demo-modal').classList.remove('hidden')">
+    <a class="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-lg shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-3" onclick="toggleDemoModal()">
         <i class="fa-solid fa-rocket text-lg"></i> Request Demo
     </a>
 </div>
@@ -670,7 +670,7 @@
 <div id="demo-modal" class="fixed inset-0 z-[9999] hidden flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
     <div class="w-[95%] md:w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl relative p-6 md:p-8">
         <!-- Close button -->
-        <button class="absolute top-3 right-3 text-slate-600 hover:text-slate-900 rounded-full p-1" onclick="document.getElementById('demo-modal').classList.remove('hidden')" aria-label="Close modal">
+        <button class="absolute top-3 right-3 text-slate-600 hover:text-slate-900 rounded-full p-1 cursor-pointer" onclick="toggleDemoModal()" aria-label="Close modal">
             <i class="fa-solid fa-xmark"></i>
         </button>
         
@@ -724,5 +724,14 @@
 
 
 
+
+<script>
+function toggleDemoModal() {
+    const modal = document.getElementById('demo-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+</script>
 </body>
 </html>
