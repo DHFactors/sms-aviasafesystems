@@ -4,17 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AviaSAFE-SMS — Request a Demo</title>
-    <meta name="description" content="AviaSAFE-SMS demo request form — contact us at support@aviasafesystems.com to request a personalized safety intelligence platform demonstration.">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="AviaSAFE-SMS — Request a Demo">
-    <meta property="og:description" content="Request a demo of the AviaSAFE-SMS aviation safety management platform.">
-    <meta property="og:url" content="https://betasms.aviasafesystems.com/contact.html">
+    <meta name="description" content="AviaSAFE-SMS demo request form — secure multi-tenant safety management platform">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts: Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
@@ -47,47 +43,64 @@
     <style>
         html { scroll-behavior: smooth; }
 
-        /* Fixed-header anchor offset */
-        section[id] { scroll-margin-top: 96px; }
-
-        /* Light Card Hover Effects */
-        .light-card {
-            background: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
-            transition: all 0.25s ease-in-out;
+        /* Anti-bot honeypot styles */
+        .anti-bot {
+            position: absolute !important;
+            left !important;
+            top !important;
+            width !important;
+            height !important;
+            overflow !important;
         }
-        .light-card:hover {
+
+        /* Input guard styles */
+        .input-guard {
+            transition: all 0.3s ease;
+        }
+        .input-guard:focus {
             border-color: #0284C7;
-            box-shadow: 0 12px 24px -8px rgba(2, 132, 199, 0.15);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+        }
+
+        /* Card styles */
+        .contact-card {
+            @apply bg-white rounded-2xl p-6 shadow-sm border border-slate-200;
+        }
+        .contact-card:hover {
+            @apply border-brand-500 shadow-md;
         }
 
         /* Form input styles */
         .form-input {
-            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors;
+            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors appearance-none;
         }
         .form-input:focus {
-            border-color: #0284C7;
+            @apply border-color:#0284C7;
         }
 
         /* Select styles */
         .select-input {
-            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors appearance-none;
+            @apply w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent appearance-none block pr-4;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%236B7280' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-right: 0.5rem;
             background-center: 2rem;
+        }
+
+        /* Button styles */
+        .submit-btn {
+            @apply w-full py-3 px-8 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-md shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2;
         }
     </style>
 </head>
 
 <body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
 
-    <!-- TOP NAVIGATION BAR (Same as index.html) -->
+    <!-- TOP NAVIGATION BAR -->
     <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <!-- Brand Logo -->
-            <a href="#" class="flex items-center gap-3 group">
+            <a href="/index.html" class="flex items-center gap-3 group">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-deepTeal-800 to-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/30 group-hover:scale-105 transition-transform">
                     <i class="fa-solid font-bold text-xl fa-shield-halved"></i>
                 </div>
@@ -118,78 +131,59 @@
 
     <main class="pt-20 flex-grow flex-shrink-0 basis-auto pb-12">
 
-        <!-- Hero Section: Demo Request -->
-        <section class="relative min-h-[80vh] flex items-center pt-12 pb-20 overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-700 text-white border-b border-slate-700">
-            <div class="absolute top-0 right-1/3 w-[500px] h-[500px] bg-brand-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <!-- ========== PRODUCT PITCH ========== -->
+        <section class="py-24 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-700 text-white">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center max-w-2xl mx-auto mb-12">
+                    <h2 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-4">
+                        Transform Your Safety Data into Predictive Intelligence
+                    </h2>
+                    <p class="text-slate-300 text-base sm:text-lg leading-relaxed">
+                        AviaSAFE-SMS is a secure, multi-tenant safety management platform engineered to support ICAO Annex 19 compliance and State Safety Programme (SSP) oversight. Request a personalized demo to see how we help operators automate compliance workflows, protect Just Culture, and proactively identify systemic risks before they escalate.
+                    </p>
+                </div>
+            </div>
+        </section>
 
-            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 w-full relative z-10">
-                <div class="pt-20">
+        <!-- ========== DEMO REQUEST FORM ========== -->
+        <section id="contact" class="py-24 bg-white">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                <!-- Contact Status Message -->
+                <div id="contactStatus" class="contact-status text-center mb-6 hidden" role="alert"></div>
 
-                    <!-- Heading -->
-                    <div class="text-center mb-12">
-                        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15] mb-4 text-white">
-                            Request a Demo
-                        </h1>
-                        <p class="text-base sm:text-lg text-slate-200 mb-8 font-normal leading-relaxed">
-                            Get in touch to see how AviaSAFE-SMS can transform your organization's safety intelligence.
-                        </p>
-                    </div>
+                <!-- Contact Form Card -->
+                <div class="contact-card">
+                    <form class="contact-form" action="/api/submit-demo" method="POST" novalidate>
 
-                    <!-- Contact Form Card -->
-                    <div class="max-w-md mx-auto bg-white rounded-2xl p-8 shadow-2xl max-w-mp shadow-lg">
+                        <!-- Anti-bot honeypot -->
+                        <input type="text" name="anti_bot" class="anti-bot hidden" aria-hidden="true">
 
-                        <!-- Form -->
-                        <form action="mailto:support@aviasafesystems.com" method="POST" enctype="text/plain">
-
-                            <div class="grid grid-cols-1 gap-4 mb-6">
-                                <!-- Full Name -->
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
-                                    <input type="text" name="fullname" class="form-input" placeholder="John Doe" required>
-                                </div>
-
-                                <!-- Organization / Airline -->
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">Organization / Airline</label>
-                                    <input type="text" name="organization" class="form-input" placeholder="Buddha Air" />
-                                </div>
-
-                                <!-- Work Email -->
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">Work Email <span class="text-red-500">*</span></label>
-                                    <input type="email" name="email" class="form-input" placeholder="john@buddha-air.com" required>
-                                </div>
-
-                                <!-- Primary Domain of Interest -->
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">Primary Domain of Interest</label>
-                                    <select name="domain" class="select-input">
-                                        <option value="" disabled selected>Select an option</option>
-                                        <option value="airline">Airline</option>
-                                        <option value="aerodrome">Aerodrome</option>
-                                        <option value="amo">AMO / MRO</option>
-                                        <option value="regulator">Regulator / CAA</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Message -->
+                        <div class="grid grid-cols-1 gap-4 mb-6">
+                            <!-- Contact Person Field -->
                             <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-2">Message</label>
-                                <textarea name="message" rows="4" class="form-input w-full py-3 resize-none" placeholder="Briefly describe your safety intelligence needs..."></textarea>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Contact Person</label>
+                                <input type="text" name="contact_person" class="form-input" placeholder="John Doe" required>
                             </div>
 
-                            <!-- Submit Button -->
-                            <div class="mt-8">
-                                <button type="submit" class="w-full py-3 px-8 text-base font-bold text-white bg-gradient-to-r from-brand-600 to-teal-600 hover:from-brand-700 hover:to-teal-700 rounded-xl shadow-md shadow-brand-500/30 transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-paper-plane text-xs"></i> Send Request
-                                </button>
+                            <!-- Airline / Organization Name Field -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Airline / Organization Name</label>
+                                <input type="text" name="organization" class="form-input" placeholder="Buddha Air" required>
                             </div>
 
-                        </form>
+                            <!-- Work Email Field -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Work Email</label>
+                                <input type="email" name="work_email" class="form-input" placeholder="john@buddha-air.com" required>
+                            </div>
+                        </div>
 
-                    </div>
+                        <!-- Submit Button -->
+                        <button type="submit" class="submit-btn">
+                            <i class="fa-solid fa-paper-plane text-xs"></i> Send Demo Request
+                        </button>
 
+                    </form>
                 </div>
             </div>
         </section>
@@ -205,53 +199,106 @@
     </footer>
 
     <script>
-    // Subdomain redirect: route non-reserved tenant subdomains of
-    // *.aviasafesystems.com to their tenant login / dashboard.
-    (function() {
-        const hostname = window.location.hostname;
-        const parts = hostname.split('.');
+    // ============================================================================
+    // HYBRID CONTACT FORM - Cloudflare Worker placeholder
+    // The form action="/api/submit-demo" will be intercepted by the Cloudflare Worker
+    // that will process the demo request and send to support@aviasafesystems.com
+    // ============================================================================
 
-        if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
-            const subdomain = parts[0];
-            const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
-
-            if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
-                // Storage keys are env-prefixed (aviasafe:{env}:user) so beta
-                // state can never leak onto production tenant subdomains.
-                const isBetaHost = /beta/.test(hostname) || hostname === 'localhost' || hostname === '127.0.0.1';
-                const user = localStorage.getItem('aviasafe:' + (isBetaHost ? 'beta' : 'prod') + ':user');
-                if (user) {
-                    window.location.href = '/safety.html';
-                } else {
-                    window.location.href = '/login.html?tenant=' + subdomain;
-                }
+    // ============================================================================
+    // ANTI-BOT HONEYPOT GUARD
+    // ============================================================================
+    // This detects automated form submissions by checking if the honeypot field
+    // was filled in. Legitimate users won't see/fill this field.
+    document.addEventListener('DOMContentLoaded', function() {
+        var honeypot = document.querySelector('input[name="anti_bot"]');
+        if (honeypot) {
+            // If honeypot is filled, remove the submit button to prevent submission
+            var form = honeypot.closest('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    if (honeypot.value.trim()) {
+                        e.preventDefault();
+                        // Show indication that submission was blocked
+                        var status = document.getElementById('contactStatus');
+                        if (status) {
+                            status.hidden = false;
+                            status.textContent = 'Submission blocked: automated detection.';
+                            status.className = 'contact-status contact-status-error';
+                            status.setAttribute('role', 'alert');
+                        }
+                    }
+                });
             }
         }
-    })();
-    </script>
+    });
 
-    <script>
-    // Scroll-to-top: reveal the button after scrolling 300px, then smooth-scroll back.
-    (function() {
-        const scrollBtn = document.getElementById('scrollToTopBtn');
-        if (!scrollBtn) return;
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 300) {
-                scrollBtn.classList.remove('hidden');
-            } else {
-                scrollBtn.classList.add('hidden');
+    // ============================================================================
+    // FORM SUBMISSION HANDLING
+    // ============================================================================
+    // The form action="/api/submit-demo" will be handled by Cloudflare Worker.
+    // For now, we provide basic client-side validation and a success message.
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.querySelector('.contact-form');
+        if (!form) return;
+
+        form.addEventListener('submit', function(e) {
+            // Basic client-side validation for the 3 fields
+            var contactPerson = form.querySelector('input[name="contact_person"]');
+            var organization = form.querySelector('input[name="organization"]');
+            var workEmail = form.querySelector('input[name="work_email"]');
+
+            if (!contactPerson || !contactPerson.value.trim()) {
+                e.preventDefault();
+                showValidationError('Please enter your contact person name.');
+                return;
             }
-        });
-        scrollBtn.addEventListener('click', () => {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-    })();
-    </script>
 
-    <!-- Floating Scroll-to-Top Button -->
-    <button id="scrollToTopBtn" aria-label="Scroll to top" class="fixed bottom-20 right-6 z-40 hidden p-3 rounded-full bg-brand-600 hover:bg-brand-500 text-white shadow-lg transition-all duration-300 hover:scale-110 focus:outline-none">
-        <i class="fa-solid fa-arrow-up text-sm"></i>
-    </button>
+            if (!organization || !organization.value.trim()) {
+                e.preventDefault();
+                showValidationError('Please enter your airline/organization name.');
+                return;
+            }
+
+            if (!workEmail || !workEmail.value.trim()) {
+                e.preventDefault();
+                showValidationError('Please enter your work email address.');
+                return;
+            }
+
+            // Email format validation
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (workEmail && !emailRegex.test(workEmail.value)) {
+                e.preventDefault();
+                showValidationError('Please enter a valid email address.');
+                return;
+            }
+
+            // If we reach here, the form will submit to /api/submit-demo
+            // which will be handled by the Cloudflare Worker
+            // Uncomment the following line if you want to prevent default for testing:
+            // e.preventDefault();
+        });
+
+        function showValidationError(message) {
+            // Create error element
+            var existingError = document.querySelector('.validation-error');
+            if (existingError) existingError.remove();
+
+            var errorEl = document.createElement('div');
+            errorEl.className = 'validation-error text-red-600 text-sm mt-2';
+            errorEl.textContent = message;
+
+            // Insert after the first form group
+            var firstGroup = form.querySelector('.grid > div');
+            if (firstGroup) {
+                firstGroup.parentNode.insertBefore(errorEl, firstGroup.nextSibling);
+            } else {
+                form.insertBefore(errorEl, form.querySelector('button'));
+            }
+        }
+    });
+    </script>
 
 </body>
 </html>
