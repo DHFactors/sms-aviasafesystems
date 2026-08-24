@@ -87,3 +87,40 @@
 - **Protected (never purge):** `tenants`, `regulators`, `state/ssp/risk_register`, `firestore.rules`, `firestore.indexes.json`
 
 **Decision rule:** If a collection cannot be proven seed-owned or protected, stop and report instead of deleting (implemented as existence check before purge; `notifications` not purged).
+
+## 9. Before-counts and planned-after (from `python backend/scripts/setup_two_tenants_beta.py --database-id sms-db-beta --dry-run` on 2026-08-24)
+
+| Collection | fishtail-air before | vnkt-airport before | Classification | Seed-owned? | Planned-after (minimal deterministic) |
+|---|---|---|---|---|---|
+| `tenants` (doc) | 1 exists | 0 (will be created) | **PRESERVE** | No (protected metadata) | 1 / 1 |
+| `tenants/{tid}/metadata/*` (info, profile, risk_matrix) | 2 docs | 0 docs | **PRESERVE** | No | 2 / 1 (`vnkt-airport/metadata/info` will be created by script) |
+| `tenants/{tid}/reports` | 31 | 0 | **PURGE** | Yes (seed/reports.py) | 1 / 1 (MOR / VSR) |
+| `tenants/{tid}/hazards` | 110 | 0 | **PURGE** | Yes (seed/hazard_can.py) | 1 / 1 (Bow-Tie / Fishbone) |
+| `tenants/{tid}/can_cap` | 18 | 0 | **PURGE** | Yes | 1 / 1 |
+| `tenants/{tid}/can_cap/{can}/caps` | 32 | 0 | **PURGE** | Yes (nested) | 1 / 1 (Open / Closed) |
+| `tenants/{tid}/flight_diversions` | 0 | 0 | **EMPTY** | Yes but no data to purge; seed not required for minimal workflow | 0 / 0 |
+| `tenants/{tid}/surveys` | 16 | 0 | **PURGE** | Yes (seed/surveys.py) | 0 / 0 (minimal seed has no surveys) |
+| `tenants/{tid}/responses` | 16 | 0 | **PURGE** | Yes | 0 / 0 |
+| `tenants/{tid}/verification` | 0 | 0 | **EMPTY** | Yes (seed-owned, 0 docs) | 0 / 0 |
+| `tenants/{tid}/audit_logs` (subcollection, if exists) | 0 | 0 | **EMPTY** | Unproven (top-level `audit_logs` is actual) | 0 / 0 |
+| `tenants/{tid}/notifications` | 0 | 0 | **EMPTY** | **Not present** (0 hits in repo, not purged) | 0 / 0 |
+| `psoe_assessments` (top-level) | ~1 (per tenant) | 0 | **PRESERVE** | Yes but protected for this task (not in deletion allowlist) | 1 / 1 (preserved) |
+| `audit_logs` (top-level) | ? (shared) | ? | **PRESERVE** | Not proven seed-owned for deletion | preserved |
+| `feedback`, `regulators`, `caan_reports`, `state/ssp/risk_register` | — | — | **PRESERVE** | No | preserved |
+| `firestore.rules`, `firestore.indexes.json` | files | files | **PRESERVE** | No | preserved |
+
+**All PURGE records are seed-owned beta data** (verified via `seed/*.py` and `backend/app/services/*` paths above). No top-level collection is deleted without proof — `psoe_assessments`, `audit_logs` top-level are **PRESERVE** for this task.
+
+## 10. Tenant metadata confirmation (Step 4)
+
+- **Execute phase creates** `tenants/fishtail-air/metadata/info` (already exists, 2 docs; will be preserved and `departments` synced) **and** `tenants/vnkt-airport/metadata/info` (currently 0 docs, **missing** — script will create it). Verified in dry-run: `vnkt-airport` `metadata (protected, not purged): 0` before, `metadata/info` will be created via `tenant_ref.collection("metadata").document("info").set({tenant_id, name, updated_at}, merge=True)` in `setup_two_tenants_beta.py` seed. Both tenants will have `metadata/info` after execute, as required by `app/firebase.py:74` `get_tenant_metadata`.
+
+## 11. Final minimal dataset (Step 5)
+
+- **Fishtail Air:** `report-fishtail-air-mor-001` (MOR) → `hazard FI-HZ-001-26` (severity 4, probability 3, risk High, `sram_data.mode: BOWTIE`) → `CAN-FISHTAIL-001` → `CAP-FISHTAIL-001-001` status `Open` (deterministic IDs, canonical department `Flight Operations`)
+- **VNKT Airport:** `report-vnkt-airport-vsr-001` (VSR) → `hazard VN-HZ-001-26` (Fishbone `sram_data.mode: FISHBONE`) → `CAN-VNKT-001` → `CAP-VNKT-001-001` status `Closed` (canonical `Airside Operations`)
+
+## 12. No Firebase Auth SDK invoked
+
+- Script imports `firebase_admin.credentials`, `firestore` only — **no `firebase_admin.auth`** import or `auth.create_user`, `auth.set_custom_user_claims`, `auth.delete_user` calls. Dry-run JSON shows `"auth_operations": 0`, `no_writes_dry_run: true`, `no_production_access: true`.
+
