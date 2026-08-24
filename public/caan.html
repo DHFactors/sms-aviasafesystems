@@ -234,8 +234,19 @@ const OPERATOR_ORDER = [
 
 function destroyCaanChart(key) {
     if (caanChartInstances[key]) {
-        caanChartInstances[key].destroy();
+        try { caanChartInstances[key].destroy(); } catch (_) {}
         delete caanChartInstances[key];
+    }
+    // Legacy alias: sspTrend was stored under logical name
+    if (key === 'caanSSPRiskChart' && caanChartInstances['sspTrend']) {
+        try { caanChartInstances['sspTrend'].destroy(); } catch (_) {}
+        delete caanChartInstances['sspTrend'];
+    }
+    // Fallback: destroy any Chart.js instance still bound to canvas
+    const canvas = document.getElementById(key);
+    if (canvas && window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(canvas);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
     }
 }
 
@@ -523,6 +534,10 @@ function renderStateSpiTrend(trend) {
     if (typeof Chart === 'undefined') return;
     const ctx = document.getElementById('caanSSPRiskChart');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
     if (!trend || !Array.isArray(trend.series) || !trend.series.length) return;
 
     const labels = trend.labels || [];
@@ -547,7 +562,7 @@ function renderStateSpiTrend(trend) {
         spanGaps: true,
     }));
 
-    caanChartInstances.sspTrend = new Chart(ctx, {
+    caanChartInstances['caanSSPRiskChart'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,

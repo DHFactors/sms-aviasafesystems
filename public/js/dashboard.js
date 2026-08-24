@@ -53,6 +53,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const { role, tenantId } = session;
 
+    // Sync demo persona storage so header/context never shows a stale demo
+    // tenant (e.g. air-dynasty-demo) when the user is actually fishtail-air.
+    // This also keeps TenantResolver.getCurrentTenant() consistent for any
+    // synchronous title resolution via applyTenantContext.
+    try {
+        if (typeof TenantResolver !== 'undefined' && TenantResolver.syncDemoTenantWithAuth) {
+            TenantResolver.syncDemoTenantWithAuth(session);
+        }
+        // Expose for synchronous getCurrentTenant() fallback
+        window.__AUTH_TENANT_ID = tenantId || null;
+    } catch (_) { /* ignore */ }
+
     if (role !== 'AIRLINE_ADMIN' && role !== 'CAAN_SMD' && role !== 'SUPER_ADMIN') {
         showError('Unauthorized role. Contact your administrator.');
         return;
@@ -60,6 +72,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('dashboardSection').style.display = 'block';
 
+    // Dynamic tenant context: derive display directly from auth claims
     const tenantName = tenantId ? tenantId.toUpperCase() : 'Cross-Tenant Safety Overview';
     const subtitle = getDepartmentDisplayName({
         role: session.role,
@@ -78,6 +91,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
+            try {
+                if (typeof TenantResolver !== 'undefined' && TenantResolver.clearTenantSession) {
+                    TenantResolver.clearTenantSession();
+                } else if (typeof TenantResolver !== 'undefined' && TenantResolver.clearDemoTenant) {
+                    TenantResolver.clearDemoTenant();
+                }
+                // Clear copilot session counters (env-prefixed)
+                try {
+                    var ck = (typeof storageKey === 'function' ? storageKey('copilot_message_count') : 'aviasafe_copilot_message_count');
+                    sessionStorage.removeItem(ck);
+                    sessionStorage.removeItem('aviasafe_copilot_message_count');
+                    sessionStorage.removeItem('aviasafe:beta:copilot_message_count');
+                    sessionStorage.removeItem('aviasafe:prod:copilot_message_count');
+                } catch (_) {}
+                window.__AUTH_TENANT_ID = null;
+            } catch (_) {}
             await firebase.auth().signOut();
             window.location.href = '/login.html';
         });
@@ -264,6 +293,11 @@ function renderRiskChart(data) {
     destroyChart('riskChartCanvas');
     const ctx = document.getElementById('riskChartCanvas');
     if (!ctx) return;
+    // Extra guard: Chart.js binds instance to canvas; destroy orphan if destroyChart missed it
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const counts = { Low: 0, High: 0, 'Very High': 0 };
     for (const d of data) {
@@ -274,7 +308,7 @@ function renderRiskChart(data) {
     const vals = labels.map(l => counts[l] || 0);
     const colors = labels.map(l => ICAO_COLORS[l]);
 
-    chartInstances.risk = new Chart(ctx, {
+    chartInstances['riskChartCanvas'] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
@@ -307,6 +341,10 @@ function renderSSMRiskChart(data) {
     destroyChart('ssmRiskChartCanvas');
     const ctx = document.getElementById('ssmRiskChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const colors = {
         Operational: '#1a73e8',
@@ -319,7 +357,7 @@ function renderSSMRiskChart(data) {
     const labels = Array.isArray(data.labels) ? data.labels : [];
     const series = Array.isArray(data.series) ? data.series : [];
 
-    chartInstances.ssmTrend = new Chart(ctx, {
+    chartInstances['ssmRiskChartCanvas'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels,
@@ -368,8 +406,12 @@ function renderTrendChart(data) {
     destroyChart('trendChartCanvas');
     const ctx = document.getElementById('trendChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
-    chartInstances.trend = new Chart(ctx, {
+    chartInstances['trendChartCanvas'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(d => `${d.month}/${d.year}`),
@@ -394,9 +436,13 @@ function renderHazardChart(data) {
     destroyChart('hazardChartCanvas');
     const ctx = document.getElementById('hazardChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const top = data.slice(0, 10);
-    chartInstances.hazard = new Chart(ctx, {
+    chartInstances['hazardChartCanvas'] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: top.map(d => d.occurrence_type),
@@ -500,9 +546,28 @@ function statusBadgeClass(status) {
 }
 
 function destroyChart(key) {
+    // 1) Destroy tracked instance for this canvas key
     if (chartInstances[key]) {
-        chartInstances[key].destroy();
+        try { chartInstances[key].destroy(); } catch (_) {}
         delete chartInstances[key];
+    }
+    // 2) Legacy alias support (previous logical keys: risk, ssmTrend, trend, hazard)
+    const legacyMap = {
+        'riskChartCanvas': 'risk',
+        'ssmRiskChartCanvas': 'ssmTrend',
+        'trendChartCanvas': 'trend',
+        'hazardChartCanvas': 'hazard'
+    };
+    const legacyKey = legacyMap[key];
+    if (legacyKey && chartInstances[legacyKey]) {
+        try { chartInstances[legacyKey].destroy(); } catch (_) {}
+        delete chartInstances[legacyKey];
+    }
+    // 3) Fallback: destroy any Chart.js instance still bound to this canvas (covers tenant-switch reloads without hard refresh)
+    const canvas = document.getElementById(key);
+    if (canvas && window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(canvas);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
     }
 }
 

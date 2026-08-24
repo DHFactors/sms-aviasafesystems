@@ -213,8 +213,13 @@ const PILLAR_META = [
 
 function destroyChart(key) {
     if (chartInstances[key]) {
-        chartInstances[key].destroy();
+        try { chartInstances[key].destroy(); } catch (_) {}
         delete chartInstances[key];
+    }
+    const canvas = document.getElementById(key === 'radar' ? 'pillarRadarChart' : key === 'bars' ? 'operatorBarChart' : key);
+    if (canvas && window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(canvas);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
     }
 }
 
@@ -323,6 +328,10 @@ function renderPillarRadar(state) {
         return;
     }
     destroyChart('radar');
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
     const labels = PILLAR_META.map(p => p.label);
     chartInstances['radar'] = new Chart(ctx, {
         type: 'radar',
@@ -373,6 +382,10 @@ function renderOperatorBars(state, operators) {
         return;
     }
     destroyChart('bars');
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
     const sorted = [...operators].sort((a, b) => (b.overall_sms_maturity ?? -1) - (a.overall_sms_maturity ?? -1));
     chartInstances['bars'] = new Chart(ctx, {
         type: 'bar',

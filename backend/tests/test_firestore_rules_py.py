@@ -1,4 +1,4 @@
-"""Pytest mirror of the Firestore rule-lint (Chunk 17 / Headway audit).
+"""Pytest mirror of the Firestore rule-lint (Chunk 17 / AviaSAFE-SMS audit).
 
 Parses firestore.rules and asserts the structural invariants that the
 JS lint also enforces, so the Python CI stage catches rule regressions.

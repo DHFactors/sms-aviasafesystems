@@ -25,7 +25,7 @@ async def issue_can(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -160,7 +160,7 @@ async def update_can_status(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -183,7 +183,7 @@ async def delete_can(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -218,7 +218,7 @@ async def submit_cap(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -277,7 +277,7 @@ async def update_cap(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -301,7 +301,7 @@ async def review_cap(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,
@@ -331,7 +331,7 @@ async def update_cap_status(
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
-    # (Headway audit / CAR-19 oversight: aggregate analytics only).
+    # (AviaSAFE-SMS audit / CAR-19 oversight: aggregate analytics only).
     if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
         raise HTTPException(
             status_code=403,

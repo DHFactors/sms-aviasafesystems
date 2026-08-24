@@ -202,18 +202,40 @@ class CanCapService:
 
     def get_can(self, can_id: str, user: dict) -> Optional[dict]:
         try:
+            # Optimized: direct where + doc lookup
             if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
+                base = get_cross_tenant_collection(CAN_COLLECTION)
             else:
-                docs = self._can_collection().get()
-
+                base = self._can_collection()
+            # Try where can_reference
+            for field in ["can_reference", "__name__"]:
+                try:
+                    q = base.where(field, "==", can_id).limit(1)
+                    docs = list(q.get())
+                    if docs:
+                        doc = docs[0]
+                        data = doc.to_dict()
+                        data["id"] = doc.id
+                        self._serialize_timestamps(data)
+                        try:
+                            caps = doc.reference.collection(CAP_SUBCOLLECTION).order_by("created_at", direction="DESCENDING").limit(1).get()
+                            if caps:
+                                cap_data = caps[0].to_dict()
+                                cap_data["id"] = caps[0].id
+                                self._serialize_timestamps(cap_data)
+                                data["latest_cap"] = cap_data
+                        except Exception:
+                            pass
+                        return data
+                except Exception:
+                    continue
+            # Fallback scan limited
+            docs = list(base.limit(500).get())
             for doc in docs:
                 data = doc.to_dict()
                 if doc.id == can_id or data.get("can_reference") == can_id:
                     data["id"] = doc.id
                     self._serialize_timestamps(data)
-
-                    # Attach latest CAP
                     try:
                         caps = doc.reference.collection(CAP_SUBCOLLECTION).order_by("created_at", direction="DESCENDING").limit(1).get()
                         if caps:
@@ -223,7 +245,6 @@ class CanCapService:
                             data["latest_cap"] = cap_data
                     except Exception:
                         pass
-
                     return data
             return None
         except Exception as e:
@@ -232,44 +253,80 @@ class CanCapService:
 
     def list_cans(self, user: dict, filters: dict = None) -> List[dict]:
         try:
+            filters = filters or {}
+            # Build DB-level where for exact matches; days/search remain Python
+            def _build_query(base):
+                q = base
+                for key, field in [("status", "status"), ("priority", "priority"), ("assigned_to", "assigned_to"), ("department", "department"), ("hazard_id", "hazard_id")]:
+                    val = filters.get(key)
+                    if val:
+                        try:
+                            q = q.where(field, "==", val)
+                        except Exception as e:
+                            logger.warning(f"CAN list_cans DB where failed for {field}: {e}")
+                # Time filter: days -> created_at >= cutoff at DB if possible
+                if filters.get("days"):
+                    try:
+                        cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
+                        q = q.where("created_at", ">=", cutoff)
+                    except Exception:
+                        pass
+                return q
+
             if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
+                base = get_cross_tenant_collection(CAN_COLLECTION)
             else:
-                docs = self._can_collection().get()
+                base = self._can_collection()
+
+            # Limit handling
+            limit = min(int(filters.get("limit") or filters.get("page_size") or 100), 500)
+            query = _build_query(base)
+            try:
+                from google.cloud.firestore import Query as FirestoreQuery
+                query = query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(limit)
+            except Exception as e:
+                logger.warning(f"CAN list_cans order/limit failed: {e}")
+                try:
+                    query = query.limit(limit)
+                except Exception:
+                    pass
+
+            try:
+                docs = list(query.get())
+            except Exception as e:
+                logger.warning(f"CAN list_cans filtered query failed, fallback: {e}")
+                docs = list(base.limit(limit).get())
 
             results = []
             for doc in docs:
                 data = doc.to_dict()
                 data["id"] = doc.id
-
-                if filters:
-                    if filters.get("days"):
-                        cutoff = datetime.now(timezone.utc) - timedelta(days=filters["days"])
-                        issued = coerce_utc_datetime(
-                            data.get("issued_at") or data.get("created_at")
-                        )
-                        if issued is None or issued < cutoff:
-                            continue
-                    if filters.get("hazard_id") and data.get("hazard_id") != filters["hazard_id"]:
+                # Python re-check for DB filters + search
+                if filters.get("days"):
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
+                    issued = coerce_utc_datetime(data.get("issued_at") or data.get("created_at"))
+                    if issued is None or issued < cutoff:
                         continue
-                    if filters.get("status") and data.get("status") != filters["status"]:
+                if filters.get("hazard_id") and data.get("hazard_id") != filters["hazard_id"]:
+                    continue
+                if filters.get("status") and data.get("status") != filters["status"]:
+                    continue
+                if filters.get("priority") and data.get("priority") != filters["priority"]:
+                    continue
+                if filters.get("assigned_to") and data.get("assigned_to") != filters["assigned_to"]:
+                    continue
+                if filters.get("department") and (data.get("department") or "") != filters["department"]:
+                    continue
+                if filters.get("search"):
+                    s = filters["search"].lower()
+                    ref = (data.get("can_reference") or "").lower()
+                    title = (data.get("title") or "").lower()
+                    if s not in ref and s not in title:
                         continue
-                    if filters.get("priority") and data.get("priority") != filters["priority"]:
-                        continue
-                    if filters.get("assigned_to") and data.get("assigned_to") != filters["assigned_to"]:
-                        continue
-                    if filters.get("department") and (data.get("department") or "") != filters["department"]:
-                        continue
-                    if filters.get("search"):
-                        s = filters["search"].lower()
-                        ref = (data.get("can_reference") or "").lower()
-                        title = (data.get("title") or "").lower()
-                        if s not in ref and s not in title:
-                            continue
-
                 self._serialize_timestamps(data)
                 results.append(data)
 
+            # If query had order, keep; else sort
             results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
             return results
         except Exception as e:
@@ -384,7 +441,9 @@ class CanCapService:
 
         doc_data = {
             "cap_reference": cap_reference,
-            "can_id": can_id,
+            "can_id": can_doc_id,
+            "can_reference": can_ref,
+            "tenant_id": self.tenant_id,
             "department": payload.get("department") or can_department or "",
             "action_plan": payload["action_plan"],
             "timeline": payload["timeline"],
@@ -503,13 +562,12 @@ class CanCapService:
     def list_all_caps(self, user: dict, filters: dict = None) -> List[dict]:
         """List every CAP across the tenant's CANs, joined with the parent CAN
         (reference + issued date) so pages can show 'date CAN received' and the
-        CAN a CAP refers to without an extra round-trip."""
-        try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                docs = self._can_collection().get()
+        CAN a CAP refers to without an extra round-trip.
 
+        Optimized: single collection_group query for CAPs when tenant_id is present,
+        bounded limits, DB-level where for status/department/days.
+        """
+        try:
             filters = filters or {}
             status_f = filters.get("status")
             can_id_f = filters.get("can_id")
@@ -519,22 +577,164 @@ class CanCapService:
 
             cutoff = None
             if days_f:
-                cutoff = datetime.now(timezone.utc) - timedelta(days=days_f)
+                try:
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=int(days_f))
+                except Exception:
+                    cutoff = None
+
+            limit = min(int(filters.get("limit") or filters.get("page_size") or 100), 500)
+
+            # Try optimized collection_group path for CAPs if not filtering by specific can_id (which needs parent join)
+            use_group = not can_id_f
+            caps_via_group: List[Any] = []
+            if use_group:
+                try:
+                    from app.firebase import get_db
+                    db = get_db()
+                    q = db.collection_group(CAP_SUBCOLLECTION)
+                    if not (user.get("role") in settings.CROSS_TENANT_ROLES):
+                        # Tenant isolation via tenant_id field (new caps)
+                        try:
+                            q = q.where("tenant_id", "==", self.tenant_id)
+                        except Exception:
+                            pass
+                    if status_f:
+                        q = q.where("status", "==", status_f)
+                    if department_f:
+                        q = q.where("department", "==", department_f)
+                    if cutoff is not None:
+                        q = q.where("created_at", ">=", cutoff)
+                    from google.cloud.firestore import Query as FirestoreQuery
+                    q = q.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(limit)
+                    caps_via_group = list(q.get())
+                    # If group returned results, join with CAN map
+                    if caps_via_group:
+                        # Build CAN map for join (limited fetch)
+                        if user.get("role") in settings.CROSS_TENANT_ROLES:
+                            can_docs = list(get_cross_tenant_collection(CAN_COLLECTION).limit(500).get())
+                        else:
+                            can_docs = list(self._can_collection().limit(500).get())
+                        can_map = {c.id: c.to_dict() for c in can_docs}
+                        # Also map by can_reference
+                        can_ref_map = {v.get("can_reference"): v for k, v in can_map.items() if v.get("can_reference")}
+                        results = []
+                        for cap in caps_via_group:
+                            data = cap.to_dict()
+                            data["id"] = cap.id
+                            # Resolve parent CAN
+                            parent_id = data.get("can_id") or ""
+                            parent_data = can_map.get(parent_id) or {}
+                            if not parent_data and data.get("can_reference"):
+                                parent_data = can_ref_map.get(data["can_reference"], {})
+                                if parent_data:
+                                    # Find id
+                                    for cid, cd in can_map.items():
+                                        if cd.get("can_reference") == data.get("can_reference"):
+                                            parent_id = cid
+                                            break
+                            # Fallback via path
+                            if not parent_data:
+                                try:
+                                    path = getattr(cap.reference, "path", "") or ""
+                                    if "/can_cap/" in str(path):
+                                        cand = str(path).split("/can_cap/")[1].split("/")[0]
+                                        parent_data = can_map.get(cand, {})
+                                        if parent_data:
+                                            parent_id = cand
+                                except Exception:
+                                    pass
+                            data["can_id"] = parent_id
+                            data["can_reference"] = parent_data.get("can_reference", "")
+                            can_issued = parent_data.get("issued_at")
+                            if hasattr(can_issued, "isoformat"):
+                                can_issued = can_issued.isoformat()
+                            data["can_issued_at"] = can_issued
+                            data["hazard_id"] = parent_data.get("hazard_id", "")
+                            data["priority"] = parent_data.get("priority", "")
+                            dept = data.get("department") or parent_data.get("department", "")
+                            data["department"] = dept
+                            if department_f and (dept or "") != department_f:
+                                continue
+                            self._serialize_timestamps(data)
+                            if search:
+                                hay = " ".join(str(v) for v in [
+                                    data.get("cap_reference", ""),
+                                    data.get("can_reference", ""),
+                                    data.get("action_plan", ""),
+                                    data.get("status", ""),
+                                ]).lower()
+                                if search not in hay:
+                                    continue
+                            results.append(data)
+                        results.sort(key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min, reverse=True)
+                        return results[:limit]
+                except Exception as e:
+                    logger.warning(f"list_all_caps group query failed, fallback to per-CAN: {e}")
+
+            # Fallback: bounded per-CAN (previous logic but limited)
+            if user.get("role") in settings.CROSS_TENANT_ROLES:
+                base = get_cross_tenant_collection(CAN_COLLECTION)
+            else:
+                base = self._can_collection()
+            # For can_id filter, use where at DB
+            if can_id_f:
+                try:
+                    q = base.where("can_reference", "==", can_id_f).limit(1)
+                    docs = list(q.get())
+                    if not docs:
+                        q2 = base.limit(500)
+                        docs = [d for d in q2.get() if d.id == can_id_f]
+                    else:
+                        docs = docs
+                except Exception:
+                    docs = list(base.limit(500).get())
+                    docs = [d for d in docs if d.id == can_id_f or d.to_dict().get("can_reference") == can_id_f]
+            else:
+                # Apply department filter at DB for CAN level to reduce fan-out
+                try:
+                    q = base
+                    if department_f:
+                        q = q.where("department", "==", department_f)
+                    from google.cloud.firestore import Query as FirestoreQuery
+                    q = q.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(min(100, limit))
+                    docs = list(q.get())
+                except Exception:
+                    docs = list(base.limit(min(100, limit)).get())
 
             results = []
             for can_doc in docs:
                 can_data = can_doc.to_dict()
                 if can_id_f and can_doc.id != can_id_f and can_data.get("can_reference") != can_id_f:
                     continue
-                caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
+                # Bounded caps per CAN
+                try:
+                    cap_coll = can_doc.reference.collection(CAP_SUBCOLLECTION)
+                    # Try filtered caps at DB where possible
+                    qcap = cap_coll
+                    if status_f:
+                        try:
+                            qcap = qcap.where("status", "==", status_f)
+                        except Exception:
+                            pass
+                    if cutoff is not None:
+                        try:
+                            qcap = qcap.where("created_at", ">=", cutoff)
+                        except Exception:
+                            pass
+                    from google.cloud.firestore import Query as FirestoreQuery
+                    qcap = qcap.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(20)
+                    caps = list(qcap.get())
+                except Exception:
+                    try:
+                        caps = list(can_doc.reference.collection(CAP_SUBCOLLECTION).limit(20).get())
+                    except Exception:
+                        caps = list(can_doc.reference.collection(CAP_SUBCOLLECTION).get()) if hasattr(can_doc.reference.collection(CAP_SUBCOLLECTION), "get") else []
                 for cap in caps:
                     data = cap.to_dict()
                     if status_f and data.get("status") != status_f:
                         continue
                     if cutoff:
-                        submitted = coerce_utc_datetime(
-                            data.get("submitted_at") or data.get("created_at")
-                        )
+                        submitted = coerce_utc_datetime(data.get("submitted_at") or data.get("created_at"))
                         if submitted is None or submitted < cutoff:
                             continue
                     data["id"] = cap.id
@@ -560,12 +760,13 @@ class CanCapService:
                         if search not in hay:
                             continue
                     results.append(data)
+                    if len(results) >= limit:
+                        break
+                if len(results) >= limit:
+                    break
 
-            results.sort(
-                key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min,
-                reverse=True,
-            )
-            return results
+            results.sort(key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min, reverse=True)
+            return results[:limit]
         except Exception as e:
             logger.error(f"Failed to list all CAPs: {e}")
             raise

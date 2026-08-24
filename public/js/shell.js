@@ -125,6 +125,21 @@
         logout.id = 'shellLogoutBtn';
         logout.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
         logout.addEventListener('click', function () {
+            try {
+                if (typeof TenantResolver !== 'undefined' && TenantResolver.clearTenantSession) {
+                    TenantResolver.clearTenantSession();
+                } else if (typeof TenantResolver !== 'undefined' && TenantResolver.clearDemoTenant) {
+                    TenantResolver.clearDemoTenant();
+                }
+                try {
+                    var ck = (typeof storageKey === 'function' ? storageKey('copilot_message_count') : 'aviasafe_copilot_message_count');
+                    sessionStorage.removeItem(ck);
+                    sessionStorage.removeItem('aviasafe_copilot_message_count');
+                    sessionStorage.removeItem('aviasafe:beta:copilot_message_count');
+                    sessionStorage.removeItem('aviasafe:prod:copilot_message_count');
+                    window.__AUTH_TENANT_ID = null;
+                } catch (e2) {}
+            } catch (e) {}
             if (typeof firebase !== 'undefined' && firebase.auth) {
                 firebase.auth().signOut().then(function () {
                     window.location.href = '/login.html';
@@ -272,7 +287,12 @@
         main.appendChild(buildHeader());
         main.appendChild(buildHero());
         main.appendChild(content);
-        main.appendChild(buildFooter());
+        // Pages that ship their own complete static footer (the premium
+        // dashboards' 3-line .app-footer with the "Made with love" line)
+        // must not also receive the shell footer — that stacked two footers.
+        if (!document.querySelector('footer.app-footer')) {
+            main.appendChild(buildFooter());
+        }
         shell.appendChild(sidebar);
         shell.appendChild(main);
 

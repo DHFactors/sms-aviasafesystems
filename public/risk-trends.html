@@ -200,6 +200,10 @@ function renderRiskChart(data) {
     destroyChart('riskChartCanvas');
     const ctx = document.getElementById('riskChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const counts = { Low: 0, High: 0, 'Very High': 0 };
     for (const d of data) {
@@ -210,7 +214,7 @@ function renderRiskChart(data) {
     const vals = labels.map(l => counts[l] || 0);
     const colors = labels.map(l => ICAO_COLORS[l]);
 
-    chartInstances.risk = new Chart(ctx, {
+    chartInstances['riskChartCanvas'] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels,
@@ -243,8 +247,12 @@ function renderTrendChart(data) {
     destroyChart('trendChartCanvas');
     const ctx = document.getElementById('trendChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
-    chartInstances.trend = new Chart(ctx, {
+    chartInstances['trendChartCanvas'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: data.map(d => `${d.month}/${d.year}`),
@@ -268,14 +276,20 @@ function renderTrendChart(data) {
 function destroyChart(key) {
     const inst = chartInstances[key];
     if (inst) {
-        inst.destroy();
+        try { inst.destroy(); } catch (_) {}
         delete chartInstances[key];
-        return;
+    }
+    // Legacy alias: risk/trend stored under short keys in older code
+    const legacyMap = { 'riskChartCanvas': 'risk', 'trendChartCanvas': 'trend' };
+    const legacy = legacyMap[key];
+    if (legacy && chartInstances[legacy]) {
+        try { chartInstances[legacy].destroy(); } catch (_) {}
+        delete chartInstances[legacy];
     }
     const canvas = document.getElementById(key);
-    if (canvas && window.Chart) {
+    if (canvas && window.Chart && typeof Chart.getChart === 'function') {
         const orphan = Chart.getChart(canvas);
-        if (orphan) orphan.destroy();
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
     }
 }
 

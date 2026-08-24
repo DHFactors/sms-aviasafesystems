@@ -102,32 +102,40 @@
         ];
     }
 
-    // Backend base URL. Prefer APP_CONFIG (set by firebase.js on authenticated
-    // pages), then API_BASE_URL, then a hostname-based fallback so the widget
-    // always talks to the correct Render backend even on standalone pages that
-    // never load firebase.js (e.g. register.html).
+    // Backend base URL. Priority (first hit wins):
+    //   1. localStorage 'aviasafe:localApiBaseUrl' — set once in the browser
+    //      console to point every Copilot request at a locally-running backend
+    //      (e.g. Docker on http://localhost:8000):
+    //        localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
+    //      Demo pages served on http://localhost:5005 (firebase serve) rely on
+    //      this override to avoid CORS/network failures against Render.
+    //   2. APP_CONFIG.apiBaseUrl (set by firebase.js — itself honours the same
+    //      localStorage override) / window.API_BASE_URL.
+    //   3. Hostname-based fallback (beta → beta backend, else prod).
     //
-    // Guest (unauthenticated) mode is part of the beta self-service rollout and
-    // the /api/v1/copilot/guest/chat route only exists on the beta backend, so
-    // guest requests are pinned there unconditionally. Pinning prevents a 404
-    // when a public page is served from a host whose fallback would otherwise
-    // resolve to the production backend (which has no guest route).
+    // Guest (unauthenticated) mode is pinned to the beta backend ONLY when no
+    // local override is present — the /api/v1/copilot/guest/chat route only
+    // exists on beta, so without an override pinning prevents a 404 on prod hosts.
     function resolveApiBase() {
-        if (isGuestPage()) return 'https://sms-aviasafesystems-beta.onrender.com';
+        try {
+            var local = window.localStorage && window.localStorage.getItem('aviasafe:localApiBaseUrl');
+            if (local && local.trim()) return local.trim().replace(/\/+$/, '');
+        } catch (e) { /* ignore storage errors (incognito) */ }
         if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
         if (window.API_BASE_URL) return window.API_BASE_URL;
         var host = window.location.hostname || '';
         var isBeta = host.indexOf('beta') !== -1 ||
             host === 'localhost' || host === '127.0.0.1';
+        // Guest pages without a local override must hit beta (only it serves /guest/chat).
+        // Non-guest pages without an override still use the same hostname fallback.
         return isBeta
             ? 'https://sms-aviasafesystems-beta.onrender.com'
             : 'https://aviasafe-unified-platform.onrender.com';
     }
 
-    var API_BASE = resolveApiBase();
-
     function chatEndpoint() {
-        return API_BASE + (isGuestPage() ? '/api/v1/copilot/guest/chat' : '/api/v1/copilot/chat');
+        var base = resolveApiBase();
+        return base + (isGuestPage() ? '/api/v1/copilot/guest/chat' : '/api/v1/copilot/chat');
     }
 
     var history = [];

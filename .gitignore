@@ -2,6 +2,10 @@
 .env
 backend/.env
 *.env
+# Demo env copy carries real secrets — *.env does NOT match ".env.demo"
+.env.demo
+backend/.env.demo
+**/.env.demo
 
 # reCAPTCHA / App Check keys
 recaptch.txt

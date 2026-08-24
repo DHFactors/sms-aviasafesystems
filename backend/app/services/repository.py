@@ -167,11 +167,6 @@ class ReportRepository:
             base = self._build_collection(filter)
             logger.debug(f"Firestore query: collection_group={filter.cross_tenant}, tenant_id={filter.tenant_id}, path='tenants/{filter.tenant_id}/{self.COLLECTION}', date_from={filter.date_from}, date_to={filter.date_to}")
 
-            raw_all = list(base.limit(5000).stream())
-            logger.debug(f"Raw doc count at tenants/{filter.tenant_id}/{self.COLLECTION} (no filters): {len(raw_all)}")
-            if not raw_all:
-                logger.warning(f"RAW COUNT IS ZERO — collection tenants/{filter.tenant_id}/{self.COLLECTION} is empty or does not exist. Check tenant_id format vs Firestore path.")
-
             query = self._apply_filters(base, filter)
             query = query.order_by(
                 filter.sort_by, direction=self._sort_order(filter.sort_order)
@@ -185,20 +180,27 @@ class ReportRepository:
                 self._serialize_timestamps(data)
                 results.append(data)
 
-            if len(results) == 0 and len(raw_all) > 0 and (filter.date_from or filter.date_to):
-                logger.warning(f"Date filter ({filter.date_from} to {filter.date_to}) returned 0 results but {len(raw_all)} docs exist unfiltered. Retrying with a timezone-safe in-memory date filter (likely ISO-string timestamps or old seed data).")
-                unfiltered = []
-                for doc in raw_all:
-                    data = doc.to_dict()
-                    data["id"] = doc.id
-                    self._serialize_timestamps(data)
-                    unfiltered.append(data)
-                results = [
-                    d for d in unfiltered
-                    if self._doc_in_date_range(
-                        d.get(filter.sort_by), filter.date_from, filter.date_to
-                    )
-                ]
+            # Fallback for ISO-string timestamps: only if filtered query returned 0 but date filter was applied
+            if len(results) == 0 and (filter.date_from or filter.date_to):
+                # Lazy unfiltered fetch for fallback (bounded to limit)
+                try:
+                    raw_docs = list(base.limit(limit).get())
+                    if raw_docs:
+                        logger.warning(f"Date filter ({filter.date_from} to {filter.date_to}) returned 0 results but {len(raw_docs)} docs exist unfiltered. Retrying with timezone-safe in-memory filter.")
+                        unfiltered = []
+                        for doc in raw_docs:
+                            data = doc.to_dict()
+                            data["id"] = doc.id
+                            self._serialize_timestamps(data)
+                            unfiltered.append(data)
+                        fallback = [
+                            d for d in unfiltered
+                            if self._doc_in_date_range(d.get(filter.sort_by), filter.date_from, filter.date_to)
+                        ]
+                        if fallback:
+                            results = fallback
+                except Exception as fe:
+                    logger.warning(f"Fallback unfiltered fetch failed: {fe}")
 
             self._cache[cache_key] = (now, results)
             if len(results) == 0:

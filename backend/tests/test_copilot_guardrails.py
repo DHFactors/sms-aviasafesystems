@@ -1,6 +1,6 @@
 """AI Copilot guardrails — read-only scope + prompt-injection quarantine.
 
-Static assertions lock in the Headway audit requirements:
+Static assertions lock in the AviaSAFE-SMS audit requirements:
   1. The Groq copilot service layer has ZERO database access
      (no Firestore imports, no write primitives).
   2. The copilot route imports no CAN/CAP, hazard, or risk-matrix mutation

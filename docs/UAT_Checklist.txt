@@ -1,0 +1,326 @@
+================================================================================
+                    AVIASAFE-SMS UAT CHECKLIST - PILOT OPERATORS
+================================================================================
+
+Project:     AviaSAFE-SMS Operator Safety Dashboard
+Version:     2.1.0 (restored from git commit 9ccf724)
+Date:        [INSERT DATE]
+Tester:      [INSERT TESTER NAME]
+Environment: [INSERT: PRODUCTION | BETA]
+
+================================================================================
+SECTION 1: LOGIN & AUTHENTICATION
+================================================================================
+
+1.  ACCESS SAFETY DASHBOARD
+    - Navigate to: https://sms.aviasafesystems.com/safety.html
+    - Page loads successfully in incognito/private browser window
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+2.  LOGIN WITH DEMO CREDENTIALS
+    - Username: demo@buddha-air.com
+    - Password: demopass123
+    - Successful login to dashboard
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+3.  PRODUCTION/BETA SWITCHER
+    - Locate sandbox toggle in header/navbar
+    - Switch from Production to Beta sandbox
+    - Beta environment loads with operator profiles
+    - Switch back to Production
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+4.  LOGOUT FUNCTIONALITY
+    - Click logout button in header
+    - Returns to login screen
+    - Session fully cleared
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+5.  SESSION PERSISTENCE
+    - Refresh the page after login
+    - Dashboard remains accessible without re-login
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 2: SAFETY DASHBOARD LAYOUT
+================================================================================
+
+6.  NAVY/BLUE HEADER BANNER
+    - Header background: #1e3a5f (dark navy) gradient
+    - AviaSAFE badge/logo visible and not broken
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+7.  OPERATOR TITLE DISPLAY
+    - Exact text: "BUDDHA-AIR - Corporate Safety Department"
+    - Text renders at correct header position
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+8.  AVIASAFE BADGE/LOGO
+    - Badge/logo image renders without broken image icon
+    - Clickable (if applicable)
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+9.  LOGOUT BUTTON IN HEADER
+    - Logout button present in navy header
+    - Functional link to login screen
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+10. SIDEBAR NAVIGATION PANEL
+    - Sidebar collapsible/expandable
+    - Navigation links visible and accessible
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+11. FOOTER DISPLAY
+    - Footer text: "A Project by Ghanshyam Acharya"
+    - Text visible at bottom of page
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 3: FILTER CONTROLS
+================================================================================
+
+12. DEFAULT FILTER: "PERIOD: LAST 60 DAYS"
+    - 60-day filter is default/pre-selected
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+13. REFRESH BUTTON FUNCTIONALITY
+    - Click Refresh button
+    - KPI cards reload with current data
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+14. DATE RANGE MODIFICATION (if applicable)
+    - Date picker opens when modifying filter
+    - Can select different date ranges
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+15. FILTER PERSISTENCE ACROSS CARDS
+    - Same 60-day period shows on all 6 KPI cards
+    - Consistent filtering across dashboard
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 4: KPI CARDS (6 CARDS TOTAL)
+================================================================================
+
+16. TOTAL REPORTS CARD
+    - Card displays total report count
+    - Number displayed > 0
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+17. OPEN REPORTS CARD
+    - Card displays open reports count
+    - Number displayed ≥ 0
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+18. CLOSED REPORTS CARD
+    - Card displays closed reports count
+    - Number displayed ≥ 0
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+19. HIGH RISK CARD
+    - Card displays high risk count
+    - Number displayed ≥ 0
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+20. CRITICAL CARD
+    - Card displays critical count
+    - Number displayed ≥ 0
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+21. ANON RATE CARD
+    - Card displays anonymity rate
+    - Percentage shown: 0-100%
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+K VISUAL VERIFICATION:
+- [ ] All 6 cards display without overlapping
+- [ ] Card titles match design specification
+- [ ] Card values update when filter changes
+- [ ] No broken icons or missing labels
+- [ ] Overall layout matches git 9ccf724 design
+
+================================================================================
+SECTION 5: DATABASE ISOLATION VERIFICATION
+================================================================================
+
+22. PRODUCTION DATA ISOLATION
+    - Dashboard shows Buddha Air data ONLY
+    - No beta/sandbox data mixed in production view
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+23. BETA SANDBOX OPERATOR PROFILES
+    - Beta environment contains operator profiles
+    - Count of profiles visible
+    - [PASS/FAIL] ______  Expected: 20 operators ______  Actual: _______
+
+24. DATA CROSS-CONTAMINATION CHECK
+    - Verify production data does not appear in beta
+    - Verify beta data does not appear in production
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+25. BETA SANDBOX SWITCHER FUNCTIONALITY
+    - Switching to beta shows different operator data
+    - Switching back to production shows original data
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+26. UI RESPECTS DATABASE CONTEXT
+    - Correct database ID shown in page metadata
+    - Environment indicator (prod/beta) visible
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 6: AI COPILOT / GUARDRAILS
+================================================================================
+
+27. AI COPILOT VALID QUERY
+    - Enter valid safety-related query
+    - Returns appropriate safety information
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+28. AI COPILOT INJECTION ATTEMPT
+    - Attempt injection/prompt injection
+    - Quarantine triggers; no execution
+    - Appropriate error displayed
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+29. AI READ-ONLY CONSTRAINTS
+    - Attempt to modify database records via AI
+    - Access denied error displayed
+    - No database modification possible
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+30. AI QUARANTINE TAGS
+    - AI responds appropriately to quarantine conditions
+    - System handles gracefully
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 7: SECURITY BOUNDARY VERIFICATION
+================================================================================
+
+31. SEC-01 BOUNDARY ENFORCEMENT
+    - No cross-tenant data access possible
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+32. SEC-02 BOUNDARY ENFORCEMENT
+    - Firestore rules apply correctly
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+33. SEC-03 BOUNDARY ENFORCEMENT
+    - Session isolation maintained
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+34. SEC-04 BOUNDARY ENFORCEMENT
+    - API gateway restrictions functional
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+35. SEC-05 BOUNDARY ENFORCEMENT
+    - Data export restrictions in place
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+36. ADMIN OPERATIONS AS REGULAR USER
+    - Attempt admin-level operations
+    - Access denied error displayed
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 8: PERFORMANCE & LOADING
+================================================================================
+
+37. PAGE LOAD TIME (safety.html)
+    - Load time < 3 seconds on standard connection
+    - [PASS/FAIL] ______  Measured time: ______ seconds
+
+38. KPI CARDS RENDER AFTER FILTER CHANGE
+    - Cards reload within 2 seconds of filter change
+    - [PASS/FAIL] ______  Measured time: ______ seconds
+
+39. SIDEBAR NAVIGATION RESPONSIVE
+    - Works on both mobile and desktop browsers
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+40. NO CONSOLE ERRORS ON PAGE LOAD
+    - Open browser Developer Tools (F12)
+    - 0 errors in Console tab on page load
+    - [PASS/FAIL] ______  Errors counted: ______
+
+================================================================================
+SECTION 9: MOBILE RESPONSIVENESS
+================================================================================
+
+41. MOBILE BROWSER ACCESS
+    - Access dashboard on smartphone/mobile browser
+    - Layout adjusts without horizontal scrolling
+    - [PASS/FAIL] ______  Device: ________________________________
+
+42. KPI CARDS STACK VERTICALLY ON MOBILE
+    - Cards resize/responsive on mobile
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+43. SIDEBAR COLLAPSES TO HAMBURGER MENU
+    - Mobile menu functional
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+44. FOOTER VISIBLE ON MOBILE
+    - "A Project by Ghanshyam Acharya" visible
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+================================================================================
+SECTION 10: FINAL ACCEPTANCE
+================================================================================
+
+45. OVERALL DASHBOARD FUNCTIONALITY
+    - All features working as designed for operator use
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+46. NO CRITICAL BLOCKERS IDENTIFIED
+    - Zero show-stopping bugs remain
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+47. READY FOR PRODUCTION USE
+    - Pilot operator can complete safety workflows
+    - [PASS/FAIL] ______  Comments: ________________________________
+
+48. SIGN-OBTAINED
+    - Pilot operator representative signs off
+    - [PASS/FAIL] ______  Signature: ____________________________
+
+================================================================================
+UAT SUMMARY
+================================================================================
+
+TOTAL TESTS:    48
+PASSED:         _____ / 48
+FAILED:         _____ / 48
+PERCENTAGE:     _____%
+
+OVERALL ASSESSMENT:
+[ ] FULLY ACCEPTED - All criteria met
+[ ] ACCEPTED WITH MINOR ISSUES - documented below
+[ ] NOT ACCEPTED - critical issues remain
+
+COMMENTS & ISSUES:
+_________________________________________________________________
+_________________________________________________________________
+_________________________________________________________________
+
+TESTER SIGNATURE: ______________________________ DATE: ____________
+
+================================================================================
+QUALITY GATES - MUST PASS FOR RELEASE
+================================================================================
+
+[ ] ✅ All 48 test cases completed
+[ ] ✅ Production dashboard renders correctly (sms.aviasafesystems.com)
+[ ] ✅ Beta sandbox contains 20 operator profiles
+[ ] ✅ Database isolation verified (sms-db vs sms-db-beta)
+[ ] ✅ Security boundaries SEC-01 through SEC-05 enforced
+[ ] ✅ AI Copilot guardrails operational
+[ ] ✅ No critical blockers remain
+[ ] ✅ Pilot operator sign-off obtained
+[ ] ✅ Firebase Crashlytics monitoring active
+[ ] ✅ All 558 backend tests still passing
+
+================================================================================
+END OF UAT CHECKLIST
+================================================================================

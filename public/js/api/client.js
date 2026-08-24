@@ -50,15 +50,28 @@ const ApiClient = {
 
     _getTenantId: async () => {
         try {
-            // Prefer the active tenant slug resolved from the subdomain / demo
-            // context (single source of truth), then fall back to the session
-            // tenant claim for signed-in users whose subdomain is absent.
+            // Auth claims are the source of truth when signed in — never let a
+            // stale sessionStorage demo persona (e.g. air-dynasty-demo) override
+            // the signed-in user's actual tenant (e.g. fishtail-air for
+            // safety@fishtailair.com). See tenant_context.js:syncDemoTenantWithAuth.
+            const session = await getCurrentUser();
+            const authTenant = session && session.tenantId;
+            if (authTenant) {
+                // Keep the demo persona in sync so getCurrentTenant() stays consistent
+                try {
+                    if (typeof TenantResolver !== 'undefined' && TenantResolver.syncDemoTenantWithAuth) {
+                        TenantResolver.syncDemoTenantWithAuth(session);
+                    }
+                } catch (_) { /* ignore */ }
+                return authTenant;
+            }
+            // Unauthenticated or cross-tenant (SUPER_ADMIN/CAAN_SMD without tenant) —
+            // fall back to subdomain / demo context
             if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
                 const active = TenantResolver.getCurrentTenant();
                 if (active) return active;
             }
-            const session = await getCurrentUser();
-            return (session && session.tenantId) || null;
+            return authTenant || null;
         } catch {
             return null;
         }
@@ -69,11 +82,11 @@ const ApiClient = {
             const session = await getCurrentUser();
             const email = (session && session.email) || '';
             if (email && typeof resolveDepartmentFromEmail === 'function') {
-                let tenantId = null;
-                if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
+                // Prefer auth tenant for department resolver — same reason as _getTenantId
+                let tenantId = session && session.tenantId ? session.tenantId : null;
+                if (!tenantId && typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
                     tenantId = TenantResolver.getCurrentTenant();
                 }
-                if (!tenantId && session) tenantId = session.tenantId || null;
                 return resolveDepartmentFromEmail(email, tenantId);
             }
             return null;

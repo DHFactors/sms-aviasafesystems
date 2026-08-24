@@ -1,10 +1,10 @@
-# Security Audit Report — Headway SMS
+# Security Audit Report — AviaSAFE-SMS SMS
 
 *Last updated: 2026-08-22*
 
 ## Executive Summary
 
-All Headway security boundary controls are now **enforced, validated, and deployed**. The multi-tenant isolation, AI guardrails, and storage partitioning specified in the Headway standard are live in production.
+All AviaSAFE-SMS security boundary controls are now **enforced, validated, and deployed**. The multi-tenant isolation, AI guardrails, and storage partitioning specified in the AviaSAFE-SMS standard are live in production.
 
 ---
 
@@ -96,7 +96,7 @@ git add . && git commit -m "security: enforce headway-standard multi-tenant isol
 
 ---
 
-## Key Protections Enforced by the Headway Standard
+## Key Protections Enforced by the AviaSAFE-SMS Standard
 
 | Protection | Enforcement Layer | Status |
 |---|---|---|
@@ -123,4 +123,4 @@ git add . && git commit -m "security: enforce headway-standard multi-tenant isol
 - [x] Git commit pushed to `origin/main` with full audit trail
 - [x] Firebase hosting + Firestore rules live
 
-**Headway security posture: COMPLIANT & DEPLOYED** — All 5 security boundaries (SEC-01 through SEC-05) are enforced at every entry point: token gateway → tenant-partitioned Firestore → partitioned Storage → read-only AI copilot with injection quarantine + egress whitelist.
+**AviaSAFE-SMS security posture: COMPLIANT & DEPLOYED** — All 5 security boundaries (SEC-01 through SEC-05) are enforced at every entry point: token gateway → tenant-partitioned Firestore → partitioned Storage → read-only AI copilot with injection quarantine + egress whitelist.
