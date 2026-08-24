@@ -48,6 +48,7 @@ scripts/firebase/backups/
 # Runtime logs
 backend/logs/
 logs/
+backend/scripts/logs/
 
 # IDE and System Files
 .vscode/
