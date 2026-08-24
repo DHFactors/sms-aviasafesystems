@@ -16,6 +16,7 @@ import google.generativeai as genai
 from loguru import logger
 
 from app.core.config import settings
+from app.core.perf import timed as _perf_timed
 from app.services.risk_matrix import (
     compute_risk_index,
     get_risk_level,
@@ -112,7 +113,8 @@ Return ONLY valid JSON with the following structure:
 Do NOT include risk_index or risk_level in the JSON. Those are computed server-side.
 """
 
-        response = model.generate_content(prompt)
+        with _perf_timed("gemini"):
+            response = model.generate_content(prompt)
 
         response_text = response.text
         json_match = re.search(r'\{[\s\S]*\}', response_text)
@@ -439,7 +441,8 @@ Provide one recommendation object per low-scoring pillar. Do not invent pillar s
 """
 
     try:
-        response = model.generate_content(prompt)
+        with _perf_timed("gemini"):
+            response = model.generate_content(prompt)
         response_text = response.text
         json_match = re.search(r'\{[\s\S]*\}', response_text)
         if json_match:

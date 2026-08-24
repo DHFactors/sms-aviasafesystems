@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
+from app.core.perf import timed as _perf_timed
 from app.firebase import get_db
 
 # Explicit Groq model identifier. Kept as a named constant so deployments can
@@ -304,7 +305,7 @@ def enforce_safety_boundary(
 def get_tenant_classification(tenant_id: Optional[str]) -> Optional[str]:
     """Resolve the tenant's formal operational classification from Firestore.
 
-    Uses the strictly READ-ONLY handle (Headway audit §1.2): the Copilot
+    Uses the strictly READ-ONLY handle (AviaSAFE-SMS audit §1.2): the Copilot
     context cannot create, set, update or delete documents."""
     from app.services.ai_copilot import ReadOnlyFirestoreClient
 
@@ -571,13 +572,14 @@ def chat(
         settings.GROQ_TEMPERATURE,
     )
     try:
-        completion = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=settings.GROQ_TEMPERATURE,
-            max_tokens=settings.GROQ_MAX_TOKENS,
-            stream=False,
-        )
+        with _perf_timed("groq"):
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=settings.GROQ_TEMPERATURE,
+                max_tokens=settings.GROQ_MAX_TOKENS,
+                stream=False,
+            )
         reply = completion.choices[0].message.content
         if not reply:
             logger.warning("Groq returned an empty completion — copilot returning offline reply")
@@ -610,13 +612,14 @@ def chat(
                 GROQ_MODEL_NAME,
             )
             try:
-                completion = client.chat.completions.create(
-                    model=GROQ_MODEL_NAME,
-                    messages=messages,
-                    temperature=settings.GROQ_TEMPERATURE,
-                    max_tokens=settings.GROQ_MAX_TOKENS,
-                    stream=False,
-                )
+                with _perf_timed("groq"):
+                    completion = client.chat.completions.create(
+                        model=GROQ_MODEL_NAME,
+                        messages=messages,
+                        temperature=settings.GROQ_TEMPERATURE,
+                        max_tokens=settings.GROQ_MAX_TOKENS,
+                        stream=False,
+                    )
                 reply = completion.choices[0].message.content
                 return reply.strip() if reply else _offline_reply(message)
             except Exception as e2:

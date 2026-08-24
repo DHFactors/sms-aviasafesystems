@@ -11,6 +11,7 @@ from fastapi import HTTPException, Request
 from loguru import logger
 
 from app.core.config import settings
+from app.core.perf import note_current as perf_note
 from app.firebase import get_db
 
 redis_url = settings.REDIS_URL or os.getenv("REDIS_URL", "")
@@ -251,11 +252,13 @@ def rate_limit(limit_type: str):
 
                 redis_key = _build_redis_key(limit_type, tenant_id, ip, window_sec)
 
+                _t0 = time.perf_counter()
                 count = await r.incr(redis_key)
                 if count == 1:
                     await r.expire(redis_key, window_sec)
 
                 ttl = await r.ttl(redis_key)
+                perf_note("redis", (time.perf_counter() - _t0) * 1000)
                 remaining = max(0, max_count - count)
 
                 resp_headers = {

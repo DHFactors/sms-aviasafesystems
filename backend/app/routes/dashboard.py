@@ -15,6 +15,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 
 from app.core.config import settings
+from app.core.perf import timed as _perf_timed
 from app.middleware.auth import get_current_user, get_tenant_user, get_caan_user, get_admin_user
 from app.services.dashboard_service import DashboardService
 from loguru import logger
@@ -68,7 +69,8 @@ async def get_dashboard_overview(
     logger.info(f"Dashboard overview request: user={user.get('email')}, role={user.get('role')}, tenant_id={user.get('tenant_id')}, days={days}")
     svc = DashboardService(user)
     try:
-        data = svc.get_airline_overview(days=days)
+        with _perf_timed("firestore"):
+            data = svc.get_airline_overview(days=days)
         kpi_count = (data.get("kpis") or {}).get("total_reports", -1)
         logger.info(f"Dashboard overview result for tenant {user.get('tenant_id')}: total_reports={kpi_count}")
         return _envelope(data)
@@ -202,13 +204,14 @@ async def get_master_register(
         scoped_user = dict(user)
         scoped_user["tenant_id"] = str(archetypeId).strip()
         scoped_user["role"] = "AIRLINE_ADMIN"
-        data = build_master_register(
-            scoped_user,
-            department=department,
-            assigned_to_uid=assigned_to_uid,
-            assigned_to_email=assigned_to or user.get("email"),
-            user_department=user_department,
-        )
+        with _perf_timed("firestore"):
+            data = build_master_register(
+                scoped_user,
+                department=department,
+                assigned_to_uid=assigned_to_uid,
+                assigned_to_email=assigned_to or user.get("email"),
+                user_department=user_department,
+            )
         try:
             from app.firebase import get_db
             from demo.session_manager import apply_overlay, load_cap_overlays
@@ -220,13 +223,14 @@ async def get_master_register(
         except Exception:
             pass  # overlay merge is best-effort; master rows still render
     else:
-        data = build_master_register(
-            user,
-            department=department,
-            assigned_to_uid=assigned_to_uid,
-            assigned_to_email=assigned_to,
-            user_department=user_department,
-        )
+        with _perf_timed("firestore"):
+            data = build_master_register(
+                user,
+                department=department,
+                assigned_to_uid=assigned_to_uid,
+                assigned_to_email=assigned_to,
+                user_department=user_department,
+            )
     return _envelope(data)
 
 
@@ -322,7 +326,8 @@ async def get_caan_state(
     user: Dict[str, Any] = Depends(get_caan_user),
 ):
     svc = DashboardService(user)
-    data = svc.get_caan_state(days=days, regulator_id=regulator_id)
+    with _perf_timed("firestore"):
+        data = svc.get_caan_state(days=days, regulator_id=regulator_id)
     return _envelope(data)
 
 
