@@ -33,6 +33,8 @@ CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.nac.com.np",
     "https://ssp.caanepal.gov.np",
     # Local development / static file servers
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "http://localhost:5000",
     "http://localhost:8000",
     "http://127.0.0.1:5500",
@@ -96,6 +98,9 @@ app.add_middleware(ManualCORSMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+# Task 02 latency instrumentation (temporary) — added last so it is outermost.
+from app.core.perf import PerfTimingMiddleware  # noqa: E402
+app.add_middleware(PerfTimingMiddleware)
 
 
 def _req_id(request: Request) -> str:

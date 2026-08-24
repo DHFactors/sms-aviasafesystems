@@ -74,10 +74,20 @@ const firebaseConfig = IS_BETA_ENV ? BETA_CONFIG : PROD_CONFIG;
 const RECAPTCHA_SITE_KEY = firebaseConfig.appCheckSiteKey || '';
 
 // Centralized application configuration (single source of truth)
+// Local-demo override: set once in the browser console to point every
+// ApiClient call at a locally running backend (e.g. Docker on :8000):
+//   localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
+// Remove it with localStorage.removeItem('aviasafe:localApiBaseUrl').
+const LOCAL_API_BASE_URL = (() => {
+    try { return window.localStorage.getItem('aviasafe:localApiBaseUrl'); }
+    catch (e) { return null; }
+})();
+
 const APP_CONFIG = {
-    apiBaseUrl: IS_BETA_ENV
-        ? 'https://sms-aviasafesystems-beta.onrender.com'
-        : 'https://aviasafe-unified-platform.onrender.com',
+    apiBaseUrl: LOCAL_API_BASE_URL
+        || (IS_BETA_ENV
+            ? 'https://sms-aviasafesystems-beta.onrender.com'
+            : 'https://aviasafe-unified-platform.onrender.com'),
     environment: IS_BETA_ENV ? 'beta' : 'production',
     recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     pagination: { defaultPageSize: 20, maxPageSize: 100 },
