@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import base64
 import json
+import time
 
 from loguru import logger
 
@@ -146,6 +147,7 @@ def build_master_register(
       - Cursor pagination via created_at < cursor
       - Single collection_group fetch for CAPs (removes N+1 per-CAN reads)
     """
+    t0 = time.perf_counter()
     tenant_id = user.get("tenant_id")
     cross_tenant = user.get("role") in settings.CROSS_TENANT_ROLES
 
@@ -156,6 +158,7 @@ def build_master_register(
         ps = 50
     ps = max(1, min(ps, settings.REPO_MAX_PAGE_SIZE))
     cursor_dt = _parse_cursor(cursor)
+    logger.info(f"[PERF] master_register start tenant={tenant_id} cross={cross_tenant} page_size={ps} dept={department} status={status} days={days}")
 
     # Date range handling (Firestore-level)
     cutoff_from: Optional[datetime] = None
@@ -295,10 +298,12 @@ def build_master_register(
     rows: List[dict] = []
 
     # --- Hazards: Firestore-level filtering ---
+    t_haz = time.perf_counter()
     try:
         # Use DB filtering for department/status + limit; assignee/search remain Python
         hazard_query = _build_filtered_query(_hazard_base(), norm_dept, status, cursor_dt, order_field="created_at")
         hazard_docs = _safe_get(hazard_query, lambda: _hazard_base())
+        logger.info(f"[PERF] hazards query={len(hazard_docs)} docs {(time.perf_counter()-t_haz)*1000:.1f}ms dept={norm_dept} status={status}")
         # If query already filtered at DB, we still apply Python checks for safety (search, alias edge)
         for doc in hazard_docs:
             data = doc.to_dict() or {}
@@ -329,6 +334,7 @@ def build_master_register(
         logger.error(f"Master register hazard scan failed: {e}")
 
     # --- CANs: Firestore-level filtering ---
+    t_can = time.perf_counter()
     can_docs_cache: List[Any] = []
     try:
         # For assignee filtering, try to push assigned_to_uid or assigned_to if single filter
@@ -382,6 +388,7 @@ def build_master_register(
                 pass
 
         can_docs_cache = _safe_get(can_query, lambda: _can_base())
+        logger.info(f"[PERF] can_cap query={len(can_docs_cache)} docs {(time.perf_counter()-t_can)*1000:.1f}ms")
         for can_doc in can_docs_cache:
             can_data = can_doc.to_dict() or {}
             if not _match_department(can_data):
@@ -422,6 +429,7 @@ def build_master_register(
                 continue
 
         # Attempt collection_group fetch for caps - batched (removes N+1)
+        t_caps = time.perf_counter()
         cap_limit = per_type_limit
         cap_query = None
         caps_via_group = False
@@ -455,12 +463,14 @@ def build_master_register(
             elif cursor_dt is not None:
                 cap_query = cap_query.where("created_at", "<", cursor_dt)
             caps_fetched = list(cap_query.get())
+            logger.info(f"[PERF] caps query={len(caps_fetched)} docs {(time.perf_counter()-t_caps)*1000:.1f}ms via_group=True")
             caps_via_group = True
             # If group query returned 0 but we have CANs with caps missing tenant_id, fallback may still be needed
             # Check if any caps missing tenant_id by seeing if can_map caps not in result
             # We will supplement fallback only if needed below
         except Exception as e:
             logger.warning(f"Master register CAP collection_group query failed (fallback to per-CAN bounded): {e}")
+            logger.info(f"[PERF] caps query fallback {(time.perf_counter()-t_caps)*1000:.1f}ms")
             cap_query = None
 
         # If group query succeeded but tenant caps may be legacy without tenant_id, supplement with bounded per-CAN fetch for those CANs not covered
@@ -589,12 +599,14 @@ def build_master_register(
     except Exception as e:
         logger.error(f"Master register CAP batch scan failed: {e}")
 
+    t_filter_sort = time.perf_counter()
     def _sort_key(row: dict):
         # Use date string; ISO sorts lexicographically but we parse for safety
         dt = _coerce_dt(row.get("date"))
         return dt or datetime.min.replace(tzinfo=timezone.utc)
 
     rows.sort(key=_sort_key, reverse=True)
+    logger.info(f"[PERF] filtering/sorting rows={len(rows)} {(time.perf_counter()-t_filter_sort)*1000:.1f}ms")
 
     # Apply Python pagination slice after merge (handles cross-type ordering)
     # If cursor provided, rows already DB-filtered by cursor_dt, but double-check
@@ -627,6 +639,7 @@ def build_master_register(
     # If we fetched per_type_limit and paged_rows == ps and rows length == paged_rows length, we may still have more; keep has_more true
     # For now, set has_more = len(rows) >= ps and not all data exhausted (conservative)
 
+    t_count = time.perf_counter()
     # Preserve total/by_status/by_type semantics via count aggregation (bounded)
     # For paginated view, counts should reflect current page's visible rows when search/assignee OR present (Python filters),
     # otherwise try Firestore count aggregation for accurate totals.
@@ -703,6 +716,8 @@ def build_master_register(
     total = total_via_count if total_via_count is not None else len(paged_rows)
     # For by_status/by_type when paginated and counts incomplete, keep paged counts (original semantics were for visible rows)
     # When using aggregation, by_status would need per-status queries; keep paged for simplicity and to avoid extra reads
+    logger.info(f"[PERF] count aggregation {(time.perf_counter()-t_count)*1000:.1f}ms total_via_count={total_via_count}")
+    logger.info(f"[PERF] master_register total {(time.perf_counter()-t0)*1000:.1f}ms returned {len(paged_rows)} rows has_more={has_more} total={total}")
 
     return {
         "rows": paged_rows,
