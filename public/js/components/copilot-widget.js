@@ -102,16 +102,16 @@
         ];
     }
 
-    // Backend base URL. Priority (first hit wins):
-    //   1. localStorage 'aviasafe:localApiBaseUrl' — set once in the browser
-    //      console to point every Copilot request at a locally-running backend
-    //      (e.g. Docker on http://localhost:8000):
+    // Single runtime mapping: Firebase Hosting URL -> Render backend.
+    // Priority (first hit wins):
+    //   1. localStorage 'aviasafe:localApiBaseUrl' — set once in console to point Copilot
+    //      at a locally-running backend (Docker on http://localhost:8000):
     //        localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
-    //      Demo pages served on http://localhost:5005 (firebase serve) rely on
-    //      this override to avoid CORS/network failures against Render.
-    //   2. APP_CONFIG.apiBaseUrl (set by firebase.js — itself honours the same
-    //      localStorage override) / window.API_BASE_URL.
-    //   3. Hostname-based fallback (beta → beta backend, else prod).
+    //      Demo pages served on http://localhost:5005 rely on this override.
+    //   2. window.APP_CONFIG.apiBaseUrl (set by public/js/firebase.js via IS_BETA_ENV:
+    //        beta Hosting URL -> Render beta API, prod Hosting URL -> Render prod API).
+    //   3. Hostname-based fallback (beta -> beta backend, else prod). Deployed frontend
+    //      never defaults to localhost — localhost only when hostname is localhost.
     //
     // Guest (unauthenticated) mode is pinned to the beta backend ONLY when no
     // local override is present — the /api/v1/copilot/guest/chat route only
@@ -123,14 +123,13 @@
         } catch (e) { /* ignore storage errors (incognito) */ }
         if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
         if (window.API_BASE_URL) return window.API_BASE_URL;
-        var host = window.location.hostname || '';
-        var isBeta = host.indexOf('beta') !== -1 ||
-            host === 'localhost' || host === '127.0.0.1';
-        // Guest pages without a local override must hit beta (only it serves /guest/chat).
-        // Non-guest pages without an override still use the same hostname fallback.
-        return isBeta
-            ? 'https://sms-aviasafesystems-beta.onrender.com'
-            : 'https://aviasafe-unified-platform.onrender.com';
+        var host = (window.location.hostname || '').toLowerCase();
+        var isBetaHost = host.indexOf('beta') !== -1 || host.indexOf('sms-beta') !== -1;
+        var isLocalhost = host === 'localhost' || host === '127.0.0.1';
+        // Deployed beta hosts -> beta backend; deployed prod hosts -> prod backend
+        if (isBetaHost) return 'https://sms-aviasafesystems-beta.onrender.com';
+        if (isLocalhost) return 'https://sms-aviasafesystems-beta.onrender.com';
+        return 'https://aviasafe-unified-platform.onrender.com';
     }
 
     function chatEndpoint() {

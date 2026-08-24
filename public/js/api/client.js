@@ -1,5 +1,24 @@
 const ApiClient = {
-    _baseUrl: () => (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || 'https://aviasafe-unified-platform.onrender.com',
+    // Single runtime mapping: Firebase Hosting URL -> Render backend.
+    // Priority: APP_CONFIG.apiBaseUrl (set by public/js/firebase.js via IS_BETA_ENV) else hostname mapping.
+    // Deployed frontend never defaults to localhost — localhost only when hostname is localhost.
+    _baseUrl: () => {
+        if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
+        if (window.API_BASE_URL) return window.API_BASE_URL;
+        try {
+            const h = (window.location.hostname || '').toLowerCase();
+            const isBetaHost = h.includes('beta') || h.includes('sms-beta');
+            if (isBetaHost) return 'https://sms-aviasafesystems-beta.onrender.com';
+            if (h === 'localhost' || h === '127.0.0.1') {
+                try {
+                    const local = window.localStorage && window.localStorage.getItem('aviasafe:localApiBaseUrl');
+                    if (local && local.trim()) return local.trim().replace(/\/+$/, '');
+                } catch {}
+                return 'http://localhost:8000';
+            }
+        } catch {}
+        return 'https://aviasafe-unified-platform.onrender.com';
+    },
 
     _waitForFirebase: () => {
         return new Promise(resolve => {
