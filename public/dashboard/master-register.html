@@ -102,8 +102,16 @@
         <input type="text" id="filterDepartment" placeholder="e.g. Engineering & Maintenance" style="min-width:180px;">
         <label>Search:</label>
         <input type="text" id="filterSearch" placeholder="Reference or title..." style="flex:1;min-width:150px;">
-        <button class="btn-search" onclick="loadRegister()"><i class="fas fa-search"></i> Search</button>
+        <label>Page size:</label>
+        <select id="pageSize" style="width:80px;">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+        </select>
+        <button class="btn-search" onclick="loadRegister(false)"><i class="fas fa-search"></i> Search</button>
+        <button class="btn-search" id="loadMoreBtn" onclick="loadRegister(true)" style="display:none;background:#64748b;"><i class="fas fa-plus"></i> Load More</button>
     </div>
+    <div id="paginationInfo" style="font-size:0.8rem;color:#64748b;margin-bottom:0.5rem;display:none;"></div>
 
     <div class="table-card">
         <table>
@@ -145,6 +153,9 @@ let typeFilter = '';
 let statusFilter = '';
 let sortKey = 'date';
 let sortDir = -1;
+let nextCursor = null;
+let hasMore = false;
+let currentPageSize = 50;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -210,37 +221,71 @@ function riskBadgeClass(risk) {
     return 'badge-default';
 }
 
-async function loadRegister() {
+async function loadRegister(append) {
     const tbody = document.getElementById('registerBody');
     const loading = document.getElementById('loadingIndicator');
     const empty = document.getElementById('emptyIndicator');
     const statusSel = document.getElementById('filterStatus');
-    tbody.innerHTML = '';
+    const pageSizeSel = document.getElementById('pageSize');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    const paginationInfo = document.getElementById('paginationInfo');
+    if (!append) {
+        tbody.innerHTML = '';
+        allRows = [];
+        nextCursor = null;
+        hasMore = false;
+    }
     loading.style.display = 'flex';
     empty.style.display = 'none';
+    if (pageSizeSel) currentPageSize = parseInt(pageSizeSel.value, 10) || 50;
 
     try {
         const department = document.getElementById('filterDepartment').value.trim() || undefined;
+        const status = document.getElementById('filterStatus').value.trim() || undefined;
+        const search = document.getElementById('filterSearch').value.trim() || undefined;
         const params = new URLSearchParams();
         if (department) params.set('department', department);
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        params.set('page_size', String(currentPageSize));
+        if (append && nextCursor) params.set('cursor', nextCursor);
         const qs = params.toString() ? '?' + params.toString() : '';
         const data = await ApiClient.get('/api/v1/dashboard/master-register' + qs);
         const payload = data || {};
-        allRows = payload.rows || [];
+        const newRows = payload.rows || [];
+        if (append) {
+            allRows = allRows.concat(newRows);
+        } else {
+            allRows = newRows;
+        }
+        // Pagination state from backend
+        const pagination = payload.pagination || {};
+        nextCursor = pagination.next_cursor || null;
+        hasMore = !!pagination.has_more;
 
-        // Populate status dropdown from actual data
-        const current = statusSel.value;
-        statusSel.innerHTML = '<option value="">All</option>';
-        Object.keys(payload.by_status || {}).sort().forEach(function(s) {
-            const opt = document.createElement('option');
-            opt.value = s; opt.textContent = s;
-            statusSel.appendChild(opt);
-        });
-        statusSel.value = current;
+        // Populate status dropdown from actual data (only on first load without status filter)
+        if (!append) {
+            const current = statusSel.value;
+            if (!status) {
+                statusSel.innerHTML = '<option value="">All</option>';
+                Object.keys(payload.by_status || {}).sort().forEach(function(s) {
+                    const opt = document.createElement('option');
+                    opt.value = s; opt.textContent = s;
+                    statusSel.appendChild(opt);
+                });
+                statusSel.value = current;
+            }
+        }
 
         renderStats(payload);
         renderTable();
         loading.style.display = 'none';
+        // Update pagination UI
+        if (loadMoreBtn) loadMoreBtn.style.display = hasMore ? 'inline-block' : 'none';
+        if (paginationInfo) {
+            paginationInfo.style.display = 'block';
+            paginationInfo.textContent = 'Showing ' + allRows.length + ' rows' + (hasMore ? ' — more available' : ' — end') + ' (page_size=' + currentPageSize + ')';
+        }
     } catch (err) {
         loading.style.display = 'none';
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;

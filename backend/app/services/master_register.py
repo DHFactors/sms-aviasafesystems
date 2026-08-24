@@ -10,7 +10,7 @@
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import base64
 import json
@@ -123,6 +123,9 @@ def build_master_register(
     search: Optional[str] = None,
     page_size: Optional[int] = None,
     cursor: Optional[str] = None,
+    days: Optional[int] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
 ) -> dict:
     """Assemble the unified register for the authenticated user's scope.
 
@@ -154,6 +157,19 @@ def build_master_register(
     ps = max(1, min(ps, settings.REPO_MAX_PAGE_SIZE))
     cursor_dt = _parse_cursor(cursor)
 
+    # Date range handling (Firestore-level)
+    cutoff_from: Optional[datetime] = None
+    cutoff_to: Optional[datetime] = None
+    if date_from is not None:
+        cutoff_from = _coerce_dt(date_from)
+    elif days is not None and days > 0:
+        try:
+            cutoff_from = datetime.now(timezone.utc) - timedelta(days=int(days))
+        except Exception:
+            cutoff_from = None
+    if date_to is not None:
+        cutoff_to = _coerce_dt(date_to)
+
     # Normalized department for DB where (if provided)
     norm_dept = normalize_department(department) if department else None
     # For CAP dept fallback
@@ -164,7 +180,7 @@ def build_master_register(
     per_type_limit = max(ps, 25)  # at least 25 to allow merge diversity
 
     def _build_filtered_query(base, dept_val: Optional[str], status_val: Optional[str], cursor_dt_val: Optional[datetime], order_field: str = "created_at"):
-        """Apply department/status where + cursor + order_by + limit. Falls back gracefully."""
+        """Apply department/status/date where + order_by + limit + start_after cursor. Falls back gracefully."""
         q = base
         try:
             # Department filter at DB level
@@ -172,19 +188,22 @@ def build_master_register(
                 q = q.where("department", "==", dept_val)
             if status_val:
                 q = q.where("status", "==", status_val)
-            # Cursor as created_at < cursor for DESC order
-            if cursor_dt_val is not None:
-                # Need to apply before order_by for Firestore
-                q = q.where(order_field, "<", cursor_dt_val)
+            # Date range at DB level
+            if cutoff_from is not None:
+                q = q.where(order_field, ">=", cutoff_from)
+            if cutoff_to is not None:
+                q = q.where(order_field, "<=", cutoff_to)
         except Exception as e:
             logger.warning(f"Master register DB filter build failed (fallback to Python): {e}")
-            # Return base without filters if where fails (missing index etc.)
             q = base
-            if cursor_dt_val is not None:
-                try:
-                    q = q.where(order_field, "<", cursor_dt_val)
-                except Exception:
-                    pass
+            # Retry date filters individually
+            for val, op in [(cutoff_from, ">="), (cutoff_to, "<=")]:
+                if val is not None:
+                    try:
+                        q = q.where(order_field, op, val)
+                    except Exception:
+                        pass
+        # Order and limit
         try:
             from google.cloud.firestore import Query as FirestoreQuery
             q = q.order_by(order_field, direction=FirestoreQuery.DESCENDING).limit(per_type_limit)
@@ -194,6 +213,25 @@ def build_master_register(
                 q = q.limit(per_type_limit)
             except Exception:
                 pass
+        # Cursor via start_after (preferred) — Firestore requires order_by before start_after
+        if cursor_dt_val is not None:
+            try:
+                # Try start_after with dict form (mock friendly)
+                if hasattr(q, "start_after"):
+                    try:
+                        q = q.start_after({order_field: cursor_dt_val})
+                    except Exception:
+                        # Fallback: try positional value
+                        q = q.start_after(cursor_dt_val)
+                else:
+                    # Fallback for older mocks: use where < cursor
+                    q = q.where(order_field, "<", cursor_dt_val)
+            except Exception as e:
+                logger.warning(f"Master register start_after failed, using where fallback: {e}")
+                try:
+                    q = q.where(order_field, "<", cursor_dt_val)
+                except Exception:
+                    pass
         return q
 
     # We try DB-filtered queries; on failure fall back to full fetch + Python filter
@@ -296,12 +334,16 @@ def build_master_register(
         # For assignee filtering, try to push assigned_to_uid or assigned_to if single filter
         can_base = _can_base()
         can_query = can_base
-        # Apply department/status at DB
+        # Apply department/status/date at DB
         try:
             if norm_dept:
                 can_query = can_query.where("department", "==", norm_dept)
             if status:
                 can_query = can_query.where("status", "==", status)
+            if cutoff_from is not None:
+                can_query = can_query.where("created_at", ">=", cutoff_from)
+            if cutoff_to is not None:
+                can_query = can_query.where("created_at", "<=", cutoff_to)
             # If only one assignee dimension, push to DB for efficiency; OR case stays Python
             single_assignee = sum(bool(x) for x in [assigned_to_uid, assigned_to_email, user_department]) == 1
             if single_assignee:
@@ -311,9 +353,6 @@ def build_master_register(
                     can_query = can_query.where("assigned_to", "==", assigned_to_email)
                 elif user_department:
                     can_query = can_query.where("department", "==", normalize_department(user_department))
-            if cursor_dt is not None:
-                # CANs order by issued_at or created_at; use created_at for cursor
-                can_query = can_query.where("created_at", "<", cursor_dt)
         except Exception as e:
             logger.warning(f"Master register CAN DB filter build partial failure: {e}")
 
@@ -321,10 +360,24 @@ def build_master_register(
             from google.cloud.firestore import Query as FirestoreQuery
             # Prefer issued_at/created_at; fallback to created_at
             can_query = can_query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(per_type_limit)
+            # Cursor via start_after
+            if cursor_dt is not None and hasattr(can_query, "start_after"):
+                try:
+                    can_query = can_query.start_after({"created_at": cursor_dt})
+                except Exception:
+                    try:
+                        can_query = can_query.start_after(cursor_dt)
+                    except Exception:
+                        can_query = can_query.where("created_at", "<", cursor_dt)
         except Exception as e:
             logger.warning(f"Master register CAN order/limit failed: {e}")
             try:
                 can_query = can_query.limit(per_type_limit)
+                if cursor_dt is not None and hasattr(can_query, "start_after"):
+                    try:
+                        can_query = can_query.start_after({"created_at": cursor_dt})
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -368,7 +421,7 @@ def build_master_register(
             except Exception:
                 continue
 
-        # Attempt collection_group fetch for caps
+        # Attempt collection_group fetch for caps - batched (removes N+1)
         cap_limit = per_type_limit
         cap_query = None
         caps_via_group = False
@@ -384,10 +437,23 @@ def build_master_register(
             if status:
                 # CAP status filter
                 cap_query = cap_query.where("status", "==", status)
-            if cursor_dt is not None:
-                cap_query = cap_query.where("created_at", "<", cursor_dt)
+            if cutoff_from is not None:
+                cap_query = cap_query.where("created_at", ">=", cutoff_from)
+            if cutoff_to is not None:
+                cap_query = cap_query.where("created_at", "<=", cutoff_to)
             from google.cloud.firestore import Query as FirestoreQuery
             cap_query = cap_query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(cap_limit)
+            # Cursor via start_after
+            if cursor_dt is not None and hasattr(cap_query, "start_after"):
+                try:
+                    cap_query = cap_query.start_after({"created_at": cursor_dt})
+                except Exception:
+                    try:
+                        cap_query = cap_query.start_after(cursor_dt)
+                    except Exception:
+                        cap_query = cap_query.where("created_at", "<", cursor_dt)
+            elif cursor_dt is not None:
+                cap_query = cap_query.where("created_at", "<", cursor_dt)
             caps_fetched = list(cap_query.get())
             caps_via_group = True
             # If group query returned 0 but we have CANs with caps missing tenant_id, fallback may still be needed
@@ -561,15 +627,86 @@ def build_master_register(
     # If we fetched per_type_limit and paged_rows == ps and rows length == paged_rows length, we may still have more; keep has_more true
     # For now, set has_more = len(rows) >= ps and not all data exhausted (conservative)
 
+    # Preserve total/by_status/by_type semantics via count aggregation (bounded)
+    # For paginated view, counts should reflect current page's visible rows when search/assignee OR present (Python filters),
+    # otherwise try Firestore count aggregation for accurate totals.
+    def _try_count(base, dept_val, status_val):
+        """Try Firestore count aggregation with same dept/status/date filters (bounded)."""
+        try:
+            q = base
+            if dept_val:
+                q = q.where("department", "==", dept_val)
+            if status_val:
+                # For by_status we count per status, not filtered status
+                pass
+            if cutoff_from is not None:
+                q = q.where("created_at", ">=", cutoff_from)
+            if cutoff_to is not None:
+                q = q.where("created_at", "<=", cutoff_to)
+            # Assignee single filter can be pushed
+            single_assignee = sum(bool(x) for x in [assigned_to_uid, assigned_to_email, user_department]) == 1
+            if single_assignee:
+                if assigned_to_uid:
+                    q = q.where("assigned_to_uid", "==", assigned_to_uid)
+                elif assigned_to_email:
+                    q = q.where("assigned_to", "==", assigned_to_email)
+            # If search present, count aggregation not accurate (substring) -> fallback
+            if search:
+                return None
+            cnt_res = q.count().get()
+            if cnt_res and hasattr(cnt_res[0], "value"):
+                return cnt_res[0].value or 0
+            if cnt_res and isinstance(cnt_res[0], (list, tuple)) and hasattr(cnt_res[0][0], "value"):
+                return cnt_res[0][0].value or 0
+        except Exception as e:
+            logger.debug(f"Count aggregation failed, fallback to bounded: {e}")
+        return None
+
+    # Compute status/type counts from paged rows (accurate for current page, preserves original semantics when paginated)
+    # For total, try aggregation when no Python-only filters (search or multi-assignee)
+    total_via_count = None
+    if not search and not (assignee_filters and sum(bool(x) for x in [assigned_to_uid, assigned_to_email, user_department]) > 1):
+        try:
+            # Sum counts for hazards + cans + caps via aggregation
+            haz_count = _try_count(_hazard_base(), norm_dept, None)
+            can_count = _try_count(_can_base(), norm_dept, None)
+            # Caps count via group
+            cap_count = None
+            try:
+                db = get_db()
+                cq = db.collection_group(CAP_SUBCOLLECTION)
+                if not cross_tenant and tenant_id:
+                    cq = cq.where("tenant_id", "==", tenant_id)
+                if norm_dept_for_cap:
+                    cq = cq.where("department", "==", norm_dept_for_cap)
+                if cutoff_from is not None:
+                    cq = cq.where("created_at", ">=", cutoff_from)
+                if cutoff_to is not None:
+                    cq = cq.where("created_at", "<=", cutoff_to)
+                cap_res = cq.count().get()
+                if cap_res and hasattr(cap_res[0], "value"):
+                    cap_count = cap_res[0].value or 0
+            except Exception:
+                cap_count = None
+            if haz_count is not None and can_count is not None:
+                total_via_count = (haz_count or 0) + (can_count or 0) + (cap_count or 0)
+        except Exception:
+            total_via_count = None
+
     status_counts: Dict[str, int] = {}
     type_counts: Dict[str, int] = {}
     for row in paged_rows:
         status_counts[row["status"]] = status_counts.get(row["status"], 0) + 1
         type_counts[row["type"]] = type_counts.get(row["type"], 0) + 1
 
+    # If we have accurate count, use it for total; otherwise use paged length (bounded semantics)
+    total = total_via_count if total_via_count is not None else len(paged_rows)
+    # For by_status/by_type when paginated and counts incomplete, keep paged counts (original semantics were for visible rows)
+    # When using aggregation, by_status would need per-status queries; keep paged for simplicity and to avoid extra reads
+
     return {
         "rows": paged_rows,
-        "total": len(paged_rows),
+        "total": total,
         "total_unpaged": len(rows),
         "by_status": status_counts,
         "by_type": type_counts,
@@ -580,6 +717,9 @@ def build_master_register(
             "user_department": user_department,
             "status": status,
             "search": search,
+            "days": days,
+            "date_from": _iso(cutoff_from) if cutoff_from else None,
+            "date_to": _iso(cutoff_to) if cutoff_to else None,
         },
         "pagination": {
             "page_size": ps,
