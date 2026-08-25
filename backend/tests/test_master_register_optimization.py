@@ -281,6 +281,43 @@ def test_cap_batch_no_n_plus_one(monkeypatch):
     assert db._group_calls >= 1
     assert db._group_calls <= 2
 
+def test_total_equals_sum_by_type_across_all_types(monkeypatch):
+    hazards = [MockDoc(f"h{i}", {"hazard_id": f"H{i}", "title": f"HT{i}", "status": "Open", "department": "", "created_at": _dt(i)}) for i in range(3)]
+    cans = [MockDoc(f"c{i}", {"can_reference": f"CAN-{i}", "title": f"CT{i}", "status": "Open", "department": "", "created_at": _dt(i)}) for i in range(2)]
+    caps = [
+        MockDoc("cap1", {"cap_reference": "CAN-0-CAP-1", "action_plan": "F1", "status": "Open", "department": "", "created_at": _dt(1), "tenant_id": "t1", "can_id": "c0"}, path="tenants/t1/can_cap/c0/caps/cap1"),
+        MockDoc("cap2", {"cap_reference": "CAN-1-CAP-1", "action_plan": "F2", "status": "Closed", "department": "", "created_at": _dt(1), "tenant_id": "t1", "can_id": "c1"}, path="tenants/t1/can_cap/c1/caps/cap2"),
+        MockDoc("cap3", {"cap_reference": "CAN-1-CAP-2", "action_plan": "F3", "status": "In Progress", "department": "", "created_at": _dt(1), "tenant_id": "t1", "can_id": "c1"}, path="tenants/t1/can_cap/c1/caps/cap3"),
+    ]
+    haz_coll, can_coll, db = _patch_master(monkeypatch, hazards, cans, caps_group=caps)
+    user = {"role": "AIRLINE_ADMIN", "tenant_id": "t1", "uid": "u1", "email": "a@t1.com"}
+    result = master_register.build_master_register(user, page_size=3)
+    assert result["total"] == 8
+    assert result["by_type"] == {"Hazard": 3, "CAN": 2, "CAP": 3}
+    assert result["total"] == sum(result["by_type"].values())
+    assert len(result["rows"]) == 3
+
+def test_total_falls_back_when_caps_count_fails(monkeypatch):
+    hazards = [MockDoc("h1", {"hazard_id": "H1", "title": "T", "status": "Open", "department": "", "created_at": _dt(1)})]
+    cans = [MockDoc("c1", {"can_reference": "CAN-1", "title": "C", "status": "Open", "department": "", "created_at": _dt(1)})]
+
+    class BrokenCountColl(MockColl):
+        def count(self):
+            self.calls["count"] += 1
+            raise RuntimeError("caps index missing")
+    haz_coll, can_coll, db = _patch_master(monkeypatch, hazards, cans, caps_group=[])
+    orig_group = db.collection_group
+    def broken_group(name):
+        orig_group(name)
+        return BrokenCountColl([])
+    monkeypatch.setattr(db, "collection_group", broken_group)
+    user = {"role": "AIRLINE_ADMIN", "tenant_id": "t1", "uid": "u1", "email": "a@t1.com"}
+    result = master_register.build_master_register(user)
+    # Aggregation must be abandoned entirely (no haz+can+0 masking); fallback keeps invariant
+    assert result["total"] == len(result["rows"])
+    assert result["total"] == sum(result["by_type"].values())
+    assert result["by_type"] == {"Hazard": 1, "CAN": 1}
+
 def test_api_route_pagination(monkeypatch):
     # Test the FastAPI route supports page_size/cursor
     from unittest.mock import patch

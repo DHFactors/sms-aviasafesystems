@@ -678,6 +678,7 @@ def build_master_register(
     # Compute status/type counts from paged rows (accurate for current page, preserves original semantics when paginated)
     # For total, try aggregation when no Python-only filters (search or multi-assignee)
     total_via_count = None
+    agg_type_counts = None
     if not search and not (assignee_filters and sum(bool(x) for x in [assigned_to_uid, assigned_to_email, user_department]) > 1):
         try:
             # Sum counts for hazards + cans + caps via aggregation
@@ -698,13 +699,18 @@ def build_master_register(
                     cq = cq.where("created_at", "<=", cutoff_to)
                 cap_res = cq.count().get()
                 if cap_res and hasattr(cap_res[0], "value"):
-                    cap_count = cap_res[0].value or 0
+                    cap_count = int(cap_res[0].value or 0)
+                elif cap_res and isinstance(cap_res[0], (list, tuple)) and hasattr(cap_res[0][0], "value"):
+                    cap_count = int(cap_res[0][0].value or 0)
             except Exception:
                 cap_count = None
-            if haz_count is not None and can_count is not None:
-                total_via_count = (haz_count or 0) + (can_count or 0) + (cap_count or 0)
+            # All three components must succeed; a missing caps count must never be masked as 0
+            if haz_count is not None and can_count is not None and cap_count is not None:
+                total_via_count = int(haz_count) + int(can_count) + int(cap_count)
+                agg_type_counts = {"Hazard": int(haz_count), "CAN": int(can_count), "CAP": int(cap_count)}
         except Exception:
             total_via_count = None
+            agg_type_counts = None
 
     status_counts: Dict[str, int] = {}
     type_counts: Dict[str, int] = {}
@@ -712,11 +718,14 @@ def build_master_register(
         status_counts[row["status"]] = status_counts.get(row["status"], 0) + 1
         type_counts[row["type"]] = type_counts.get(row["type"], 0) + 1
 
-    # If we have accurate count, use it for total; otherwise use paged length (bounded semantics)
-    total = total_via_count if total_via_count is not None else len(paged_rows)
-    # For by_status/by_type when paginated and counts incomplete, keep paged counts (original semantics were for visible rows)
-    # When using aggregation, by_status would need per-status queries; keep paged for simplicity and to avoid extra reads
-    logger.info(f"[PERF] count aggregation {(time.perf_counter()-t_count)*1000:.1f}ms total_via_count={total_via_count}")
+    if total_via_count is not None and agg_type_counts is not None:
+        # Aggregation authoritative: total and by_type share one source so they always agree
+        type_counts = {k: v for k, v in agg_type_counts.items() if v}
+        total = total_via_count
+    else:
+        # Bounded fallback: both metrics derive from paged rows so the invariant still holds
+        total = len(paged_rows)
+    logger.info(f"[PERF] count aggregation {(time.perf_counter()-t_count)*1000:.1f}ms total_via_count={total_via_count} components={agg_type_counts}")
     logger.info(f"[PERF] master_register total {(time.perf_counter()-t0)*1000:.1f}ms returned {len(paged_rows)} rows has_more={has_more} total={total}")
 
     return {

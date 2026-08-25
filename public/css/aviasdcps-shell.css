@@ -1,0 +1,219 @@
+/* ============================================================================
+   FILE: aviasdcps-shell.css
+   PATH: public/css/aviasdcps-shell.css
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS workspace shell — layout grid, fixed sidebar, sticky top
+            header, typography variables, and responsive breakpoints.
+            Follows the same design tokens as css/variables.css and
+            css/shell.css for visual consistency.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ */
+
+/* ── Theme Tokens ─────────────────────────────────────────────────────────── */
+:root {
+    --aviasdcps-navy:       #072535;
+    --aviasdcps-navy-dark:  #051a26;
+    --aviasdcps-navy-light: #0284c7;
+    --aviasdcps-green:      #34a853;
+    --aviasdcps-gold:       #d4af37;
+    --aviasdcps-bg:         #f1f5f9;
+    --aviasdcps-surface:    #ffffff;
+    --aviasdcps-border:     #e2e8f0;
+    --aviasdcps-text:       #0f172a;
+    --aviasdcps-text-muted: #64748b;
+    --aviasdcps-sidebar-w:  240px;
+    --aviasdcps-header-h:   52px;
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+.aviasdcps-shell,
+.aviasdcps-shell * { box-sizing: border-box; margin: 0; padding: 0; }
+
+.aviasdcps-shell {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--aviasdcps-bg);
+    color: var(--aviasdcps-text);
+    min-height: 100vh;
+    display: flex;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+.aviasdcps-sidebar {
+    width: var(--aviasdcps-sidebar-w);
+    flex-shrink: 0;
+    background: var(--aviasdcps-navy-dark);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    z-index: 200;
+    overflow-y: auto;
+    transition: transform var(--aviasdcps-transition, 0.25s ease);
+}
+
+.aviasdcps-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.95rem 1.15rem;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.aviasdcps-sidebar-brand i { font-size: 1.2rem; color: var(--aviasdcps-green); }
+
+.aviasdcps-sidebar-sub {
+    padding: 0.35rem 1.15rem 0.7rem;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: rgba(255,255,255,0.4);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.aviasdcps-sidebar-nav { flex: 1; padding: 0.45rem 0; }
+.aviasdcps-sidebar-nav ul { list-style: none; }
+
+.aviasdcps-sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.58rem 1.15rem;
+    color: rgba(255,255,255,0.72);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.aviasdcps-sidebar-nav li a i { width: 17px; text-align: center; font-size: 0.82rem; }
+.aviasdcps-sidebar-nav li a:hover { background: rgba(255,255,255,0.07); color: #fff; }
+.aviasdcps-sidebar-nav li a.active {
+    background: rgba(2,132,199,0.2);
+    border-left-color: var(--aviasdcps-green);
+    color: #fff;
+}
+
+.aviasdcps-sidebar-foot {
+    padding: 0.7rem 1.15rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.6rem;
+    color: rgba(255,255,255,0.35);
+    line-height: 1.55;
+}
+
+/* ── Main Column ──────────────────────────────────────────────────────────── */
+.aviasdcps-main {
+    flex: 1;
+    margin-left: var(--aviasdcps-sidebar-w);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Top Header ───────────────────────────────────────────────────────────── */
+.aviasdcps-header {
+    background: var(--aviasdcps-navy);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.4rem;
+    height: var(--aviasdcps-header-h);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 3px solid var(--aviasdcps-green);
+    gap: 0.8rem;
+}
+.aviasdcps-header-left  { display: flex; align-items: center; gap: 0.7rem; }
+.aviasdcps-header-right { display: flex; align-items: center; gap: 0.85rem; }
+
+.aviasdcps-header-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+}
+
+.aviasdcps-header-toggle {
+    background: none; border: none; color: #fff;
+    font-size: 1.05rem; cursor: pointer; opacity: 0.8;
+    padding: 0.2rem;
+}
+.aviasdcps-header-toggle:hover { opacity: 1; }
+
+.aviasdcps-period {
+    display: flex; align-items: center; gap: 0.35rem;
+}
+.aviasdcps-period label { font-size: 0.75rem; opacity: 0.65; }
+.aviasdcps-period select {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.22);
+    padding: 0.3rem 0.55rem;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+.aviasdcps-period select option { background: var(--aviasdcps-navy); color: #fff; }
+
+.aviasdcps-user-pill {
+    display: flex; align-items: center; gap: 0.4rem;
+    background: rgba(255,255,255,0.08);
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    border: 1px solid rgba(255,255,255,0.18);
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.aviasdcps-user-pill i { font-size: 0.85rem; }
+
+/* ── Viewport ─────────────────────────────────────────────────────────────── */
+.aviasdcps-viewport {
+    flex: 1;
+    padding: 1.4rem;
+    max-width: 1440px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+/* ── Section Title ────────────────────────────────────────────────────────── */
+.aviasdcps-section-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--aviasdcps-text);
+    margin: 1.1rem 0 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+.aviasdcps-section-title:first-child { margin-top: 0; }
+.aviasdcps-section-title i { color: var(--aviasdcps-navy-light); font-size: 0.9rem; }
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.aviasdcps-footer {
+    text-align: center;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--aviasdcps-border);
+    font-size: 0.75rem;
+    color: var(--aviasdcps-text-muted);
+    margin-top: 0.8rem;
+}
+.aviasdcps-footer a { color: var(--aviasdcps-text-muted); text-decoration: none; }
+.aviasdcps-footer a:hover { color: var(--aviasdcps-navy-light); }
+.aviasdcps-footer span { margin: 0 0.25rem; }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .aviasdcps-sidebar { transform: translateX(-100%); }
+    .aviasdcps-sidebar.open { transform: translateX(0); }
+    .aviasdcps-main { margin-left: 0; }
+    .aviasdcps-header .aviasdcps-period { display: none; }
+}

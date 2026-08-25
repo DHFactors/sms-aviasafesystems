@@ -1,0 +1,71 @@
+<!-- ============================================================================
+   FILE: taxonomy.html
+   PATH: public/views/taxonomy.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS Taxonomy Management view — hierarchical tree navigator,
+            ADREP 2000 category definitions, CAAN CAR-19 local extensions,
+            and custom aviation safety tag bindings.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="taxonomyViewContainer">
+  <!-- Top Taxonomy Control Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="toolbar-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="taxonomySearchInput" placeholder="Search ADREP taxonomies, codes, or descriptors..." />
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="taxonomySchemeFilter" class="aviasdcps-select">
+        <option value="ICAO_ADREP" selected>ICAO ADREP 2000 Standard</option>
+        <option value="CAR19_NEPAL">CAAN CAR-19 Local Extension</option>
+        <option value="CUSTOM">Operator Custom Tags</option>
+      </select>
+
+      <button class="btn-primary" id="btnAddTaxonomyNode">
+        <i class="fa-solid fa-folder-plus"></i> Add Taxonomy Node
+      </button>
+    </div>
+  </div>
+
+  <!-- Taxonomy Workspace Layout -->
+  <div class="report-workspace-grid" style="grid-template-columns: 360px 1fr;">
+    <!-- Left: Hierarchical Tree Browser -->
+    <div class="aviasdcps-card report-config-card">
+      <div class="report-section-header">
+        <h4>Taxonomy Hierarchy</h4>
+        <span class="text-muted">ADREP Occurrence Categories</span>
+      </div>
+
+      <div class="taxonomy-tree-container" id="taxonomyTreeList">
+        <div class="tree-loading text-muted">
+          <i class="fa-solid fa-spinner fa-spin"></i> Loading taxonomy structure...
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Detail & Customization Editor -->
+    <div class="aviasdcps-card report-preview-card">
+      <div class="preview-header">
+        <span id="selectedNodeBreadcrumb">ADREP / GENERAL</span>
+        <div class="preview-actions">
+          <button class="btn-secondary" id="btnExportTaxonomyJson">
+            <i class="fa-solid fa-file-code"></i> Export JSON
+          </button>
+          <button class="btn-primary" id="btnSaveTaxonomyDetail" disabled>
+            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+          </button>
+        </div>
+      </div>
+
+      <div class="taxonomy-editor-body" id="taxonomyEditorBody">
+        <div class="document-placeholder">
+          <i class="fa-solid fa-sitemap doc-icon"></i>
+          <h4>No Taxonomy Node Selected</h4>
+          <p class="text-muted">Select an ADREP category from the tree on the left to edit descriptors and risk mappings.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,50 @@
+<section>
+    <h2 class="aviasdcps-section-title"><i class="fas fa-plane-arrival"></i> Occurrence Register</h2>
+</section>
+
+<div class="aviasdcps-subnav">
+    <button class="aviasdcps-subnav-btn active" data-tab="mor">MOR</button>
+    <button class="aviasdcps-subnav-btn" data-tab="vsr">VSR</button>
+    <button class="aviasdcps-subnav-btn" data-tab="all">All Reports</button>
+</div>
+
+<div class="aviasdcps-toolbar">
+    <input type="text" id="occSearch" placeholder="Search report, flight, location...">
+    <select id="occRiskFilter">
+        <option value="">All Risk Levels</option>
+        <option value="Low">Low</option>
+        <option value="High">High</option>
+        <option value="Very High">Very High</option>
+    </select>
+</div>
+
+<div class="aviasdcps-table-wrap">
+    <table class="aviasdcps-table">
+        <thead>
+            <tr>
+                <th>Report ID</th>
+                <th>Flight</th>
+                <th>Date</th>
+                <th>Location</th>
+                <th>Risk Index</th>
+                <th>Risk Level</th>
+                <th>Phase</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="occTableBody">
+            <tr><td colspan="8" class="aviasdcps-loading"><i class="fas fa-spinner fa-spin"></i>&nbsp; Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="aviasdcps-pagination" id="occPagination"></div>
+
+<div class="aviasdcps-drawer-overlay" id="occDrawerOverlay"></div>
+<div class="detail-drawer" id="occDrawer">
+    <div class="detail-drawer-head">
+        <h3 id="occDrawerTitle">Report Details</h3>
+        <button class="detail-drawer-close" id="occDrawerClose"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="detail-drawer-body" id="occDrawerBody"></div>
+</div>

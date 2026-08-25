@@ -1,0 +1,138 @@
+<!-- ============================================================================
+   FILE: preferences.html
+   PATH: public/views/preferences.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS System Preferences view — manages tenant safety settings,
+            ICAO Doc 9859 risk matrix calibration, mandatory notification thresholds,
+            and API key integration parameters.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="preferencesViewContainer">
+  <!-- Top Action & Navigation Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="occurrence-type-toggle">
+      <button class="toggle-btn active" data-pref-tab="organization">
+        <i class="fa-solid fa-building"></i> Organization & Tenant
+      </button>
+      <button class="toggle-btn" data-pref-tab="risk-matrix">
+        <i class="fa-solid fa-table-cells"></i> Matrix Calibration
+      </button>
+      <button class="toggle-btn" data-pref-tab="notifications">
+        <i class="fa-solid fa-bell"></i> Alerts & Thresholds
+      </button>
+      <button class="toggle-btn" data-pref-tab="security">
+        <i class="fa-solid fa-key"></i> API & Access Keys
+      </button>
+    </div>
+
+    <div class="toolbar-filters">
+      <button class="btn-primary" id="btnSavePreferences">
+        <i class="fa-solid fa-floppy-disk"></i> Save Preferences
+      </button>
+    </div>
+  </div>
+
+  <!-- Pane 1: Organization & Tenant Settings -->
+  <div class="pref-pane active" id="panePrefOrganization">
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>TENANT & OPERATOR PROFILE</span>
+      </div>
+
+      <div class="form-grid-2col">
+        <div class="form-group">
+          <label for="prefTenantId">Tenant Identifier (Immutable Scope)</label>
+          <input type="text" id="prefTenantId" class="node-input" value="fishtail-air" readonly />
+        </div>
+
+        <div class="form-group">
+          <label for="prefOrgName">AOC Organization Name</label>
+          <input type="text" id="prefOrgName" class="node-input" value="Fishtail Air Pvt. Ltd." />
+        </div>
+
+        <div class="form-group">
+          <label for="prefAocNumber">AOC / Regulatory Approval Number</label>
+          <input type="text" id="prefAocNumber" class="node-input" value="CAAN-AOC-038" />
+        </div>
+
+        <div class="form-group">
+          <label for="prefPrimaryRegulator">State Safety Authority</label>
+          <select id="prefPrimaryRegulator" class="aviasdcps-select">
+            <option value="CAAN" selected>Civil Aviation Authority of Nepal (CAAN)</option>
+            <option value="FAA">Federal Aviation Administration (FAA)</option>
+            <option value="EASA">European Union Aviation Safety Agency (EASA)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pane 2: Risk Matrix Calibration -->
+  <div class="pref-pane" id="panePrefRiskMatrix" style="display: none;">
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>ICAO DOC 9859 MATRIX SEVERITY & PROBABILITY WEIGHTS</span>
+      </div>
+
+      <div class="form-grid-2col">
+        <div class="form-group">
+          <label for="prefMatrixScheme">Default Risk Schema</label>
+          <select id="prefMatrixScheme" class="aviasdcps-select">
+            <option value="5x5_ICAO" selected>Standard 5×5 ICAO Tolerability Matrix</option>
+            <option value="4x4_BASIC">4×4 Simplified Operational Grid</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="prefIntolerableAction">Intolerable Index Trigger Action</label>
+          <select id="prefIntolerableAction" class="aviasdcps-select">
+            <option value="HALT_NOTIFY" selected>Immediate Halt & Notify Accountable Exec</option>
+            <option value="LOG_ESCALATE">Log CAP & Escalate to Safety Manager</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pane 3: Notifications & Alert Thresholds -->
+  <div class="pref-pane" id="panePrefNotifications" style="display: none;">
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>AUTOMATED SAFETY ALERTS & CAR-19 ESCALATIONS</span>
+      </div>
+
+      <div class="report-options-list">
+        <label class="checkbox-label">
+          <input type="checkbox" id="prefAlertMorImmediate" checked />
+          <span>Send instant webhook for Mandatory Occurrence (MOR) submissions (&lt;72h CAR-19 trigger)</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="prefAlertSpiBreach" checked />
+          <span>Dispatch SMS/Email notification when an SPI breaches the predefined alert limit</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="prefAlertOverdueCap" checked />
+          <span>Weekly digest for Corrective Action Plans (CAPs) nearing 30-day target resolution</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pane 4: API & Security Keys -->
+  <div class="pref-pane" id="panePrefSecurity" style="display: none;">
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>TENANT INTEGRATION TOKENS</span>
+      </div>
+
+      <div class="form-group">
+        <label for="prefApiKey">SDCPS REST API Key (Injected as X-Tenant-Id)</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="password" id="prefApiKey" class="node-input" value="ak_live_fishtail_9f83a2bc41" readonly />
+          <button class="btn-secondary" id="btnToggleApiKey">Reveal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

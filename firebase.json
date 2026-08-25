@@ -22,6 +22,14 @@
       ],
       "rewrites": [
         {
+          "source": "/aviasdcps",
+          "destination": "/aviasdcps.html"
+        },
+        {
+          "source": "/aviasdcps/**",
+          "destination": "/aviasdcps.html"
+        },
+        {
           "source": "/register.html",
           "destination": "/register.html"
         },
@@ -94,6 +102,14 @@
         "**/node_modules/**"
       ],
       "rewrites": [
+        {
+          "source": "/aviasdcps",
+          "destination": "/aviasdcps.html"
+        },
+        {
+          "source": "/aviasdcps/**",
+          "destination": "/aviasdcps.html"
+        },
         {
           "source": "/register.html",
           "destination": "/register.html"

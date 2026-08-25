@@ -1,0 +1,109 @@
+<!-- ============================================================================
+   FILE: reports.html
+   PATH: public/views/reports.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS Generate Report view — configuration interface for automated
+            ICAO Annex 19 / CAR-19 State Safety Programme quarterly and annual
+            executive safety performance reports, PDF generation, and export.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="reportsViewContainer">
+  <!-- Top Report Configuration Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="occurrence-type-toggle">
+      <button class="toggle-btn active" data-report-type="quarterly">
+        <i class="fa-solid fa-calendar-week"></i> Quarterly SMS Summary
+      </button>
+      <button class="toggle-btn" data-report-type="annual">
+        <i class="fa-solid fa-calendar-days"></i> Annual State Safety Report
+      </button>
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="reportYearSelect" class="aviasdcps-select">
+        <option value="2026" selected>Year: 2026</option>
+        <option value="2025">Year: 2025</option>
+      </select>
+
+      <select id="reportQuarterSelect" class="aviasdcps-select">
+        <option value="Q1" selected>Quarter 1 (Jan - Mar)</option>
+        <option value="Q2">Quarter 2 (Apr - Jun)</option>
+        <option value="Q3">Quarter 3 (Jul - Sep)</option>
+        <option value="Q4">Quarter 4 (Oct - Dec)</option>
+      </select>
+
+      <button class="btn-primary" id="btnCompileReport">
+        <i class="fa-solid fa-gears"></i> Compile Report
+      </button>
+    </div>
+  </div>
+
+  <!-- Report Layout Split View -->
+  <div class="report-workspace-grid">
+    <!-- Left: Parameter Customizer & Section Toggles -->
+    <div class="aviasdcps-card report-config-card">
+      <div class="report-section-header">
+        <h4>Report Inclusions</h4>
+        <span class="text-muted">ICAO Doc 9859 / CAR-19 Matrix</span>
+      </div>
+
+      <div class="report-options-list">
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkKpiOverview" checked />
+          <span>Executive Safety KPI & Status Distribution</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkHrcSummary" checked />
+          <span>High Risk Category (HRC) Analysis & Precursors</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkMorRegister" checked />
+          <span>Mandatory Occurrence (MOR/VSR) Register Breakdown</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkBowtieMatrix" checked />
+          <span>SRAM Bow-Tie Tolerability Matrix & Active Barriers</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="chkCapTracking" checked />
+          <span>Corrective Action Plans (CAP) Resolution Rates</span>
+        </label>
+      </div>
+
+      <div class="report-metadata-section">
+        <div class="form-group">
+          <label for="reportAuthor">Prepared By:</label>
+          <input type="text" id="reportAuthor" class="node-input" value="Safety Manager (Fishtail Air)" />
+        </div>
+        <div class="form-group">
+          <label for="reportRecipient">Submitted To:</label>
+          <input type="text" id="reportRecipient" class="node-input" value="Civil Aviation Authority of Nepal (CAAN)" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Printable Document Preview Panel -->
+    <div class="aviasdcps-card report-preview-card">
+      <div class="preview-header">
+        <span>DOCUMENT PREVIEW</span>
+        <div class="preview-actions">
+          <button class="btn-secondary" id="btnPrintReport" disabled>
+            <i class="fa-solid fa-print"></i> Print
+          </button>
+          <button class="btn-primary" id="btnDownloadPdf" disabled>
+            <i class="fa-solid fa-file-pdf"></i> Download PDF
+          </button>
+        </div>
+      </div>
+
+      <div class="document-page" id="reportDocumentPreview">
+        <div class="document-placeholder">
+          <i class="fa-solid fa-file-lines doc-icon"></i>
+          <h4>No Report Compiled</h4>
+          <p class="text-muted">Select parameters and click "Compile Report" to generate the executive document.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
