@@ -107,6 +107,14 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "caps",
+      "fieldPath": "tenant_id",
+      "indexes": [
+        { "queryScope": "COLLECTION_GROUP", "order": "ASCENDING" },
+        { "queryScope": "COLLECTION_GROUP", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "reports",
       "fieldPath": "report_type",
       "indexes": [

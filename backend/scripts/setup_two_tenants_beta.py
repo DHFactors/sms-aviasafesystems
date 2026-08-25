@@ -123,6 +123,7 @@ def parse_args():
     p.add_argument("--confirm-beta-purge", action="store_true", help="Explicit confirmation for beta purge")
     p.add_argument("--skip-seed", action="store_true", help="Purge only, skip seeding")
     p.add_argument("--skip-purge", action="store_true", help="Seed only, skip purge (dry-run still shows counts)")
+    p.add_argument("--all-tenants", action="store_true", help="Read-only exact inventory of ALL tenants (implies dry-run, no purge/seed)")
     return p.parse_args()
 
 
@@ -619,6 +620,20 @@ def main():
     logger.info(f"Firebase project ID: {project_id}")
     logger.info(f"Firestore database ID: {database_id}")
     logger.info(f"Auth operations: 0")
+
+    if getattr(args, "all_tenants", False):
+        if getattr(args, "execute", False):
+            logger.info("[ALL-TENANTS] Refusing: --all-tenants is read-only and cannot run with --execute")
+            sys.exit(2)
+        from beta_all_tenant_inventory import run_inventory
+        inv = run_inventory(db, logger=logger)
+        inv_path = LOG_DIR / f"all_tenants_dryrun_{ts}.json"
+        with open(inv_path, "w", encoding="utf-8") as f:
+            json.dump(inv, f, indent=2, default=str)
+        logger.info(f"[ALL-TENANTS] Manifest written: {inv_path}")
+        logger.info(f"[ALL-TENANTS] Purge plan preview: {json.dumps(inv['purge_plan_preview'], indent=2, default=str)}")
+        logger.info("[ALL-TENANTS] Read-only mode complete. No writes. Auth operations: 0.")
+        sys.exit(0)
 
     # Verify departments
     verify_departments()
