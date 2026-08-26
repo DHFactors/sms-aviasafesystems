@@ -1,0 +1,32 @@
+<section>
+    <h2 class="aviasdcps-section-title"><i class="fas fa-gauge-high"></i> Dashboard Overview</h2>
+</section>
+
+<section>
+    <div class="aviasdcps-kpi-grid" id="homeKpiGrid">
+        <div class="kpi-card"><h3>Occurrences</h3><div class="kpi-value" id="homeOccTotal">–</div></div>
+        <div class="kpi-card kpi-critical"><h3>Unresolved High Risk</h3><div class="kpi-value" id="homeHighRisk">–</div></div>
+        <div class="kpi-card"><h3>Open Hazards</h3><div class="kpi-value" id="homeOpenHazards">–</div></div>
+        <div class="kpi-card kpi-success"><h3>MSR Complete</h3><div class="kpi-value" id="homeMsrComplete">–</div></div>
+    </div>
+</section>
+
+<section>
+    <h3 class="aviasdcps-section-title"><i class="fas fa-lightbulb"></i> Top 3 Insights</h3>
+    <div class="aviasdcps-insight-grid" id="homeInsightGrid"></div>
+</section>
+
+<section class="aviasdcps-chart-grid">
+    <div class="aviasdcps-chart-card">
+        <h3>Monthly Occurrence Trends (12m)</h3>
+        <div class="aviasdcps-chart-wrap"><canvas id="homeChartTrends"></canvas></div>
+    </div>
+    <div class="aviasdcps-chart-card">
+        <h3>Risk Distribution (3-tier)</h3>
+        <div class="aviasdcps-chart-wrap"><canvas id="homeChartRisk"></canvas></div>
+    </div>
+    <div class="aviasdcps-chart-card chart-full">
+        <h3>Hazard Taxonomy Heatmap (top categories)</h3>
+        <div class="aviasdcps-chart-wrap"><canvas id="homeChartTaxonomy"></canvas></div>
+    </div>
+</section>

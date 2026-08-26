@@ -11,8 +11,8 @@
 
 import json
 import re
+import warnings
 from typing import Dict, Any, List, Optional
-import google.generativeai as genai
 from loguru import logger
 
 from app.core.config import settings
@@ -23,13 +23,35 @@ from app.services.risk_matrix import (
     THRESHOLDS_DEFAULT,
 )
 
-GEMINI_API_KEY = settings.AI_API_KEY or settings.GEMINI_API_KEY
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(settings.AI_MODEL)
-else:
-    logger.warning("AI_API_KEY not set. AI features will use mock data.")
+# google.generativeai is deprecated (migrate to google-genai). Import is
+# lazy/guarded so the Copilot/Groq route — which never touches Gemini — can
+# never crash on an import-time SyntaxWarning or missing SDK, and the
+# pre-existing deprecation warning is suppressed at the source. When the SDK
+# is absent or GEMINI_API_KEY is empty, every analysis call falls back to the
+# in-process mock classifier (mock_analysis).
+try:
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning, module="google.*")
+        warnings.filterwarnings("ignore", message=".*generativeai.*", category=UserWarning)
+        import google.generativeai as genai  # type: ignore
+except Exception as _gemini_import_err:  # pragma: no cover - SDK not installed
+    genai = None  # type: ignore
+    logger.warning(f"google.generativeai import failed ({_gemini_import_err}); Gemini features will use mock data.")
+    GEMINI_API_KEY = None
     model = None
+else:
+    GEMINI_API_KEY = settings.AI_API_KEY or settings.GEMINI_API_KEY
+    if GEMINI_API_KEY and genai is not None:
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(settings.AI_MODEL)
+        except Exception as _cfg_err:
+            logger.warning(f"Gemini configuration failed ({_cfg_err}); using mock data.")
+            model = None
+    else:
+        if not GEMINI_API_KEY:
+            logger.warning("AI_API_KEY / GEMINI_API_KEY not set. AI features will use mock data.")
+        model = None
 
 
 def sanitize_prompt(narrative: str) -> str:

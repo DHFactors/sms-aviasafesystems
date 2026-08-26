@@ -1,7 +1,7 @@
 """
 Deep Diagnostic & Architectural Root-Cause Analysis for All 20 Tenants on sms-db-beta
 
-Headway §1.1 Security Audit — Virtual Mirroring Alignment
+AviaSAFE-SMS §1.1 Security Audit — Virtual Mirroring Alignment
 """
 
 import sys

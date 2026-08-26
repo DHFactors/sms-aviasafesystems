@@ -1,0 +1,61 @@
+<section>
+    <h2 class="aviasdcps-section-title"><i class="fas fa-triangle-exclamation"></i> Hazard Register</h2>
+</section>
+
+<div class="aviasdcps-toolbar">
+    <input type="text" id="hazardSearch" placeholder="Search description, hazard ID...">
+    <select id="hazardStatusFilter">
+        <option value="">All Statuses</option>
+        <option value="Open">Open</option>
+        <option value="Processing">Processing</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Closed">Closed</option>
+        <option value="Reopened">Reopened</option>
+    </select>
+    <select id="hazardPriorityFilter">
+        <option value="">All Priorities</option>
+        <option value="H">High</option>
+        <option value="M">Medium</option>
+        <option value="L">Low</option>
+    </select>
+    <select id="hazardSourceFilter">
+        <option value="">All Sources</option>
+        <option value="VSR">VSR</option>
+        <option value="MOR">MOR</option>
+        <option value="Quality Audit">Quality Audit</option>
+        <option value="CAAN Audit">CAAN Audit</option>
+        <option value="Safety Inspection">Safety Inspection</option>
+        <option value="Flight Diversion">Flight Diversion</option>
+        <option value="Internal Audit">Internal Audit</option>
+    </select>
+</div>
+
+<div class="aviasdcps-table-wrap">
+    <table class="aviasdcps-table">
+        <thead>
+            <tr>
+                <th>Hazard ID</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Risk Level</th>
+                <th>Source</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody id="hazardTableBody">
+            <tr><td colspan="7" class="aviasdcps-loading"><i class="fas fa-spinner fa-spin"></i>&nbsp; Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="aviasdcps-pagination" id="hazardPagination"></div>
+
+<div class="aviasdcps-drawer-overlay" id="hazardDrawerOverlay"></div>
+<div class="detail-drawer" id="hazardDrawer">
+    <div class="detail-drawer-head">
+        <h3 id="hazardDrawerTitle">Hazard Details</h3>
+        <button class="detail-drawer-close" id="hazardDrawerClose"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="detail-drawer-body" id="hazardDrawerBody"></div>
+</div>

@@ -69,13 +69,13 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
 
     # ── CORS ──
-    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://127.0.0.1:5500"
+    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
 
     # ── Firebase ──
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
-    FIREBASE_DATABASE_ID: Optional[str] = None
+    FIREBASE_DATABASE_ID: str = "sms-db-beta"
     # Public Firebase Web API key used by the server-side login endpoint
     # (app/services/login_service.py) to verify credentials against the
     # Identity Toolkit REST API. It is the same public key shipped in

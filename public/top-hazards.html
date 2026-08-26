@@ -175,9 +175,13 @@ function renderHazardChart(data) {
     destroyChart('hazardChartCanvas');
     const ctx = document.getElementById('hazardChartCanvas');
     if (!ctx) return;
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const top = data.slice(0, 10);
-    chartInstances.hazard = new Chart(ctx, {
+    chartInstances['hazardChartCanvas'] = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: top.map(d => d.occurrence_type),
@@ -233,8 +237,18 @@ async function loadHazardStats() {
 
 function destroyChart(key) {
     if (chartInstances[key]) {
-        chartInstances[key].destroy();
+        try { chartInstances[key].destroy(); } catch (_) {}
         delete chartInstances[key];
+    }
+    // Legacy alias support
+    if (key === 'hazardChartCanvas' && chartInstances['hazard']) {
+        try { chartInstances['hazard'].destroy(); } catch (_) {}
+        delete chartInstances['hazard'];
+    }
+    const canvas = document.getElementById(key);
+    if (canvas && window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(canvas);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
     }
 }
 

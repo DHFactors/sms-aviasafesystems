@@ -224,6 +224,211 @@ def generate_report_pdf(report_data: dict, report_type: str,
     return buffer.getvalue()
 
 
+class CaanPdfGenerator:
+    """Build the CAAN SSP oversight PDF from a StateAggregateReport dict using
+    ReportLab flowables with NumberedCanvas page numbering and CAR-19 disclaimers."""
+
+    @staticmethod
+    def build_ssp_report_pdf(report: dict) -> bytes:
+        if not HAS_REPORTLAB:
+            return _placeholder_pdf(report, "CAAN SSP Oversight", "")
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=50, rightMargin=50,
+            topMargin=60, bottomMargin=60,
+        )
+        styles = getSampleStyleSheet()
+        story: list = []
+
+        title_style = ParagraphStyle(
+            "CaanTitle", parent=styles["Title"],
+            fontSize=20, spaceAfter=4, textColor=colors.HexColor("#002f6c"),
+        )
+        subtitle_style = ParagraphStyle(
+            "CaanSubtitle", parent=styles["Normal"],
+            fontSize=10, textColor=colors.HexColor("#64748b"), spaceAfter=14,
+        )
+        heading_style = ParagraphStyle(
+            "CaanH2", parent=styles["Heading2"],
+            fontSize=13, textColor=colors.HexColor("#002f6c"),
+            spaceBefore=14, spaceAfter=6,
+        )
+        normal = styles["Normal"]
+        small = ParagraphStyle(
+            "CaanSmall", parent=normal, fontSize=8,
+            textColor=colors.HexColor("#94a3b8"),
+        )
+
+        # ── Header banner ──
+        story.append(Paragraph("CAAN State Safety Programme Oversight Report", title_style))
+        story.append(Paragraph(
+            "Civil Aviation Authority of Nepal — ICAO Annex 19 / CAR-19 Compliance",
+            subtitle_style,
+        ))
+
+        year = report.get("reporting_year", "")
+        quarter = report.get("reporting_quarter")
+        period = f"{year}" + (f" Q{quarter}" if quarter else "")
+        generated = report.get("generated_at", "")
+        story.append(Paragraph(
+            f"<b>Reporting Period:</b> {period} &nbsp;|&nbsp; "
+            f"<b>Generated:</b> {generated}",
+            normal,
+        ))
+        story.append(Spacer(1, 0.25 * inch))
+
+        # ── Executive KPI grid ──
+        story.append(Paragraph("Executive Summary", heading_style))
+        kpi_data = [
+            ("Total Operators", str(report.get("total_operators", 0))),
+            ("Total Hazards", str(report.get("total_hazards", 0))),
+            ("Total Reports", str(report.get("total_reports", 0))),
+            ("Total CANs/CAPs", str(report.get("total_cans", 0))),
+            ("Open CANs/CAPs", str(report.get("open_cans", 0))),
+            ("Overdue CANs/CAPs", str(report.get("overdue_cans", 0))),
+            ("Industry Risk Index", str(report.get("industry_risk_index", "N/A"))),
+        ]
+        kpi_table = Table(
+            [[Paragraph(f"<b>{l}</b>", normal), Paragraph(v, normal)] for l, v in kpi_data],
+            colWidths=[3 * inch, 2 * inch],
+        )
+        kpi_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(kpi_table)
+        story.append(Spacer(1, 0.2 * inch))
+
+        # ── HRC distribution table ──
+        hrc = report.get("hrc_distribution", [])
+        if hrc:
+            story.append(Paragraph("High Risk Category Distribution", heading_style))
+            hrc_header = [
+                Paragraph("<b>Category</b>", normal),
+                Paragraph("<b>Count</b>", normal),
+                Paragraph("<b>High Risk</b>", normal),
+                Paragraph("<b>Level II</b>", normal),
+                Paragraph("<b>Level III</b>", normal),
+                Paragraph("<b>Level IV</b>", normal),
+                Paragraph("<b>% of Total</b>", normal),
+            ]
+            hrc_rows = [hrc_header]
+            for item in hrc:
+                if isinstance(item, dict):
+                    hrc_rows.append([
+                        Paragraph(str(item.get("category", "")), normal),
+                        Paragraph(str(item.get("count", 0)), normal),
+                        Paragraph(str(item.get("high_risk_count", 0)), normal),
+                        Paragraph(str(item.get("level_ii_count", 0)), normal),
+                        Paragraph(str(item.get("level_iii_count", 0)), normal),
+                        Paragraph(str(item.get("level_iv_count", 0)), normal),
+                        Paragraph(f"{item.get('percentage_of_total', 0):.1f}%", normal),
+                    ])
+            col_w = [1.2 * inch, 0.7 * inch, 0.8 * inch, 0.7 * inch, 0.8 * inch, 0.8 * inch, 0.9 * inch]
+            hrc_table = Table(hrc_rows, colWidths=col_w)
+            hrc_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002f6c")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(hrc_table)
+            story.append(Spacer(1, 0.2 * inch))
+
+        # ── Operator surveillance table (paginated via KeepTogether chunks) ──
+        operators = report.get("operator_summaries", [])
+        if operators:
+            story.append(Paragraph("Operator Surveillance Summary", heading_style))
+            op_header = [
+                Paragraph("<b>Operator</b>", normal),
+                Paragraph("<b>Hazards</b>", normal),
+                Paragraph("<b>Reports</b>", normal),
+                Paragraph("<b>CANs</b>", normal),
+                Paragraph("<b>Overdue</b>", normal),
+                Paragraph("<b>Risk Index</b>", normal),
+                Paragraph("<b>Compliance</b>", normal),
+            ]
+            op_rows = [op_header]
+            for op in operators:
+                if isinstance(op, dict):
+                    op_rows.append([
+                        Paragraph(str(op.get("operator_name", op.get("tenant_id", ""))), normal),
+                        Paragraph(str(op.get("total_hazards", 0)), normal),
+                        Paragraph(str(op.get("total_reports", 0)), normal),
+                        Paragraph(str(op.get("total_cans", 0)), normal),
+                        Paragraph(str(op.get("overdue_cans", 0)), normal),
+                        Paragraph(str(op.get("risk_index", "N/A")), normal),
+                        Paragraph(
+                            f"{op.get('compliance_score', 0):.0f}%" if op.get("compliance_score") else "N/A",
+                            normal,
+                        ),
+                    ])
+            op_col_w = [1.6 * inch, 0.7 * inch, 0.7 * inch, 0.6 * inch, 0.7 * inch, 0.8 * inch, 0.8 * inch]
+            # Paginate in chunks of 20 rows per KeepTogether
+            chunk_size = 20
+            for i in range(1, len(op_rows), chunk_size):
+                chunk = op_rows[i : i + chunk_size]
+                if i == 1:
+                    chunk = [op_header] + chunk
+                op_table = Table(chunk, colWidths=op_col_w)
+                op_table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#002f6c")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ]))
+                from reportlab.platypus import KeepTogether
+                story.append(KeepTogether([op_table, Spacer(1, 0.15 * inch)]))
+
+        # ── Insights & recommendations ──
+        insights = report.get("insights", [])
+        if insights:
+            story.append(Paragraph("Insights", heading_style))
+            for ins in insights:
+                story.append(Paragraph(f"\u2022 {ins}", normal))
+                story.append(Spacer(1, 0.04 * inch))
+
+        recommendations = report.get("recommendations", [])
+        if recommendations:
+            story.append(Paragraph("Recommendations", heading_style))
+            for rec in recommendations:
+                story.append(Paragraph(f"\u2022 {rec}", normal))
+                story.append(Spacer(1, 0.04 * inch))
+
+        # ── Inspector digital signature placeholder ──
+        story.append(Spacer(1, 0.5 * inch))
+        sig_label = ParagraphStyle(
+            "SigLabel", parent=normal, fontSize=9, textColor=colors.HexColor("#475569"),
+        )
+        sig_line = "_" * 50
+        from reportlab.platypus import KeepTogether
+        story.append(KeepTogether([
+            Paragraph("<b>Digital Signature — CAAN Inspector:</b>", sig_label),
+            Spacer(1, 0.3 * inch),
+            Paragraph(sig_line, normal),
+            Spacer(1, 0.05 * inch),
+            Paragraph("Name: ___________________________ &nbsp;&nbsp; Designation: ___________________________", sig_label),
+            Spacer(1, 0.05 * inch),
+            Paragraph("Date: ___________________________", sig_label),
+        ]))
+
+        from app.services.pdf_canvas import NumberedCanvas
+        doc.build(story, canvasmaker=NumberedCanvas)
+        buffer.seek(0)
+        return buffer.getvalue()
+
+
 def _placeholder_pdf(report_data: dict, report_type: str,
                      period: str, tenant_name: Optional[str] = None) -> bytes:
     lines = [

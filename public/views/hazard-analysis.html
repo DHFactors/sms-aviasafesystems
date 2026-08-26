@@ -1,0 +1,144 @@
+<!-- ============================================================================
+   FILE: hazard-analysis.html
+   PATH: public/views/hazard-analysis.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS Hazard Analysis view — multi-dimensional safety risk analytics,
+            ADREP taxonomy distribution charts, root cause frequency breakdowns,
+            and mitigation effectiveness tracking.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="hazardAnalysisViewContainer">
+  <!-- Top Analytics & Filter Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="toolbar-search">
+      <i class="fa-solid fa-filter"></i>
+      <select id="analysisTimeframe" class="aviasdcps-select">
+        <option value="30d">Last 30 Days</option>
+        <option value="90d">Last 90 Days</option>
+        <option value="1y" selected>Last 12 Months</option>
+        <option value="all">All Historical Records</option>
+      </select>
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="analysisDepartmentFilter" class="aviasdcps-select">
+        <option value="">All Operational Units</option>
+        <option value="Flight Operations">Flight Operations</option>
+        <option value="Maintenance">Maintenance & Engineering</option>
+        <option value="Ground Ops">Ground Handling & Cargo</option>
+        <option value="Cabin Safety">Cabin Safety</option>
+      </select>
+
+      <button class="btn-secondary" id="btnExportHazardAnalytics">
+        <i class="fa-solid fa-file-arrow-down"></i> Export Dataset (.csv)
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div class="insight-grid" id="hazardMetricsGrid">
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">Identified Hazards</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Total Logged:</span>
+          <strong id="statTotalHazards">—</strong>
+        </div>
+        <div class="insight-row">
+          <span>Active / Unmitigated:</span>
+          <strong class="text-danger" id="statActiveHazards">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">Top Contributing Factor</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span id="statTopFactorName">Loading...</span>
+          <strong class="badge badge-amber" id="statTopFactorCount">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">Mitigation Velocity</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Avg. Days to Mitigate:</span>
+          <strong id="statAvgMitigationDays">—</strong>
+        </div>
+        <div class="insight-row">
+          <span>Barrier Reliability:</span>
+          <strong class="badge badge-green" id="statBarrierReliability">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">High Severity Ratio</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Level A & B Hazards:</span>
+          <strong class="badge badge-red" id="statHighSeverityRatio">—</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics Chart Matrix -->
+  <div class="report-workspace-grid" style="grid-template-columns: 1fr 1fr; margin-top: 16px;">
+    <!-- Chart 1: ADREP Taxonomy Breakdown -->
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>HAZARD DISTRIBUTION BY ICAO TAXONOMY</span>
+      </div>
+      <div style="height: 320px; position: relative;">
+        <canvas id="chartHazardTaxonomy"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 2: Root Cause Frequency Pareto -->
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>ROOT CAUSE CLASSIFICATION FREQUENCY</span>
+      </div>
+      <div style="height: 320px; position: relative;">
+        <canvas id="chartHazardCauses"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Root Cause Breakdown Table -->
+  <div class="table-container aviasdcps-card" style="margin-top: 16px;">
+    <div class="preview-header p-3">
+      <span>TOP HAZARD CLUSTERS & MITIGATION STATUS</span>
+    </div>
+    <table class="aviasdcps-table" id="hazardAnalysisTable">
+      <thead>
+        <tr>
+          <th>Taxonomy Code</th>
+          <th>Cluster / Factor Title</th>
+          <th>Frequency</th>
+          <th>Primary Operational Unit</th>
+          <th>Residual Risk Level</th>
+          <th>Mitigation Coverage</th>
+        </tr>
+      </thead>
+      <tbody id="hazardAnalysisTableBody">
+        <tr>
+          <td colspan="6" class="table-loading">Aggregating hazard analytics...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

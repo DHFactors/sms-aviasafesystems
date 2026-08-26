@@ -1,4 +1,4 @@
-"""Chunk 17+ — automated multi-tenant security boundary tests (Headway).
+"""Chunk 17+ — automated multi-tenant security boundary tests (AviaSAFE-SMS).
 
 SEC-01  Tenant A token reading Tenant B CAN/hazard      -> isolated namespace
         (path-partitioned query returns no cross-tenant doc -> 404)

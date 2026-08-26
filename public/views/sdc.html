@@ -1,0 +1,113 @@
+<!-- ============================================================================
+   FILE: sdc.html
+   PATH: public/views/sdc.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS SDC Ingestion view — drag-and-drop file dropzone,
+            schema mapping panel, ingestion staging console with status
+            badges, staging summary table, and batch action buttons.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-view-sdc">
+
+  <!-- 1. Drag-and-Drop Dropzone -->
+  <div class="sdc-dropzone" id="sdcDropzone">
+    <div class="sdc-dropzone-icon">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+    </div>
+    <h3>Drop SDC File Here</h3>
+    <p class="text-muted">Accepts CSV, Excel (.xlsx / .xls), ICAO ECCAIRS E5X XML, and JSON</p>
+    <p class="text-muted">or</p>
+    <label class="btn-primary sdc-browse-btn" for="sdcFileInput">
+      <i class="fa-solid fa-folder-open"></i> Browse Files
+    </label>
+    <input
+      type="file"
+      id="sdcFileInput"
+      accept=".csv,.xlsx,.xls,.e5x,.xml,.json"
+      multiple
+      hidden
+    />
+    <div class="sdc-file-info" id="sdcFileInfo"></div>
+  </div>
+
+  <!-- 2. Schema Mapping Panel -->
+  <div class="sdc-mapping-panel aviasdcps-card" id="sdcMappingPanel" style="display:none;">
+    <div class="sdc-panel-header">
+      <h3><i class="fa-solid fa-table-columns"></i> Schema Mapping</h3>
+      <span class="text-muted">Map source fields &rarr; ICAO ADREP 2000 attributes</span>
+    </div>
+
+    <div class="sdc-mapping-toolbar">
+      <select id="sdcTargetSchema" class="aviasdcps-select">
+        <option value="adrep">ICAO ADREP 2000</option>
+        <option value="car19">CAAN CAR-19</option>
+        <option value="eccairs">ECCAIRS v5</option>
+      </select>
+      <button class="btn-secondary" id="sdcAutoMap">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Map
+      </button>
+      <button class="btn-secondary" id="sdcClearMapping">
+        <i class="fa-solid fa-eraser"></i> Clear
+      </button>
+    </div>
+
+    <div class="sdc-mapping-table-wrap">
+      <table class="aviasdcps-table" id="sdcMappingTable">
+        <thead>
+          <tr>
+            <th>Source Column</th>
+            <th>Preview Sample</th>
+            <th>ADREP Target Field</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="sdcMappingBody">
+          <tr><td colspan="4" class="text-muted" style="text-align:center;padding:1rem;">No columns detected.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 3. Ingestion Staging Console -->
+  <div class="sdc-staging-console aviasdcps-card" id="sdcStagingConsole" style="display:none;">
+    <div class="sdc-panel-header">
+      <h3><i class="fa-solid fa-clipboard-check"></i> Ingestion Staging Console</h3>
+      <div class="sdc-staging-badges" id="sdcStagingBadges">
+        <span class="badge badge-muted" id="sdcBadgeParsed">Parsed: 0</span>
+        <span class="badge badge-amber" id="sdcBadgeWarnings" style="display:none;">Warnings: 0</span>
+        <span class="badge badge-red" id="sdcBadgeErrors" style="display:none;">Errors: 0</span>
+      </div>
+    </div>
+
+    <!-- Staging Summary Table -->
+    <div class="sdc-staging-table-wrap">
+      <table class="aviasdcps-table" id="sdcStagingTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Severity</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="sdcStagingBody">
+          <tr><td colspan="6" class="text-muted" style="text-align:center;padding:1.5rem;">No records staged.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="sdc-staging-actions">
+      <button class="btn-primary" id="btnValidateBatch" disabled>
+        <i class="fa-solid fa-play"></i> Validate Batch
+      </button>
+      <button class="btn-primary sdc-commit-btn" id="btnCommitBatch" disabled>
+        <i class="fa-solid fa-database"></i> Commit Batch
+      </button>
+    </div>
+  </div>
+
+</div>

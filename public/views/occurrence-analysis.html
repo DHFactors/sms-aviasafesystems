@@ -1,0 +1,143 @@
+<!-- ============================================================================
+   FILE: occurrence-analysis.html
+   PATH: public/views/occurrence-analysis.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS Occurrence Analysis view — multi-dimensional flight safety
+            analytics, phase of flight distribution, severity vs class matrices,
+            and monthly mandatory (MOR) vs voluntary (VSR) trend evaluations.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="occurrenceAnalysisViewContainer">
+  <!-- Top Analytics & Filter Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="toolbar-search">
+      <i class="fa-solid fa-filter"></i>
+      <select id="occAnalysisTimeframe" class="aviasdcps-select">
+        <option value="30d">Last 30 Days</option>
+        <option value="90d">Last 90 Days</option>
+        <option value="1y" selected>Last 12 Months</option>
+        <option value="all">All Historical Records</option>
+      </select>
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="occAnalysisFleetFilter" class="aviasdcps-select">
+        <option value="">All Fleet Types</option>
+        <option value="AS350B3e">Airbus H125 (AS350 B3e)</option>
+        <option value="Bell407">Bell 407 GXi</option>
+      </select>
+
+      <button class="btn-secondary" id="btnExportOccAnalytics">
+        <i class="fa-solid fa-file-arrow-down"></i> Export Analytics (.csv)
+      </button>
+    </div>
+  </div>
+
+  <!-- Metric Summary Cards Grid -->
+  <div class="insight-grid" id="occMetricsGrid">
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">Total Occurrences</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Total Processed:</span>
+          <strong id="statTotalOccurrences">—</strong>
+        </div>
+        <div class="insight-row">
+          <span>MOR / VSR Split:</span>
+          <strong id="statMorVsrRatio">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">High-Risk Flight Phase</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span id="statTopPhaseName">Loading...</span>
+          <strong class="badge badge-amber" id="statTopPhaseCount">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">Reporting Timeliness</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Avg. Submission:</span>
+          <strong id="statAvgSubmissionHours">—</strong>
+        </div>
+        <div class="insight-row">
+          <span>CAR-19 &lt;72h Compliance:</span>
+          <strong class="badge badge-green" id="statComplianceRate">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">ECCAIRS 2 Ready</span>
+      </div>
+      <div class="insight-body">
+        <div class="insight-row">
+          <span>Validated E5X Files:</span>
+          <strong class="badge badge-blue" id="statEccairsReady">—</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics Visualizations Grid -->
+  <div class="report-workspace-grid" style="grid-template-columns: 1fr 1fr; margin-top: 16px;">
+    <!-- Chart 1: Flight Phase Breakdown -->
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>OCCURRENCES BY FLIGHT PHASE (ADREP)</span>
+      </div>
+      <div style="height: 320px; position: relative;">
+        <canvas id="chartFlightPhase"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 2: Monthly MOR vs VSR Trend -->
+    <div class="aviasdcps-card p-4">
+      <div class="preview-header">
+        <span>REPORTING INGESTION TRAJECTORY</span>
+      </div>
+      <div style="height: 320px; position: relative;">
+        <canvas id="chartOccReportingTrend"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Class & Severity Matrix Table -->
+  <div class="table-container aviasdcps-card" style="margin-top: 16px;">
+    <div class="preview-header p-3">
+      <span>OCCURRENCE CLASSIFICATION & SEVERITY CORRELATION</span>
+    </div>
+    <table class="aviasdcps-table" id="occAnalysisTable">
+      <thead>
+        <tr>
+          <th>ADREP Event Type</th>
+          <th>Class Category</th>
+          <th>Total Events</th>
+          <th>High Severity (A/B)</th>
+          <th>Mandatory (MOR)</th>
+          <th>Voluntary (VSR)</th>
+          <th>Investigation Status</th>
+        </tr>
+      </thead>
+      <tbody id="occAnalysisTableBody">
+        <tr>
+          <td colspan="7" class="table-loading">Aggregating occurrence analytics...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

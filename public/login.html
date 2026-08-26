@@ -304,43 +304,45 @@ var developerPersonaActive = false;
 function onDemoPersonaChange(value) {
     if (!value) return;
 
-    // Developer / Super-Admin persona: cross-tenant, no tenant scoping. Autofill
-    // the developer credentials so sign-in targets Firebase Auth directly and the
-    // role-based router sends SUPER_ADMIN to the admin panel.
+    var emailInput = document.getElementById('email');
+    var passwordInput = document.getElementById('password');
+
+    // Developer / System Admin persona: cross-tenant, no tenant scoping.
     if (value === 'developer') {
         developerPersonaActive = true;
         if (typeof TenantResolver !== 'undefined' && TenantResolver.clearDemoTenant) {
             TenantResolver.clearDemoTenant();
         }
-        var emailInput = document.getElementById('email');
-        var passwordInput = document.getElementById('password');
         if (emailInput) emailInput.value = 'ezondiza.dhf@gmail.com';
-        if (passwordInput) passwordInput.value = 'DEV-Aviasafe-2026';
+        if (passwordInput) passwordInput.value = 'DevSecurePassword2026!';
         updateTenantDisplay();
         return;
     }
 
-    // CAAN SMD persona: scope to the regulator tenant and autofill the State
-    // Safety Management Department account. Role-based routing lands on the
-    // State Aviation Safety Oversight dashboard (/caan.html).
-    if (value === 'smd') {
-        developerPersonaActive = false;
-        if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
-            TenantResolver.setDemoTenant('caan');
-        }
-        var smdEmail = document.getElementById('email');
-        var smdPassword = document.getElementById('password');
-        if (smdEmail) smdEmail.value = 'smd@caanepal.gov.np';
-        if (smdPassword) smdPassword.value = 'CAAN-Safety-2026';
-        updateTenantDisplay();
-        return;
-    }
-
+    // Tenant operational personas: scope to the tenant and autofill
+    // the role-prefixed email with the shared operational password.
     developerPersonaActive = false;
+    var personaMap = {
+        'fishtail-safety': { email: 'safety@fishtailair.com.np',   tenant: 'fishtail-air' },
+        'fishtail-145':    { email: '145@fishtailair.com.np',      tenant: 'fishtail-air' },
+        'fishtail-camo':   { email: 'camo@fishtailair.com.np',     tenant: 'fishtail-air' },
+        'fishtail-ops':    { email: 'ops@fishtailair.com.np',      tenant: 'fishtail-air' },
+        'fishtail-gops':   { email: 'gops@fishtailair.com.np',     tenant: 'fishtail-air' },
+        'nepalw-safety':   { email: 'safety@nepalwings.com.np',    tenant: 'nepal-wings' },
+        'nepalw-145':      { email: '145@nepalwings.com.np',       tenant: 'nepal-wings' },
+        'nepalw-camo':     { email: 'camo@nepalwings.com.np',      tenant: 'nepal-wings' },
+        'nepalw-ops':      { email: 'ops@nepalwings.com.np',       tenant: 'nepal-wings' },
+        'nepalw-gops':     { email: 'gops@nepalwings.com.np',      tenant: 'nepal-wings' },
+    };
+    var info = personaMap[value];
+    if (!info) return;
+
     if (typeof TenantResolver !== 'undefined' && TenantResolver.setDemoTenant) {
-        TenantResolver.setDemoTenant(value);
-        updateTenantDisplay();
+        TenantResolver.setDemoTenant(info.tenant);
     }
+    if (emailInput) emailInput.value = info.email;
+    if (passwordInput) passwordInput.value = 'AviationSafe2026!';
+    updateTenantDisplay();
 }
 
 // Reserved platform keywords must never render as an active tenant scope,
@@ -545,6 +547,20 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             console.log('✅ Logged in as:', user.email);
             console.log('   Role:', user.role);
             console.log('   Tenant:', user.tenantId || 'None');
+
+            // Sync sessionStorage tenant so the next page (safety.html etc.)
+            // never renders a stale demo persona like air-dynasty-demo when the
+            // user is actually safety@fishtailair.com (fishtail-air).
+            try {
+                if (typeof TenantResolver !== 'undefined' && TenantResolver.syncDemoTenantWithAuth) {
+                    TenantResolver.syncDemoTenantWithAuth(user);
+                }
+                window.__AUTH_TENANT_ID = user.tenantId || null;
+                // Clear prior copilot session counters on tenant switch
+                var ck = (typeof storageKey === 'function' ? storageKey('copilot_message_count') : 'aviasafe_copilot_message_count');
+                try { sessionStorage.removeItem(ck); } catch (e2) {}
+                try { sessionStorage.removeItem('aviasafe_copilot_message_count'); } catch (e2) {}
+            } catch (e) {}
 
             // Production tenant-membership verification (blocked before redirect).
             var membershipErr = tenantMembershipError(user);

@@ -1,0 +1,128 @@
+<!-- ============================================================================
+   FILE: data.html
+   PATH: public/views/data.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS Universal Data Query Engine view — unified multi-table
+            search, cross-domain safety data filtering, dynamic field projection,
+            and raw JSON / CSV export capabilities.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="dataQueryViewContainer">
+  <!-- Query Builder Bar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="toolbar-search" style="flex: 2;">
+      <i class="fa-solid fa-terminal"></i>
+      <input type="text" id="universalQueryInput" placeholder="Query expression (e.g., status == 'Open' AND severity IN ['A', 'B'])..." />
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="queryDatasetSelector" class="aviasdcps-select">
+        <option value="all" selected>All Unified Records</option>
+        <option value="hazards">Hazards Master</option>
+        <option value="occurrences">Occurrences (MOR/VSR)</option>
+        <option value="spis">SPI Indicators</option>
+        <option value="caps">Corrective Actions (CAP)</option>
+      </select>
+
+      <button class="btn-primary" id="btnExecuteQuery">
+        <i class="fa-solid fa-play"></i> Run Query
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Query Workspace -->
+  <div class="report-workspace-grid" style="grid-template-columns: 300px 1fr;">
+    <!-- Left: Field Projections & Criteria Filters -->
+    <div class="aviasdcps-card report-config-card">
+      <div class="report-section-header">
+        <h4>Field Projections</h4>
+        <span class="text-muted">Select active output columns</span>
+      </div>
+
+      <div class="report-options-list" id="fieldProjectionList">
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="record_id" checked />
+          <span>Record Identifier (ID)</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="event_date" checked />
+          <span>Event / Logged Date</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="record_type" checked />
+          <span>Domain Class / Type</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="title_desc" checked />
+          <span>Summary Description</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="severity_index" checked />
+          <span>Risk Index / Tolerability</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="status" checked />
+          <span>Lifecycle Status</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" data-field="tenant_id" />
+          <span>Tenant Scope Key</span>
+        </label>
+      </div>
+
+      <div class="report-section-header" style="margin-top: 16px;">
+        <h4>Aggregation & Limits</h4>
+      </div>
+
+      <div class="form-group">
+        <label for="queryRecordLimit">Max Records Limit:</label>
+        <select id="queryRecordLimit" class="aviasdcps-select">
+          <option value="50">50 Records</option>
+          <option value="100" selected>100 Records</option>
+          <option value="500">500 Records</option>
+          <option value="1000">1,000 Records</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Right: Result Grid & Export Controls -->
+    <div class="aviasdcps-card report-preview-card">
+      <div class="preview-header">
+        <div>
+          <span>QUERY RESULTS</span>
+          <span class="badge badge-green ml-2" id="queryExecutionTime" style="margin-left: 8px;">0 ms</span>
+          <span class="badge badge-subtle ml-1" id="queryResultCount">0 rows returned</span>
+        </div>
+        <div class="preview-actions">
+          <button class="btn-secondary" id="btnExportQueryCsv">
+            <i class="fa-solid fa-file-csv"></i> CSV
+          </button>
+          <button class="btn-secondary" id="btnExportQueryJson">
+            <i class="fa-solid fa-file-code"></i> JSON
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container" style="flex: 1; overflow-y: auto;">
+        <table class="aviasdcps-table" id="queryResultsTable">
+          <thead id="queryResultsHead">
+            <tr>
+              <th>Record ID</th>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Summary</th>
+              <th>Risk Index</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="queryResultsBody">
+            <tr>
+              <td colspan="6" class="table-loading">Ready to execute query. Enter criteria or click "Run Query".</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

@@ -109,7 +109,7 @@ Live endpoints:
 | Testing | [tests/README.md](./tests/README.md) |
 | Known limitations / tech debt | [docs/KNOWN_LIMITATIONS.md](./docs/KNOWN_LIMITATIONS.md) |
 | Product charter | [docs/archive/PROJECT_CHARTER.md](./docs/archive/PROJECT_CHARTER.md) |
-| Status & roadmap | [docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md](./docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md), [docs/PROJECT_STATUS_REPORT_2026-08-17.md](./docs/PROJECT_STATUS_REPORT_2026-08-17.md), [ROADMAP.md](./ROADMAP.md) |
+| Status & roadmap | [docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md](./docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md), [docs/PROJECT_STATUS_REPORT_2026-08-24.md](./docs/PROJECT_STATUS_REPORT_2026-08-24.md), [ROADMAP.md](./ROADMAP.md) |
 | Demo walkthrough | [docs/archive/DEMO_GUIDE.md](./docs/archive/DEMO_GUIDE.md) |
 | File structure & routing | [docs/FILE_STRUCTURE.md](./docs/FILE_STRUCTURE.md) |
 | Tenant onboarding | [public/docs/tenant-guide/](./public/docs/tenant-guide/) |

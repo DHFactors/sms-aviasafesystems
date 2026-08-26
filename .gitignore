@@ -2,6 +2,10 @@
 .env
 backend/.env
 *.env
+# Demo env copy carries real secrets — *.env does NOT match ".env.demo"
+.env.demo
+backend/.env.demo
+**/.env.demo
 
 # reCAPTCHA / App Check keys
 recaptch.txt
@@ -44,6 +48,7 @@ scripts/firebase/backups/
 # Runtime logs
 backend/logs/
 logs/
+backend/scripts/logs/
 
 # IDE and System Files
 .vscode/
@@ -57,3 +62,5 @@ Thumbs.db
 docs/.env.local
 
 docs/tenant_details.txt
+_archive/legacy-backups/beta-testing-credentials.csv
+credential.txt

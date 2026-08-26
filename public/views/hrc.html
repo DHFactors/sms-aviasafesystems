@@ -1,0 +1,91 @@
+<!-- ============================================================================
+   FILE: hrc.html
+   PATH: public/views/hrc.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS High Risk Categories (HRC) view — renders ICAO Annex 19 / CAR-19
+            state safety risk focus area cards, precursor trends, and drilldown
+            registers.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-register-container" id="hrcViewContainer">
+  <!-- Top Action & Filter Toolbar -->
+  <div class="register-toolbar aviasdcps-card">
+    <div class="toolbar-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="hrcSearchInput" placeholder="Filter high risk categories or precursors..." />
+    </div>
+
+    <div class="toolbar-filters">
+      <select id="hrcTaxonomyStandard" class="aviasdcps-select">
+        <option value="ICAO_ADREP" selected>ICAO ADREP Standard</option>
+        <option value="CAR19_NEPAL">CAAN CAR-19 State Safety</option>
+      </select>
+
+      <button class="btn-secondary" id="btnExportHrcReport">
+        <i class="fa-solid fa-file-pdf"></i> Export HRC Brief
+      </button>
+    </div>
+  </div>
+
+  <!-- HRC Summary Category Cards Grid -->
+  <div class="insight-grid" id="hrcCardsGrid">
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">CFIT (Controlled Flight Into Terrain)</span>
+      </div>
+      <div class="insight-body" id="hrcCardCfit">
+        <span class="no-data">Loading metrics...</span>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">LOC-I (Loss of Control In-Flight)</span>
+      </div>
+      <div class="insight-body" id="hrcCardLoci">
+        <span class="no-data">Loading metrics...</span>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">RS (Runway Safety / Excursion)</span>
+      </div>
+      <div class="insight-body" id="hrcCardRs">
+        <span class="no-data">Loading metrics...</span>
+      </div>
+    </div>
+
+    <div class="aviasdcps-card insight-card">
+      <div class="insight-header">
+        <span class="insight-title">MAC (Mid-Air Collision / Airspace)</span>
+      </div>
+      <div class="insight-body" id="hrcCardMac">
+        <span class="no-data">Loading metrics...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- State Risk Aggregation Table -->
+  <div class="table-container aviasdcps-card">
+    <table class="aviasdcps-table" id="hrcTable">
+      <thead>
+        <tr>
+          <th>Category Code</th>
+          <th>Risk Category Name</th>
+          <th>Precursor Count</th>
+          <th>Active Hazards</th>
+          <th>Open CAPs</th>
+          <th>Risk Exposure Index</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="hrcTableBody">
+        <tr>
+          <td colspan="7" class="table-loading">Loading High Risk Category register...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

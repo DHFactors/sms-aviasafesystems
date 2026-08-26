@@ -626,10 +626,14 @@ async function renderPsoe(list) {
             '<span class="pval">' + (v ? v.toFixed(1) : '0') + '%</span></div>';
     }).join('');
 
-    // Radar
+    // Radar — destroy before create (tenant switch without reload = canvas already in use)
     const ctx = document.getElementById('psoeRadar');
     if (ctx && window.Chart) {
-        if (charts.radar) charts.radar.destroy();
+        if (charts.radar) { try { charts.radar.destroy(); } catch (_) {} }
+        if (typeof Chart.getChart === 'function') {
+            const orphan = Chart.getChart(ctx);
+            if (orphan) { try { orphan.destroy(); } catch (_) {} }
+        }
         charts.radar = new Chart(ctx, {
             type: 'radar',
             data: {
@@ -931,7 +935,11 @@ function renderIntelligence(hazards, reports, caps, cans) {
 
     const vCtx = document.getElementById('velocityChart');
     if (vCtx && window.Chart) {
-        if (charts.velocity) charts.velocity.destroy();
+        if (charts.velocity) { try { charts.velocity.destroy(); } catch (_) {} }
+        if (typeof Chart.getChart === 'function') {
+            const orphan = Chart.getChart(vCtx);
+            if (orphan) { try { orphan.destroy(); } catch (_) {} }
+        }
         charts.velocity = new Chart(vCtx, {
             type: 'bar',
             data: {
@@ -1293,7 +1301,11 @@ function renderTrends(hazards, caps) {
     if (lastDeg != null && lastDeg >= DEGRADED_AMBER_PCT) alerts++;
     const ctx = document.getElementById('trendChart');
     if (ctx && window.Chart) {
-        if (charts.trend) charts.trend.destroy();
+        if (charts.trend) { try { charts.trend.destroy(); } catch (_) {} }
+        if (typeof Chart.getChart === 'function') {
+            const orphan = Chart.getChart(ctx);
+            if (orphan) { try { orphan.destroy(); } catch (_) {} }
+        }
         charts.trend = new Chart(ctx, {
             type: 'line',
             data: {

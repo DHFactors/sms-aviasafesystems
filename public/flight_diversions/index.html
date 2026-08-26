@@ -213,7 +213,11 @@ async function loadDiversions() {
 function renderTrendChart(list) {
     const ctx = document.getElementById('trendChart');
     if (!ctx) return;
-    if (diversionTrendChart) { diversionTrendChart.destroy(); diversionTrendChart = null; }
+    if (diversionTrendChart) { try { diversionTrendChart.destroy(); } catch (_) {} diversionTrendChart = null; }
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
 
     const monthly = {};
     (list || []).forEach(d => {

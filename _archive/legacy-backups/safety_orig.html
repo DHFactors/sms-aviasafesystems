@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Dashboard — AviaSAFE SSP</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/styles/global.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/chart-theme.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: #f1f5f9;
+            color: #0b2a42;
+            min-height: 100vh;
+        }
+
+        .nav {
+            background: #0b2a42;
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.3px; }
+        .nav h1 i { margin-right: 0.5rem; }
+        .nav-actions { display: flex; align-items: center; gap: 1rem; }
+        .nav-actions span { font-size: 0.8rem; opacity: 0.8; }
+        .btn-logout {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.5); }
+
+        .container { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+
+        #dashboardSection { display: none; }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #0b2a42;
+            margin: 1.5rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+
+        /* ── KPI Grid ── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 1rem;
+        }
+        .kpi-card {
+            background: #fff;
+            padding: 1.25rem;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            border-left: 4px solid #1a6b8a;
+            transition: transform 0.15s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .kpi-card.high { border-left-color: #dc3545; }
+        .kpi-card h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            margin-bottom: 0.4rem;
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0b2a42;
+        }
+
+        /* ── Chart Grid ── */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
+
+        .chart-card {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            padding: 1.25rem;
+        }
+        .chart-card h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #0b2a42;
+            margin-bottom: 1rem;
+        }
+        .chart-wrapper { position: relative; height: 260px; }
+
+        /* ── Full-width charts ── */
+        .chart-full { grid-column: 1 / -1; }
+        .chart-full .chart-wrapper { height: 280px; }
+
+        /* ── Reports Table ── */
+        .table-card {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+        .table-card table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table-card th {
+            background: #f8fafc;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            padding: 0.85rem 1rem;
+            text-align: left;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .table-card td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.875rem;
+        }
+        .table-card tbody tr:hover { background: #f8fafc; }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-critical { background: #fde8e8; color: #dc3545; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-medium { background: #fff8e1; color: #f9a825; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-processing { background: #fff3e0; color: #e65100; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-failed { background: #fde8e8; color: #dc3545; }
+        .badge-archived { background: #f1f5f9; color: #64748b; }
+
+        /* ── Pagination ── */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .page-btn {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+        .page-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #1a6b8a; color: #1a6b8a; }
+        .page-btn:disabled { opacity: 0.4; cursor: default; }
+        .page-info { font-size: 0.85rem; color: #64748b; }
+
+        /* ── States ── */
+        .state-container { position: relative; min-height: 100px; }
+        .state-loading::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+        }
+        .state-loading::after {
+            content: 'Loading...';
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 0.9rem;
+            z-index: 2;
+        }
+        .state-empty, .state-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 1rem;
+        }
+        .state-empty .empty-msg, .state-error .error-msg {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .state-error .error-msg { color: #dc3545; }
+
+        /* ── Filter Bar ── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            background: #fff;
+            padding: 0.75rem 1.25rem;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .filter-bar label { font-size: 0.85rem; font-weight: 500; color: #0b2a42; }
+        .filter-bar select {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            background: #fff;
+            cursor: pointer;
+        }
+        .btn-refresh {
+            margin-left: auto;
+            background: #1a6b8a;
+            color: #fff;
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: background 0.15s;
+        }
+        .btn-refresh:hover { background: #0b2a42; }
+
+        .kpi-grid.state-loading,
+        .chart-card .state-loading,
+        .table-card .state-loading {
+            min-height: 120px;
+        }
+    </style>
+
+    <link rel="stylesheet" href="css/theme.css">
+    </head>
+<body>
+
+<div class="app-shell">
+    <div id="dashboardSection">
+
+        <!-- ==================== VIEW: KEY INDICATORS (default) ==================== -->
+        <div id="key-indicators-section" class="dashboard-view" data-dashboard-view>
+
+            <!-- Filters -->
+            <div class="filter-bar">
+                <label for="daysFilter"><i class="fas fa-calendar-alt"></i> Period:</label>
+                <select id="daysFilter">
+                    <option value="30">Last 30 Days</option>
+                    <option value="60" selected>Last 60 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="180">Last 180 Days</option>
+                    <option value="365">Last 365 Days</option>
+                    <option value="0">All Time</option>
+                </select>
+                <button id="refreshBtn" class="btn-refresh"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+
+            <!-- Section 1: KPI Cards -->
+            <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
+            <div id="kpiGrid" class="kpi-grid state-container"></div>
+
+        </div>
+
+        <!-- ==================== VIEW: RISK & TRENDS (secondary) ==================== -->
+        <div id="risk-trends-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-chart-bar"></i> Risk &amp; Trends</h2>
+                <a href="/risk-trends.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Open Full View</a>
+            </div>
+
+            <!-- Section 2: Risk & Trends -->
+            <div class="section-title shell-scroll-spy" id="risk-trends"><i class="fas fa-chart-bar"></i> Risk & Trends</div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Risk Distribution</h3>
+                    <div id="riskChart" class="chart-wrapper state-container">
+                        <canvas id="riskChartCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Monthly Trends</h3>
+                    <div id="trendChart" class="chart-wrapper state-container">
+                        <canvas id="trendChartCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card chart-full">
+                    <h3>SSM Risk Trend (Avg Risk Index by SSP Category)</h3>
+                    <div id="ssmRiskChart" class="chart-wrapper state-container">
+                        <canvas id="ssmRiskChartCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ==================== VIEW: TOP HAZARDS (secondary) ==================== -->
+        <div id="top-hazards-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-triangle-exclamation"></i> Top Hazards</h2>
+                <a href="/top-hazards.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Open Full View</a>
+            </div>
+
+            <!-- Section 3: Top Hazards -->
+            <div class="section-title shell-scroll-spy" id="hazards"><i class="fas fa-triangle-exclamation"></i> Top Hazards</div>
+            <div class="chart-grid">
+                <div class="chart-card chart-full">
+                    <h3>Hazard Occurrence Frequency <a href="/top-hazards.html" class="btn btn-outline btn-sm" style="float:right;font-size:0.8rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Top Hazards</a></h3>
+                    <div id="hazardChart" class="chart-wrapper state-container">
+                        <canvas id="hazardChartCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ==================== VIEW: CORRECTIVE ACTION NOTICES (secondary) ==================== -->
+        <div id="corrective-actions-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</h2>
+                <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> Full CAN Register</a>
+            </div>
+
+            <!-- Section 4: Corrective Action (CAN/CAP) Register -->
+            <div class="section-title shell-scroll-spy" id="corrective-actions"><i class="fas fa-clipboard-check"></i> Corrective Action Notices</div>
+        <div id="canCapTable" class="table-card state-container">
+            <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
+                <span style="font-size:0.85rem;color:#475569;"><i class="fas fa-clipboard-check"></i> CAN Register — <strong id="canCapCount">0</strong> notices</span>
+                <a href="/can_cap/issue.html" style="margin-left:auto;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-plus"></i> Issue CAN</a>
+                <a href="/can_cap/cans.html" style="margin-left:1rem;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> All CANs</a>
+                <a href="/can_cap/caps.html" style="margin-left:1rem;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> CAP Register</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>CAN Ref</th>
+                        <th>Title</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Target Date</th>
+                        <th>Issued At</th>
+                    </tr>
+                </thead>
+                <tbody id="cansTableBody"></tbody>
+            </table>
+            <div id="cansTableState" class="state-empty" style="display:none;padding:1rem;"></div>
+        </div>
+
+        </div>
+
+        <!-- ==================== VIEW: LATEST REPORTS (secondary) ==================== -->
+        <div id="reports-section" class="dashboard-view" data-dashboard-view style="display:none;">
+
+            <div class="page-header" style="margin-bottom:1rem;">
+                <h2 style="font-size:1.25rem;"><i class="fas fa-chart-bar"></i> Latest Reports</h2>
+                <a href="/reports/index.html" class="btn btn-outline btn-sm"><i class="fas fa-external-link-alt"></i> View All Reports</a>
+            </div>
+
+            <!-- Section 5: Latest Reports -->
+            <div class="section-title shell-scroll-spy" id="reports"><i class="fas fa-chart-bar"></i> Latest Reports</div>
+        <div id="reportsTable" class="table-card state-container">
+            <div class="filter-bar" style="border-radius:0;box-shadow:none;border-bottom:1px solid #e2e8f0;margin-bottom:0;">
+                <label for="recentRange"><i class="fas fa-calendar-alt"></i> Timeline:</label>
+                <select id="recentRange">
+                    <option value="7">This Week</option>
+                    <option value="30" selected>This Month</option>
+                    <option value="90">This Quarter</option>
+                    <option value="365">This Year</option>
+                </select>
+                <a href="/reports/index.html" style="margin-left:auto;font-size:0.8rem;color:#1a6b8a;"><i class="fas fa-external-link-alt"></i> View All Reports</a>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Occurrence</th>
+                        <th>Location</th>
+                        <th>Risk Index</th>
+                        <th>Risk Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="reportsBody"></tbody>
+            </table>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/tenant_context.js"></script>
+    <script src="/js/department_resolver.js"></script>
+<script>
+window.DEFAULT_DASHBOARD_VIEW = 'key-indicators-section';
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    nav: [
+        { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+        { href: '/dashboard/index.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+        { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+        { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+        { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
+        { href: '/audits/psoe.html', label: 'PSOE Audit', icon: 'fa-clipboard-check', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'CAAN_SMD', 'SUPER_ADMIN', 'safety'] },
+        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'safety'] },
+    ],
+};
+</script>
+<script src="/js/api/client.js"></script>
+<script src="/js/shell.js"></script>
+<script src="/js/dashboard-nav.js"></script>
+<script src="/js/api/dashboard.js"></script>
+<script src="/js/dashboard-utils.js"></script>
+<script src="/js/report.js"></script>
+<script src="/js/hazards.js"></script>
+<script src="/js/can_cap.js"></script>
+<script src="/js/verification.js"></script>
+<script src="/js/reports.js"></script>
+<script src="/js/flight_diversions.js"></script>
+<script src="/js/feedback.js"></script>
+<script src="/js/dashboard.js"></script>
+
+<script>
+initFeedbackWidget();
+</script>
+
+</body>
+</html>

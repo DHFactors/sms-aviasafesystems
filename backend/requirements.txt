@@ -1,55 +1,48 @@
-# ============================================================================
-# FILE: requirements.txt
-# PATH: backend/requirements.txt
-# VERSION: 1.0.0
-# DATE CREATED: 2026-07-03
-# PURPOSE: Python dependencies for FastAPI backend with Firebase integration.
-# AUTHOR: Ghanshyam Acharya
-# CODE OWNER: AviaSafeSystems
-# ============================================================================
-
 # Core Framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-dotenv==1.0.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+python-dotenv>=1.0.0
 
 # Firebase Admin SDK
 # NOTE: firebase-admin>=6.6.0 required for named Firestore databases
-# (firestore.client(database_id=...) support added in 6.6.0). Pinning the
-# 6.4.0 build breaks `sms-db` init with TypeError on startup.
+# (firestore.client(database_id=...) support added in 6.6.0).
 firebase-admin>=6.6.0
-# google-cloud-firestore (transitive via firebase-admin); >=2.11.0 supports
-# named databases (Client(database=...)). Explicit pin guards the Docker build.
 google-cloud-firestore>=2.11.0
 
 # Authentication
-python-multipart==0.0.6
+python-multipart>=0.0.6
 
 # AI Integration
-google-generativeai==0.5.0
+google-generativeai>=0.5.0
 
 # Security & Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
 
 # Validation
-email-validator==2.1.0.post1
+email-validator>=2.1.0
 
 # Rate Limiting (Redis-backed)
-redis[hiredis]==5.0.7
+redis[hiredis]>=5.0.7
 
 # AI Chat Assistant (Groq — Safety & Compliance Copilot)
-# groq>=0.11.0 is required for httpx 0.28+ compatibility. Older groq (0.9.x)
-# passes httpx's removed `proxies` kwarg to the client wrapper and crashes on
-# init with: TypeError: Client.__init__() got an unexpected keyword argument
-# 'proxies'. httpx is pinned <0.28.0 to keep the two compatible.
 groq>=0.11.0
-httpx>=0.27.0,<0.28.0
+httpx>=0.27.0
 
 # Utilities
-loguru==0.7.2
-python-dateutil==2.8.2
+loguru>=0.7.2
+python-dateutil>=2.8.2
 
 # PDF report generation
-reportlab==4.1.0
-jinja2==3.1.4
+reportlab>=4.1.0
+jinja2>=3.1.4
+
+# Background Scheduling
+apscheduler>=3.10.4
+
+# Retry & Resilience
+tenacity>=8.2.3
+
+# Testing
+pytest>=8.1.0
+pytest-asyncio>=0.23.5

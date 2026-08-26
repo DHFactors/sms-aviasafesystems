@@ -1,0 +1,107 @@
+<!-- ============================================================================
+   FILE: spis.html
+   PATH: public/views/spis.html
+   VERSION: 1.0.0-beta.1
+   PURPOSE: aviaSDCPS SPIs & SPTs view — domain and status filter toolbar,
+            summary KPI metric cards, and master indicator monitoring table.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ -->
+
+<div class="aviasdcps-view-spis">
+
+  <!-- 1. Filter Toolbar -->
+  <div class="spis-filter-toolbar aviasdcps-card">
+    <div class="spis-filter-group">
+      <label>Domain:</label>
+      <select id="spisDomainFilter" class="aviasdcps-select">
+        <option value="all">All Domains</option>
+        <option value="flight">Flight Operations</option>
+        <option value="maintenance">Maintenance</option>
+        <option value="ground">Ground Operations</option>
+        <option value="security">Security</option>
+        <option value="atc">ATC / ATM</option>
+        <option value="aerodrome">Aerodrome</option>
+        <option value="hazard">Hazard Identification</option>
+      </select>
+    </div>
+    <div class="spis-filter-group">
+      <label>Status:</label>
+      <button class="spis-filter-btn active" data-filter="all">All Indicators</button>
+      <button class="spis-filter-btn" data-filter="alert">
+        <span class="spis-status-dot spis-dot-alert"></span> Alert / Exceeded
+      </button>
+      <button class="spis-filter-btn" data-filter="watch">
+        <span class="spis-status-dot spis-dot-watch"></span> Watchlist
+      </button>
+      <button class="spis-filter-btn" data-filter="nominal">
+        <span class="spis-status-dot spis-dot-nominal"></span> Nominal
+      </button>
+    </div>
+    <div class="spis-filter-group">
+      <input
+        type="text"
+        id="spisSearchInput"
+        placeholder="Search SPI name or code…"
+        class="aviasdcps-input"
+      />
+    </div>
+  </div>
+
+  <!-- 2. Summary KPI Metric Cards -->
+  <div class="spis-kpi-grid" id="spisKpiGrid">
+    <div class="spis-kpi-card spis-kpi-total">
+      <div class="spis-kpi-icon"><i class="fa-solid fa-bullseye"></i></div>
+      <div class="spis-kpi-body">
+        <span class="spis-kpi-label">Active SPIs</span>
+        <span class="spis-kpi-value" id="spisActiveCount">—</span>
+      </div>
+    </div>
+    <div class="spis-kpi-card spis-kpi-nominal">
+      <div class="spis-kpi-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="spis-kpi-body">
+        <span class="spis-kpi-label">Nominal</span>
+        <span class="spis-kpi-value" id="spisNominalCount">—</span>
+      </div>
+    </div>
+    <div class="spis-kpi-card spis-kpi-alert">
+      <div class="spis-kpi-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="spis-kpi-body">
+        <span class="spis-kpi-label">Alert / Exceeded</span>
+        <span class="spis-kpi-value" id="spisAlertCount">—</span>
+      </div>
+    </div>
+    <div class="spis-kpi-card spis-kpi-watch">
+      <div class="spis-kpi-icon"><i class="fa-solid fa-eye"></i></div>
+      <div class="spis-kpi-body">
+        <span class="spis-kpi-label">Watchlist</span>
+        <span class="spis-kpi-value" id="spisWatchCount">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Master Indicator Monitoring Table -->
+  <div class="aviasdcps-card">
+    <table class="aviasdcps-table" id="spisTable">
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>SPI Name</th>
+          <th>Domain</th>
+          <th>Target (SPT)</th>
+          <th>Alert Threshold</th>
+          <th>Current Value</th>
+          <th>Trajectory</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="spisTableBody">
+        <tr>
+          <td colspan="8" class="text-muted" style="text-align:center;padding:1.5rem;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Loading indicators…
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>

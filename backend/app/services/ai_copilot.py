@@ -1,6 +1,6 @@
 # ============================================================================
 # FILE: backend/app/services/ai_copilot.py
-# PURPOSE: AI Executive Copilot — READ-ONLY database scope (Headway audit
+# PURPOSE: AI Executive Copilot — READ-ONLY database scope (AviaSAFE-SMS audit
 #          §1.2). The Copilot execution context receives a strictly read-only
 #          Firestore handle: any write/update/delete/create attempt raises
 #          PermissionError before reaching the database.

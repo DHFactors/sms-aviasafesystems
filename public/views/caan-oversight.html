@@ -1,0 +1,114 @@
+<!--
+  FILE: caan-oversight.html
+  PATH: public/views/caan-oversight.html
+  VERSION: 1.0.0
+  PURPOSE: CAAN SSP Oversight workspace view — header, KPI strip, chart canvas
+           wrappers, and the dispatch audit log register table.
+  AUTHOR: AviaSAFE Systems
+-->
+
+<div class="oversight-workspace">
+
+  <!-- Workspace Header -->
+  <div class="workspace-header">
+    <h2><i class="fa-solid fa-shield-halved"></i> CAAN SSP Oversight Dashboard</h2>
+    <div class="header-actions">
+      <button class="aviasdcps-btn aviasdcps-btn-secondary" id="btnExportPdf">
+        <i class="fa-solid fa-file-pdf"></i> Export PDF
+      </button>
+      <button class="aviasdcps-btn aviasdcps-btn-primary" id="btnDispatchEmail">
+        <i class="fa-solid fa-envelope"></i> Dispatch Report
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI Metric Strip -->
+  <div class="kpi-metric-strip" id="kpiMetricStrip">
+    <div class="kpi-card"><span class="kpi-label">Loading...</span></div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="oversight-loading" id="oversightLoading">
+    <i class="fa-solid fa-spinner fa-spin"></i>&nbsp; Loading CAAN oversight data...
+  </div>
+
+  <!-- Chart Grid & Audit Table (hidden until data loads) -->
+  <div id="oversightContent" style="display:none;">
+
+    <!-- Charts Grid -->
+    <div class="oversight-grid">
+
+      <!-- HRC Doughnut -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="fa-solid fa-radiation"></i> HRC Distribution</h3>
+          <span class="chart-badge">Doughnut</span>
+        </div>
+        <div style="height:280px;">
+          <canvas id="caanHrcChart"></canvas>
+        </div>
+      </div>
+
+      <!-- SPI Control Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="fa-solid fa-chart-line"></i> SPI Control Chart</h3>
+          <span class="chart-badge">1&sigma; / 2&sigma; Bands</span>
+        </div>
+        <div style="height:280px;">
+          <canvas id="caanSpiControlChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Operator Risk Scatter -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="fa-solid fa-braille"></i> Operator Risk Scatter</h3>
+          <span class="chart-badge">Bubble</span>
+        </div>
+        <div style="height:280px;">
+          <canvas id="caanOperatorRiskChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Domain Compliance Bar -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="fa-solid fa-chart-bar"></i> Domain Compliance</h3>
+          <span class="chart-badge">Grouped Bar</span>
+        </div>
+        <div style="height:280px;">
+          <canvas id="caanDomainComplianceChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Dispatch Audit Log Register -->
+    <div class="chart-card" style="margin-top:16px;">
+      <div class="chart-card-header">
+        <h3><i class="fa-solid fa-clock-rotate-left"></i> Dispatch Audit Log</h3>
+        <span class="chart-badge">Recent</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Audit ID</th>
+              <th>Regulator</th>
+              <th>Period</th>
+              <th>Recipients</th>
+              <th>Status</th>
+              <th>Checksum</th>
+            </tr>
+          </thead>
+          <tbody id="auditLogBody">
+            <tr><td colspan="6" class="table-loading">Loading audit records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>

@@ -31,14 +31,17 @@
     // to a seeded demo tenant (or the CAAN regulator tenant for the ASSD/FSSD
     // directorates).
     var DEMO_PERSONAS = [
-        { key: 'developer', label: 'Developer / Super-Admin', tenant: 'developer' },
-        { key: 'smd', label: 'SMD (Safety Management Dept - CAAN)', tenant: 'smd' },
-        { key: 'fixed-wing', label: 'Fixed-Wing', tenant: 'himalaya-airlines-demo' },
-        { key: 'rotary', label: 'Rotary', tenant: 'air-dynasty-demo' },
-        { key: 'amo', label: 'AMO', tenant: 'nepal-aero-maintenance-demo' },
-        { key: 'airport', label: 'Airport', tenant: 'tia-kathmandu-demo' },
-        { key: 'assd', label: 'ASSD', tenant: 'caan' },
-        { key: 'fssd', label: 'FSSD', tenant: 'caan' },
+        { key: 'developer', label: 'Developer / System Admin', tenant: 'system' },
+        { key: 'fishtail-safety',  label: 'Fishtail Air - Safety Manager',      tenant: 'fishtail-air' },
+        { key: 'fishtail-145',     label: 'Fishtail Air - Part-145 Mx Manager', tenant: 'fishtail-air' },
+        { key: 'fishtail-camo',    label: 'Fishtail Air - CAMO',                tenant: 'fishtail-air' },
+        { key: 'fishtail-ops',     label: 'Fishtail Air - Flight Ops',          tenant: 'fishtail-air' },
+        { key: 'fishtail-gops',    label: 'Fishtail Air - Ground Ops',          tenant: 'fishtail-air' },
+        { key: 'nepalw-safety',    label: 'Nepal Wings - Safety Manager',       tenant: 'nepal-wings' },
+        { key: 'nepalw-145',       label: 'Nepal Wings - Part-145 Mx Manager',  tenant: 'nepal-wings' },
+        { key: 'nepalw-camo',      label: 'Nepal Wings - CAMO',                 tenant: 'nepal-wings' },
+        { key: 'nepalw-ops',       label: 'Nepal Wings - Flight Ops',           tenant: 'nepal-wings' },
+        { key: 'nepalw-gops',      label: 'Nepal Wings - Ground Ops',           tenant: 'nepal-wings' },
     ];
 
     // Subdomain -> Firestore tenant document id normalization. Public tenant
@@ -148,6 +151,80 @@
         try {
             global.sessionStorage.removeItem(DEMO_TENANT_STORAGE_KEY);
         } catch (e) { /* ignore */ }
+        // Also clear the auth-synced cache so a stale tenant never survives logout
+        try {
+            global.sessionStorage.removeItem(DEMO_TENANT_STORAGE_KEY + ':auth');
+        } catch (e) { /* ignore */ }
+        if (typeof global.__AUTH_TENANT_ID !== 'undefined') {
+            try { global.__AUTH_TENANT_ID = null; } catch (e) { /* ignore */ }
+        }
+    }
+
+    // ── Auth-synced tenant: the source of truth when a user is signed in ──
+    // Dashboard pages must never show "air-dynasty-demo" when the signed-in user
+    // is safety@fishtailair.com (tenant fishtail-air). The sessionStorage demo
+    // persona is ONLY for pre-auth persona switching on the login page.
+    function syncDemoTenantWithAuth(user) {
+        // user: null (logout) OR { tenantId/tenant_id } OR string tenantId
+        try {
+            var tenantId = null;
+            if (typeof user === 'string') tenantId = user;
+            else if (user && (user.tenantId || user.tenant_id)) tenantId = user.tenantId || user.tenant_id;
+            // SUPER_ADMIN / CAAN_SMD are cross-tenant — never pin a demo tenant
+            var role = user && (user.role || (user.claims && user.claims.role));
+            if (role === 'SUPER_ADMIN' || role === 'CAAN_SMD') {
+                clearDemoTenant();
+                return;
+            }
+            if (!tenantId) {
+                // No tenant on user (logged out, or cross-tenant) — clear stale demo
+                clearDemoTenant();
+                return;
+            }
+            var normalized = normalizeTenantId(tenantId);
+            // Write both the primary demo key and an auth-cache key so
+            // getCurrentTenant() can return it synchronously on next load
+            try {
+                global.sessionStorage.setItem(DEMO_TENANT_STORAGE_KEY, normalized);
+                global.sessionStorage.setItem(DEMO_TENANT_STORAGE_KEY + ':auth', normalized);
+            } catch (e2) { /* ignore */ }
+            try { global.__AUTH_TENANT_ID = normalized; } catch (e2) { /* ignore */ }
+        } catch (e) { /* never block auth */ }
+    }
+
+    function getAuthTenantSync() {
+        try {
+            if (global.__AUTH_TENANT_ID) return global.__AUTH_TENANT_ID;
+            // Fallback: check auth-cache key (survives reload within same tab)
+            var cached = global.sessionStorage.getItem(DEMO_TENANT_STORAGE_KEY + ':auth');
+            if (cached) {
+                global.__AUTH_TENANT_ID = cached;
+                return cached;
+            }
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    // Clear copilot + demo session keys that must not survive a tenant switch.
+    // Called on logout and on auth tenant mismatch.
+    function clearTenantSession() {
+        clearDemoTenant();
+        // Copilot widget session limit counters (sessionStorage)
+        try {
+            var copilotKeys = [
+                'aviasafe_copilot_message_count',
+                // env-prefixed variant via storageKey('copilot_message_count')
+                (typeof global.storageKey === 'function' ? global.storageKey('copilot_message_count') : null),
+                'aviasafe:beta:copilot_message_count',
+                'aviasafe:prod:copilot_message_count'
+            ];
+            copilotKeys.forEach(function (k) {
+                if (k) global.sessionStorage.removeItem(k);
+            });
+            // Demo toolbar session flags
+            global.sessionStorage.removeItem('demoToolbar');
+            global.sessionStorage.removeItem('demoEnabledAt');
+        } catch (e) { /* ignore */ }
     }
 
     function normalizeTenantId(slug) {
@@ -171,9 +248,39 @@
     }
 
     function getCurrentTenant() {
+        // Authenticated users: tenant comes from Firebase auth claims, never from
+        // a stale sessionStorage demo persona. This fixes the bug where
+        // safety@fishtailair.com still saw "air-dynasty-demo" from a prior persona.
+        var authTenant = getAuthTenantSync();
+        if (authTenant) return normalizeTenantId(authTenant);
+        // Also try synchronous currentUser check (claims may be cached on the
+        // Firebase user object after getIdTokenResult has run once)
+        try {
+            if (global.firebase && global.firebase.auth && global.firebase.auth().currentUser) {
+                var u = global.firebase.auth().currentUser;
+                // __AUTH_TENANT_ID is set by syncDemoTenantWithAuth on every
+                // successful getCurrentUser() / onAuthStateChanged — if present,
+                // it already would have been returned above. No extra sync fetch here.
+            }
+        } catch (e) { /* ignore */ }
+
         if (isDemoEnvironment()) {
             var stored = getDemoTenant();
-            if (stored) return normalizeTenantId(stored);
+            if (stored) {
+                // If we're authenticated but getAuthTenantSync missed (race),
+                // don't blindly return the stale demo persona — let the caller
+                // (ApiClient / dashboard) prefer the async auth tenant instead.
+                // Return stored only for unauthenticated/demo persona flows.
+                try {
+                    var isAuthed = !!(global.firebase && global.firebase.auth && global.firebase.auth().currentUser);
+                    if (isAuthed && authTenant === null) {
+                        // Don't return demo persona when authed but auth tenant unknown
+                        // — fallback to subdomain/default instead of wrong tenant
+                        return DEFAULT_DEMO_TENANT;
+                    }
+                } catch (e2) { /* ignore */ }
+                return normalizeTenantId(stored);
+            }
             return DEFAULT_DEMO_TENANT;
         }
         var sub = getTenantFromSubdomain();
@@ -254,6 +361,9 @@
         getDemoTenant: getDemoTenant,
         setDemoTenant: setDemoTenant,
         clearDemoTenant: clearDemoTenant,
+        syncDemoTenantWithAuth: syncDemoTenantWithAuth,
+        getAuthTenantSync: getAuthTenantSync,
+        clearTenantSession: clearTenantSession,
         normalizeTenantId: normalizeTenantId,
         getTenantClassification: getTenantClassification,
         prettifySlug: prettifySlug,

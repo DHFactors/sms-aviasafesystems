@@ -12,3 +12,5 @@ services:
         value: "true"
       - key: ENVIRONMENT
         value: "production"
+      - key: FIREBASE_DATABASE_ID
+        value: sms-db

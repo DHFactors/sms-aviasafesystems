@@ -172,6 +172,11 @@ async def get_master_register(
     assigned_to_uid: Optional[str] = Query(None),
     assigned_to: Optional[str] = Query(None),
     user_department: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search: Optional[str] = Query(None, description="Search reference or title"),
+    page_size: Optional[int] = Query(50, ge=1, le=100, description="Page size (1-100, default 50)"),
+    cursor: Optional[str] = Query(None, description="Opaque pagination cursor from previous response"),
+    days: Optional[int] = Query(None, ge=0, description="Date range filter: last N days, 0 or omitted = all time"),
     archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
@@ -211,6 +216,11 @@ async def get_master_register(
                 assigned_to_uid=assigned_to_uid,
                 assigned_to_email=assigned_to or user.get("email"),
                 user_department=user_department,
+                status=status,
+                search=search,
+                page_size=page_size,
+                cursor=cursor,
+                days=days,
             )
         try:
             from app.firebase import get_db
@@ -230,6 +240,11 @@ async def get_master_register(
                 assigned_to_uid=assigned_to_uid,
                 assigned_to_email=assigned_to,
                 user_department=user_department,
+                status=status,
+                search=search,
+                page_size=page_size,
+                cursor=cursor,
+                days=days,
             )
     return _envelope(data)
 

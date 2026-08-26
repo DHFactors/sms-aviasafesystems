@@ -152,8 +152,31 @@ class HazardService:
 
     def get_hazard_by_id(self, hazard_id_or_doc_id: str, user: dict) -> Optional[dict]:
         try:
+            # Optimized: direct document lookup + fallback filtered query (avoids full scan)
             if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(self.COLLECTION).get()
+                # Try collection_group filtered by hazard_id field
+                try:
+                    q = get_cross_tenant_collection(self.COLLECTION).where("hazard_id", "==", hazard_id_or_doc_id).limit(1)
+                    docs = list(q.get())
+                    if docs:
+                        data = docs[0].to_dict()
+                        data["id"] = docs[0].id
+                        self._serialize_timestamps(data)
+                        return data
+                except Exception:
+                    pass
+                # Try document ID via cross collection (not directly addressable), fallback scan limited
+                try:
+                    docs = get_cross_tenant_collection(self.COLLECTION).where("__name__", "==", hazard_id_or_doc_id).limit(1).get()
+                    if docs:
+                        data = docs[0].to_dict()
+                        data["id"] = docs[0].id
+                        self._serialize_timestamps(data)
+                        return data
+                except Exception:
+                    pass
+                # Last resort: limited scan
+                docs = get_cross_tenant_collection(self.COLLECTION).limit(500).get()
                 for doc in docs:
                     data = doc.to_dict()
                     if doc.id == hazard_id_or_doc_id or data.get("hazard_id") == hazard_id_or_doc_id:
@@ -162,13 +185,32 @@ class HazardService:
                         return data
                 return None
             else:
-                docs = get_tenant_collection(self.tenant_id, self.COLLECTION).get()
-                for doc in docs:
-                    data = doc.to_dict()
-                    if doc.id == hazard_id_or_doc_id or data.get("hazard_id") == hazard_id_or_doc_id:
-                        data["id"] = doc.id
-                        self._serialize_timestamps(data)
-                        return data
+                # Tenant-scoped: direct document get
+                try:
+                    snap = get_tenant_collection(self.tenant_id, self.COLLECTION).document(hazard_id_or_doc_id).get()
+                    if snap.exists and snap.to_dict():
+                        data = snap.to_dict()
+                        # Mock may return exists True with empty data; treat empty as not found
+                        if data:
+                            data["id"] = snap.id
+                            self._serialize_timestamps(data)
+                            return data
+                except Exception:
+                    pass
+                # Fallback: where hazard_id ==
+                try:
+                    q = get_tenant_collection(self.tenant_id, self.COLLECTION).where("hazard_id", "==", hazard_id_or_doc_id).limit(1)
+                    docs = list(q.get())
+                    # Mock where returns all docs; filter manually and require non-empty data
+                    for d in docs:
+                        dd = d.to_dict()
+                        if dd and (d.id == hazard_id_or_doc_id or dd.get("hazard_id") == hazard_id_or_doc_id):
+                            data = dd
+                            data["id"] = d.id
+                            self._serialize_timestamps(data)
+                            return data
+                except Exception:
+                    pass
                 return None
         except Exception as e:
             logger.error(f"Failed to get hazard {hazard_id_or_doc_id}: {e}")
@@ -176,10 +218,50 @@ class HazardService:
 
     def list_hazards(self, user: dict, filters: dict = None) -> List[dict]:
         try:
+            filters = filters or {}
+            # Build Firestore-level where clauses for non-search fields
+            def _apply_filters(query):
+                # Only apply exact-match filters at DB level; search remains Python (substring)
+                for key, field in [("status", "status"), ("priority", "priority"), ("source", "source"), ("taxonomy", "taxonomy"), ("tenant_id", "tenant_id"), ("department", "department")]:
+                    val = filters.get(key)
+                    if val:
+                        try:
+                            query = query.where(field, "==", val)
+                        except Exception as e:
+                            logger.warning(f"Hazard list_hazards DB where failed for {field}: {e}")
+                return query
+
+            # Pagination: limit to 500 max, default 100
+            limit = min(int(filters.get("limit") or 100), 500)
+            # Support page_size via filters
+            if filters.get("page_size"):
+                try:
+                    limit = min(int(filters["page_size"]), 500)
+                except Exception:
+                    pass
+
             if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(self.COLLECTION).get()
+                base = get_cross_tenant_collection(self.COLLECTION)
             else:
-                docs = get_tenant_collection(self.tenant_id, self.COLLECTION).get()
+                base = get_tenant_collection(self.tenant_id, self.COLLECTION)
+
+            query = _apply_filters(base)
+            # Order and limit
+            try:
+                from google.cloud.firestore import Query as FirestoreQuery
+                query = query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(limit)
+            except Exception as e:
+                logger.warning(f"Hazard list_hazards order/limit failed: {e}")
+                try:
+                    query = query.limit(limit)
+                except Exception:
+                    pass
+
+            try:
+                docs = list(query.get())
+            except Exception as e:
+                logger.warning(f"Hazard list_hazards filtered query failed, fallback to Python filtering: {e}")
+                docs = list(base.get())
 
             results = []
             for doc in docs:
@@ -187,30 +269,40 @@ class HazardService:
                 data["id"] = doc.id
                 self._serialize_timestamps(data)
 
-                if filters:
-                    if filters.get("status") and data.get("status") != filters["status"]:
+                # Python re-check for DB-filtered fields (safety) and search
+                if filters.get("status") and data.get("status") != filters["status"]:
+                    continue
+                if filters.get("priority") and data.get("priority") != filters["priority"]:
+                    continue
+                if filters.get("source") and data.get("source") != filters["source"]:
+                    continue
+                if filters.get("taxonomy") and data.get("taxonomy") != filters["taxonomy"]:
+                    continue
+                if filters.get("tenant_id") and data.get("tenant_id") != filters["tenant_id"]:
+                    continue
+                if filters.get("department") and (data.get("department") or "") != filters["department"]:
+                    continue
+                if filters.get("search"):
+                    search = filters["search"].lower()
+                    hid = (data.get("hazard_id") or "").lower()
+                    title = (data.get("title") or "").lower()
+                    desc = (data.get("description") or "").lower()
+                    if search not in hid and search not in title and search not in desc:
                         continue
-                    if filters.get("priority") and data.get("priority") != filters["priority"]:
-                        continue
-                    if filters.get("source") and data.get("source") != filters["source"]:
-                        continue
-                    if filters.get("taxonomy") and data.get("taxonomy") != filters["taxonomy"]:
-                        continue
-                    if filters.get("tenant_id") and data.get("tenant_id") != filters["tenant_id"]:
-                        continue
-                    if filters.get("department") and (data.get("department") or "") != filters["department"]:
-                        continue
-                    if filters.get("search"):
-                        search = filters["search"].lower()
-                        hid = (data.get("hazard_id") or "").lower()
-                        title = (data.get("title") or "").lower()
-                        desc = (data.get("description") or "").lower()
-                        if search not in hid and search not in title and search not in desc:
-                            continue
 
                 results.append(data)
 
-            results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
+            # If query already ordered, keep; otherwise sort
+            # Only sort if not already limited ordered query succeeded
+            try:
+                # If we used order_by, results are already sorted; keep as is
+                pass
+            except Exception:
+                results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
+            # Ensure sort if query failed fallback
+            if not results or results != sorted(results, key=lambda r: r.get("created_at", datetime.min), reverse=True):
+                # Only re-sort if needed (fallback case)
+                results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
             return results
         except Exception as e:
             logger.error(f"Failed to list hazards: {e}")
@@ -219,15 +311,35 @@ class HazardService:
     def update_hazard(self, hazard_id: str, payload: dict, user: dict) -> Optional[dict]:
         try:
             collection = get_tenant_collection(self.tenant_id, self.COLLECTION)
-            docs = collection.get()
+            # Optimized: direct lookup
             target_doc = None
             target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                    target_doc = data
-                    target_id = doc.id
-                    break
+            try:
+                snap = collection.document(hazard_id).get()
+                snap_data = snap.to_dict() if snap.exists else None
+                if snap.exists and snap_data:
+                    target_doc = snap_data
+                    target_id = snap.id
+                else:
+                    q = collection.where("hazard_id", "==", hazard_id).limit(1)
+                    docs = list(q.get())
+                    # Mock where returns all; filter manually for fallback
+                    filtered = [d for d in docs if d.id == hazard_id or d.to_dict().get("hazard_id") == hazard_id]
+                    if filtered:
+                        target_doc = filtered[0].to_dict()
+                        target_id = filtered[0].id
+                    elif docs and len(docs) == 1 and docs[0].to_dict().get("hazard_id") == hazard_id:
+                        target_doc = docs[0].to_dict()
+                        target_id = docs[0].id
+            except Exception:
+                # Fallback scan limited
+                docs = collection.limit(500).get()
+                for doc in docs:
+                    data = doc.to_dict()
+                    if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
+                        target_doc = data
+                        target_id = doc.id
+                        break
 
             if not target_doc:
                 return None
@@ -266,13 +378,26 @@ class HazardService:
     def update_status(self, hazard_id: str, status: str, user: dict) -> Optional[dict]:
         try:
             collection = get_tenant_collection(self.tenant_id, self.COLLECTION)
-            docs = collection.get()
             target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                    target_id = doc.id
-                    break
+            try:
+                snap = collection.document(hazard_id).get()
+                if snap.exists and snap.to_dict():
+                    target_id = snap.id
+                else:
+                    q = collection.where("hazard_id", "==", hazard_id).limit(1)
+                    docs = list(q.get())
+                    filtered = [d for d in docs if d.id == hazard_id or d.to_dict().get("hazard_id") == hazard_id]
+                    if filtered:
+                        target_id = filtered[0].id
+                    elif docs and docs[0].to_dict().get("hazard_id") == hazard_id:
+                        target_id = docs[0].id
+            except Exception:
+                docs = collection.limit(500).get()
+                for doc in docs:
+                    data = doc.to_dict()
+                    if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
+                        target_id = doc.id
+                        break
 
             if not target_id:
                 return None
@@ -298,13 +423,24 @@ class HazardService:
     def assign_hazard(self, hazard_id: str, assigned_to: str, assigned_to_uid: str, user: dict) -> Optional[dict]:
         try:
             collection = get_tenant_collection(self.tenant_id, self.COLLECTION)
-            docs = collection.get()
             target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                    target_id = doc.id
-                    break
+            try:
+                snap = collection.document(hazard_id).get()
+                if snap.exists and snap.to_dict():
+                    target_id = snap.id
+                else:
+                    q = collection.where("hazard_id", "==", hazard_id).limit(1)
+                    docs = list(q.get())
+                    filtered = [d for d in docs if d.id == hazard_id or d.to_dict().get("hazard_id") == hazard_id]
+                    if filtered:
+                        target_id = filtered[0].id
+            except Exception:
+                docs = collection.limit(500).get()
+                for doc in docs:
+                    data = doc.to_dict()
+                    if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
+                        target_id = doc.id
+                        break
 
             if not target_id:
                 return None
@@ -328,32 +464,82 @@ class HazardService:
 
     def get_hazard_stats(self, user: dict) -> Dict[str, Any]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(self.COLLECTION).get()
-            else:
-                docs = get_tenant_collection(self.tenant_id, self.COLLECTION).get()
-
+            # Optimized: use count aggregation where possible, else limited fetch
             stats = {"Open": 0, "Processing": 0, "Under Review": 0, "Closed": 0, "Reopened": 0}
             taxonomy_counts = {}
             priority_counts = {"H": 0, "M": 0, "L": 0}
             risk_level_counts = {}
 
-            for doc in docs:
-                data = doc.to_dict()
-                status = data.get("status", "Open")
-                if status in stats:
-                    stats[status] += 1
+            # Try count via filtered queries for each status (efficient)
+            try:
+                if user.get("role") in settings.CROSS_TENANT_ROLES:
+                    base = get_cross_tenant_collection(self.COLLECTION)
+                else:
+                    base = get_tenant_collection(self.tenant_id, self.COLLECTION)
 
-                taxonomy = data.get("taxonomy", "Other")
-                taxonomy_counts[taxonomy] = taxonomy_counts.get(taxonomy, 0) + 1
+                # Use aggregation count per status where possible
+                total_docs = None
+                for st in list(stats.keys()):
+                    try:
+                        cnt = base.where("status", "==", st).count().get()
+                        # Parse count
+                        if cnt and hasattr(cnt[0], "value"):
+                            v = cnt[0].value or 0
+                        elif cnt and isinstance(cnt[0], (list, tuple)) and hasattr(cnt[0][0], "value"):
+                            v = cnt[0][0].value or 0
+                        else:
+                            v = None
+                        if v is not None:
+                            stats[st] = v
+                            continue
+                    except Exception:
+                        pass
+                    # Fallback if count not supported
+                    total_docs = None
+                    break
+                # If count succeeded for all statuses, we still need taxonomy/priority - fetch limited set
+                # Fetch limited docs for taxonomy aggregation (up to 500)
+                docs = list(base.limit(500).get())
+            except Exception:
+                if user.get("role") in settings.CROSS_TENANT_ROLES:
+                    docs = list(get_cross_tenant_collection(self.COLLECTION).limit(500).get())
+                else:
+                    docs = list(get_tenant_collection(self.tenant_id, self.COLLECTION).limit(500).get())
+                # Reset stats to compute from docs
+                stats = {"Open": 0, "Processing": 0, "Under Review": 0, "Closed": 0, "Reopened": 0}
+                for doc in docs:
+                    data = doc.to_dict()
+                    status = data.get("status", "Open")
+                    if status in stats:
+                        stats[status] += 1
+                    taxonomy = data.get("taxonomy", "Other")
+                    taxonomy_counts[taxonomy] = taxonomy_counts.get(taxonomy, 0) + 1
+                    priority = data.get("priority")
+                    if priority in priority_counts:
+                        priority_counts[priority] += 1
+                    rl = data.get("risk_level")
+                    if rl:
+                        risk_level_counts[rl] = risk_level_counts.get(rl, 0) + 1
+                return {
+                    "by_status": stats,
+                    "by_taxonomy": taxonomy_counts,
+                    "by_priority": priority_counts,
+                    "by_risk_level": risk_level_counts,
+                    "total": sum(stats.values()),
+                }
 
-                priority = data.get("priority")
-                if priority in priority_counts:
-                    priority_counts[priority] += 1
-
-                rl = data.get("risk_level")
-                if rl:
-                    risk_level_counts[rl] = risk_level_counts.get(rl, 0) + 1
+            # If count path succeeded, need taxonomy/priority from docs
+            if 'docs' in locals():
+                for doc in docs:
+                    data = doc.to_dict()
+                    taxonomy = data.get("taxonomy", "Other")
+                    taxonomy_counts[taxonomy] = taxonomy_counts.get(taxonomy, 0) + 1
+                    priority = data.get("priority")
+                    if priority in priority_counts:
+                        priority_counts[priority] += 1
+                    rl = data.get("risk_level")
+                    if rl:
+                        risk_level_counts[rl] = risk_level_counts.get(rl, 0) + 1
 
             return {
                 "by_status": stats,

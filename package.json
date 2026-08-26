@@ -25,6 +25,7 @@
   "author": "AviaSafeSystems.com",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "serve": "^14.0.0"
   },
   "repository": {

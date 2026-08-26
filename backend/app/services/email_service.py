@@ -12,9 +12,12 @@
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
 
+import hashlib
 import logging
+import random
 import smtplib
 import ssl
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -131,16 +134,61 @@ def _send_sendgrid(to: str, rendered: Dict[str, str]) -> Dict[str, Any]:
     return {"sent": True, "provider": "sendgrid", "to": to}
 
 
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_string(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+_MAX_EMAIL_RETRIES = 3
+_BASE_DELAY = 1.0
+
+
+def _retry_with_backoff(func, *args, max_retries: int = _MAX_EMAIL_RETRIES, **kwargs) -> Dict[str, Any]:
+    """Execute func with exponential backoff + jitter. On exhaustion, quarantine to DLQ."""
+    last_error: Optional[Exception] = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return func(*args, **kwargs)
+        except Exception as exc:
+            last_error = exc
+            delay = _BASE_DELAY * (2 ** (attempt - 1)) + random.uniform(0, 0.5)
+            logger.warning(
+                f"Email dispatch attempt {attempt}/{max_retries} failed: {exc}. "
+                f"Retrying in {delay:.1f}s"
+            )
+            time.sleep(delay)
+
+    logger.error(f"All {max_retries} email dispatch attempts exhausted: {last_error}")
+    try:
+        from app.services.dlq_service import DlqService
+        dlq = DlqService()
+        dlq.quarantine(
+            original_operation="email_dispatch",
+            payload={"args": [str(a) for a in args], "kwargs": {k: str(v) for k, v in kwargs.items()}},
+            error_message=str(last_error),
+            max_attempts=max_retries,
+        )
+    except Exception as dlq_err:
+        logger.error(f"Failed to quarantine failed email to DLQ: {dlq_err}")
+
+    return {"sent": False, "error": str(last_error), "retries_exhausted": True}
+
+
 def send_welcome_email(to: str, context: Dict[str, Any]) -> Dict[str, Any]:
-    """Send the welcome email to `to`. Never raises; returns a result dict."""
+    """Send the welcome email to `to`. Never raises; returns a result dict.
+    Includes SHA-256 digest of the rendered payload and exponential backoff retry."""
     try:
         rendered = render_welcome_email(context)
+        payload_hash = sha256_string(rendered.get("html", ""))
         provider = (settings.EMAIL_PROVIDER or "none").strip().lower()
 
         if provider == "smtp":
-            result = _send_smtp(to, rendered)
+            result = _retry_with_backoff(_send_smtp, to, rendered)
         elif provider == "sendgrid":
-            result = _send_sendgrid(to, rendered)
+            result = _retry_with_backoff(_send_sendgrid, to, rendered)
         else:
             result = {
                 "sent": False,
@@ -149,8 +197,62 @@ def send_welcome_email(to: str, context: Dict[str, Any]) -> Dict[str, Any]:
                 "reason": "EMAIL_PROVIDER is 'none' — welcome email logged, not delivered",
                 "preview": rendered["html"],
             }
-        logger.info(f"Welcome email to {to}: provider={result.get('provider')} sent={result.get('sent', False)}")
+        result["payload_sha256"] = payload_hash
+        logger.info(f"Welcome email to {to}: provider={result.get('provider')} sent={result.get('sent', False)} hash={payload_hash}")
         return result
     except Exception as e:
         logger.error(f"Welcome email to {to} failed: {e}")
         return {"sent": False, "provider": (settings.EMAIL_PROVIDER or "none").lower(), "to": to, "error": str(e)}
+
+
+def send_regulatory_report(
+    to: str,
+    subject: str,
+    html_body: str,
+    text_body: str,
+    attachment_bytes: Optional[bytes] = None,
+    attachment_filename: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Dispatch a regulatory report email with optional PDF attachment.
+    Uses exponential backoff + jitter; quarantines to DLQ on exhaustion."""
+    rendered = {"subject": subject, "html": html_body, "text": text_body}
+    payload_hash = sha256_bytes(attachment_bytes) if attachment_bytes else sha256_string(html_body)
+    provider = (settings.EMAIL_PROVIDER or "none").strip().lower()
+
+    def _send_fn(to_addr: str, rendered_data: Dict[str, str]) -> Dict[str, Any]:
+        msg = EmailMessage()
+        msg["Subject"] = rendered_data["subject"]
+        msg["From"] = formataddr(_from_address())
+        msg["To"] = to_addr
+        msg.set_content(rendered_data["text"])
+        msg.add_alternative(rendered_data["html"], subtype="html")
+        if attachment_bytes and attachment_filename:
+            msg.add_attachment(
+                attachment_bytes,
+                maintype="application",
+                subtype="pdf",
+                filename=attachment_filename,
+            )
+        host = settings.SMTP_HOST
+        if not host:
+            raise ValueError("SMTP_HOST is not configured")
+        port = int(settings.SMTP_PORT or 587)
+        with smtplib.SMTP(host, port, timeout=30) as server:
+            if port in (587, 25):
+                server.starttls(context=ssl.create_default_context())
+            if settings.SMTP_USER and settings.SMTP_PASS:
+                server.login(settings.SMTP_USER, settings.SMTP_PASS)
+            server.send_message(msg)
+        return {"sent": True, "provider": "smtp", "to": to_addr, "host": host}
+
+    if provider == "smtp":
+        result = _retry_with_backoff(_send_fn, to, rendered)
+    else:
+        result = {
+            "sent": False,
+            "provider": provider,
+            "to": to,
+            "reason": f"EMAIL_PROVIDER '{provider}' not configured for regulatory dispatch",
+        }
+    result["payload_sha256"] = payload_hash
+    return result

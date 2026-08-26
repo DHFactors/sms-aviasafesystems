@@ -707,11 +707,43 @@ function getRoleDestination(user) {
     return '/safety.html';
 }
 
-// ── Auth-state sync for the mirroring context ───────────────────────────────
-// Runs alongside each page's own observer: keeps window.DEMO_CONTEXT fresh
-// for AEs and clears stale contexts for everyone else / on sign-out.
+// ── Auth-state sync for tenant + mirroring contexts ────────────────────────
+// 1) Keeps sessionStorage demo tenant in sync with the signed-in user's
+//    actual tenant_id (fixes safety.html showing air-dynasty-demo when logged
+//    in as safety@fishtailair.com). 2) Keeps DEMO_CONTEXT fresh for AEs.
 if (typeof firebase !== 'undefined' && firebase.auth) {
     firebase.auth().onAuthStateChanged(function (u) {
+        try {
+            // Tenant sync: on sign-in, pin sessionStorage to the user's tenant;
+            // on sign-out, clear it so the next persona can't inherit it.
+            if (typeof TenantResolver !== 'undefined' && TenantResolver.syncDemoTenantWithAuth) {
+                if (u) {
+                    // Need claims for tenant_id — fetch async, but also set a
+                    // best-effort sync from cached __AUTH_TENANT_ID if available
+                    u.getIdTokenResult(false).then(function (tr) {
+                        var tenantId = (tr.claims && (tr.claims.tenant_id || tr.claims.tenantId)) || null;
+                        var role = tr.claims && tr.claims.role;
+                        TenantResolver.syncDemoTenantWithAuth({ tenantId: tenantId, tenant_id: tenantId, role: role, claims: tr.claims });
+                        try { window.__AUTH_TENANT_ID = tenantId || null; } catch (e2) {}
+                    }).catch(function () {
+                        // Fallback: if token fetch fails, at least don't keep stale demo tenant
+                    });
+                } else {
+                    // Signed out — exhaustive clear
+                    if (TenantResolver.clearTenantSession) TenantResolver.clearTenantSession();
+                    else if (TenantResolver.clearDemoTenant) TenantResolver.clearDemoTenant();
+                    try {
+                        window.__AUTH_TENANT_ID = null;
+                        // Copilot session counters must not survive logout
+                        var ck = (typeof storageKey === 'function' ? storageKey('copilot_message_count') : 'aviasafe_copilot_message_count');
+                        sessionStorage.removeItem(ck);
+                        sessionStorage.removeItem('aviasafe_copilot_message_count');
+                        sessionStorage.removeItem('aviasafe:beta:copilot_message_count');
+                        sessionStorage.removeItem('aviasafe:prod:copilot_message_count');
+                    } catch (e2) {}
+                }
+            }
+        } catch (e) { /* never block auth */ }
         try {
             if (u && _isProspectAe(u.email)) {
                 resolveTenantContext({ email: u.email });
