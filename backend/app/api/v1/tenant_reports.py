@@ -13,7 +13,7 @@ from app.repositories.audit_repo import list_tenant_dispatches
 from app.services.tenant_pdf_generator import TenantPdfGenerator
 from app.firebase import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/sms", tags=["Tenant SMS Reporting"])
 
 
 def _compile_tenant_monthly_report(tenant_id: str, year: int, month: int) -> Dict[str, Any]:
@@ -71,7 +71,7 @@ def _compile_tenant_monthly_report(tenant_id: str, year: int, month: int) -> Dic
     }
 
 
-@router.get("/sms/monthly-summary")
+@router.get("/monthly-summary")
 async def get_monthly_sms_summary(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
@@ -83,7 +83,7 @@ async def get_monthly_sms_summary(
     return {"success": True, "report": report}
 
 
-@router.get("/sms/export-pdf")
+@router.get("/export-pdf")
 async def export_tenant_srb_pdf(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
@@ -101,7 +101,7 @@ async def export_tenant_srb_pdf(
     )
 
 
-@router.post("/sms/dispatch-srb")
+@router.post("/dispatch-srb")
 async def dispatch_srb_report(
     year: int = Query(..., ge=2000, le=2100),
     month: int = Query(..., ge=1, le=12),
@@ -136,7 +136,7 @@ async def dispatch_srb_report(
     }
 
 
-@router.get("/sms/audit-logs")
+@router.get("/audit-logs")
 async def get_tenant_audit_logs(
     limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None),
