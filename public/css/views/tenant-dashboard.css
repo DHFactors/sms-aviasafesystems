@@ -1,0 +1,280 @@
+/* ============================================================================
+   FILE: tenant-dashboard.css
+   PATH: public/css/views/tenant-dashboard.css
+   VERSION: 1.0.0
+   PURPOSE: Tenant SMS Dashboard — KPI strip, 5x5 interactive risk matrix,
+            SPI charts, CAPA register, and audit table.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ */
+
+/* ========== TENANT DASHBOARD WORKSPACE ========== */
+.tenant-dashboard-workspace {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tenant-dashboard-workspace .workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tenant-dashboard-workspace .workspace-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0b1e2d;
+  margin: 0;
+}
+
+.tenant-dashboard-workspace .header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ========== KPI STRIP ========== */
+.tenant-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.tenant-kpi-strip .kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow 0.15s ease;
+}
+
+.tenant-kpi-strip .kpi-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tenant-kpi-strip .kpi-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #64748b;
+}
+
+.tenant-kpi-strip .kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #0b1e2d;
+}
+
+.tenant-kpi-strip .kpi-trend {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.tenant-kpi-strip .kpi-trend.alert { color: #dc2626; }
+.tenant-kpi-strip .kpi-trend.ok { color: #16a34a; }
+
+/* ========== 5x5 INTERACTIVE RISK MATRIX ========== */
+.tenant-risk-matrix {
+  display: grid;
+  grid-template-columns: auto repeat(5, 1fr);
+  gap: 2px;
+  max-width: 560px;
+}
+
+.tenant-risk-matrix .matrix-corner {
+  background: #0b1e2d;
+  border-radius: 4px 0 0 0;
+}
+
+.tenant-risk-matrix .matrix-header {
+  background: #0b1e2d;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 8px 4px;
+  white-space: nowrap;
+}
+
+.tenant-risk-matrix .matrix-row-label {
+  background: #0b1e2d;
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 6px;
+  writing-mode: horizontal-tb;
+}
+
+.tenant-risk-matrix .matrix-cell {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  border-radius: 3px;
+  cursor: default;
+  transition: transform 0.1s ease;
+}
+
+.tenant-risk-matrix .matrix-cell:hover {
+  transform: scale(1.08);
+  z-index: 1;
+}
+
+.tenant-risk-matrix .matrix-cell .cell-count {
+  font-size: 1.1rem;
+}
+
+.tenant-risk-matrix .matrix-cell .cell-count.zero {
+  opacity: 0.35;
+  font-weight: 400;
+}
+
+.tenant-risk-matrix .matrix-cell.tolerability-ACCEPTABLE { background: #22c55e; }
+.tenant-risk-matrix .matrix-cell.tolerability-TOLERABLE { background: #f59e0b; }
+.tenant-risk-matrix .matrix-cell.tolerability-INTOLERABLE { background: #dc2626; }
+
+/* ========== CHART CARD (shared) ========== */
+.tenant-chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.tenant-chart-card .chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tenant-chart-card .chart-card-header h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+
+.tenant-chart-card .chart-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.tenant-chart-card canvas {
+  width: 100% !important;
+  max-height: 300px;
+}
+
+.tenant-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .tenant-charts-grid { grid-template-columns: 1fr; }
+}
+
+/* ========== CAPA TABLE ========== */
+.tenant-capa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.tenant-capa-table thead th {
+  background: #0b1e2d;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tenant-capa-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.tenant-capa-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.tenant-capa-table .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tenant-capa-table .status-badge.OPEN { background: #fef3c7; color: #92400e; }
+.tenant-capa-table .status-badge.IN_PROGRESS { background: #dbeafe; color: #1e40af; }
+.tenant-capa-table .status-badge.VERIFIED_CLOSED { background: #dcfce7; color: #166534; }
+.tenant-capa-table .status-badge.OVERDUE { background: #fee2e2; color: #991b1b; }
+
+/* ========== AUDIT TABLE ========== */
+.tenant-audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.tenant-audit-table thead th {
+  background: #0b1e2d;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.tenant-audit-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.tenant-audit-table tbody tr:hover { background: #f8fafc; }
+
+.tenant-audit-table .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.tenant-audit-table .status-badge.delivered { background: #dcfce7; color: #166534; }
+.tenant-audit-table .status-badge.pending { background: #fef9c3; color: #854d0e; }
+.tenant-audit-table .status-badge.failed { background: #fee2e2; color: #991b1b; }
+
+/* ========== LOADING / EMPTY ========== */
+.tenant-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}

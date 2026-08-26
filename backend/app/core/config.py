@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
-    FIREBASE_DATABASE_ID: Optional[str] = None
+    FIREBASE_DATABASE_ID: str = "sms-db-beta"
     # Public Firebase Web API key used by the server-side login endpoint
     # (app/services/login_service.py) to verify credentials against the
     # Identity Toolkit REST API. It is the same public key shipped in

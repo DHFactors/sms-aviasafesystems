@@ -1,0 +1,252 @@
+/* ============================================================================
+   FILE: caan-oversight.css
+   PATH: public/css/views/caan-oversight.css
+   VERSION: 1.0.0
+   PURPOSE: CAAN SSP Oversight workspace — KPI strip, chart cards, grid layout,
+            audit table register, and role-restricted sidebar styling.
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ */
+
+/* ========== OVERSIGHT WORKSPACE ========== */
+.oversight-workspace {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.oversight-workspace .workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.oversight-workspace .workspace-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0b1e2d;
+  margin: 0;
+}
+
+.oversight-workspace .workspace-header .header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ========== KPI METRIC STRIP ========== */
+.kpi-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.kpi-metric-strip .kpi-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow 0.15s ease;
+}
+
+.kpi-metric-strip .kpi-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.kpi-metric-strip .kpi-card .kpi-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #64748b;
+}
+
+.kpi-metric-strip .kpi-card .kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0b1e2d;
+}
+
+.kpi-metric-strip .kpi-card .kpi-trend {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.kpi-metric-strip .kpi-card .kpi-trend.up { color: #dc2626; }
+.kpi-metric-strip .kpi-card .kpi-trend.down { color: #16a34a; }
+.kpi-metric-strip .kpi-card .kpi-trend.stable { color: #94a3b8; }
+
+/* ========== OVERSIGHT GRID ========== */
+.oversight-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .oversight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========== CHART CARD ========== */
+.chart-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.chart-card .chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.chart-card .chart-card-header h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+}
+
+.chart-card .chart-card-header .chart-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.chart-card canvas {
+  width: 100% !important;
+  max-height: 280px;
+}
+
+/* ========== AUDIT TABLE REGISTER ========== */
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.audit-table thead th {
+  background: #0b1e2d;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.audit-table tbody td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.audit-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.audit-table .status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.audit-table .status-badge.delivered { background: #dcfce7; color: #166534; }
+.audit-table .status-badge.pending { background: #fef9c3; color: #854d0e; }
+.audit-table .status-badge.retrying { background: #fef3c7; color: #92400e; }
+.audit-table .status-badge.failed { background: #fee2e2; color: #991b1b; }
+
+/* ========== ROLE-RESTRICTED SIDEBAR ========== */
+.nav-item[data-role-restricted] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.nav-item[data-role-restricted="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.nav-item[data-role-restricted].role-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ========== LOADING / EMPTY STATES ========== */
+.oversight-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.oversight-empty {
+  text-align: center;
+  padding: 40px;
+  color: #94a3b8;
+}
+
+.oversight-empty i {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* ========== EMAIL DISPATCH PROMPT ========== */
+.dispatch-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.dispatch-prompt-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.dispatch-prompt-card h3 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dispatch-prompt-card input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.dispatch-prompt-card .prompt-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

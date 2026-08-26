@@ -63,3 +63,4 @@ docs/.env.local
 
 docs/tenant_details.txt
 _archive/legacy-backups/beta-testing-credentials.csv
+credential.txt

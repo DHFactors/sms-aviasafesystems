@@ -31,14 +31,17 @@
     // to a seeded demo tenant (or the CAAN regulator tenant for the ASSD/FSSD
     // directorates).
     var DEMO_PERSONAS = [
-        { key: 'developer', label: 'Developer / Super-Admin', tenant: 'developer' },
-        { key: 'smd', label: 'SMD (Safety Management Dept - CAAN)', tenant: 'smd' },
-        { key: 'fixed-wing', label: 'Fixed-Wing', tenant: 'himalaya-airlines-demo' },
-        { key: 'rotary', label: 'Rotary', tenant: 'air-dynasty-demo' },
-        { key: 'amo', label: 'AMO', tenant: 'nepal-aero-maintenance-demo' },
-        { key: 'airport', label: 'Airport', tenant: 'tia-kathmandu-demo' },
-        { key: 'assd', label: 'ASSD', tenant: 'caan' },
-        { key: 'fssd', label: 'FSSD', tenant: 'caan' },
+        { key: 'developer', label: 'Developer / System Admin', tenant: 'system' },
+        { key: 'fishtail-safety',  label: 'Fishtail Air - Safety Manager',      tenant: 'fishtail-air' },
+        { key: 'fishtail-145',     label: 'Fishtail Air - Part-145 Mx Manager', tenant: 'fishtail-air' },
+        { key: 'fishtail-camo',    label: 'Fishtail Air - CAMO',                tenant: 'fishtail-air' },
+        { key: 'fishtail-ops',     label: 'Fishtail Air - Flight Ops',          tenant: 'fishtail-air' },
+        { key: 'fishtail-gops',    label: 'Fishtail Air - Ground Ops',          tenant: 'fishtail-air' },
+        { key: 'nepalw-safety',    label: 'Nepal Wings - Safety Manager',       tenant: 'nepal-wings' },
+        { key: 'nepalw-145',       label: 'Nepal Wings - Part-145 Mx Manager',  tenant: 'nepal-wings' },
+        { key: 'nepalw-camo',      label: 'Nepal Wings - CAMO',                 tenant: 'nepal-wings' },
+        { key: 'nepalw-ops',       label: 'Nepal Wings - Flight Ops',           tenant: 'nepal-wings' },
+        { key: 'nepalw-gops',      label: 'Nepal Wings - Ground Ops',           tenant: 'nepal-wings' },
     ];
 
     // Subdomain -> Firestore tenant document id normalization. Public tenant

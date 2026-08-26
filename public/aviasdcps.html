@@ -22,6 +22,8 @@
   <!-- Core SDCPS Stylesheets -->
   <link rel="stylesheet" href="css/aviasdcps-shell.css" />
   <link rel="stylesheet" href="css/aviasdcps-components.css" />
+  <link rel="stylesheet" href="css/views/caan-oversight.css" />
+  <link rel="stylesheet" href="css/views/tenant-dashboard.css" />
 
   <!-- External Visualizations Engine -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -89,6 +91,18 @@
       <a href="#preferences" class="nav-item" data-route="preferences">
         <i class="fa-solid fa-sliders"></i><span>Preferences</span>
       </a>
+
+      <!-- Section 6: Regulator Oversight (role-restricted) -->
+      <div class="nav-group-title">Regulator Oversight</div>
+      <a href="#caan-oversight" class="nav-item" data-route="caan-oversight" data-role-restricted="false">
+        <i class="fa-solid fa-shield-halved"></i><span>CAAN SSP Oversight</span>
+      </a>
+
+      <!-- Section 7: Tenant SMS (role-restricted) -->
+      <div class="nav-group-title">Tenant SMS</div>
+      <a href="#tenant-dashboard" class="nav-item" data-route="tenant-dashboard" data-role-restricted="false">
+        <i class="fa-solid fa-plane"></i><span>SMS Dashboard</span>
+      </a>
     </nav>
   </aside>
 
@@ -143,6 +157,15 @@
   <script src="js/views/reports.js"></script>
   <script src="js/views/taxonomy.js"></script>
   <script src="js/views/preferences.js"></script>
+  <script src="js/views/caan-oversight.js"></script>
+
+  <!-- CAAN Oversight Charts & PDF Export -->
+  <script src="js/charts/caan-charts.js"></script>
+  <script src="js/services/caan-pdf-export.js"></script>
+
+  <!-- Tenant SMS Dashboard -->
+  <script src="js/charts/tenant-charts.js"></script>
+  <script src="js/views/tenant-dashboard.js"></script>
 
   <!-- Dynamic Router Dispatcher -->
   <script src="js/aviasdcps-router.js"></script>

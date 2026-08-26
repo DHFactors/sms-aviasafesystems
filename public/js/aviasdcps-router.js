@@ -84,6 +84,22 @@ const AviaSDCPSRouter = (function () {
       template: 'views/preferences.html',
       controllerName: 'AviaSDCPSPreferences',
       title: 'System Preferences & Matrix Calibration'
+    },
+
+    // CAAN Regulator Oversight (role-restricted)
+    'caan-oversight': {
+      template: 'views/caan-oversight.html',
+      controllerName: 'AviaSDCPSCaanOversight',
+      title: 'CAAN SSP Oversight Dashboard',
+      allowedRoles: ['regulator', 'auditor', 'CAAN_SMD', 'CAAN_ADMIN', 'CAAN_AUDITOR']
+    },
+
+    // Tenant SMS Dashboard (role-restricted)
+    'tenant-dashboard': {
+      template: 'views/tenant-dashboard.html',
+      controllerName: 'AviaSDCPSTenantDashboard',
+      title: 'Tenant SMS Dashboard',
+      allowedRoles: ['operator', 'safety_manager', 'admin', 'AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN', 'SAFETY_OFFICER']
     }
   };
 
@@ -94,6 +110,26 @@ const AviaSDCPSRouter = (function () {
   async function navigate(routeKey) {
     const activeKey = ROUTE_REGISTRY[routeKey] ? routeKey : 'home';
     const config = ROUTE_REGISTRY[activeKey];
+
+    // Role-based access check
+    if (config.allowedRoles) {
+      const userRole = (window.AviaSDCPSUser && window.AviaSDCPSUser.getRole) 
+        ? window.AviaSDCPSUser.getRole() 
+        : (sessionStorage.getItem('aviasafe_role') || localStorage.getItem('aviasafe_role') || '');
+      const roleLower = userRole.toLowerCase();
+      if (!config.allowedRoles.some(r => roleLower.includes(r.toLowerCase()))) {
+        const viewport = document.getElementById('aviasdcpsViewport');
+        if (viewport) {
+          viewport.innerHTML = `
+            <div class="aviasdcps-card p-4">
+              <h4 class="text-danger"><i class="fa-solid fa-lock"></i> Access Restricted</h4>
+              <p class="text-muted">This view requires one of the following roles: ${config.allowedRoles.join(', ')}</p>
+            </div>`;
+        }
+        return;
+      }
+    }
+
     const viewport = document.getElementById('aviasdcpsViewport');
     const titleEl = document.getElementById('currentViewTitle');
 

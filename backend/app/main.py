@@ -15,6 +15,7 @@ from app.core.cors import ManualCORSMiddleware
 from app.firebase import initialize_firebase, is_firebase_ready
 from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, tenants, regulators, contact, feedback, copilot, psoe
 from app.routes import demo as demo_routes
+from app.api.v1.router import router as v1_router
 
 setup_logging()
 
@@ -57,7 +58,14 @@ async def lifespan(app: FastAPI):
         initialize_firebase()
     except Exception as e:
         logger.warning(f"Firebase initialization failed at startup: {e}. Lazy init will retry on first request.")
+
+    # Start APScheduler background jobs (weekly SSP + monthly tenant dispatch + daily DLQ replay)
+    from app.core.lifecycle import start_scheduler, stop_scheduler
+    start_scheduler()
+
     yield
+
+    stop_scheduler()
 
 
 app = FastAPI(
@@ -263,6 +271,8 @@ app.include_router(copilot.router, prefix=settings.API_PREFIX_COPILOT, tags=["Co
 
 app.include_router(psoe.router, prefix=settings.API_PREFIX_PSOE, tags=["PSOE Audit & Surveillance"])
 app.include_router(psoe.router, prefix=settings.API_PREFIX_PSOE_LEGACY, tags=["PSOE Audit & Surveillance (Legacy)"], include_in_schema=False)
+
+app.include_router(v1_router, prefix="/api/v1", tags=["API v1 — CAAN Oversight"])
 
 app.include_router(metrics_router, prefix="", tags=["Metrics"])
 
