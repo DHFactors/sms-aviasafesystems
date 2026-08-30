@@ -17,7 +17,7 @@ so the stored component_scores / overall_score_pct / overall_level match what
 the live API and /audits/psoe.html render.
 
 Usage:
-    python backend/scripts/seed_psoe_baselines.py                 # sms-db-beta
+    python backend/scripts/seed_psoe_baselines.py                 # sms-db
     python backend/scripts/seed_psoe_baselines.py --database sms-db
 """
 
@@ -160,7 +160,7 @@ def main():
     # NOTE: default is hard-coded (not read from the environment) because
     # importing app.core.config loads backend/.env into the process env,
     # which would otherwise override the intended beta target.
-    parser.add_argument("--database", default="sms-db-beta")
+    parser.add_argument("--database", default="sms-db")
     args = parser.parse_args()
 
     settings.FIREBASE_DATABASE_ID = args.database

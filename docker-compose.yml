@@ -14,7 +14,7 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=${PORT:-8000}
-      - FIREBASE_DATABASE_ID=sms-db-beta
+      - FIREBASE_DATABASE_ID=sms-db
       - ENVIRONMENT=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/live"]

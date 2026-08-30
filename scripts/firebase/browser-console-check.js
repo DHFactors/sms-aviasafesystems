@@ -14,8 +14,8 @@ const PORT = 9223;
 const urls = process.argv.slice(2).length
     ? process.argv.slice(2)
     : [
-        'https://sms-beta.web.app/',
-        'https://sms-beta.web.app/login.html',
+        'https://sms.aviasafesystems.com/',
+        'https://sms.aviasafesystems.com/login.html',
     ];
 
 function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }

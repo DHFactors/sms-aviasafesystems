@@ -313,7 +313,7 @@ QUALITY GATES - MUST PASS FOR RELEASE
 [ ] ✅ All 48 test cases completed
 [ ] ✅ Production dashboard renders correctly (sms.aviasafesystems.com)
 [ ] ✅ Beta sandbox contains 20 operator profiles
-[ ] ✅ Database isolation verified (sms-db vs sms-db-beta)
+[ ] ✅ Database isolation verified (sms-db vs sms-db)
 [ ] ✅ Security boundaries SEC-01 through SEC-05 enforced
 [ ] ✅ AI Copilot guardrails operational
 [ ] ✅ No critical blockers remain

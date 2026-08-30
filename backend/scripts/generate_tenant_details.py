@@ -8,7 +8,7 @@ Combines three configuration sources with live Firestore metrics:
                                    (email / {CODE}-{ROLE}-2026 password per account)
   2. beta-testing-credentials.csv — credential reference rows (covers tenants that
                                    are documented but not seeded, e.g. Saurya Airlines)
-  3. Firestore (sms-db-beta)     — tenant docs, hazard / CAN / CAP counts and
+  3. Firestore (sms-db)     — tenant docs, hazard / CAN / CAP counts and
                                    PSOE assessment statuses per tenant
 
 Output: a plain-text audit document grouped by tenant with
@@ -180,8 +180,8 @@ def render_tenant_block(index, display_name, tenant_id, op_type, accounts, m):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate the tenant details audit document.")
-    parser.add_argument("--database", default="sms-db-beta",
-                        help="Firestore database id (default: sms-db-beta)")
+    parser.add_argument("--database", default="sms-db",
+                        help="Firestore database id (default: sms-db)")
     parser.add_argument("--output", default=DEFAULT_OUTPUT,
                         help=f"Output path (default: {DEFAULT_OUTPUT})")
     args = parser.parse_args()

@@ -1,5 +1,5 @@
 """
-Deep Diagnostic & Architectural Root-Cause Analysis for All 20 Tenants on sms-db-beta
+Deep Diagnostic & Architectural Root-Cause Analysis for All 20 Tenants on sms-db
 
 AviaSAFE-SMS §1.1 Security Audit — Virtual Mirroring Alignment
 """
@@ -33,9 +33,9 @@ beta_db = False
 prod_db = False
 if firebase_js_path.exists():
     fb = firebase_js_path.read_text(encoding="utf-8")
-    beta_db = "sms-db-beta" in fb
+    beta_db = "sms-db" in fb
     prod_db = "sms-db" in fb
-    print(f"  firebase.js BETA databaseId: {'sms-db-beta' if beta_db else 'NOT SET'}")
+    print(f"  firebase.js BETA databaseId: {'sms-db' if beta_db else 'NOT SET'}")
     print(f"  firebase.js PROD databaseId: {'sms-db' if prod_db else 'NOT SET'}")
 
 # Database consistency check
@@ -121,7 +121,7 @@ print("  Evaluating Scenario A: Database Name Mismatch")
 print(f"    - FIRESTORE_DATABASE_ID in backend config: {'YES' if db_id_ref else 'NO'}")
 if not db_id_ref:
     print("    ! POSSIBLE: FIRESTORE_DATABASE_ID not referenced in backend config")
-    print("       firebase.js has databaseId hardcoded (sms-db for prod, sms-db-beta for beta),")
+    print("       firebase.js has databaseId hardcoded (sms-db for prod, sms-db for beta),")
     print("       but backend/app/core/config.py does not have FIRESTORE_DATABASE_ID env var.")
     print("    ✅ RECOMMENDED: Add FIRESTORE_DATABASE_ID to config.py and ensure Render env vars")
 else:
@@ -188,13 +188,13 @@ print("  Recommended fixes:")
 if not db_id_ref:
     print("  1. Add FIRESTORE_DATABASE_ID to backend/app/core/config.py")
     print("     - Set env var: FIRESTORE_DATABASE_ID=sms-db (production)")
-    print("     - Or: FIRESTORE_DATABASE_ID=sms-db-beta (beta)")
+    print("     - Or: FIRESTORE_DATABASE_ID=sms-db (beta)")
     print("     - Ensure Render dashboard has this env var configured")
 
 if not db_consistent:
     print("  2. Verify firebase.js databaseId consistency")
     print("     - PROD: databaseId: 'sms-db' (already set)")
-    print("     - BETA: databaseId: 'sms-db-beta' (already set)")
+    print("     - BETA: databaseId: 'sms-db' (already set)")
 
 if not reads_through_api:
     print("  3. Ensure ae-dashboard.html uses backend API (not direct Firestore SDK)")
@@ -294,7 +294,7 @@ print("""CONCLUSIONS & NEXT ACTIONS:
    → ACTION: Add FIRESTORE_DATABASE_ID = os.environ.get("FIRESTORE_DATABASE_ID")
    to backend/app/core/config.py. Set Render env var:
    - FIRESTORE_DATABASE_ID=sms-db (production)
-   - Or FIRESTORE_DATABASE_ID=sms-db-beta (beta)
+   - Or FIRESTORE_DATABASE_ID=sms-db (beta)
 
 2. ✅ VERIFIED: 20-tenant registry is correctly configured
    → 10 fixed-wing + 10 rotary-wing archetypes all validated

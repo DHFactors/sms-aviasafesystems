@@ -3,7 +3,7 @@
 Validate the 365-day seasonal seed against the phase-3 integrity checks.
 
 Usage:
-    python backend/scripts/validate_seasonal_seed.py --database sms-db-beta
+    python backend/scripts/validate_seasonal_seed.py --database sms-db
 """
 
 import argparse
@@ -30,7 +30,7 @@ def check(name, ok, detail=""):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--database", default="sms-db-beta")
+    parser.add_argument("--database", default="sms-db")
     args = parser.parse_args()
 
     settings.FIREBASE_DATABASE_ID = args.database

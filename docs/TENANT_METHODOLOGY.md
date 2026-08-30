@@ -200,7 +200,7 @@ Mapping (old `type` → new `tenant_type`):
 1. `TENANT_TYPES` enum + validation in `app/services/production_seed.py` (write `type` + `tenant_type`).
 2. `TenantCreate.tenant_type` in `app/routes/admin.py`; pass-through in `create_tenant` /
    `create_tenant_with_credentials`.
-3. Backfill script `backend/scripts/backfill_tenant_types.py` (dry-run + apply, §7) + run against `sms-db-beta`.
+3. Backfill script `backend/scripts/backfill_tenant_types.py` (dry-run + apply, §7) + run against `sms-db`.
 4. `list_tenants_admin` returns `tenant_type` + `?tenant_type=` filter.
 5. `public/admin/production-setup.html`: Step 2 type dropdown + conditional fields; bulk CSV header;
    Existing Tenants **Type** column; tenant-credentials page shows type.
@@ -208,7 +208,7 @@ Mapping (old `type` → new `tenant_type`):
    `CREDENTIAL_TENANT_CODES`/`CREDENTIAL_EMAIL_DOMAINS` += new tenants; `OPERATOR_PROFILES` += 3 new
    profiles with `tenant_type`.
 7. `seed/operators.py` + `production_seed.py` write `tenant_type`; preview shows Type column.
-8. Seed the 3 new tenants in `sms-db-beta` (surveys/hazards/reports/CAN/CAP) + simplified accounts.
+8. Seed the 3 new tenants in `sms-db` (surveys/hazards/reports/CAN/CAP) + simplified accounts.
 9. Run backend suite (target 231+ passing), update `manual_verification.md`, update
    `docs/API.md` (§3.11 + admin §) and the next status report.
 

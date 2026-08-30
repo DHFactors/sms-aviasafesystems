@@ -21,7 +21,7 @@ for (const line of raw.split(/\r?\n/)) {
     }
 }
 const args = process.argv.slice(2);
-const databaseId = args.find((a) => !a.startsWith('--')) || 'sms-db-beta';
+const databaseId = args.find((a) => !a.startsWith('--')) || 'sms-db';
 const onlyTara = args.includes('--only-tara');
 
 const app = admin.initializeApp({

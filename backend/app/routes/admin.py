@@ -547,7 +547,7 @@ async def admin_seed_deploy(
 
     Writes the regulator, tags the operator tenants, and seeds surveys +
     hazards + reports. Runs against the backend's configured database
-    (beta -> sms-db-beta, production -> sms-db).
+    (sms-db, the single consolidated database).
     """
     _verify_admin_setup(req.setup_key)
     from app.services import production_seed

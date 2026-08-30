@@ -2,7 +2,7 @@
 // Reads backend/.env for service-account credentials.
 // Usage:
 //   node scripts/firebase/inspect-hazards.js <tenantId> [databaseId]
-//     e.g. node scripts/firebase/inspect-hazards.js tara-air sms-db-beta
+//     e.g. node scripts/firebase/inspect-hazards.js tara-air sms-db
 'use strict';
 
 const fs = require('fs');
@@ -25,7 +25,7 @@ function loadEnv() {
 
 async function main() {
     const tenantId = process.argv[2];
-    const databaseId = process.argv[3] || 'sms-db-beta';
+    const databaseId = process.argv[3] || 'sms-db';
     if (!tenantId) {
         console.error('Usage: node inspect-hazards.js <tenantId> [databaseId]');
         process.exit(1);

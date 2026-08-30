@@ -65,8 +65,8 @@ def test_cors_allows_canonical_frontend_origins(client):
         assert resp.headers.get("access-control-allow-credentials") == "true"
 
 
-def test_cors_preflight_beta_hosting_and_local_origins(client):
-    """The beta web.app hosting origin and the local dev servers must pass the
+def test_cors_preflight_hosting_and_local_origins(client):
+    """The web.app hosting origin and the local dev servers must pass the
     CORS preflight with the explicit App Check / tenant-routing header list."""
     from app.main import CANONICAL_ALLOWED_ORIGINS, _allowed_origins
 
@@ -75,7 +75,7 @@ def test_cors_preflight_beta_hosting_and_local_origins(client):
         assert origin in merged
 
     for origin in (
-        "https://aerosafety-sms-beta.web.app",
+        "https://demo.aviasafesystems.com",
         "http://localhost:5000",
         "http://localhost:8000",
         "http://127.0.0.1:5500",
@@ -99,9 +99,9 @@ def test_cors_preflight_beta_hosting_and_local_origins(client):
 def test_cors_exposes_rate_limit_headers(client):
     """The rate-limit / back-off headers must be readable from a cross-origin
     response so the SPA can honour Retry-After and the sliding-window counters."""
-    resp = client.get("/health", headers={"Origin": "https://aerosafety-sms-beta.web.app"})
+    resp = client.get("/health", headers={"Origin": "https://aerosafety-sms-prod.web.app"})
     assert resp.status_code == 200
-    assert resp.headers.get("access-control-allow-origin") == "https://aerosafety-sms-beta.web.app"
+    assert resp.headers.get("access-control-allow-origin") == "https://aerosafety-sms-prod.web.app"
     exposed = resp.headers.get("access-control-expose-headers") or ""
     for header in ("Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"):
         assert header.lower() in exposed.lower(), f"header {header} not exposed"

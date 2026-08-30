@@ -5,7 +5,7 @@ POST /api/reports flow, _auto_create_hazard_from_report) with source_id set
 to the report's id so the 1:1 report <-> hazard linkage is restored.
 
 Usage:
-  python backend/scripts/backfill_hazards.py [--database sms-db-beta]
+  python backend/scripts/backfill_hazards.py [--database sms-db]
       [--tenant tara-air --tenant sita-air] [--all] [--dry-run]
 
   --all        run for every operator tenant (default when no --tenant given)
@@ -24,7 +24,7 @@ load_dotenv(override=False)
 from firebase_admin import credentials, firestore
 import firebase_admin
 
-DEFAULT_DB = "sms-db-beta"
+DEFAULT_DB = "sms-db"
 OPERATORS = [
     "sita-air", "yeti-airlines", "summit-air", "simrik-air",
     "buddha-air", "air-dynasty", "tara-air",

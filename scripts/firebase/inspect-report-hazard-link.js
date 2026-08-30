@@ -24,7 +24,7 @@ function loadEnv() {
 
 async function main() {
     const tenantId = process.argv[2];
-    const databaseId = process.argv[3] || 'sms-db-beta';
+    const databaseId = process.argv[3] || 'sms-db';
     if (!tenantId) {
         console.error('Usage: node inspect-report-hazard-link.js <tenantId> [databaseId]');
         process.exit(1);

@@ -1,4 +1,4 @@
-"""List tenants in sms-db-beta."""
+"""List tenants in sms-db."""
 import os, sys, re
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
@@ -22,7 +22,7 @@ cred = credentials.Certificate({
     "token_uri": env.get("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
 })
 app = firebase_admin.initialize_app(cred, name="list_tenants")
-db = firestore.client(app, database_id="sms-db-beta")
+db = firestore.client(app, database_id="sms-db")
 
 for t in db.collection("tenants").stream():
     d = t.to_dict()

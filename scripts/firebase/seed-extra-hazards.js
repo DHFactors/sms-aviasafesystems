@@ -3,7 +3,7 @@
 // Uses the same schema/seed_version as seed_caan_demo_data.py.
 // Usage:
 //   node scripts/firebase/seed-extra-hazards.js [databaseId] [tenantId ...]
-//     e.g. node scripts/firebase/seed-extra-hazards.js sms-db-beta buddha-air tara-air
+//     e.g. node scripts/firebase/seed-extra-hazards.js sms-db buddha-air tara-air
 'use strict';
 
 const fs = require('fs');
@@ -91,7 +91,7 @@ function riskLevelFor(riskIndex) {
 }
 
 async function main() {
-    const databaseId = process.argv[2] || 'sms-db-beta';
+    const databaseId = process.argv[2] || 'sms-db';
     const tenants = process.argv.slice(3);
     if (tenants.length === 0) tenants.push(...DEFAULT_TENANTS);
 

@@ -1,0 +1,91 @@
+# =============================================================================
+# Render Blueprint — single consolidated backend service
+# -----------------------------------------------------------------------------
+# Deploys the unified AviaSAFE API as one Docker web service. There is no
+# separate beta service: the platform runs against the consolidated `sms-db`
+# Firestore named database in the `aerosafety-sms-prod` project.
+#
+# Values marked `sync: false` are secrets — set them in the Render dashboard
+# (Services -> aviasafe-api -> Environment); they are never stored here.
+# =============================================================================
+
+services:
+  - type: web
+    name: aviasafe-api
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: backend
+    plan: starter                  # upgrade/downgrade as needed
+    healthCheckPath: /live
+    autoDeploy: true
+
+    envVars:
+      # ── Runtime ──────────────────────────────────────────────────────────
+      - key: PORT
+        value: 8000
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: API_VERSION
+        value: "1.0.0"
+      - key: REDIS_ENABLED
+        value: "true"
+      - key: REDIS_URL
+        sync: false
+
+      # ── Firebase Admin SDK (aerosafety-sms-prod / sms-db) ─────────────────
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_DATABASE_URL
+        sync: false
+      - key: FIREBASE_DATABASE_ID
+        value: sms-db
+
+      # ── Supabase Postgres (operational tables) ────────────────────────────
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+
+      # ── CORS (comma-separated browser origins) ────────────────────────────
+      - key: CORS_ORIGINS
+        value: https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://demo.aviasafesystems.com,https://smssurvey.gsacharya.com,https://sms.nac.com.np,https://ssp.caanepal.gov.np
+      - key: ALLOWED_ORIGINS
+        value: https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://demo.aviasafesystems.com,https://smssurvey.gsacharya.com,https://sms.nac.com.np,https://ssp.caanepal.gov.np
+
+      # ── Auth / bootstrap secrets ──────────────────────────────────────────
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: JWT_EXPIRES_IN
+        value: "1440"
+      - key: SETUP_SECRET
+        sync: false
+      - key: DEFAULT_PROVISION_PASSWORD
+        sync: false
+      - key: DEFAULT_SEED_PASSWORD
+        sync: false
+
+      # ── AI / reporting integrations ───────────────────────────────────────
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        sync: false
+
+      # ── Email (SendGrid/Sender) integrations ──────────────────────────────
+      - key: SENDER_API_KEY
+        sync: false
+      - key: SENDER_FROM_EMAIL
+        sync: false
+      - key: SENDER_LIST_ID
+        sync: false

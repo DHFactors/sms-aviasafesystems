@@ -25,8 +25,6 @@ setup_logging()
 CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
-    "https://aerosafety-sms-beta.web.app",
-    "https://sms-beta.web.app",
     "https://demo.aviasafesystems.com",
     # Public survey frontends (multi-tenant subdomains / portals)
     "https://smssurvey.gsacharya.com",

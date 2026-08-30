@@ -57,7 +57,7 @@ The backend loads `backend/.env` automatically (absolute path resolution in
 | `SETUP_SECRET` | For admin ops | — | Second factor for provisioning endpoints |
 | `DEFAULT_PROVISION_PASSWORD` | For `/provision-airlines` | — | No hardcoded fallback |
 | `DEFAULT_SEED_PASSWORD` | For seed pipeline | — | No hardcoded fallback |
-| `ALLOWED_ORIGINS` | No | `https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000` | Comma-separated CORS list |
+| `ALLOWED_ORIGINS` | No | `https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://demo.aviasafesystems.com,http://localhost:3000,http://localhost:8000` | Comma-separated CORS list |
 | `DEBUG` | No | `false` | Enables verbose logging |
 | `REDIS_URL` | No | empty | Enables Redis rate limiting when set |
 | `RATE_LIMIT_PER_MINUTE` | No | `60` | Per-IP limit |

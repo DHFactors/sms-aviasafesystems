@@ -258,7 +258,7 @@ function getTenantFromSubdomain() {
     
     if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
         var subdomain = parts[0];
-        var reserved = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+        var reserved = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'gap-analysis-ssp', 'localhost'];
         if (reserved.indexOf(subdomain) === -1) {
             return subdomain;
         }
@@ -342,7 +342,7 @@ function onDemoPersonaChange(value) {
 
 // Reserved platform keywords must never render as an active tenant scope,
 // even when passed explicitly via ?tenant=.
-var RESERVED_TENANT_KEYWORDS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+var RESERVED_TENANT_KEYWORDS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'gap-analysis-ssp', 'localhost'];
 
 function prettifyTenantName(slug) {
     if (typeof TenantResolver !== 'undefined' && TenantResolver.prettifySlug) {

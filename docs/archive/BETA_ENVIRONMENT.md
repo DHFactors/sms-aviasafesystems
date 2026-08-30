@@ -11,20 +11,20 @@ The beta is a **fully isolated environment** in its own Firebase project. Beta t
 | **Hosting** | `https://sms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) | `https://sms.aviasafesystems.com` / `aerosafety-sms-prod.web.app` |
 | **Firebase project** | `gap-analysis-ssp` (projectNumber `817614332543`) | `aerosafety-sms-prod` (projectNumber `527947363983`) |
 | **Backend** | `https://aviasafe-unified-platform.onrender.com` | `https://aviasafe-unified-platform.onrender.com` |
-| **Firestore** | `sms-db-beta` (native, us-west1, PITR 7d, project `gap-analysis-ssp`) | `sms-db` (native, us-west1, project `aerosafety-sms-prod`) |
+| **Firestore** | `sms-db` (native, us-west1, PITR 7d, project `gap-analysis-ssp`) | `sms-db` (native, us-west1, project `aerosafety-sms-prod`) |
 | **Auth pool** | `gap-analysis-ssp` (50 seeded users, 2,233 migrated docs) | `aerosafety-sms-prod` |
 | **Redis** | Upstash `aviasafe-redis` (rate limiting) | Not used |
 
 Frontend routing (`public/js/firebase.js`) selects the config by environment:
-- **Beta** (`sms.aviasafesystems.com`, `sms-beta.web.app`, any host containing `beta`, localhost): `gap-analysis-ssp` client config, `databaseId: "sms-db-beta"`, `apiBaseUrl: "https://aviasafe-unified-platform.onrender.com"`, `environment: "beta"`.
+- **Beta** (`sms.aviasafesystems.com`, `sms-beta.web.app`, any host containing `beta`, localhost): `gap-analysis-ssp` client config, `databaseId: "sms-db"`, `apiBaseUrl: "https://aviasafe-unified-platform.onrender.com"`, `environment: "beta"`.
 - **Production** (everything else, including `sms.aviasafesystems.com` and tenant subdomains `*.aviasafesystems.com`): `aerosafety-sms-prod` client config, `databaseId: "sms-db"`, `apiBaseUrl: "https://aviasafe-unified-platform.onrender.com"`, `environment: "production"`.
 
 ## Isolation Migration (2026-08-18)
 
-Previously the beta Firestore database (`sms-db-beta`) lived inside the **production** project (`aerosafety-sms-prod`), sharing its Auth pool. Completed migration:
+Previously the beta Firestore database (`sms-db`) lived inside the **production** project (`aerosafety-sms-prod`), sharing its Auth pool. Completed migration:
 
-1. Created `sms-db-beta` in `gap-analysis-ssp` (us-west1, native, PITR 7d).
-2. Deployed Firestore rules + indexes: `firebase deploy --only firestore:sms-db-beta --project gap-analysis-ssp`.
+1. Created `sms-db` in `gap-analysis-ssp` (us-west1, native, PITR 7d).
+2. Deployed Firestore rules + indexes: `firebase deploy --only firestore:sms-db --project gap-analysis-ssp`.
 3. Copied **2,233 documents** (tenants incl. nested subcollections, users, audit_logs, regulators, feedback, seed_metadata) via `backend/scripts/migrate_beta_db.py`; `--verify` reports 2,233/2,233 with 0 missing / 0 extra / 0 checksum mismatch.
 4. Purged 63 legacy Auth accounts from the `gap-analysis-ssp` pool and re-provisioned the 50-user seed (`backend/scripts/purge_auth_pool.py` + `python -m seed.deploy_seed --users-only --yes`). Audit (`backend/scripts/audit_seed_beta.py`) passes all data + provisioning checks.
 5. Beta Firebase **web** config (in `public/js/firebase.js` `BETA_CONFIG`): apiKey `AIzaSyAhvyNyLyqRWidGIkk-by3J9bJ5xtSFTdc`, authDomain `gap-analysis-ssp.firebaseapp.com`, projectId `gap-analysis-ssp`, storageBucket `gap-analysis-ssp.firebasestorage.app`, messagingSenderId `817614332543`, appId `1:817614332543:web:01224a312e8478b24d554a`.
@@ -38,12 +38,12 @@ Previously the beta Firestore database (`sms-db-beta`) lived inside the **produc
 - **App Check** (`backend/app/middleware/app_check.py`): `X-Firebase-AppCheck` tokens are verified server-side on register/join/verify/lookup/guest-chat. Clients activate reCAPTCHA v3 on `register.html`/`join.html` via `public/js/firebase.js`; the **beta reCAPTCHA site key is not yet provisioned** — register it in the `gap-analysis-ssp` console (Security > App Check) and paste into `BETA_CONFIG`/`APP_CONFIG.recaptchaSiteKey`.
 - **Copilot boundary** (`backend/app/services/groq_copilot.py`): prompt-injection and out-of-scope queries are rejected in code before any model call.
 
-## Firestore PITR — Verified Retention (sms-db-beta, gap-analysis-ssp)
+## Firestore PITR — Verified Retention (sms-db, gap-analysis-ssp)
 
 Verified with:
 
 ```
-gcloud firestore databases describe --database=sms-db-beta --project=gap-analysis-ssp
+gcloud firestore databases describe --database=sms-db --project=gap-analysis-ssp
 ```
 
 Key output:
@@ -60,7 +60,7 @@ type: FIRESTORE_NATIVE
 ### Reference: forcing 7-day retention (not needed, documented for completeness)
 
 ```
-gcloud firestore databases update --database=sms-db-beta --project=gap-analysis-ssp --enable-pitr --retention-duration=7d
+gcloud firestore databases update --database=sms-db --project=gap-analysis-ssp --enable-pitr --retention-duration=7d
 ```
 
 ## Deployment Notes
@@ -71,10 +71,10 @@ gcloud firestore databases update --database=sms-db-beta --project=gap-analysis-
 - Beta Render service (`sms-aviasafesystems-beta`) env vars — **REQUIRED for the isolated project**:
   - `FIREBASE_PROJECT_ID=gap-analysis-ssp`
   - `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` = the `gap-analysis-ssp` service-account (key file `backend/gap-analysis-ssp-sa.json`, gitignored)
-  - `FIREBASE_DATABASE_ID=sms-db-beta`
+  - `FIREBASE_DATABASE_ID=sms-db`
   - `ENVIRONMENT=beta`
   - `REDIS_URL` (Upstash), `ALLOWED_ORIGINS` (must include `https://sms.aviasafesystems.com` and `https://sms-beta.web.app`), `GROQ_API_KEY`, `GEMINI_API_KEY`, `DEBUG=false`
-- Firestore rules/indexes are per-project now: `firebase deploy --only firestore:sms-db-beta --project gap-analysis-ssp` for beta; `--project aerosafety-sms-prod` for production.
+- Firestore rules/indexes are per-project now: `firebase deploy --only firestore:sms-db --project gap-analysis-ssp` for beta; `--project aerosafety-sms-prod` for production.
 
 ## Verification Commands
 
@@ -83,7 +83,7 @@ gcloud firestore databases update --database=sms-db-beta --project=gap-analysis-
 curl https://aviasafe-unified-platform.onrender.com/live
 
 # Firestore PITR state (beta project)
-gcloud firestore databases describe --database=sms-db-beta --project=gap-analysis-ssp
+gcloud firestore databases describe --database=sms-db --project=gap-analysis-ssp
 
 # Migration integrity (from backend/, with gap-analysis-ssp SA env)
 python scripts/migrate_beta_db.py --verify

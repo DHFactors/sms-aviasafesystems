@@ -70,7 +70,7 @@ class Settings(BaseSettings):
 
     # ── CORS ──
     # Single-canonical-domain origin list (betasms.* decommissioned 2026-08).
-    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
+    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://demo.aviasafesystems.com,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
     # When set, takes precedence over ALLOWED_ORIGINS (Render-env friendly).
     CORS_ORIGINS: Optional[str] = None
 

@@ -29,8 +29,7 @@ import argparse
 import os
 import sys
 
-BETA_DB_ID = "sms-db-beta"
-PROD_DB_ID = "sms-db"
+BETA_DB_ID = "sms-db"
 
 TENANT_SUBCOLLECTIONS = [
     "metadata",
@@ -155,23 +154,16 @@ def main(argv=None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--db", default=BETA_DB_ID,
-                        help="Firestore database id to unseed (default: beta).")
-    parser.add_argument("--allow-production", action="store_true",
-                        help="Permit targeting the production database (dangerous).")
+                        help="Firestore database id to unseed (default: sms-db).")
     parser.add_argument("--tenant-id", action="append", default=None,
-                        help="Tenant(s) to unseed (repeatable). Defaults to all 5 beta "
-                             "provider tenants. 'caan' is never implied.")
+                        help="Tenant(s) to unseed (repeatable). Defaults to all 5 provider "
+                             "tenants. 'caan' is never implied.")
     parser.add_argument("--include-users", action="store_true",
                         help="Also delete the tenant's Firebase Auth accounts + users/{uid} "
                              "mirrors (protected admin accounts are always kept).")
     parser.add_argument("--yes", action="store_true",
                         help="Skip interactive confirmations.")
     args = parser.parse_args(argv)
-
-    if args.db == PROD_DB_ID and not args.allow_production:
-        print("Refusing to unseed the production database (sms-db).")
-        print("If you really mean this, pass --allow-production.")
-        return 2
 
     os.environ["FIREBASE_DATABASE_ID"] = args.db
 

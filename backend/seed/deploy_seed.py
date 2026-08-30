@@ -1,19 +1,16 @@
 # ============================================================================
 # FILE: deploy_seed.py
 # PATH: backend/seed/deploy_seed.py
-# PURPOSE: Safe wrapper around seed.runner.run() with an explicit database
-#          override and confirmation gates. The default target is the beta
-#          database (sms-db-beta); the production database (sms-db) is refused
-#          unless --allow-production is passed explicitly.
+# PURPOSE: Safe wrapper around seed.runner.run() for the single consolidated
+#          `sms-db` Firestore database, with confirmation gates.
 #
 # Usage (from backend/):
-#   python -m seed.deploy_seed                          # full beta seed
+#   python -m seed.deploy_seed                          # full seed
 #   python -m seed.deploy_seed --force
 #   python -m seed.deploy_seed --dry-run
 #   python -m seed.deploy_seed --tenant-id buddha-air --tenant-id air-dynasty
 #   python -m seed.deploy_seed --tenant-id ktm-mro --force --dry-run
 #   python -m seed.deploy_seed --surveys-only --tenant-id buddha-air
-#   python -m seed.deploy_seed --db sms-db --allow-production   # do not do this
 # ============================================================================
 
 import argparse
@@ -21,8 +18,7 @@ import os
 import sys
 from getpass import getpass
 
-BETA_DB_ID = "sms-db-beta"
-PROD_DB_ID = "sms-db"
+DB_ID = "sms-db"
 
 
 def _confirm(prompt: str, yes: bool) -> bool:
@@ -38,13 +34,11 @@ def _confirm(prompt: str, yes: bool) -> bool:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
-        description="Seed the beta SMS database (or an explicit override).",
+        description="Seed the consolidated SMS database (sms-db).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--db", default=BETA_DB_ID,
-                        help="Firestore database id to seed (default: beta).")
-    parser.add_argument("--allow-production", action="store_true",
-                        help="Permit targeting the production database (dangerous).")
+    parser.add_argument("--db", default=DB_ID,
+                        help="Firestore database id to seed (default: sms-db).")
     parser.add_argument("--tenant-id", action="append", default=None,
                         help="Restrict seeding to these operator tenants (repeatable). "
                              "When given, the CAAN regulator and state-risk reference "
@@ -62,11 +56,6 @@ def main(argv=None) -> int:
     parser.add_argument("--yes", action="store_true",
                         help="Skip interactive confirmations.")
     args = parser.parse_args(argv)
-
-    if args.db == PROD_DB_ID and not args.allow_production:
-        print("Refusing to seed the production database (sms-db).")
-        print("If you really mean this, pass --allow-production.")
-        return 2
 
     os.environ["FIREBASE_DATABASE_ID"] = args.db
 

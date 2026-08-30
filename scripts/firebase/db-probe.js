@@ -23,7 +23,7 @@ const app = admin.initializeApp({
     }),
 });
 (async () => {
-    for (const dbId of ['sms-db-beta', 'sms-db']) {
+    for (const dbId of ['sms-db', 'sms-db']) {
         try {
             const db = admin.firestore(app, dbId);
             const r = await db.collection('regulators').get();

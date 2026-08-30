@@ -2,7 +2,7 @@
  * @module AviaSAFE aviaSDCPS
  * @file public/js/views/sdc.js
  * @version 1.0.0-beta.1 (2026-08-25)
- * @target sms-db-beta / feat/betasms-self-service
+ * @target sms-db / consolidated platform
  *
  * SDC Ingestion controller — drag-and-drop file upload, CSV/Excel/E5X/JSON
  * parsing, ICAO ADREP 2000 schema mapping, validation via /sdc/validate,

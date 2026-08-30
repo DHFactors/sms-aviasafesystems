@@ -508,7 +508,7 @@
 
         if (parts.length >= 2 && parts[1] === 'aviasafesystems') {
             const subdomain = parts[0];
-            const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+            const reserved = ['www', 'sms', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'betasms', 'gap-analysis-ssp', 'localhost'];
 
             if (!reserved.includes(subdomain) && subdomain !== 'aviasafesystems') {
                 // Storage keys are env-prefixed (aviasafe:{env}:user) so beta

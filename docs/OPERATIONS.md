@@ -79,7 +79,8 @@ Exposed metrics (source: `backend/app/core/metrics.py`):
 | `ai_success_rate_percent` | gauge | Derived success rate |
 | `firestore_latency_avg_ms` / `firestore_latency_p99_ms` | gauge | Rolling window of last 1000 samples |
 
-All metrics are **in-memory, per-instance**, and reset on restart (fine for the single-instance beta).
+All metrics are **in-memory, per-instance**, and reset on restart (fine for the single-instance
+deployment).
 
 **Gaps / suggested additions:**
 
@@ -139,27 +140,27 @@ All metrics are **in-memory, per-instance**, and reset on restart (fine for the 
 - Every change must keep `python -m pytest tests/ -q` green.
 - Record changes + current commit in the status report under `docs/archive/`.
 
-## 9. Beta Monitoring (closed-beta period)
+## 9. Monitoring (day-to-day)
 
-Consolidated from the former `docs/BETA_MONITORING_GUIDE.md` (2026-08-06). Applies while the
-closed beta is active; see [DEPLOYMENT.md](./DEPLOYMENT.md) for the beta stack.
+Consolidated from the former `docs/BETA_MONITORING_GUIDE.md` (2026-08-06) — kept as ongoing
+monitoring for the production environment; see [DEPLOYMENT.md](./DEPLOYMENT.md) for the stack.
 
-**Beta surfaces:**
-- Hosting: `https://sms-beta.web.app` / `https://sms.aviasafesystems.com`
+**Surfaces:**
+- Hosting: `https://sms.aviasafesystems.com`
 - Backend: `https://aviasafe-unified-platform.onrender.com` (Render service `aviasafe-unified-platform`)
-- Firestore: `sms-db-beta` (project `gap-analysis-ssp`, us-west1, PITR 7d — fully isolated)
+- Firestore: `sms-db` (project `aerosafety-sms-prod`, us-west1)
 - Redis: Upstash `aviasafe-redis`
 
-### 9.1 Daily — Render Beta Logs
+### 9.1 Daily — Render Logs
 
-In the Render dashboard, open **sms-aviasafesystems-beta → Logs**.
+In the Render dashboard, open **aviasafe-unified-platform → Logs**.
 
 **After each deploy (startup), confirm:**
 ```
-Firebase Admin SDK initialized successfully (database=sms-db-beta)
+Firebase Admin SDK initialized successfully (database=sms-db)
 Connected to Upstash Redis        <- only after the first rate-limited request
 ```
-- `database=sms-db-beta` must match — if it says `sms-db`, the wrong database is wired.
+- `database=sms-db` must match — if it says anything else, the wrong database is wired.
 - If `Redis unavailable, rate limiting disabled` appears, Redis is down or misconfigured.
 
 **Daily greps:**
@@ -178,16 +179,16 @@ grep -c "status': 429"          # total 429s
 grep -c "auth/verify', 'status': 401"   # total failed logins
 ```
 
-### 9.2 Weekly — Firestore Usage (`sms-db-beta`)
+### 9.2 Weekly — Firestore Usage (`sms-db`)
 
 No `gcloud firestore documents` command exists — use the Firestore REST API or the Firebase console:
 
 ```bash
 TOKEN=$(gcloud auth print-access-token)
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://firestore.googleapis.com/v1/projects/gap-analysis-ssp/databases/sms-db-beta/documents/<collection>?pageSize=1000"
+  "https://firestore.googleapis.com/v1/projects/aerosafety-sms-prod/databases/sms-db/documents/<collection>?pageSize=1000"
 ```
-- Console: `https://console.firebase.google.com/project/gap-analysis-ssp/firestore/data/sms-db-beta`
+- Console: `https://console.firebase.google.com/project/aerosafety-sms-prod/firestore/data/sms-db`
 - Top-level collections: `tenants`, `reports`, `hazards`, `can_cap`, `reporting`, `flight_diversions`,
   `caan_reports`, `state`, `metadata`. Survey responses live under each tenant:
   `tenants/{tenant_id}/surveys` (collection group).
@@ -213,12 +214,12 @@ redis-cli -u $UPSTASH_REDIS_URL --tls KEYS 'rl:auth_attempts:ip:*'
 
 | Signal | Severity | Owner action |
 |--------|----------|--------------|
-| HTTP 500s on any beta endpoint | **P0** | Stop tester invites, investigate immediately |
-| `sms-db-beta` missing from logs / `sms-db` in use | **P0** | Verify beta env vars on Render |
+| HTTP 500s on any endpoint | **P0** | Stop tester invites, investigate immediately |
+| Wrong Firestore database in logs (not `sms-db`) | **P0** | Verify env vars on Render |
 | Redis unavailable (rate limiting off) | P1 | Check `REDIS_URL`, Upstash console |
 | Single IP saturating auth limit | P1 | Block IP at edge / notify tester if legit |
 | Growth anomalies (e.g. 10× reports in one week) | P2 | Review whether a tester misused the tool |
 
-**Where to get help:** backend logs (Render → sms-aviasafesystems-beta → Logs); Firestore (Firebase
-console → aerosafety-sms-prod → Firestore → sms-db-beta); Redis (Upstash console → aviasafe-redis);
+**Where to get help:** backend logs (Render → aviasafe-unified-platform → Logs); Firestore (Firebase
+console → aerosafety-sms-prod → Firestore → sms-db); Redis (Upstash console → aviasafe-redis);
 `gcloud.cmd` at `C:\Users\CEO-LAPTOP\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin`.

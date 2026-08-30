@@ -12,7 +12,7 @@
  * @module AviaSAFE aviaSDCPS
  * @file public/js/views/occurrence.js
  * @version 1.0.0-beta.1 (2026-08-25)
- * @target sms-db-beta / feat/betasms-self-service
+ * @target sms-db / consolidated platform
  */
 
 const AviaSDCPSOccurrence = (function () {

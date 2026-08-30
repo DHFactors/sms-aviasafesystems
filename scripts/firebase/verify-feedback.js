@@ -108,8 +108,8 @@ function check(name, cond, detail) {
 
   // 4. Deployed pages include the widget + CAAN SSP link.
   const pages = [
-    { url: "https://sms-beta.web.app/caan.html", has: ["/js/feedback.js", "/reports/generate.html"] },
-    { url: "https://sms-beta.web.app/safety.html", has: ["/js/feedback.js"] },
+    { url: "https://sms.aviasafesystems.com/caan.html", has: ["/js/feedback.js", "/reports/generate.html"] },
+    { url: "https://sms.aviasafesystems.com/safety.html", has: ["/js/feedback.js"] },
   ];
   for (const p of pages) {
     const res = await fetch(p.url);

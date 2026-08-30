@@ -7,9 +7,9 @@
 #          reports, same shapes as scripts/seed_caan_demo_data.py), and records
 #          every action to the `audit_logs` collection.
 #
-#          Target database is whatever the backend is configured for (beta
-#          backend -> sms-db-beta, production backend -> sms-db), so the panel
-#          deployed to each site only ever touches its own environment.
+#          Target database is whatever the backend is configured for — the
+#          single consolidated `sms-db` named database — so the panel always
+#          operates against the live platform data.
 # ============================================================================
 
 import random

@@ -16,7 +16,7 @@ the latest dated report is [docs/PROJECT_STATUS_REPORT_2026-08-24.md](./docs/PRO
 | **SRA & RCA Analysis Toolkit** | ✅ COMPLETE | 5x5 Safety Risk Assessment matrix, 6-category Fishbone root-cause analysis, 1:1 action-item linkage to CANs (2026-08-16) |
 | **Tenant Operational Profiles** | ✅ COMPLETE | Constraint-based demo seeder (fleet, base hub, authorized destinations, hazard domains) + 5 demo reference profiles (2026-08-17) |
 | **Multi-tenant Routing & Demo Switcher** | ✅ COMPLETE | Subdomain→tenant resolver, conditional demo persona switcher, email→department mapping (2026-08-17) |
-| **Latency Baseline & Local Demo Environment** | ✅ COMPLETE | `[PERF]` request instrumentation (pending Render push), root-cause analysis (cold starts / unfiltered Firestore scans / AI timeouts), one-click local Docker demo targeting `sms-db-beta` (2026-08-24) |
+| **Latency Baseline & Local Demo Environment** | ✅ COMPLETE | `[PERF]` request instrumentation (pending Render push), root-cause analysis (cold starts / unfiltered Firestore scans / AI timeouts), one-click local Docker demo targeting `sms-db` (2026-08-24) |
 
 ## Remaining Release-Candidate Phases
 

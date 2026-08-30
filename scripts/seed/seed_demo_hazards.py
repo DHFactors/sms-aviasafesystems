@@ -1,7 +1,7 @@
 # ==============================================================================
 # File: scripts/seed/seed_demo_hazards.py
 # Description: Populates baseline operational hazards and linked HFACS 7.0
-#              RCA factors into the beta database (sms-db-beta).
+#              RCA factors into the beta database (sms-db).
 # ==============================================================================
 
 import os
@@ -16,15 +16,15 @@ from app.firebase import initialize_firebase, get_firestore_db
 from app.services.hazard_service import HazardService
 
 async def seed_hazards():
-    if settings.FIRESTORE_DATABASE_ID != "sms-db-beta":
-        print(f"❌ Safety block: Script must target 'sms-db-beta', got '{settings.FIRESTORE_DATABASE_ID}'.")
+    if settings.FIRESTORE_DATABASE_ID != "sms-db":
+        print(f"❌ Safety block: Script must target 'sms-db', got '{settings.FIRESTORE_DATABASE_ID}'.")
         sys.exit(1)
 
     initialize_firebase()
     db = get_firestore_db()
     service = HazardService(db=db)
 
-    print("🌱 Seeding demo hazards and RCA factors onto sms-db-beta...")
+    print("🌱 Seeding demo hazards and RCA factors onto sms-db...")
 
     # Sample Hazard 1: Fishtail Air
     h1 = {

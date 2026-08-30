@@ -4,7 +4,7 @@
    VERSION: 1.0.0
    PURPOSE: Subdomain tenant resolver + demo-environment tenant switching.
             Exposes TenantResolver used across all pages for the active tenant
-            slug, demo-persona selection (beta/demo hosts only), and tenant
+            slug, demo-persona selection (demo hosts only), and tenant
             metadata placeholders (#tenantTitle, #tenantLogo fallback).
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
@@ -15,12 +15,12 @@
     // Hosts where the demo-persona switcher is available. On every other host
     // (production tenant subdomains) the tenant is strictly locked to the
     // subdomain and demo-switching controls are hidden.
-    var DEMO_HOSTNAMES = ['sms-beta.web.app', 'demo.aviasafesystems.com', '127.0.0.1', 'localhost'];
+    var DEMO_HOSTNAMES = ['demo.aviasafesystems.com', '127.0.0.1', 'localhost'];
 
     // Reserved platform subdomains are NEVER treated as tenants. Visiting
     // a reserved host (e.g. www, app, sms) must not auto-scope the login to
     // `?tenant=<reserved>` or show a tenant badge on the root domain.
-    var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
+    var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'gap-analysis-ssp', 'localhost'];
 
     var DEMO_TENANT_STORAGE_KEY = (typeof global.storageKey === 'function')
         ? global.storageKey('demo_tenant')

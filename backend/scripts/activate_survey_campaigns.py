@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Activate survey campaign windows for yeti-airlines and tara-air in sms-db-beta.
+"""Activate survey campaign windows for yeti-airlines and tara-air in sms-db.
 
 Read-only otherwise: only writes the tenant config map + derived surveyConfig
 mirror, exactly matching what the /api/v1/tenants/{id}/config PUT endpoint

@@ -225,7 +225,7 @@ function test_get_applicable_occurrence_categories() {
 // ---------------------------------------------------------------------------
 
 function test_demo_environment_detection() {
-    withEnv('sms-beta.web.app', () => assert.strictEqual(TenantResolver.isDemoEnvironment(), true));
+    withEnv('sms-beta.web.app', () => assert.strictEqual(TenantResolver.isDemoEnvironment(), false, 'decommissioned beta host is not a demo host'));
     withEnv('demo.aviasafesystems.com', () => assert.strictEqual(TenantResolver.isDemoEnvironment(), true));
     withEnv('127.0.0.1', () => assert.strictEqual(TenantResolver.isDemoEnvironment(), true));
     withEnv('localhost', () => assert.strictEqual(TenantResolver.isDemoEnvironment(), true));
@@ -254,7 +254,7 @@ function test_subdomain_extraction() {
 
 function test_reserved_beta_subdomains() {
     // Platform / infra hosts must never be treated as tenants.
-    ['betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'].forEach((sub) => {
+    ['betasms', 'gap-analysis-ssp', 'localhost'].forEach((sub) => {
         withEnv(`${sub}.aviasafesystems.com`, () => {
             assert.strictEqual(
                 TenantResolver.getTenantFromSubdomain(),
@@ -265,8 +265,8 @@ function test_reserved_beta_subdomains() {
     });
     // Even an explicit ?tenant=<reserved> query must be ignored on a reserved
     // subdomain — the login must not auto-fill or redirect to it.
-    withEnv('sms-beta.aviasafesystems.com', () => {
-        global.location.search = '?tenant=sms-beta';
+    withEnv('docs.aviasafesystems.com', () => {
+        global.location.search = '?tenant=docs';
         assert.strictEqual(
             TenantResolver.getTenantFromSubdomain(),
             null,
@@ -289,13 +289,13 @@ function test_current_tenant_prod_locks_to_subdomain() {
 }
 
 function test_current_tenant_demo_uses_default() {
-    withEnv('sms-beta.web.app', () => {
+    withEnv('demo.aviasafesystems.com', () => {
         assert.strictEqual(TenantResolver.getCurrentTenant(), 'himalaya-airlines-demo');
     });
 }
 
 function test_current_tenant_demo_toggle_via_session() {
-    withEnv('sms-beta.web.app', () => {
+    withEnv('demo.aviasafesystems.com', () => {
         assert.strictEqual(TenantResolver.setDemoTenant('air-dynasty-demo'), true);
         assert.strictEqual(TenantResolver.getCurrentTenant(), 'air-dynasty-demo');
         TenantResolver.clearDemoTenant();

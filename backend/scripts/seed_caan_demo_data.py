@@ -13,9 +13,9 @@
 #          removed before re-seeding. Production sms-db is never touched.
 #
 # Usage:
-#   python scripts/seed_caan_demo_data.py            # beta (sms-db-beta)
-#   python scripts/seed_caan_demo_data.py sms-db-beta
-#   SEED_DB=sms-db-beta python scripts/seed_caan_demo_data.py
+#   python scripts/seed_caan_demo_data.py            # beta (sms-db)
+#   python scripts/seed_caan_demo_data.py sms-db
+#   SEED_DB=sms-db python scripts/seed_caan_demo_data.py
 # ============================================================================
 
 import os
@@ -23,7 +23,7 @@ import random
 import sys
 from datetime import datetime, timedelta, timezone
 
-DB_ID = os.environ.get("SEED_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db-beta")
+DB_ID = os.environ.get("SEED_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db")
 os.environ["FIREBASE_DATABASE_ID"] = DB_ID
 
 SEED_VERSION = "caan-demo-1"

@@ -1,6 +1,6 @@
 """One-time purge: wipe sms-db to a 100% virgin state.
 
-DO NOT RUN THIS AGAINST sms-db-beta — this targets ONLY the Production database.
+DO NOT RUN — the consolidation reset is handled by backend/seed/seeder.py.
 """
 import sys
 from google.cloud import firestore
@@ -53,7 +53,7 @@ def purge_sms_db():
         docs = list(db.collection(coll_name).list_documents())
         print(f"  {coll_name}: {len(docs)} documents")
     print("\n✅ sms-db is now in a virgin state.")
-    print("⚠️  sms-db-beta was NOT touched by this script.")
+    print("⚠️  sms-db was NOT touched by this script.")
 
 if __name__ == "__main__":
     purge_sms_db()

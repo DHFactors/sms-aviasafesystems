@@ -26,7 +26,7 @@ const app = admin.initializeApp({
 
 (async () => {
     const tenantId = process.argv[2] || 'tara-air';
-    const databaseId = process.argv[3] || 'sms-db-beta';
+    const databaseId = process.argv[3] || 'sms-db';
     const db = getFirestore(app, databaseId);
     const snap = await db.collection('tenants').doc(tenantId).collection('hazards')
         .orderBy('created_at').get();

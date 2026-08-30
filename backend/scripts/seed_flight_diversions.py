@@ -10,10 +10,10 @@
 #          removed before re-seeding. Production sms-db is never touched.
 #
 # Usage:
-#   python scripts/seed_flight_diversions.py            # beta (sms-db-beta)
-#   python scripts/seed_flight_diversions.py sms-db-beta
+#   python scripts/seed_flight_diversions.py            # beta (sms-db)
+#   python scripts/seed_flight_diversions.py sms-db
 #   python -m scripts.seed_flight_diversions --tenants buddha-air,air-dynasty
-#   SEED_DB=sms-db-beta python scripts/seed_flight_diversions.py
+#   SEED_DB=sms-db python scripts/seed_flight_diversions.py
 # ============================================================================
 
 import argparse
@@ -22,7 +22,7 @@ import random
 import sys
 from datetime import datetime, timedelta, timezone
 
-DB_ID = os.environ.get("SEED_DB", "sms-db-beta")
+DB_ID = os.environ.get("SEED_DB", "sms-db")
 os.environ["FIREBASE_DATABASE_ID"] = DB_ID
 
 SEED_VERSION = "flight-diversion-demo-2"
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("db", nargs="?", default=DB_ID,
-                        help="Firestore database id (default: sms-db-beta).")
+                        help="Firestore database id (default: sms-db).")
     parser.add_argument("--tenants", default=None,
                         help="Comma-separated operator tenant ids to restrict seeding to "
                              "(default: all flight operators).")

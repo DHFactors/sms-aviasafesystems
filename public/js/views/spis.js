@@ -2,7 +2,7 @@
  * @module AviaSAFE aviaSDCPS
  * @file public/js/views/spis.js
  * @version 1.0.0-beta.1 (2026-08-25)
- * @target sms-db-beta / feat/betasms-self-service
+ * @target sms-db / consolidated platform
  *
  * SPIs / SPTs controller — fetches indicators from /safety-performance/indicators,
  * renders KPI cards, master indicator table with trajectory and status badges,

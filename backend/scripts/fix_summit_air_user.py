@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Fix Summit Air login failure for the local Docker demo (sms-db-beta).
+Fix Summit Air login failure for the local Docker demo (sms-db).
 
 Context
 -------
 The demo frontend runs on http://localhost:5005 (firebase serve) against the
 beta Firebase project `aerosafety-sms-prod` and the named Firestore database
-`sms-db-beta`. The user `safety@summitair.com` / `SUMMIT-Safety-2026` is the
+`sms-db`. The user `safety@summitair.com` / `SUMMIT-Safety-2026` is the
 canonical Summit Air Safety Manager account from the simplified credential
 scheme (`seed/config.py` — CODE=SUMMIT, role=safety). If the beta database
 was never seeded or Firebase Auth was wiped, Firebase returns
 "Invalid email or password".
 
 This script idempotently creates or updates that user in
-`sms-db-beta` (project `aerosafety-sms-prod`) and verifies the password via
+`sms-db` (project `aerosafety-sms-prod`) and verifies the password via
 the Identity Toolkit REST API — the same path the web app uses.
 
 Usage (from repository root or backend/)
@@ -30,7 +30,7 @@ Usage (from repository root or backend/)
   # Also seed the Summit Air tenant doc if missing
   python backend/scripts/fix_summit_air_user.py --ensure-tenant
 
-Requires:  backend/.env.demo  (FIREBASE_* + FIREBASE_DATABASE_ID=sms-db-beta)
+Requires:  backend/.env.demo  (FIREBASE_* + FIREBASE_DATABASE_ID=sms-db)
 
 Alternative: Firebase CLI
 --------------------------
@@ -69,7 +69,7 @@ for p in (str(BACKEND), str(REPO)):
         sys.path.insert(0, p)
 
 # Load backend/.env.demo explicitly when present so FIREBASE_DATABASE_ID
-# resolves to sms-db-beta even if backend/.env points at sms-db.
+# resolves to sms-db even if backend/.env points at sms-db.
 ENV_DEMO = BACKEND / ".env.demo"
 if ENV_DEMO.exists():
     try:
@@ -79,7 +79,7 @@ if ENV_DEMO.exists():
         pass
 
 # Force beta database for this fix unless caller already set a value.
-os.environ.setdefault("FIREBASE_DATABASE_ID", "sms-db-beta")
+os.environ.setdefault("FIREBASE_DATABASE_ID", "sms-db")
 
 TARGET_EMAIL = "safety@summitair.com"
 TARGET_PASSWORD = "SUMMIT-Safety-2026"
@@ -100,7 +100,7 @@ def ensure_tenant(db) -> None:
         print(f"[WARN] No OPERATOR_PROFILES entry for {TARGET_TENANT}; skipping tenant ensure.")
         return
     create_tenant(db, profile)
-    print(f"[OK] Tenant '{TARGET_TENANT}' ensured in Firestore (database=sms-db-beta).")
+    print(f"[OK] Tenant '{TARGET_TENANT}' ensured in Firestore (database=sms-db).")
 
 
 def fix_user(dry_run: bool = False, ensure_tenant_flag: bool = False) -> int:
@@ -231,7 +231,7 @@ def fix_all_users(dry_run: bool = False) -> int:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Fix Summit Air demo user(s) in sms-db-beta")
+    parser = argparse.ArgumentParser(description="Fix Summit Air demo user(s) in sms-db")
     parser.add_argument("--dry-run", action="store_true", help="Print actions without writing")
     parser.add_argument("--ensure-tenant", action="store_true", help="Also ensure the summit-air tenant doc exists")
     parser.add_argument("--all", dest="all_users", action="store_true", help="Fix ALL demo accounts (48 operators + CAAN), not just Summit Air")

@@ -108,14 +108,12 @@
     //      at a locally-running backend (Docker on http://localhost:8000):
     //        localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
     //      Demo pages served on http://localhost:5005 rely on this override.
-    //   2. window.APP_CONFIG.apiBaseUrl (set by public/js/firebase.js via IS_BETA_ENV:
-    //        beta Hosting URL -> Render beta API, prod Hosting URL -> Render prod API).
-    //   3. Hostname-based fallback (beta -> beta backend, else prod). Deployed frontend
-    //      never defaults to localhost — localhost only when hostname is localhost.
+    //   2. window.APP_CONFIG.apiBaseUrl (set by public/js/firebase.js — the
+    //      single consolidated backend URL).
+    //   3. Hostname-based fallback. Deployed frontend never defaults to
+    //      localhost — localhost only when hostname is localhost.
     //
-    // Guest (unauthenticated) mode is pinned to the beta backend ONLY when no
-    // local override is present — the /api/v1/copilot/guest/chat route only
-    // exists on beta, so without an override pinning prevents a 404 on prod hosts.
+    // Guest (unauthenticated) mode is pinned to the same unified backend.
     function resolveApiBase() {
         try {
             var local = window.localStorage && window.localStorage.getItem('aviasafe:localApiBaseUrl');
@@ -123,11 +121,8 @@
         } catch (e) { /* ignore storage errors (incognito) */ }
         if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
         if (window.API_BASE_URL) return window.API_BASE_URL;
-        var host = (window.location.hostname || '').toLowerCase();
-        var isBetaHost = host.indexOf('beta') !== -1 || host.indexOf('sms-beta') !== -1;
-        var isLocalhost = host === 'localhost' || host === '127.0.0.1';
-        // Single unified backend (beta + prod). Local dev uses the local API when set.
-        if (isBetaHost) return 'https://aviasafe-unified-platform.onrender.com';
+        var isLocalhost = ['localhost', '127.0.0.1'].indexOf((window.location.hostname || '').toLowerCase()) !== -1;
+        // Single unified backend. Local dev uses the local API when set.
         if (isLocalhost) return 'https://aviasafe-unified-platform.onrender.com';
         return 'https://aviasafe-unified-platform.onrender.com';
     }

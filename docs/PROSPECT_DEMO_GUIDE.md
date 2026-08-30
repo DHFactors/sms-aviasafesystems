@@ -125,8 +125,8 @@ payloads suitable for post-demo follow-up scoring.
 
 * Re-seed archetypes anytime:
   `cd backend && python -m seed.runner --archetypes demo-fixed-wing,demo-rotary-wing,caanepal --force`
-  (add `$env:FIREBASE_DATABASE_ID='sms-db-beta'` for the beta database).
+  (add `$env:FIREBASE_DATABASE_ID='sms-db'` for the beta database).
 * Validate integrity:
-  `python backend/scripts/validate_seasonal_seed.py --database sms-db-beta`.
+  `python backend/scripts/validate_seasonal_seed.py --database sms-db`.
 * Local fast iteration uses `--preset dev`; full staging uses `--preset full`.
 * Support contact: `info@aviasafesystems.com`.

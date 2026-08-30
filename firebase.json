@@ -4,11 +4,6 @@
       "database": "sms-db",
       "rules": "firestore/firestore.rules",
       "indexes": "firestore.indexes.json"
-    },
-    {
-      "database": "sms-db-beta",
-      "rules": "firestore/firestore.rules",
-      "indexes": "backend/firestore.indexes.json"
     }
   ],
   "hosting": [

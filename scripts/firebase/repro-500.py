@@ -1,5 +1,5 @@
 """Reproduce the GET /api/v1/hazards and /api/v1/reports 500 by running the
-exact backend service list logic + Pydantic response models against sms-db-beta."""
+exact backend service list logic + Pydantic response models against sms-db."""
 import os
 import sys
 import re
@@ -30,7 +30,7 @@ cred = credentials.Certificate({
     "token_uri": env.get("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
 })
 app = firebase_admin.initialize_app(cred, name="repro")
-db = firestore.client(app, database_id="sms-db-beta")
+db = firestore.client(app, database_id="sms-db")
 
 
 def serialize(data):

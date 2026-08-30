@@ -5,7 +5,7 @@
 #          tenant-scoped "Authorized Users" list works for existing accounts.
 #
 # Usage:
-#   python scripts/backfill_users.py            # beta (sms-db-beta)
+#   python scripts/backfill_users.py            # beta (sms-db)
 #   python scripts/backfill_users.py sms-db     # production
 #   BACKFILL_DB=sms-db python scripts/backfill_users.py
 #
@@ -15,7 +15,7 @@
 import os
 import sys
 
-DB_ID = os.environ.get("BACKFILL_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db-beta")
+DB_ID = os.environ.get("BACKFILL_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db")
 os.environ["FIREBASE_DATABASE_ID"] = DB_ID
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

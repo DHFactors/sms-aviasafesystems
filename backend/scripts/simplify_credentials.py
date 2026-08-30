@@ -21,14 +21,14 @@ Airlines, Summit Air, Simrik Air, Air Dynasty):
 Firebase Auth is shared between the beta and production environments (same
 project, `aerosafety-sms-prod`), so Auth changes apply once. The mirrored
 Firestore `users` collection is refreshed per database — run once with
-`sms-db-beta` and once with `sms-db`.
+`sms-db` and once with `sms-db`.
 
 Usage:
     python scripts/simplify_credentials.py                 # dry-run (default)
     python scripts/simplify_credentials.py --apply         # make Auth changes
     python scripts/simplify_credentials.py --apply --db sms-db   # + backfill prod
 
-The Firestore backfill targets the database in `--db` (default `sms-db-beta`)
+The Firestore backfill targets the database in `--db` (default `sms-db`)
 and requires the same service-account `.env` as the target environment.
 """
 
@@ -184,8 +184,8 @@ def main():
     parser = argparse.ArgumentParser(description="Simplify user credentials (2026-08 scheme)")
     parser.add_argument("--apply", action="store_true",
                         help="Make Auth changes (default is dry-run)")
-    parser.add_argument("--db", default=os.environ.get("BACKFILL_DB", "sms-db-beta"),
-                        help="Firestore database id for the users backfill (default sms-db-beta)")
+    parser.add_argument("--db", default=os.environ.get("BACKFILL_DB", "sms-db"),
+                        help="Firestore database id for the users backfill (default sms-db)")
     args = parser.parse_args()
 
     if not args.apply:

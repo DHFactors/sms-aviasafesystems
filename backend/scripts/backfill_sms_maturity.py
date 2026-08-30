@@ -11,7 +11,7 @@
 #          Production sms-db is never touched unless SEED_DB=...
 #
 # Usage:
-#   python scripts/backfill_sms_maturity.py            # beta (sms-db-beta)
+#   python scripts/backfill_sms_maturity.py            # beta (sms-db)
 #   python scripts/backfill_sms_maturity.py sms-db
 #   SEED_DB=sms-db python scripts/backfill_sms_maturity.py
 # ============================================================================
@@ -19,7 +19,7 @@
 import os
 import sys
 
-DB_ID = os.environ.get("SEED_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db-beta")
+DB_ID = os.environ.get("SEED_DB", sys.argv[1] if len(sys.argv) > 1 else "sms-db")
 os.environ["FIREBASE_DATABASE_ID"] = DB_ID
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

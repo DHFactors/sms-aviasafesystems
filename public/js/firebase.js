@@ -13,36 +13,11 @@
 // FIREBASE CONFIGURATION
 // ============================================================================
 
-// Strict beta/production configuration (2026-08). Both environments use the
-// aerosafety-sms-prod Firebase project. Beta reads the isolated sms-db-beta
-// named Firestore database and the beta Render backend; production uses the
-// default sms-db database and the production backend. This keeps beta traffic
-// entirely inside aerosafety-sms-prod while still isolating beta data in its
-// own named database.
-//
-// Detection order (first match wins):
-//   1. ?env=beta  or  ?beta=1                 (manual/temporary override)
-//   2. localStorage "aviasafe_env" === "beta" (persisted override for testing)
-//   3. window.__APP_ENV__ === "beta"          (deploy-time injected flag)
-//   4. hostname contains "beta"               (e.g. sms-beta.web.app,
-//                                              sms-beta.web.app, *-beta.onrender.com)
-//   5. localhost / 127.0.0.1                  (local development)
-// Anything else — sms.aviasafesystems.com, www.sms.aviasafesystems.com, tenant
-// subdomains (*.aviasafesystems.com) and *.web.app hosts — is PRODUCTION.
-function detectBetaEnvironment() {
-    if (typeof window === 'undefined') return false;
-    try {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('env') === 'beta' || params.get('beta') === '1') return true;
-        if (window.localStorage && window.localStorage.getItem('aviasafe_env') === 'beta') return true;
-    } catch (e) { /* ignore */ }
-    if (window.__APP_ENV__ === 'beta') return true;
-    const h = window.location.hostname || '';
-    if (h.indexOf('beta') !== -1) return true;
-    if (h === 'localhost' || h === '127.0.0.1') return true;
-    return false;
-}
-const IS_BETA_ENV = detectBetaEnvironment();
+// Single consolidated environment (2026): the whole platform runs against the
+// `sms-db` named Firestore database in the aerosafety-sms-prod project. The
+// former isolated `sms-db-beta` environment (and its beta host detection) has
+// been decommissioned — every host, including localhost, uses the same config.
+const IS_BETA_ENV = false;
 
 const PROD_CONFIG = {
     apiKey: "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc",
@@ -55,18 +30,7 @@ const PROD_CONFIG = {
     appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
 };
 
-const BETA_CONFIG = {
-    apiKey: "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc",
-    authDomain: "aerosafety-sms-prod.firebaseapp.com",
-    projectId: "aerosafety-sms-prod",
-    storageBucket: "aerosafety-sms-prod.firebasestorage.app",
-    messagingSenderId: "527947363983",
-    appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
-    databaseId: "sms-db-beta",
-    appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
-};
-
-const firebaseConfig = IS_BETA_ENV ? BETA_CONFIG : PROD_CONFIG;
+const firebaseConfig = PROD_CONFIG;
 
 // Per-environment reCAPTCHA v3 site key for App Check, sourced from the active
 // Firebase config. Both environments share the same key registered on
@@ -86,16 +50,16 @@ const LOCAL_API_BASE_URL = (() => {
 const APP_CONFIG = {
     apiBaseUrl: LOCAL_API_BASE_URL
         || 'https://aviasafe-unified-platform.onrender.com',
-    environment: IS_BETA_ENV ? 'beta' : 'production',
+    environment: 'production',
     recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     pagination: { defaultPageSize: 20, maxPageSize: 100 },
 };
 
-// Environment-prefixed storage keys. Cross-environment data must never leak:
-// beta state (demo tenant, setup key, persisted user) stays in a `aviasafe:beta:*`
-// namespace, production in `aviasafe:prod:*`.
+// Environment-prefixed storage keys. Data written on one host must never leak
+// into another tenant's view; the `aviasafe:prod:*` namespace is the single
+// live namespace.
 function storageKey(name) {
-    return 'aviasafe:' + (IS_BETA_ENV ? 'beta' : 'prod') + ':' + String(name);
+    return 'aviasafe:prod:' + String(name);
 }
 function storageGet(name, storage) {
     try { return (storage || window.localStorage).getItem(storageKey(name)); }
@@ -234,7 +198,7 @@ let db = null;
 // ============================================================================
 // The compat SDK's firebase.firestore() always resolves to the "(default)"
 // database and silently ignores a databaseId argument, so it can never reach
-// the sms-db / sms-db-beta named databases this project uses. To fix that we
+// the sms-db named database this project uses. To fix that we
 // pull the modular Firestore from the app container using the database
 // identifier, wrap it in the compat Firestore class, and route the namespace
 // factory — and therefore every page's firebase.firestore() call — to it.
@@ -323,7 +287,7 @@ function initServices() {
 
 function initAppCheckSafe(app) {
   try {
-    const siteKey = window.RECAPTCHA_SITE_KEY || "";
+    const siteKey = RECAPTCHA_SITE_KEY || window.RECAPTCHA_SITE_KEY || "";
     // Only attempt App Check if an explicit site key exists
     if (!siteKey || siteKey === "YOUR_RECAPTCHA_SITE_KEY") {
       console.warn("[AppCheck] No valid reCAPTCHA site key found; bypassing App Check.");
@@ -332,14 +296,14 @@ function initAppCheckSafe(app) {
       return null;
     }
 
-    // Handle debug tokens for localhost / custom staging domains
+    // Skip App Check on local development where the reCAPTCHA domain is not
+    // registered (matches the initAppCheck() orchestration below).
     if (
       location.hostname === "localhost" ||
-      location.hostname === "127.0.0.1" ||
-      location.hostname.includes("beta") ||
-      IS_BETA_ENV
+      location.hostname === "127.0.0.1"
     ) {
-      self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+      console.log("[AppCheck] Skipped on localhost");
+      return null;
     }
 
     const appCheck = initializeAppCheck(app, {
@@ -710,7 +674,8 @@ function getRoleDestination(user) {
 //    actual tenant_id (fixes safety.html showing air-dynasty-demo when logged
 //    in as safety@fishtailair.com). 2) Keeps DEMO_CONTEXT fresh for AEs.
 if (typeof firebase !== 'undefined' && firebase.auth) {
-    firebase.auth().onAuthStateChanged(function (u) {
+    try {
+        firebase.auth().onAuthStateChanged(function (u) {
         try {
             // Tenant sync: on sign-in, pin sessionStorage to the user's tenant;
             // on sign-out, clear it so the next persona can't inherit it.
@@ -752,7 +717,8 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
                 localStorage.removeItem(AE_ARCHETYPE_STORAGE_KEY);
             }
         } catch (e) { /* storage errors are non-fatal */ }
-    });
+        });
+    } catch (err) { /* never let the auth hook break page load */ }
 }
 
 // ── Quick-Switch Demo Toolbar (?demo=true) ──────────────────────────────────

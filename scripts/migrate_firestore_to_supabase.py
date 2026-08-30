@@ -1,7 +1,7 @@
 # ============================================================================
 # FILE: scripts/migrate_firestore_to_supabase.py
 # PURPOSE: One-shot (idempotent) migration of the Firestore operator database
-#          (prod: `sms-db`, beta: `sms-db-beta`; project aerosafety-sms-prod)
+#          (single consolidated database `sms-db`; project aerosafety-sms-prod)
 #          into the Supabase PostgreSQL schema defined in backend/app/db/schema.sql.
 #
 # FEATURES
@@ -1093,8 +1093,8 @@ async def run(conn, args, fs) -> None:
              len(tenant_slugs), ", ".join(tenant_slugs), args.database, args.dry_run)
     log.info("Entities: %s", ", ".join(sorted(args.only)) if args.only else "all")
 
-    is_demo_value = bool(args.database == "sms-db-beta")
-    log.info("is_demo scope: %s (database=%s)", is_demo_value, args.database)
+    is_demo_value = False
+    log.info("is_demo scope: %s (single consolidated database %s)", is_demo_value, args.database)
 
     for t in tenant_slugs:
         ctx: Dict[str, Any] = {

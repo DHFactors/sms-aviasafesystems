@@ -2,7 +2,7 @@
 """
 UAT Seed Data Utility — writes deterministic test fixtures into Firestore.
 
-Targets ONLY the configured FIREBASE_DATABASE_ID (defaults to sms-db-beta).
+Targets ONLY the configured FIREBASE_DATABASE_ID (defaults to sms-db).
 Creates:
   - 2 tenants (fishtail-air, nepal-wings) with AOC, tier, safety manager
   - 5 hazards per tenant spanning matrix cells 5A, 4C, 3D, 2E, 1E
@@ -14,7 +14,7 @@ Creates:
 Idempotent: overwrites documents with same seed_version tag.
 Usage:
   python scripts/seed_uat_data.py              # uses FIREBASE_DATABASE_ID env
-  python scripts/seed_uat_data.py sms-db-beta  # explicit database ID
+  python scripts/seed_uat_data.py sms-db  # explicit database ID
 """
 
 import os
@@ -30,7 +30,7 @@ os.chdir(ROOT)
 from dotenv import load_dotenv
 load_dotenv(os.path.join(ROOT, ".env"), override=False)
 
-DB_ID = os.environ.get("FIREBASE_DATABASE_ID", sys.argv[1] if len(sys.argv) > 1 else "sms-db-beta")
+DB_ID = os.environ.get("FIREBASE_DATABASE_ID", sys.argv[1] if len(sys.argv) > 1 else "sms-db")
 
 # ── Firebase init ─────────────────────────────────────────────────────────────
 import firebase_admin
