@@ -64,6 +64,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-primary {
     background: var(--color-accent);
+    color: var(--color-white);
     box-shadow: 0 2px 8px rgba(26, 107, 138, 0.25);
 }
 .btn-primary:hover { background: var(--color-primary-dark); }
