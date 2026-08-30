@@ -18,6 +18,9 @@ service-account.json
 
 # Beta-testing credential exports (real passwords)
 beta-testing-credentials.csv
+
+# Final consolidated credential reference (real passwords)
+final_credential.txt
 BETA_CREDENTIALS_*.md
 credential.md
 caan_credential.md
