@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from loguru import logger
 
@@ -12,6 +12,12 @@ from seed.config import (
 from seed.generator import SeededRandom, generate_timestamp
 from app.services.risk_matrix import _default_matrix_config, RISK_MATRIX_DOC_PATH
 
+# Tenant access-model fields on the tenant record:
+#   category          DEMO | CONTRACTED | STATE
+#   status            ACTIVE | SUSPENDED | EXPIRED
+#   trial_expires_at  ISO timestamp; set 30 days from creation for DEMO tenants.
+TENANT_TRIAL_DAYS = 30
+
 
 def create_tenant(db, profile: dict) -> dict:
     from app.core.config import settings
@@ -23,6 +29,12 @@ def create_tenant(db, profile: dict) -> dict:
 
     tenant_type = profile.get("tenant_type", profile["type"])
     tenant_code = profile.get("icao") or profile["id"].split("-")[0].upper()
+
+    category = profile.get("category", "DEMO")
+    status = profile.get("status", "ACTIVE")
+    trial_expires_at = None
+    if category == "DEMO":
+        trial_expires_at = (now + timedelta(days=TENANT_TRIAL_DAYS)).isoformat()
 
     tenant_data = {
         "name": profile["name"],
@@ -38,6 +50,9 @@ def create_tenant(db, profile: dict) -> dict:
         "aircraft_types": profile["aircraft_types"],
         "routes": profile["routes"],
         "email_domain": profile["email_domain"],
+        "category": category,
+        "status": status,
+        "trial_expires_at": trial_expires_at,
         "created_at": now,
         "updated_at": now,
         "seed_version": SEED_VERSION,
@@ -174,6 +189,9 @@ def create_caan_tenant(db) -> str:
         "aircraft_types": CAAN_TENANT["aircraft_types"],
         "routes": CAAN_TENANT["routes"],
         "email_domain": CAAN_TENANT["email_domain"],
+        "category": "STATE",
+        "status": "ACTIVE",
+        "trial_expires_at": None,
         "created_at": now,
         "updated_at": now,
         "seed_version": SEED_VERSION,
@@ -215,6 +233,34 @@ def create_caan_tenant(db) -> str:
     risk_matrix_config["updated_at"] = now
     risk_matrix_ref.set(risk_matrix_config, merge=True)
 
+    return tenant_id
+
+
+def create_system_tenant(db) -> str:
+    """Create the platform `system` tenant doc owning the Super Admin account.
+
+    Treated as a STATE-category tenant (platform operator, not a trial): no
+    trial_expires_at. Idempotent merge.
+    """
+    from app.core.config import settings
+
+    tenant_id = "system"
+    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
+
+    now = datetime.now(timezone.utc)
+    tenant_data = {
+        "name": "AviaSAFE Systems",
+        "type": "system",
+        "category": "STATE",
+        "status": "ACTIVE",
+        "trial_expires_at": None,
+        "active": True,
+        "created_at": now,
+        "updated_at": now,
+        "seed_version": SEED_VERSION,
+    }
+    tenant_ref.set(tenant_data, merge=True)
+    logger.info(f"Created system tenant ({tenant_id})")
     return tenant_id
 
 

@@ -11,25 +11,41 @@ from seed.config import (
 
 
 def create_user(auth, user_spec: dict) -> dict:
+    uid = user_spec["uid"]
+    password = user_spec.get("password")
+    sync_password = bool(user_spec.get("sync_password")) and bool(password)
     try:
-        existing = auth.get_user(user_spec["uid"])
+        existing = auth.get_user(uid)
         logger.info(f"User already exists: {user_spec['email']}, updating claims")
         user_record = existing
-        if user_spec.get("sync_password") and user_spec.get("password"):
+        if sync_password:
             # Provisioned bootstrap accounts (e.g. the developer super-admin)
             # always have their password re-synced so a stale Auth password can
             # never lock the owner out.
-            auth.update_user(user_spec["uid"], password=user_spec["password"])
+            auth.update_user(uid, password=password)
             logger.info(f"Password re-synced for existing user: {user_spec['email']}")
     except Exception:
-        user_record = auth.create_user(
-            uid=user_spec["uid"],
-            email=user_spec["email"],
-            password=user_spec["password"],
-            display_name=user_spec["full_name"],
-            email_verified=True,
-        )
-        logger.info(f"Created user: {user_spec['email']} ({user_spec['role']})")
+        try:
+            user_record = auth.create_user(
+                uid=uid,
+                email=user_spec["email"],
+                password=password,
+                display_name=user_spec["full_name"],
+                email_verified=True,
+            )
+            logger.info(f"Created user: {user_spec['email']} ({user_spec['role']})")
+        except auth.EmailAlreadyExistsError:
+            # The email is already bound to a different uid in this Auth pool
+            # (e.g. a prior run without a forced uid). Adopt the existing record
+            # so re-seeding stays idempotent instead of failing.
+            user_record = auth.get_user_by_email(user_spec["email"])
+            uid = user_record.uid
+            logger.warning(
+                f"Adopted existing account by email {user_spec['email']} "
+                f"(uid {uid}) — updating claims/password"
+            )
+            if sync_password:
+                auth.update_user(uid, password=password)
 
     claims = {"role": user_spec["role"]}
     if user_spec.get("tenant_id"):
@@ -39,10 +55,10 @@ def create_user(auth, user_spec: dict) -> dict:
     if user_spec.get("is_developer"):
         claims["is_developer"] = True
 
-    auth.set_custom_user_claims(user_spec["uid"], claims)
+    auth.set_custom_user_claims(uid, claims)
 
     return {
-        "uid": user_spec["uid"],
+        "uid": uid,
         "email": user_spec["email"],
         "role": user_spec["role"],
         "tenant_id": user_spec.get("tenant_id"),
