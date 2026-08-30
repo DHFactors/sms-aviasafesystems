@@ -1,5 +1,5 @@
-"""Live-verify GET /api/v1/hazards and /api/v1/reports against the BETA backend
-after the data backfill + serializer normalization fix."""
+"""Live-verify GET /api/v1/hazards and /api/v1/reports against the consolidated
+backend after the data backfill + serializer normalization fix."""
 import sys
 import json
 from pathlib import Path
@@ -50,7 +50,7 @@ def check(label, resp):
     return ok
 
 
-print(f"Beta backend: {API}")
+print(f"Backend: {API}")
 tokens = {
     "buddha": mint_id_token("sm-buddha-air-001", {"role": "AIRLINE_ADMIN", "tenant_id": "buddha-air"}),
     "sita": mint_id_token("sm-sita-air-001", {"role": "AIRLINE_ADMIN", "tenant_id": "sita-air"}),

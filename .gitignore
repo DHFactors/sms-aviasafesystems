@@ -44,6 +44,10 @@ node_modules/
 # Firebase CLI cache
 .firebase/
 
+# Supabase CLI local cache & transient data
+supabase/.temp/
+supabase/.branches/
+
 # Live auth tokens / one-off backup artifacts (never commit)
 tests/e2e/e2e_tokens.json
 scripts/firebase/backups/
