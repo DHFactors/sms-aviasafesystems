@@ -42,8 +42,8 @@ MINIMAL_TENANT_USERS = [
         "tenant_id": "yeti-airlines",
         "organization": "Yeti Airlines",
         "users": [
-            {"prefix": "admin", "email": "admin@yetiairlines.com",
-             "role": "AIRLINE_ADMIN", "full_name": "Yeti Airlines Admin",
+            {"prefix": "safety", "email": "safety@yetiairlines.com",
+             "role": "AIRLINE_ADMIN", "full_name": "Yeti Airlines Safety Manager",
              "department": "Safety"},
             {"prefix": "ops", "email": "ops@yetiairlines.com",
              "role": "USER", "full_name": "Yeti Airlines Ops",
@@ -54,8 +54,8 @@ MINIMAL_TENANT_USERS = [
         "tenant_id": "buddha-air",
         "organization": "Buddha Air",
         "users": [
-            {"prefix": "admin", "email": "admin@buddhaair.com",
-             "role": "AIRLINE_ADMIN", "full_name": "Buddha Air Admin",
+            {"prefix": "safety", "email": "safety@buddhaair.com",
+             "role": "AIRLINE_ADMIN", "full_name": "Buddha Air Safety Manager",
              "department": "Safety"},
             {"prefix": "ops", "email": "ops@buddhaair.com",
              "role": "USER", "full_name": "Buddha Air Ops",
