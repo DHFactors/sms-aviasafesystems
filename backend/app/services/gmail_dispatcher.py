@@ -2,7 +2,7 @@
 # FILE: gmail_dispatcher.py
 # PATH: backend/app/services/gmail_dispatcher.py
 # PURPOSE: Dedicated Gmail channel for self-service registration intake
-#          acknowledgments (betasms.aviasafesystems.com).
+#          acknowledgments (sms.aviasafesystems.com).
 #
 #          send_registration_acknowledgment() composes and dispatches the
 #          acknowledgment via the Gmail REST API over HTTPS (port 443) using

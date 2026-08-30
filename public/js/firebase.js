@@ -24,7 +24,7 @@
 //   1. ?env=beta  or  ?beta=1                 (manual/temporary override)
 //   2. localStorage "aviasafe_env" === "beta" (persisted override for testing)
 //   3. window.__APP_ENV__ === "beta"          (deploy-time injected flag)
-//   4. hostname contains "beta"               (e.g. betasms.aviasafesystems.com,
+//   4. hostname contains "beta"               (e.g. sms-beta.web.app,
 //                                              sms-beta.web.app, *-beta.onrender.com)
 //   5. localhost / 127.0.0.1                  (local development)
 // Anything else — sms.aviasafesystems.com, www.sms.aviasafesystems.com, tenant
@@ -85,9 +85,7 @@ const LOCAL_API_BASE_URL = (() => {
 
 const APP_CONFIG = {
     apiBaseUrl: LOCAL_API_BASE_URL
-        || (IS_BETA_ENV
-            ? 'https://sms-aviasafesystems-beta.onrender.com'
-            : 'https://aviasafe-unified-platform.onrender.com'),
+        || 'https://aviasafe-unified-platform.onrender.com',
     environment: IS_BETA_ENV ? 'beta' : 'production',
     recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     pagination: { defaultPageSize: 20, maxPageSize: 100 },

@@ -18,8 +18,8 @@
     var DEMO_HOSTNAMES = ['sms-beta.web.app', 'demo.aviasafesystems.com', '127.0.0.1', 'localhost'];
 
     // Reserved platform subdomains are NEVER treated as tenants. Visiting
-    // betasms.aviasafesystems.com (or any reserved host) must not auto-scope
-    // the login to `?tenant=betasms` or show a tenant badge on the root domain.
+    // a reserved host (e.g. www, app, sms) must not auto-scope the login to
+    // `?tenant=<reserved>` or show a tenant badge on the root domain.
     var RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'caan', 'admin', 'auth', 'docs', 'sms', 'demo', 'betasms', 'sms-beta', 'gap-analysis-ssp', 'localhost'];
 
     var DEMO_TENANT_STORAGE_KEY = (typeof global.storageKey === 'function')

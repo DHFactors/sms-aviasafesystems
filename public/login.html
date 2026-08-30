@@ -196,12 +196,7 @@ function waitForFirebase() {
 
 function getApiBaseUrl() {
     if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
-    var host = window.location.hostname;
-    var isBeta = host.indexOf('beta') !== -1 ||
-        host === 'localhost' || host === '127.0.0.1';
-    return isBeta
-        ? 'https://sms-aviasafesystems-beta.onrender.com'
-        : 'https://aviasafe-unified-platform.onrender.com';
+    return 'https://aviasafe-unified-platform.onrender.com';
 }
 
 // Attach a fresh App Check token when available (best-effort).

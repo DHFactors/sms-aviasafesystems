@@ -5,7 +5,7 @@
 **Prepared by**: AviaSAFE Systems engineering (Opencode-assisted)
 **Verification**: All figures below were verified against the committed codebase (HEAD `69f16dc`), the
 backend test suite (**358 passed**), the frontend Node test suite, and the live beta environment
-(`https://betasms.aviasafesystems.com`) on the report date.
+(`https://sms.aviasafesystems.com`) on the report date.
 
 ---
 
@@ -22,8 +22,8 @@ backend test suite (**358 passed**), the frontend Node test suite, and the live 
 - **Guest Safety Copilot on self-service pages (2026-08-18)** — the Ghanshyam copilot widget now runs
   unauthenticated on `register.html`, `join.html` and `login.html`, each with page-specific greetings
   and quick-suggestion chips (org registration / team invite codes & roles / sign-in troubleshooting,
-  tenant selection & password resets). Guest requests resolve to `/api/v1/copilot/guest/chat` pinned to
-  the beta backend (`sms-aviasafesystems-beta.onrender.com`) so the public pages never 404.
+  tenant selection & password resets). Guest requests resolve to `/api/v1/copilot/guest/chat` on the
+  unified backend (`aviasafe-unified-platform.onrender.com`) so the public pages never 404.
 - **Defensive model guard (2026-08-18, `cb7b9ff`)** — `resolve_groq_model()` validates
   `GROQ_MODEL`/env against a curated allowlist (`gpt-oss-120b`, `gpt-oss-20b`, `qwen3.6-27b`,
   `allam-2-7b`); unrecognised/deprecated values log a warning and fall back to the proven production

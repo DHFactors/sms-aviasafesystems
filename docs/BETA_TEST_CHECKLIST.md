@@ -1,7 +1,7 @@
 # AviaSAFE SMS — Closed Beta Test Checklist
 
 **Access URL:** https://sms-beta.web.app
-**Environment:** Isolated beta — API routes to `sms-aviasafesystems-beta.onrender.com`, all writes go to the `sms-db-beta` Firestore database. **No production data is touched.**
+**Environment:** Isolated beta — API routes to `aviasafe-unified-platform.onrender.com`, all writes go to the `sms-db-beta` Firestore database. **No production data is touched.**
 
 ---
 
@@ -72,7 +72,7 @@ Connected to Upstash Redis
 
 ## 7. Expected Behavior
 
-- [ ] All API calls route to `https://sms-aviasafesystems-beta.onrender.com`
+- [ ] All API calls route to `https://aviasafe-unified-platform.onrender.com`
 - [ ] All database writes land in `sms-db-beta`
 - [ ] Point-in-Time Recovery (PITR) is enabled on `sms-db-beta`
 - [ ] No production data (`sms-db`) is affected by any beta action

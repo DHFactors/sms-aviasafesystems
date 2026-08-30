@@ -5,7 +5,7 @@
 //   LOADTEST_TOKEN     - Firebase ID token (from get-token.mjs)
 
 export const BASE_URL =
-  __ENV.LOADTEST_BASE_URL || 'https://sms-aviasafesystems-beta.onrender.com';
+  __ENV.LOADTEST_BASE_URL || 'https://aviasafe-unified-platform.onrender.com';
 
 export function authHeaders() {
   const token = __ENV.LOADTEST_TOKEN || '';

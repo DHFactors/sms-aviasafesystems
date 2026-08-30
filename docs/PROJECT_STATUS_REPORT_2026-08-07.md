@@ -52,7 +52,7 @@
 | Environment | URL | Status | Notes |
 |-------------|-----|--------|-------|
 | **Beta Frontend** | `https://sms-beta.web.app` | ✅ Live (200) | Firebase Hosting, site `sms-beta`, project `gap-analysis-ssp` |
-| **Beta Backend** | `https://sms-aviasafesystems-beta.onrender.com` | ✅ Live (200) | Render service, `FIREBASE_DATABASE_ID=sms-db-beta`, auto-deploy on push |
+| **Beta Backend** | `https://aviasafe-unified-platform.onrender.com` | ✅ Live (200) | Render service, `FIREBASE_DATABASE_ID=sms-db-beta`, auto-deploy on push |
 | **Production Frontend** | `https://sms.aviasafesystems.com` | ✅ Live (200) | Firebase Hosting, site `aerosafety-sms-prod`, project `aerosafety-sms-prod` |
 | **Production Backend** | `https://aviasafe-unified-platform.onrender.com` | ✅ Live (200) | Render service, `FIREBASE_DATABASE_ID=sms-db` (via `backend/render.yaml`) |
 

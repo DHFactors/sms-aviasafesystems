@@ -316,10 +316,7 @@ function enforceSurveyWindow(surveyConfig, config) {
 
 function getApiBaseUrl() {
     if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
-    const host = window.location.hostname;
-    return (host.includes('beta') || host === 'localhost' || host === '127.0.0.1')
-        ? 'https://sms-aviasafesystems-beta.onrender.com'
-        : 'https://aviasafe-unified-platform.onrender.com';
+    return 'https://aviasafe-unified-platform.onrender.com';
 }
 
 // ── UI RENDERING FRAMEWORK ──

@@ -4,7 +4,7 @@ Operational monitoring for the closed-beta period (see `docs/BETA_ENVIRONMENT.md
 
 **Beta surfaces:**
 - Hosting: `https://sms-beta.web.app`
-- Backend: `https://sms-aviasafesystems-beta.onrender.com` (Render service `sms-aviasafesystems-beta`)
+- Backend: `https://aviasafe-unified-platform.onrender.com` (Render service `aviasafe-unified-platform`)
 - Firestore: `sms-db-beta` (project `aerosafety-sms-prod`, us-west1)
 - Redis: Upstash `aviasafe-redis`
 

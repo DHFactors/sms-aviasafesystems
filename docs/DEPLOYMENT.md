@@ -15,8 +15,8 @@ How the AviaSAFE platform is deployed and how to deploy it to each environment.
 
 | Surface | Provider | Location |
 |---|---|---|
-| Frontend (static site) | Firebase Hosting | `https://sms-beta.web.app` → `https://betasms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) |
-| Backend API | Render (Docker) | `https://sms-aviasafesystems-beta.onrender.com` |
+| Frontend (static site) | Firebase Hosting | `https://sms-beta.web.app` → `https://sms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) |
+| Backend API | Render (Docker) | `https://aviasafe-unified-platform.onrender.com` |
 | Database | Cloud Firestore (`sms-db-beta`) | Firebase project `gap-analysis-ssp`, region `us-west1`, PITR 7d |
 | Auth / App Check | Firebase Auth | `gap-analysis-ssp` (separate auth pool; reCAPTCHA key pending) |
 
@@ -108,7 +108,7 @@ firebase deploy --project gap-analysis-ssp --only hosting:sms-beta
 > beta and prod stay consistent.
 
 - Hosting DB/API selection is automatic from the hostname in `public/js/firebase.js` (dual
-  `PROD_CONFIG` / `BETA_CONFIG`): `betasms.aviasafesystems.com`, `sms-beta.web.app`, any host
+  `PROD_CONFIG` / `BETA_CONFIG`): `sms-beta.web.app`, any host
   containing `beta`, and localhost use the isolated `gap-analysis-ssp` project (`sms-db-beta` +
   beta Render API); everything else — including `sms.aviasafesystems.com` and tenant subdomains —
   uses `sms-db` + prod API. Storage keys are env-prefixed (`aviasafe:{beta|prod}:*`).
@@ -153,7 +153,7 @@ Hosting console "Release history" and promote a previous version.
 |---|---|---|---|
 | Local dev | `uvicorn` on `:8000` | `firebase serve` `:5000` | emulator or live project |
 | Staging | Render branch preview / Firebase channel | Firebase preview channel | shared `aerosafety-sms-prod` |
-| Beta | Render `sms-aviasafesystems-beta` | `betasms.aviasafesystems.com` / `sms-beta.web.app` | `gap-analysis-ssp` / `sms-db-beta` (isolated) |
+| Beta | Render `sms-aviasafesystems-beta` | `sms.aviasafesystems.com` / `sms-beta.web.app` | `gap-analysis-ssp` / `sms-db-beta` (isolated) |
 | Production | Render `main` | `sms.aviasafesystems.com` (custom domain) | shared `aerosafety-sms-prod` |
 
 **Known limitation:** no dedicated staging Firestore project exists; staging and production share

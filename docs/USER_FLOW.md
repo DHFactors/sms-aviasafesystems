@@ -309,8 +309,8 @@ loop between flows E and D.
    in `default_q.js`, with progress tracking and a comments box.
 3. On completion the response is POSTed **to the backend survey endpoint**
    `POST /api/v1/surveys` (`app.js:335`), which validates, scores, and persists
-   responses server-side. The API base URL is `APP_CONFIG.apiBaseUrl` (beta →
-   `https://sms-aviasafesystems-beta.onrender.com`, prod → `https://aviasafe-unified-platform.onrender.com`)
+   responses server-side. The API base URL is `APP_CONFIG.apiBaseUrl`
+   (`https://aviasafe-unified-platform.onrender.com`)
    or derived from the hostname when the config module is not loaded.
 4. `/portal/survey/` is a legacy redirect to `/survey/` (preserving `?tenant=`).
 

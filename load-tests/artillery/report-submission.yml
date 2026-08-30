@@ -11,7 +11,7 @@
 #   artillery run load-tests/artillery/report-submission.yml
 
 config:
-  target: "https://sms-aviasafesystems-beta.onrender.com"
+  target: "https://aviasafe-unified-platform.onrender.com"
   phases:
     - duration: 120
       arrivalRate: 5

@@ -196,7 +196,7 @@ def write_markdown(rows, generated_at):
     lines.append("> share securely. Do **NOT** commit to the repository.")
     lines.append("")
     lines.append("| Login URL | https://sms-beta.web.app |")
-    lines.append("| Backend | https://sms-aviasafesystems-beta.onrender.com |")
+    lines.append("| Backend | https://aviasafe-unified-platform.onrender.com |")
     lines.append("")
     lines.append("## Operator Accounts")
     lines.append("")

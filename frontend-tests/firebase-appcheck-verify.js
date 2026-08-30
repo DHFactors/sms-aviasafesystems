@@ -57,7 +57,7 @@ function run(hostname) {
 function assert(cond, msg) { if (!cond) { console.error('FAIL: ' + msg); process.exitCode = 1; } else { console.log('PASS: ' + msg); } }
 
 (async () => {
-    const betaWin = run('betasms.aviasafesystems.com');
+    const betaWin = run('sms-beta.web.app');
     assert(betaWin.firebase.app().config === betaWin.__FIREBASE_CONFIG__, 'beta picks BETA_CONFIG');
     assert(betaWin.__FIREBASE_CONFIG__.projectId === 'aerosafety-sms-prod', 'beta config project = aerosafety-sms-prod');
     assert(betaWin.__FIREBASE_CONFIG__.databaseId === 'sms-db-beta', 'beta database = sms-db-beta');

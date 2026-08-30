@@ -93,5 +93,5 @@
 1. Commit the guardrails work on `feat/betasms-self-service` (and `main`).
 2. Redeploy backend (Render) with `ENVIRONMENT` set per environment.
 3. Provision the beta App Check reCAPTCHA key in `gap-analysis-ssp`.
-4. Deploy frontend to both hosting sites and verify `betasms.aviasafesystems.com` (beta, gated-free)
-   and `sms.aviasafesystems.com` (production, invite-only registration) end-to-end.
+4. Deploy frontend and verify `sms.aviasafesystems.com` (production, invite-only registration)
+   end-to-end.

@@ -24,7 +24,6 @@ setup_logging()
 # environment variable can never break the browser -> API calls (CORS preflight).
 CANONICAL_ALLOWED_ORIGINS = (
     "https://sms.aviasafesystems.com",
-    "https://betasms.aviasafesystems.com",
     "https://aerosafety-sms-prod.web.app",
     "https://aerosafety-sms-beta.web.app",
     "https://sms-beta.web.app",
@@ -45,7 +44,8 @@ CANONICAL_ALLOWED_ORIGINS = (
 
 
 def _allowed_origins() -> list[str]:
-    configured = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+    raw = settings.CORS_ORIGINS if (settings.CORS_ORIGINS and settings.CORS_ORIGINS.strip()) else settings.ALLOWED_ORIGINS
+    configured = [o.strip() for o in raw.split(",") if o.strip()]
     for origin in CANONICAL_ALLOWED_ORIGINS:
         if origin not in configured:
             configured.append(origin)

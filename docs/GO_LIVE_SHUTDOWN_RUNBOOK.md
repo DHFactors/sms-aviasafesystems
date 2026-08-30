@@ -34,7 +34,7 @@ Firebase Auth users (24) were **kept** — Auth is project-wide and still requir
 | Component | Production (commercial) | Beta (testing) |
 |-----------|-------------------------|----------------|
 | Hosting | `sms.aviasafesystems.com` (DNS + hosting domain connected) / `aerosafety-sms-prod.web.app` | `https://sms-beta.web.app` (site `sms-beta`, project `gap-analysis-ssp`) |
-| Backend | `https://aviasafe-unified-platform.onrender.com` | `https://sms-aviasafesystems-beta.onrender.com` |
+| Backend | `https://aviasafe-unified-platform.onrender.com` | `https://aviasafe-unified-platform.onrender.com` |
 | Firestore | `sms-db` — **0 tenants (empty, clean slate)** | `sms-db-beta` — 7 tenants (demo data) |
 | Redis | Not used | Upstash `aviasafe-redis` (rate limiting) |
 | Auth users | 24 (shared project-wide) | 24 (shared project-wide) |
@@ -73,7 +73,7 @@ curl https://aviasafe-unified-platform.onrender.com/health
 # -> {"status":"healthy","firebase":"connected","service":"AviaSAFE SMS API","version":"1.0.0"}
 
 # Beta backend liveness
-curl https://sms-aviasafesystems-beta.onrender.com/live
+curl https://aviasafe-unified-platform.onrender.com/live
 
 # Production DB must show zero tenants
 gcloud firestore databases list --project=aerosafety-sms-prod

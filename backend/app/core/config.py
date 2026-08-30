@@ -69,7 +69,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
 
     # ── CORS ──
-    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
+    # Single-canonical-domain origin list (betasms.* decommissioned 2026-08).
+    ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
+    # When set, takes precedence over ALLOWED_ORIGINS (Render-env friendly).
+    CORS_ORIGINS: Optional[str] = None
 
     # ── PostgreSQL ──
     # asyncpg-compatible connection URL. Production points at the Supabase

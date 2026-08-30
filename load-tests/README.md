@@ -35,7 +35,7 @@ Tokens expire after **1 hour** — re-mint before each run.
 ## 2. Run — k6
 
 ```bash
-export LOADTEST_BASE_URL=https://sms-aviasafesystems-beta.onrender.com   # optional, defaults to beta
+export LOADTEST_BASE_URL=https://aviasafe-unified-platform.onrender.com   # optional, defaults to unified backend
 
 k6 run -e LOADTEST_TOKEN=$LOADTEST_TOKEN load-tests/k6/report-submission.js
 k6 run -e LOADTEST_TOKEN=$LOADTEST_TOKEN load-tests/k6/dashboard-view.js
@@ -55,7 +55,7 @@ artillery run load-tests/artillery/caan-dashboard.yml
 | Env var               | k6 usage                              | Artillery usage                        | Default                                   |
 |-----------------------|---------------------------------------|----------------------------------------|-------------------------------------------|
 | `LOADTEST_TOKEN`      | `-e LOADTEST_TOKEN=...`               | `process.env.LOADTEST_TOKEN` (auto)    | (required)                                |
-| `LOADTEST_BASE_URL`   | `-e LOADTEST_BASE_URL=...`            | edit `config.target`                   | `https://sms-aviasafesystems-beta.onrender.com` |
+| `LOADTEST_BASE_URL`   | `-e LOADTEST_BASE_URL=...`            | edit `config.target`                   | `https://aviasafe-unified-platform.onrender.com` |
 | `LOADTEST_API_KEY`    | (unused)                              | (unused)                               | public web API key (in `get-token.mjs`)   |
 
 ## Important operational notes

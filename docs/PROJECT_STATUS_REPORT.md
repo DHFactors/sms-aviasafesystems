@@ -86,8 +86,8 @@ proportional normalization and the CAAN Appendix 10 weighted composite
 |---|---|
 | Hosting (beta) | https://sms-beta.web.app · https://aerosafety-sms-beta.web.app |
 | Hosting (prod) | https://aerosafety-sms-prod.web.app · https://sms.aviasafesystems.com |
-| API (beta, Render) | https://sms-aviasafesystems-beta.onrender.com |
-| API (prod, Render) | https://sms-aviasafesystems.onrender.com |
+| API (beta, Render) | https://aviasafe-unified-platform.onrender.com |
+| API (prod, Render) | https://aviasafe-unified-platform.onrender.com |
 | Firestore rules | `firestore/firestore.rules` (released with Chunk 16 deploy) |
 | Backend repo hook | Render auto-deploy on push (see §6) |
 

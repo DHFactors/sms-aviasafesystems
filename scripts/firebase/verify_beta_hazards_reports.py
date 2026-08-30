@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from app.core.config import settings
 
-API = "https://sms-aviasafesystems-beta.onrender.com"
+API = "https://aviasafe-unified-platform.onrender.com"
 API_KEY = "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc"
 FIREBASE_AUTH_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=" + API_KEY
 

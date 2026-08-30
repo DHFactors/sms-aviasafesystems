@@ -8,7 +8,7 @@ const ApiClient = {
         try {
             const h = (window.location.hostname || '').toLowerCase();
             const isBetaHost = h.includes('beta') || h.includes('sms-beta');
-            if (isBetaHost) return 'https://sms-aviasafesystems-beta.onrender.com';
+            if (isBetaHost) return 'https://aviasafe-unified-platform.onrender.com';
             if (h === 'localhost' || h === '127.0.0.1') {
                 try {
                     const local = window.localStorage && window.localStorage.getItem('aviasafe:localApiBaseUrl');

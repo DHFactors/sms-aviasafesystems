@@ -126,9 +126,9 @@
         var host = (window.location.hostname || '').toLowerCase();
         var isBetaHost = host.indexOf('beta') !== -1 || host.indexOf('sms-beta') !== -1;
         var isLocalhost = host === 'localhost' || host === '127.0.0.1';
-        // Deployed beta hosts -> beta backend; deployed prod hosts -> prod backend
-        if (isBetaHost) return 'https://sms-aviasafesystems-beta.onrender.com';
-        if (isLocalhost) return 'https://sms-aviasafesystems-beta.onrender.com';
+        // Single unified backend (beta + prod). Local dev uses the local API when set.
+        if (isBetaHost) return 'https://aviasafe-unified-platform.onrender.com';
+        if (isLocalhost) return 'https://aviasafe-unified-platform.onrender.com';
         return 'https://aviasafe-unified-platform.onrender.com';
     }
 

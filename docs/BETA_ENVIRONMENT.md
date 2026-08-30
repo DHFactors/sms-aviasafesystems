@@ -8,15 +8,15 @@ The beta is a **fully isolated environment** in its own Firebase project. Beta t
 
 | Component | Beta | Production |
 |-----------|------|------------|
-| **Hosting** | `https://betasms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) | `https://sms.aviasafesystems.com` / `aerosafety-sms-prod.web.app` |
+| **Hosting** | `https://sms.aviasafesystems.com` (site `sms-beta`, project `gap-analysis-ssp`) | `https://sms.aviasafesystems.com` / `aerosafety-sms-prod.web.app` |
 | **Firebase project** | `gap-analysis-ssp` (projectNumber `817614332543`) | `aerosafety-sms-prod` (projectNumber `527947363983`) |
-| **Backend** | `https://sms-aviasafesystems-beta.onrender.com` | `https://aviasafe-unified-platform.onrender.com` |
+| **Backend** | `https://aviasafe-unified-platform.onrender.com` | `https://aviasafe-unified-platform.onrender.com` |
 | **Firestore** | `sms-db-beta` (native, us-west1, PITR 7d, project `gap-analysis-ssp`) | `sms-db` (native, us-west1, project `aerosafety-sms-prod`) |
 | **Auth pool** | `gap-analysis-ssp` (50 seeded users, 2,233 migrated docs) | `aerosafety-sms-prod` |
 | **Redis** | Upstash `aviasafe-redis` (rate limiting) | Not used |
 
 Frontend routing (`public/js/firebase.js`) selects the config by environment:
-- **Beta** (`betasms.aviasafesystems.com`, `sms-beta.web.app`, any host containing `beta`, localhost): `gap-analysis-ssp` client config, `databaseId: "sms-db-beta"`, `apiBaseUrl: "https://sms-aviasafesystems-beta.onrender.com"`, `environment: "beta"`.
+- **Beta** (`sms.aviasafesystems.com`, `sms-beta.web.app`, any host containing `beta`, localhost): `gap-analysis-ssp` client config, `databaseId: "sms-db-beta"`, `apiBaseUrl: "https://aviasafe-unified-platform.onrender.com"`, `environment: "beta"`.
 - **Production** (everything else, including `sms.aviasafesystems.com` and tenant subdomains `*.aviasafesystems.com`): `aerosafety-sms-prod` client config, `databaseId: "sms-db"`, `apiBaseUrl: "https://aviasafe-unified-platform.onrender.com"`, `environment: "production"`.
 
 ## Isolation Migration (2026-08-18)
@@ -73,14 +73,14 @@ gcloud firestore databases update --database=sms-db-beta --project=gap-analysis-
   - `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` = the `gap-analysis-ssp` service-account (key file `backend/gap-analysis-ssp-sa.json`, gitignored)
   - `FIREBASE_DATABASE_ID=sms-db-beta`
   - `ENVIRONMENT=beta`
-  - `REDIS_URL` (Upstash), `ALLOWED_ORIGINS` (must include `https://betasms.aviasafesystems.com` and `https://sms-beta.web.app`), `GROQ_API_KEY`, `GEMINI_API_KEY`, `DEBUG=false`
+  - `REDIS_URL` (Upstash), `ALLOWED_ORIGINS` (must include `https://sms.aviasafesystems.com` and `https://sms-beta.web.app`), `GROQ_API_KEY`, `GEMINI_API_KEY`, `DEBUG=false`
 - Firestore rules/indexes are per-project now: `firebase deploy --only firestore:sms-db-beta --project gap-analysis-ssp` for beta; `--project aerosafety-sms-prod` for production.
 
 ## Verification Commands
 
 ```bash
 # Backend liveness
-curl https://sms-aviasafesystems-beta.onrender.com/live
+curl https://aviasafe-unified-platform.onrender.com/live
 
 # Firestore PITR state (beta project)
 gcloud firestore databases describe --database=sms-db-beta --project=gap-analysis-ssp

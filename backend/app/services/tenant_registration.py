@@ -2,7 +2,7 @@
 # FILE: tenant_registration.py
 # PATH: backend/app/services/tenant_registration.py
 # PURPOSE: Self-service tenant registration + team-member onboarding for the
-#          beta portal (betasms.aviasafesystems.com).
+#          self-service portal (sms.aviasafesystems.com).
 #
 #   register_tenant():   creates a slugified tenant_id, provisions the primary
 #                        administrator (AIRLINE_ADMIN / safety), initialises the

@@ -16,7 +16,7 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const API_KEY = "AIzaSyCdCtUuyOcUIoCBEaiWGbhp6_XwZKHsicc";
-const BACKEND = process.env.BACKEND_URL || "https://sms-aviasafesystems-beta.onrender.com";
+const BACKEND = process.env.BACKEND_URL || "https://aviasafe-unified-platform.onrender.com";
 const CREDS = path.join(ROOT, "BETA_CREDENTIALS_2026-08-08.md");
 
 function loadAccounts() {

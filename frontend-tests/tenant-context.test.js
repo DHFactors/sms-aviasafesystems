@@ -263,10 +263,10 @@ function test_reserved_beta_subdomains() {
             );
         });
     });
-    // Even an explicit ?tenant=betasms query must be ignored on a reserved
+    // Even an explicit ?tenant=<reserved> query must be ignored on a reserved
     // subdomain — the login must not auto-fill or redirect to it.
-    withEnv('betasms.aviasafesystems.com', () => {
-        global.location.search = '?tenant=betasms';
+    withEnv('sms-beta.aviasafesystems.com', () => {
+        global.location.search = '?tenant=sms-beta';
         assert.strictEqual(
             TenantResolver.getTenantFromSubdomain(),
             null,

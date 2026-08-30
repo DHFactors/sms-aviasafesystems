@@ -62,11 +62,11 @@ Backend logs use **loguru** and are written to `backend/logs/`.
 
 `GET /metrics` is **admin-only** — it requires a Firebase ID token for an admin/SUPER_ADMIN user
 (via `get_admin_user`). Without it the endpoint returns `401 {"success":false,"error":"Not authenticated"}`.
-Verified against the beta service (`sms-aviasafesystems-beta`).
+Verified against the unified backend service (`aviasafe-unified-platform`).
 
 ```bash
 curl -H "Authorization: Bearer <ADMIN_ID_TOKEN>" \
-  https://sms-aviasafesystems-beta.onrender.com/metrics
+  https://aviasafe-unified-platform.onrender.com/metrics
 ```
 
 Exposed metrics (source: `backend/app/core/metrics.py`):
@@ -145,8 +145,8 @@ Consolidated from the former `docs/BETA_MONITORING_GUIDE.md` (2026-08-06). Appli
 closed beta is active; see [DEPLOYMENT.md](./DEPLOYMENT.md) for the beta stack.
 
 **Beta surfaces:**
-- Hosting: `https://sms-beta.web.app` / `https://betasms.aviasafesystems.com`
-- Backend: `https://sms-aviasafesystems-beta.onrender.com` (Render service `sms-aviasafesystems-beta`)
+- Hosting: `https://sms-beta.web.app` / `https://sms.aviasafesystems.com`
+- Backend: `https://aviasafe-unified-platform.onrender.com` (Render service `aviasafe-unified-platform`)
 - Firestore: `sms-db-beta` (project `gap-analysis-ssp`, us-west1, PITR 7d — fully isolated)
 - Redis: Upstash `aviasafe-redis`
 
