@@ -1,0 +1,42 @@
+# supabase/config.toml — Supabase CLI local configuration.
+# Generated to match the linked remote project (aviasafe-sms, ref bftnwljnpnpniksmalnk).
+# https://supabase.com/docs/guides/local-development/overview
+
+project_id = "aviasafe-sms"
+project_ref = "bftnwljnpnpniksmalnk"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[gotrue]
+enabled = true
+# JWT secret defaults for local development only — override via
+# `supabase start` env / secret management. Never commit real secrets.
+jwt_secret = "super-secret-jwt-token-with-at-least-32-characters-long"
+
+[auth]
+enabled = true
+site_url = "https://sms.aviasafesystems.com"
+additional_redirect_urls = ["https://aerosafety-sms-prod.web.app"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[storage]
+enabled = true
+max_file_size = 52428800
