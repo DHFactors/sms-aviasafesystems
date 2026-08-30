@@ -1,113 +1,238 @@
-<!-- 
-  FOLDER/FILE PATH: public/index.html
-  VERSION NO: 1.0.0
-  DATE: 2026-07-17
-  PURPOSE OF THE FILE: The global State Safety Programme (SSP) role gateway. 
-  Directs incoming traffic to the appropriate isolated cloud application 
-  based on the user's operational role.
+<!--
+==============================================================================
+File: public/portal/index.html
+Description: Multi-tenant SMS Operations Portal Dashboard with integrated
+             Hazard Tracking & DoD HFACS 7.0 Root Cause Analysis navigation.
+==============================================================================
 -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>State Safety Programme | Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Roboto:wght@500;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --navy: #002F6C;
-            --sky: #00A3E0;
-            --white: #FFFFFF;
-            --light: #F8FAFC;
-            --text: #1E293B;
-            --border: #E2E8F0;
-        }
-        body {
-            font-family: 'Open Sans', sans-serif;
-            background-color: var(--light);
-            color: var(--text);
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .gateway-card {
-            background: var(--white);
-            padding: 3rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 47, 108, 0.08);
-            max-width: 500px;
-            width: 90%;
-            text-align: center;
-            border-top: 6px solid var(--navy);
-        }
-        h1 {
-            font-family: 'Roboto', sans-serif;
-            color: var(--navy);
-            margin-bottom: 0.5rem;
-        }
-        p.subtitle {
-            color: #64748B;
-            margin-bottom: 2.5rem;
-            font-size: 0.95rem;
-        }
-        .role-btn {
-            display: block;
-            width: 100%;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            background: var(--white);
-            border: 2px solid var(--border);
-            border-radius: 6px;
-            color: var(--navy);
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            box-sizing: border-box;
-        }
-        .role-btn:hover {
-            border-color: var(--sky);
-            background: #F0F9FF;
-            transform: translateY(-2px);
-        }
-        .role-btn.primary {
-            background: var(--navy);
-            color: var(--white);
-            border-color: var(--navy);
-        }
-        .role-btn.primary:hover {
-            background: #004080;
-        }
-    </style>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../css/theme.css">
-    </head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AviaSAFE Portal — Safety Operations</title>
+  <link rel="stylesheet" href="/css/views/dashboard.css">
+  <style>
+    :root {
+      --bg: #0f1720;
+      --panel: #16212c;
+      --panel-2: #1c2a37;
+      --line: #2a3947;
+      --text: #dbe4ec;
+      --muted: #8ba0b3;
+      --amber: #e8a33d;
+      --mono: "IBM Plex Mono", Consolas, monospace;
+      --sans: "IBM Plex Sans", -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      display: flex;
+      min-height: 100vh;
+    }
+    aside {
+      width: 260px;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+    }
+    .brand {
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--amber);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 12px 8px 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 13.5px;
+      transition: background 0.15s ease;
+    }
+    .nav-item:hover {
+      background: var(--panel-2);
+      color: var(--amber);
+    }
+    .nav-item.active {
+      background: rgba(232, 163, 61, 0.15);
+      color: var(--amber);
+      font-weight: 600;
+    }
+    .badge-nav {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(232, 163, 61, 0.2);
+      color: var(--amber);
+      margin-left: auto;
+    }
+    main {
+      flex: 1;
+      padding: 32px 40px;
+      overflow-y: auto;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .tenant-badge {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      padding: 6px 12px;
+      border-radius: 20px;
+      color: var(--amber);
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .action-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .action-card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+    .action-card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
+    .action-card .btn {
+      align-self: flex-start;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .action-card .btn:hover {
+      background: var(--amber);
+      color: #0f1720;
+      border-color: var(--amber);
+    }
+  </style>
+</head>
 <body>
 
-    <div class="gateway-card">
-        <h1>Safety Culture Portal</h1>
-        <p class="subtitle">State Safety Programme (SSP) · ICAO Annex 19</p>
-
-        <!-- Employee Survey Route (Appends a test tenant parameter) -->
-        <a href="/survey/index.html?tenant=sita-air" class="role-btn primary">
-            ✈️ Take Safety Survey
-        </a>
-
-        <!-- Safety Manager Route -->
-        <a href="/dashboards/safety.html" class="role-btn">
-            📊 Airline Safety Manager Login
-        </a>
-
-        <!-- CAAN Regulator Route -->
-        <a href="/dashboards/caan.html" class="role-btn">
-            🏛️ CAAN SMD Login
-        </a>
+  <!-- Left Sidebar Navigation -->
+  <aside>
+    <div class="brand">
+      <div class="brand-eyebrow">Safety Management</div>
+      <div class="brand-title">AviaSAFE Portal</div>
     </div>
+    <nav>
+      <div class="nav-label">Core Modules</div>
+      <a href="/portal/index.html" class="nav-item active">Dashboard Overview</a>
+      <a href="/aviasdcps.html#home" class="nav-item">Voluntary Reporting (SDCPS)</a>
+      
+      <div class="nav-label">Risk Management (Doc 9859)</div>
+      <!-- Added Hazard Analysis & HFACS RCA Link -->
+      <a href="/hazards/index.html" class="nav-item">
+        <span>Hazard & RCA Analysis</span>
+        <span class="badge-nav">HFACS 7.0</span>
+      </a>
+      <a href="/report/index.html" class="nav-item">Tenant Monthly Summary</a>
+
+      <div class="nav-label">Administration</div>
+      <a href="/admin/index.html" class="nav-item">System & User Matrix</a>
+      <a href="/settings/index.html" class="nav-item">Tenant Settings</a>
+    </nav>
+  </aside>
+
+  <!-- Main Content Dashboard -->
+  <main>
+    <div class="header-bar">
+      <div>
+        <h1 style="margin: 0; font-size: 22px;">Operational Safety Management</h1>
+        <div style="color: var(--muted); font-size: 13px; margin-top: 4px;">ICAO Annex 19 & Doc 9859 Continuous Oversight</div>
+      </div>
+      <div class="tenant-badge" id="tenantBadge">TENANT: FISHTAIL-AIR</div>
+    </div>
+
+    <div class="cards-grid">
+      <!-- Direct Entry to Hazard Analysis -->
+      <div class="action-card" style="border-color: var(--amber);">
+        <div>
+          <div style="font-family: var(--mono); font-size: 11px; color: var(--amber); text-transform: uppercase; margin-bottom: 6px;">Safety Risk Management</div>
+          <h3>Hazard Assessment & HFACS RCA</h3>
+          <p>Log active operational hazards, calculate 5x5 tolerability indices, tag DoD HFACS 7.0 root cause nanocodes, and formulate actionable CAPAs.</p>
+        </div>
+        <a href="/hazards/index.html" class="btn" style="background: var(--amber); color: #0f1720;">Open Hazard Workspace &rarr;</a>
+      </div>
+
+      <!-- Occurrence Reporting -->
+      <div class="action-card">
+        <div>
+          <div style="font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px;">Safety Data Ingest</div>
+          <h3>Safety Data Collection (SDCPS)</h3>
+          <p>Submit and triage voluntary safety reports, confidential incident disclosures, and flight operations occurrence telemetry.</p>
+        </div>
+        <a href="/aviasdcps.html#home" class="btn">View Reporting Ingest &rarr;</a>
+      </div>
+
+      <!-- Regulatory Reporting -->
+      <div class="action-card">
+        <div>
+          <div style="font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px;">Safety Assurance</div>
+          <h3>State Safety Risk & SPI Reports</h3>
+          <p>Generate monthly safety summaries, compute SPI rate trends per 1,000 flight hours, and export CAAN-compliant reporting documentation.</p>
+        </div>
+        <a href="/report/index.html" class="btn">Generate Reports &rarr;</a>
+      </div>
+    </div>
+  </main>
 
 </body>
 </html>

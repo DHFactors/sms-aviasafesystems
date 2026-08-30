@@ -8,6 +8,8 @@ are honoured by scoring. Legacy Medium/Moderate labels fold into the High tier.
 
 from datetime import datetime, timezone
 
+import pytest
+
 from app.services import risk_matrix as rm
 from app.services.hazard_service import HazardService
 from app.services.report_service import ReportService
@@ -158,17 +160,30 @@ def test_get_thresholds_falls_back_on_error(monkeypatch):
 
 
 # ============================================================================
-# Hazard service: classification uses canonical thresholds
+# Hazard + report service: classification uses canonical thresholds
+# (service calls hit live PostgreSQL; rows are cleaned up after each test)
 # ============================================================================
 
-class _FakeDocRef:
-    def __init__(self, doc_id):
-        self.id = doc_id
+import asyncio
+
+from sqlalchemy import delete
+
+from app.db.db_models import Report, Hazard
+from app.db.ids import register_tenant
+from app.db.session import session_scope
 
 
-class _FakeAddCollection:
-    def add(self, data):
-        return (object(), _FakeDocRef("hazard_test_001"))
+async def _cleanup_airline1():
+    tid = register_tenant("airline1")
+    async with session_scope() as s:
+        await s.execute(delete(Report).where(Report.tenant_id == tid))
+        await s.execute(delete(Hazard).where(Hazard.tenant_id == tid))
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_postgres_rows():
+    yield
+    asyncio.run(_cleanup_airline1())
 
 
 def _hazard_payload(**overrides):
@@ -187,8 +202,6 @@ def _hazard_payload(**overrides):
 
 
 def test_hazard_create_uses_canonical_scheme(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_tenant_collection",
-                        lambda tid, coll: _FakeAddCollection())
     monkeypatch.setattr("app.services.hazard_service.get_thresholds",
                         lambda tid: dict(DEFAULT))
 
@@ -200,8 +213,6 @@ def test_hazard_create_uses_canonical_scheme(monkeypatch):
 
 
 def test_hazard_create_honours_stored_thresholds(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_tenant_collection",
-                        lambda tid, coll: _FakeAddCollection())
     monkeypatch.setattr("app.services.hazard_service.get_thresholds",
                         lambda tid: dict(CUSTOM))
 
@@ -212,8 +223,6 @@ def test_hazard_create_honours_stored_thresholds(monkeypatch):
 
 
 def test_hazard_create_classifies_from_risk_index_only(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_tenant_collection",
-                        lambda tid, coll: _FakeAddCollection())
     monkeypatch.setattr("app.services.hazard_service.get_thresholds",
                         lambda tid: dict(DEFAULT))
 
@@ -225,11 +234,6 @@ def test_hazard_create_classifies_from_risk_index_only(monkeypatch):
 # ============================================================================
 # Report service: stored thresholds honoured by scoring
 # ============================================================================
-
-class _FakeReportCollection:
-    def add(self, data):
-        return (object(), _FakeDocRef("report_test_001"))
-
 
 def _report_payload():
     return {
@@ -244,8 +248,6 @@ def _report_payload():
 
 
 def test_report_create_uses_canonical_scheme(monkeypatch):
-    monkeypatch.setattr("app.services.report_service.get_tenant_collection",
-                        lambda tid, coll: _FakeReportCollection())
     monkeypatch.setattr("app.services.report_service.get_thresholds",
                         lambda tid: dict(DEFAULT))
 
@@ -255,8 +257,6 @@ def test_report_create_uses_canonical_scheme(monkeypatch):
 
 
 def test_report_create_honours_stored_thresholds(monkeypatch):
-    monkeypatch.setattr("app.services.report_service.get_tenant_collection",
-                        lambda tid, coll: _FakeReportCollection())
     monkeypatch.setattr("app.services.report_service.get_thresholds",
                         lambda tid: dict(CUSTOM))
 

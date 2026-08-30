@@ -284,11 +284,31 @@ async def root():
         "status": "operational"
     }
 
+
+async def _database_status() -> str:
+    """Ping PostgreSQL, returning a tri-state string for the health endpoints.
+
+    ``not_configured`` when DATABASE_URL is unset (Firestore-only deploy),
+    ``connected`` on a successful SELECT 1, ``error`` on any failure.
+    """
+    if not settings.DATABASE_URL:
+        return "not_configured"
+    try:
+        from app.db.session import check_db_health
+        ok = await check_db_health()
+        return "connected" if ok else "error"
+    except Exception as e:
+        logger.warning(f"Database health ping failed: {e}")
+        return "error"
+
+
 @app.get("/health")
 async def health_check():
+    db = await _database_status()
     return {
-        "status": "healthy",
+        "status": "healthy" if db != "error" else "degraded",
         "firebase": "connected" if is_firebase_ready() else "unavailable",
+        "database": db,
         "service": "AviaSAFE SMS API",
         "version": settings.API_VERSION,
     }
@@ -300,7 +320,10 @@ async def liveness_probe():
 @app.get("/ready")
 async def readiness_probe():
     fb = is_firebase_ready()
+    db = await _database_status()
+    ready = fb and db in ("connected", "not_configured")
     return {
-        "status": "ready" if fb else "not_ready",
+        "status": "ready" if ready else "not_ready",
         "firebase": "connected" if fb else "unavailable",
+        "database": db,
     }

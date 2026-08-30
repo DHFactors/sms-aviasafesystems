@@ -1,387 +1,224 @@
+<!--
+==============================================================================
+File: public/hazards/index.html
+Description: Hazard Analysis Workspace matching ICAO Doc 9859 Matrix,
+             DoD HFACS 7.0 Root Cause Analysis (RCA), and CAPA tracking table.
+==============================================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Master Hazard Register - AviaSAFE</title>
-    <link rel="stylesheet" href="/css/variables.css">
-    <link rel="stylesheet" href="/css/main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
-        .page { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
-        .nav { background: #0b2a42; color: #fff; padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .nav h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
-        .nav h1 i { margin-right: 0.5rem; }
-        .nav-actions { display: flex; align-items: center; gap: 1rem; }
-        .nav-actions span { font-size: 0.8rem; opacity: 0.8; }
-        .btn-logout { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
-        .btn-logout:hover { background: rgba(255,255,255,0.1); }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
-        .header-bar h2 { margin: 0; color: #0b2a42; }
-        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: #fff; padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
-        .filter-bar label { font-size: 0.8rem; font-weight: 600; color: #475569; }
-        .filter-bar select, .filter-bar input { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; }
-        .filter-bar .btn-search { background: #1a6b8a; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-        .filter-bar .btn-search:hover { background: #0b2a42; }
-        .filter-bar .btn-clear { background: transparent; color: #64748b; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
-        .table-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
-        .table-card table { width: 100%; border-collapse: collapse; }
-        .table-card th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.85rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; }
-        .table-card th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-        .table-card th.sortable:hover { color: #0b2a42; }
-        .table-card th .fa-sort, .table-card th .fa-sort-up, .table-card th .fa-sort-down { margin-left: 0.3rem; opacity: 0.6; font-size: 0.7rem; }
-        .table-card td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
-        .table-card tbody tr { cursor: pointer; }
-        .table-card tbody tr:hover { background: #f8fafc; }
-        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
-        .badge-critical { background: #fde8e8; color: #dc3545; }
-        .badge-high { background: #fff3e0; color: #e65100; }
-        .badge-medium { background: #fff8e1; color: #f9a825; }
-        .badge-low { background: #e8f5e9; color: #2e7d32; }
-        .badge-default { background: #f1f5f9; color: #64748b; }
-        .badge-new { background: #e3f2fd; color: #1565c0; }
-        .badge-processing { background: #fff3e0; color: #e65100; }
-        .badge-warning { background: #fef3c7; color: #d97706; }
-        .badge-completed { background: #e8f5e9; color: #2e7d32; }
-        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .stat-card { background: #fff; padding: 1rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
-        .stat-card .num { font-size: 1.5rem; font-weight: 700; color: #0b2a42; }
-        .stat-card .lbl { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 0.25rem; }
-        .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
-        .loading-state i { font-size: 1.5rem; margin-right: 0.5rem; }
-        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
-        .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; }
-        .page-btn { background: #fff; border: 1px solid #e2e8f0; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all 0.15s; }
-        .page-btn:hover:not(:disabled) { background: #f1f5f9; border-color: #1a6b8a; color: #1a6b8a; }
-        .page-btn:disabled { opacity: 0.4; cursor: default; }
-        .page-info { font-size: 0.85rem; color: #64748b; }
-        @media (max-width: 768px) {
-            .filter-bar { flex-direction: column; align-items: stretch; }
-            .header-bar { flex-direction: column; align-items: stretch; }
-        }
-    </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AviaSAFE — Hazard Analysis & CAPA Tracking</title>
+  <link rel="stylesheet" href="/css/views/dashboard.css">
+  <style>
+    :root {
+      --bg: #0f1720;
+      --panel: #16212c;
+      --panel-2: #1c2a37;
+      --line: #2a3947;
+      --text: #dbe4ec;
+      --muted: #8ba0b3;
+      --amber: #e8a33d;
+      --act: #d9634f;
+      --precond: #4fa3d9;
+      --super: #7fbf6a;
+      --org: #c48fd9;
+      --mono: "IBM Plex Mono", Consolas, monospace;
+      --sans: "IBM Plex Sans", -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    header { padding: 18px 24px; border-bottom: 1px solid var(--line); background: rgba(15,23,32,0.97); display: flex; justify-content: space-between; align-items: center; }
+    .layout-grid { max-width: 1300px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .full-width-container { max-width: 1300px; margin: 0 auto 32px; padding: 0 20px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+    .card h2 { margin-top: 0; font-size: 15px; border-bottom: 1px solid var(--line); padding-bottom: 10px; color: var(--amber); font-family: var(--mono); }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); text-transform: uppercase; }
+    input, select, textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 6px; font-family: var(--sans); }
+    .btn { background: var(--amber); color: #0f1720; font-weight: 700; border: none; padding: 12px 18px; border-radius: 6px; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
 
-    <link rel="stylesheet" href="../css/theme.css">
-    </head>
+    /* CAPA Table Styling */
+    .table-responsive { width: 100%; overflow-x: auto; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel-2); }
+    td { padding: 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+    
+    .status-badge { display: inline-block; font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 12px; font-weight: 600; text-transform: uppercase; }
+    .status-pending { background: rgba(232, 163, 61, 0.2); color: var(--amber); border: 1px solid var(--amber); }
+    .status-implemented { background: rgba(79, 163, 217, 0.2); color: var(--precond); border: 1px solid var(--precond); }
+    .status-verified { background: rgba(127, 191, 106, 0.2); color: var(--super); border: 1px solid var(--super); }
+    .status-draft { background: rgba(139, 160, 179, 0.2); color: var(--muted); border: 1px solid var(--muted); }
+    
+    .code-tag { font-family: var(--mono); font-size: 11px; background: var(--panel-2); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); }
+  </style>
+</head>
 <body>
-
-<nav class="nav">
-    <h1><i class="fas fa-exclamation-triangle"></i> Master Hazard Register</h1>
-    <div class="nav-actions">
-        <span id="userDisplay"></span>
-        <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+  <header>
+    <div>
+      <div style="font-family: var(--mono); font-size: 11px; color: var(--amber); text-transform: uppercase; letter-spacing: 0.08em;">Safety Risk Management (ICAO Doc 9859 / DoD HFACS 7.0)</div>
+      <h1 style="margin: 4px 0 0; font-size: 20px;">Hazard Assessment & CAPA Tracking</h1>
     </div>
-</nav>
+    <a href="/portal/index.html" class="btn" style="padding: 8px 14px; font-size: 12px; text-decoration: none;">&larr; Back to Portal</a>
+  </header>
 
-<div class="page">
-    <div class="header-bar">
-        <h2><i class="fas fa-list"></i> Master Hazard Register</h2>
-        <div>
-            <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-            <a href="/can_cap/cans.html" class="btn btn-outline btn-sm"><i class="fas fa-clipboard-check"></i> View All CANs</a>
-            <a href="/hazards/create.html" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New Hazard</a>
-        </div>
-    </div>
-
-    <div id="statsRow" class="stats-row"></div>
-
-    <div class="filter-bar">
-        <label>Status:</label>
-        <select id="filterStatus"><option value="">All</option></select>
-        <label>Priority:</label>
-        <select id="filterPriority"><option value="">All</option></select>
-        <label>Source:</label>
-        <select id="filterSource"><option value="">All</option></select>
-        <label>Taxonomy:</label>
-        <select id="filterTaxonomy"><option value="">All</option></select>
-        <label>Date:</label>
-        <select id="filterDateField">
-            <option value="created_at">Created</option>
-            <option value="updated_at">Updated</option>
+  <div class="layout-grid">
+    <!-- Hazard Information & ICAO Tolerability Matrix -->
+    <div class="card">
+      <h2>1. Hazard Identification & Tolerability Matrix</h2>
+      <div class="form-group">
+        <label>Hazard Title</label>
+        <input type="text" id="hazardTitle" placeholder="e.g., Unstabilized Approach in Mountainous Terrain">
+      </div>
+      <div class="form-group">
+        <label>Operational Domain</label>
+        <select id="functionalArea">
+          <option value="flight_operations">Flight Operations</option>
+          <option value="maintenance_145">Aircraft Maintenance (Part-145)</option>
+          <option value="camo">Continuing Airworthiness (CAMO)</option>
+          <option value="ground_ops">Ground Operations & Handling</option>
         </select>
-        <input type="date" id="filterDateFrom" title="From date">
-        <input type="date" id="filterDateTo" title="To date">
-        <input type="text" id="filterSearch" placeholder="Search hazard ID, title..." style="flex:1;min-width:150px;">
-        <button class="btn-search" onclick="loadHazards()"><i class="fas fa-search"></i> Search</button>
-        <button class="btn-clear" onclick="clearFilters()"><i class="fas fa-times"></i> Clear</button>
+      </div>
+      <div class="form-group">
+        <label>Initial Risk Assessment (Doc 9859)</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <select id="severitySelect">
+            <option value="5">5 — Catastrophic</option>
+            <option value="4" selected>4 — Hazardous</option>
+            <option value="3">3 — Major</option>
+            <option value="2">2 — Minor</option>
+            <option value="1">1 — Negligible</option>
+          </select>
+          <select id="probabilitySelect">
+            <option value="A">A — Frequent</option>
+            <option value="B">B — Occasional</option>
+            <option value="C">C — Remote</option>
+            <option value="D" selected>D — Improbable</option>
+            <option value="E">E — Extremely Improbable</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Evaluated Index & Tolerability</label>
+        <div id="riskTolerabilityDisplay" style="font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--amber);">4D — TOLERABLE</div>
+      </div>
+      <div class="form-group">
+        <label>Hazard Context & Narrative</label>
+        <textarea id="hazardDescription" rows="3" placeholder="Detailed operational narrative of conditions predisposing the hazard..."></textarea>
+      </div>
     </div>
 
-    <div class="table-card">
+    <!-- DoD HFACS 7.0 Nanocode RCA Selector -->
+    <div class="card">
+      <h2>2. Root Cause Analysis (DoD HFACS 7.0)</h2>
+      <div class="form-group">
+        <label>HFACS Category Filter</label>
+        <select id="hfacsCatFilter">
+          <option value="ALL">All Categories (109 Nanocodes)</option>
+          <option value="ACT">Unsafe Acts</option>
+          <option value="PRECOND" selected>Preconditions for Unsafe Acts</option>
+          <option value="SUPER">Supervisory Factors</option>
+          <option value="ORG">Organizational Influences</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nanocode Selection</label>
+        <select id="nanocodeDropdown">
+          <option value="PE101">PE101 — Environmental Conditions Affecting Vision</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>RCA Causal Factor Detail</label>
+        <textarea id="rcaFactorNarrative" rows="3" placeholder="Explain the organizational or environmental root cause behind this occurrence..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Assigned Owner (Email)</label>
+        <input type="email" id="assignedOwner" value="safety@fishtailair.com.np">
+      </div>
+      <button class="btn" id="saveHazardBtn" style="width: 100%;">Save Hazard & RCA Factors</button>
+    </div>
+  </div>
+
+  <!-- Corrective & Preventive Actions (CAPA) Workspace & Status Table -->
+  <div class="full-width-container">
+    <div class="card">
+      <h2>3. Corrective & Preventive Action (CAPA) Tracking Registry</h2>
+      
+      <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 10px; align-items: flex-end; margin-bottom: 16px;">
+        <div>
+          <label>CAPA Title / Mitigation Description</label>
+          <input type="text" id="capaTitle" placeholder="e.g., Update OM-A approach telemetry limits for Lukla">
+        </div>
+        <div>
+          <label>Action Type</label>
+          <select id="capaType">
+            <option value="corrective">Corrective</option>
+            <option value="preventive">Preventive</option>
+            <option value="training">Training</option>
+            <option value="procedural">Procedural</option>
+          </select>
+        </div>
+        <div>
+          <label>Responsible Dept</label>
+          <select id="capaDept">
+            <option value="flight_operations">Flight Ops</option>
+            <option value="maintenance_145">Part-145</option>
+            <option value="camo">CAMO</option>
+            <option value="safety">Safety Dept</option>
+          </select>
+        </div>
+        <div>
+          <label>Target Due Date</label>
+          <input type="date" id="capaDueDate" value="2026-09-15">
+        </div>
+        <button class="btn" id="addCapaBtn" style="padding: 10px 16px;">+ Add CAPA</button>
+      </div>
+
+      <div class="table-responsive">
         <table>
-            <thead>
-                <tr>
-                    <th class="sortable" data-sort="hazard_id">Hazard ID <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="title">Title <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="source">Source <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="taxonomy">Taxonomy <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="priority">Priority <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="risk_level">Risk Level <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="status">Status <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="assigned_to">Assigned To <i class="fas fa-sort"></i></th>
-                    <th class="sortable" data-sort="created_at">Created <i class="fas fa-sort"></i></th>
-                </tr>
-            </thead>
-            <tbody id="hazardsBody"></tbody>
+          <thead>
+            <tr>
+              <th style="width: 110px;">CAPA ID</th>
+              <th>Action Title & Scope</th>
+              <th style="width: 110px;">Type</th>
+              <th style="width: 130px;">Department</th>
+              <th style="width: 100px;">Nanocode</th>
+              <th style="width: 110px;">Due Date</th>
+              <th style="width: 140px;">Status</th>
+              <th style="width: 90px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="capaTableBody">
+            <tr>
+              <td class="code-tag">CAPA-0826-01</td>
+              <td><strong>OM-A SOP Monsoonal Limits Revision</strong><br><span style="color: var(--muted); font-size: 11px;">Mandate real-time anemometer telemetry verification prior to final fix.</span></td>
+              <td><span class="code-tag">Procedural</span></td>
+              <td>Flight Ops</td>
+              <td><span class="code-tag">PE101</span></td>
+              <td>2026-09-10</td>
+              <td><span class="status-badge status-pending">Pending</span></td>
+              <td style="text-align: right;"><button class="btn" style="padding: 4px 8px; font-size: 11px;">Verify</button></td>
+            </tr>
+            <tr>
+              <td class="code-tag">CAPA-0826-02</td>
+              <td><strong>High-Elevation Visual Approach Recurrent Sim</strong><br><span style="color: var(--muted); font-size: 11px;">Incorporate degraded visibility and shifting tailwind recovery scenarios.</span></td>
+              <td><span class="code-tag">Training</span></td>
+              <td>Flight Ops</td>
+              <td><span class="code-tag">AE104</span></td>
+              <td>2026-09-30</td>
+              <td><span class="status-badge status-implemented">Implemented</span></td>
+              <td style="text-align: right;"><button class="btn" style="padding: 4px 8px; font-size: 11px;">Verify</button></td>
+            </tr>
+          </tbody>
         </table>
-        <div id="loadingIndicator" class="loading-state" style="display:none;">
-            <i class="fas fa-spinner fa-spin"></i> Loading hazards...
-        </div>
-        <div id="emptyIndicator" class="empty-state" style="display:none;">
-            <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.5rem;"></i>
-            <p>No hazards found.</p>
-        </div>
-        <div id="pagination" class="pagination" style="display:none;"></div>
+      </div>
     </div>
-</div>
+  </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-<script src="/js/firebase.js"></script>
-<script src="/js/api/client.js"></script>
-<script src="/js/hazards.js"></script>
-<script>
-let currentUser = null;
-let allHazards = [];
-let sortKey = 'created_at';
-let sortDir = -1;
-const PAGE_SIZE = 10;
-let currentPage = 1;
-
-firebase.auth().onAuthStateChanged(function(user) {
-    if (!user) { window.location.href = '/login.html'; return; }
-    currentUser = user;
-    document.getElementById('userDisplay').textContent = user.email;
-    populateFilters();
-    initSortableHeaders();
-    loadHazards();
-    loadStats();
-});
-
-function populateFilters() {
-    const statusSel = document.getElementById('filterStatus');
-    HAZARD_STATUSES.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s; opt.textContent = s;
-        statusSel.appendChild(opt);
-    });
-    const prioritySel = document.getElementById('filterPriority');
-    HAZARD_PRIORITIES.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p; opt.textContent = p;
-        prioritySel.appendChild(opt);
-    });
-    const sourceSel = document.getElementById('filterSource');
-    HAZARD_SOURCES.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s; opt.textContent = s;
-        sourceSel.appendChild(opt);
-    });
-    const taxSel = document.getElementById('filterTaxonomy');
-    HAZARD_TAXONOMIES.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t; opt.textContent = t;
-        taxSel.appendChild(opt);
-    });
-}
-
-function getFilters() {
-    return {
-        status: document.getElementById('filterStatus').value,
-        priority: document.getElementById('filterPriority').value,
-        source: document.getElementById('filterSource').value,
-        taxonomy: document.getElementById('filterTaxonomy').value,
-        search: document.getElementById('filterSearch').value,
-        dateField: document.getElementById('filterDateField').value,
-        dateFrom: document.getElementById('filterDateFrom').value,
-        dateTo: document.getElementById('filterDateTo').value,
-    };
-}
-
-function clearFilters() {
-    document.getElementById('filterStatus').value = '';
-    document.getElementById('filterPriority').value = '';
-    document.getElementById('filterSource').value = '';
-    document.getElementById('filterTaxonomy').value = '';
-    document.getElementById('filterSearch').value = '';
-    document.getElementById('filterDateField').value = 'created_at';
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
-    loadHazards();
-}
-
-async function loadHazards() {
-    const tbody = document.getElementById('hazardsBody');
-    const loading = document.getElementById('loadingIndicator');
-    const empty = document.getElementById('emptyIndicator');
-    tbody.innerHTML = '';
-    loading.style.display = 'flex';
-    empty.style.display = 'none';
-
-    try {
-        const data = await HazardsAPI.list(getFilters());
-        loading.style.display = 'none';
-        allHazards = Array.isArray(data) ? data : [];
-        currentPage = 1;
-        renderTable();
-    } catch (err) {
-        loading.style.display = 'none';
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;
-    }
-}
-
-function applyDateFilter(rows) {
-    const f = getFilters();
-    const field = f.dateField || 'created_at';
-    const from = f.dateFrom ? new Date(f.dateFrom + 'T00:00:00') : null;
-    const to = f.dateTo ? new Date(f.dateTo + 'T23:59:59.999') : null;
-    if (!from && !to) return rows;
-    return rows.filter(function(r) {
-        const d = r[field] ? new Date(r[field]) : null;
-        if (!d) return true;
-        if (from && d < from) return false;
-        if (to && d > to) return false;
-        return true;
-    });
-}
-
-function sortRows(rows) {
-    const dir = sortDir;
-    const key = sortKey;
-    return rows.slice().sort(function(a, b) {
-        let va = a[key];
-        let vb = b[key];
-        if (key === 'created_at' || key === 'updated_at') {
-            va = va ? new Date(va).getTime() : 0;
-            vb = vb ? new Date(vb).getTime() : 0;
-        } else {
-            va = (va == null ? '' : String(va)).toLowerCase();
-            vb = (vb == null ? '' : String(vb)).toLowerCase();
-        }
-        if (va < vb) return -1 * dir;
-        if (va > vb) return 1 * dir;
-        return 0;
-    });
-}
-
-function renderTable() {
-    const tbody = document.getElementById('hazardsBody');
-    const empty = document.getElementById('emptyIndicator');
-    const rows = sortRows(applyDateFilter(allHazards));
-    tbody.innerHTML = '';
-    if (rows.length === 0) {
-        empty.style.display = 'block';
-        renderPagination(0);
-        return;
-    }
-    empty.style.display = 'none';
-    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
-    const start = (currentPage - 1) * PAGE_SIZE;
-    const pageRows = rows.slice(start, start + PAGE_SIZE);
-    pageRows.forEach(function(h) {
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', function() {
-            window.location.href = `/hazards/detail.html?id=${h.id}`;
-        });
-        const riskClass = hazardRiskBadgeClass(h.risk_level);
-        const statusClass = hazardStatusBadgeClass(h.status);
-        const priorityClass = hazardPriorityBadgeClass(h.priority);
-        tr.innerHTML = `
-            <td><strong>${h.hazard_id || h.id}</strong></td>
-            <td>${h.title}</td>
-            <td>${h.source || '-'}</td>
-            <td>${h.taxonomy || '-'}</td>
-            <td><span class="badge ${priorityClass}">${h.priority}</span></td>
-            <td><span class="badge ${riskClass}">${h.risk_level || 'N/A'}</span></td>
-            <td><span class="badge ${statusClass}">${h.status}</span></td>
-            <td>${h.assigned_to || '-'}</td>
-            <td>${formatDate(h.created_at)}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-    renderPagination(rows.length);
-}
-
-function renderPagination(total) {
-    const container = document.getElementById('pagination');
-    if (!container) return;
-    if (total <= PAGE_SIZE) {
-        container.style.display = 'none';
-        return;
-    }
-    container.style.display = 'flex';
-    const totalPages = Math.ceil(total / PAGE_SIZE);
-    const start = (currentPage - 1) * PAGE_SIZE + 1;
-    const end = Math.min(currentPage * PAGE_SIZE, total);
-    container.innerHTML = `
-        <button class="page-btn" id="pagePrev" ${currentPage === 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i> Previous</button>
-        <span class="page-info">Showing ${start}–${end} of ${total} · Page ${currentPage} of ${totalPages}</span>
-        <button class="page-btn" id="pageNext" ${currentPage === totalPages ? 'disabled' : ''}>Next <i class="fas fa-chevron-right"></i></button>
-    `;
-    document.getElementById('pagePrev').addEventListener('click', function() {
-        currentPage--;
-        renderTable();
-    });
-    document.getElementById('pageNext').addEventListener('click', function() {
-        currentPage++;
-        renderTable();
-    });
-}
-
-function initSortableHeaders() {
-    document.querySelectorAll('th.sortable').forEach(function(th) {
-        th.addEventListener('click', function() {
-            const key = th.dataset.sort;
-            if (sortKey === key) {
-                sortDir = -sortDir;
-            } else {
-                sortKey = key;
-                sortDir = (key === 'created_at' || key === 'updated_at') ? -1 : 1;
-            }
-            updateSortIndicators();
-            renderTable();
-        });
-    });
-}
-
-function updateSortIndicators() {
-    document.querySelectorAll('th.sortable').forEach(function(th) {
-        const icon = th.querySelector('i');
-        if (!icon) return;
-        if (th.dataset.sort === sortKey) {
-            icon.className = sortDir === 1 ? 'fas fa-sort-up' : 'fas fa-sort-down';
-        } else {
-            icon.className = 'fas fa-sort';
-        }
-    });
-}
-
-const HAZARD_STATUS_CARD_ORDER = ['Open', 'Processing', 'Under Review', 'Closed', 'Reopened'];
-
-async function loadStats() {
-    try {
-        const stats = await HazardsAPI.getStats();
-        const container = document.getElementById('statsRow');
-        const statuses = stats.by_status || {};
-        container.innerHTML = HAZARD_STATUS_CARD_ORDER.map((status) =>
-            `<div class="stat-card"><div class="num">${statuses[status] || 0}</div><div class="lbl">${status.toUpperCase()}</div></div>`
-        ).join('') +
-            `<div class="stat-card"><div class="num">${stats.total || 0}</div><div class="lbl">Total Hazards</div></div>`;
-    } catch (e) {
-        console.error('Stats error:', e);
-    }
-}
-
-async function logout() {
-    try { await firebase.auth().signOut(); window.location.href = '/'; }
-    catch (e) { console.error(e); }
-}
-</script>
+  <script src="/js/views/hazard_analysis.js"></script>
 </body>
 </html>

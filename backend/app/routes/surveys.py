@@ -20,6 +20,11 @@ from app.firebase import get_db
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
 from app.services.audit_service import log_audit, request_context
+from app.db.db_models import Survey, SurveyResponse
+from app.db.ids import register_tenant
+from app.db.isolation import demo_scope
+from app.db.runner import run
+from app.db.session import session_scope
 from app.services.survey_scoring import (
     SURVEY_VERSION,
     SURVEY_VERSION_V4,
@@ -64,15 +69,81 @@ class SurveySubmission(BaseModel):
     )
 
 
-def _persist_tenant_survey(
-    db, tenant_id: str, survey_doc: Dict[str, Any], response_doc: Dict[str, Any]
+def _json_safe(value: Any) -> Any:
+    """Deep-convert datetimes inside dict/list payloads to ISO strings so the
+    JSONB bind processor can serialise them."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return str(value)
+
+
+def _pillar_int(value: Any) -> Optional[int]:
+    """Survey pillar columns are INT (CHECKed 1-5); round legacy float scores."""
+    try:
+        return None if value is None else int(round(float(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+async def _persist_survey_async(
+    survey_values: Dict[str, Any], response_values: Dict[str, Any]
 ) -> str:
-    """Write the scored survey + raw response doc, returning the survey id."""
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
-    result = tenant_ref.collection("surveys").add(survey_doc)
-    survey_id = result[1].id if isinstance(result, tuple) else result.id
-    tenant_ref.collection("responses").add(response_doc)
-    return survey_id
+    async with session_scope() as session:
+        survey = Survey(**survey_values)
+        session.add(survey)
+        response = SurveyResponse(**response_values)
+        session.add(response)
+        await session.flush()
+        return str(survey.id)
+
+
+def _persist_tenant_survey(
+    tenant_id: str, survey_doc: Dict[str, Any], response_doc: Dict[str, Any]
+) -> str:
+    """Persist the scored survey + raw response to Postgres, returning the
+    survey id. Both documents are written in one transaction via the bridge
+    loop (the same loop all other Postgres services use)."""
+    tid = register_tenant(tenant_id)
+    survey_values: Dict[str, Any] = {
+        "tenant_id": tid,
+        "submitted_at": survey_doc["submitted_at"],
+        "respondent_id": survey_doc.get("respondentId"),
+        "department": survey_doc.get("department"),
+        "employee_category": survey_doc.get("employee_category"),
+        "years_experience": survey_doc.get("years_experience"),
+        "language_used": survey_doc.get("language_used"),
+        "survey_version": survey_doc["survey_version"],
+        "seed_version": survey_doc.get("seed_version"),
+        "answers": _json_safe(survey_doc.get("answers")),
+        "question_scores": _json_safe(survey_doc.get("question_scores")),
+        "element_scores": _json_safe(survey_doc.get("element_scores")),
+        "safety_policy": _pillar_int(survey_doc.get("safety_policy")),
+        "safety_risk_management": _pillar_int(survey_doc.get("safety_risk_management")),
+        "safety_assurance": _pillar_int(survey_doc.get("safety_assurance")),
+        "safety_promotion": _pillar_int(survey_doc.get("safety_promotion")),
+        "overall_sms_maturity": _pillar_int(survey_doc.get("overall_sms_maturity")),
+        "overall_score_pct": survey_doc.get("overall_score_pct"),
+        "is_demo": demo_scope(),
+    }
+    response_values: Dict[str, Any] = {
+        "tenant_id": tid,
+        "respondent_id": response_doc.get("respondentId"),
+        "answers": _json_safe(response_doc.get("answers")),
+        "department": response_doc.get("department"),
+        "employee_category": response_doc.get("employee_category"),
+        "years_experience": response_doc.get("years_experience"),
+        "language_used": response_doc.get("language_used"),
+        "submitted_at": response_doc["submitted_at"],
+        "survey_version": response_doc["survey_version"],
+        "is_demo": demo_scope(),
+    }
+    return run(_persist_survey_async(survey_values, response_values))
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -197,9 +268,7 @@ async def submit_survey(
     }
 
     try:
-        survey_id = _persist_tenant_survey(
-            get_db(), tenant_id, survey_doc, response_doc
-        )
+        survey_id = _persist_tenant_survey(tenant_id, survey_doc, response_doc)
     except Exception as e:
         logger.error(f"Failed to persist survey for tenant {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to persist survey")

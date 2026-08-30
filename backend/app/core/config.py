@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     # ── CORS ──
     ALLOWED_ORIGINS: str = "https://sms.aviasafesystems.com,https://betasms.aviasafesystems.com,https://aerosafety-sms-prod.web.app,https://aerosafety-sms-beta.web.app,https://sms-beta.web.app,http://localhost:3000,http://localhost:8000,http://localhost:5000,http://localhost:5005,http://127.0.0.1:5005,http://127.0.0.1:5500"
 
+    # ── PostgreSQL ──
+    # asyncpg-compatible connection URL. Production points at the Supabase
+    # TRANSACTION pooler (PgBouncer, host *.pooler.supabase.com, port 6543)
+    # so bursty Render instances do not overwhelm the free-tier connection
+    # budget. sslmode=require / pgbouncer hints are normalised by
+    # app/db/session.py.
+    # Empty by default so the app boots on Firestore-only deployments; the async
+    # SQLAlchemy engine is created lazily in app/db/session.py.
+    DATABASE_URL: Optional[str] = None
+
     # ── Firebase ──
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_PRIVATE_KEY: Optional[str] = None
