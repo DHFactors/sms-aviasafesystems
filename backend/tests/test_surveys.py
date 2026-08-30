@@ -6,8 +6,15 @@ endpoint (validation, persistence to both surveys + responses, auth handling).
 
 from datetime import datetime
 
-from fastapi.testclient import TestClient
+import asyncio
 
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
+
+from app.db.db_models import Survey, SurveyResponse
+from app.db.ids import register_tenant
+from app.db.session import session_scope
 from app.main import app
 from app.services import survey_scoring as sc
 
@@ -196,6 +203,35 @@ def _post(payload, headers=None):
     return TestClient(app).post("/api/v1/surveys/", json=payload, headers=headers or {})
 
 
+def _fetch_survey_rows(tenant):
+    tid = register_tenant(tenant)
+
+    async def _get():
+        async with session_scope() as s:
+            surveys = (
+                await s.scalars(select(Survey).where(Survey.tenant_id == tid))
+            ).all()
+            responses = (
+                await s.scalars(select(SurveyResponse).where(SurveyResponse.tenant_id == tid))
+            ).all()
+            return {"surveys": surveys, "responses": responses}
+
+    return asyncio.run(_get())
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_survey_rows():
+    yield
+    tid = register_tenant("tara-air")
+
+    async def _wipe():
+        async with session_scope() as s:
+            await s.execute(delete(SurveyResponse).where(SurveyResponse.tenant_id == tid))
+            await s.execute(delete(Survey).where(Survey.tenant_id == tid))
+
+    asyncio.run(_wipe())
+
+
 def test_survey_route_anonymous_success(monkeypatch):
     db = _FakeDB(tenant_known=True)
     _patch_db(monkeypatch, db)
@@ -207,17 +243,21 @@ def test_survey_route_anonymous_success(monkeypatch):
     assert body["data"]["tenant_id"] == "tara-air"
     assert body["data"]["overall_sms_maturity"] is not None
 
-    # Scored doc persisted to surveys, raw doc to responses
-    assert len(db.surveys.docs) == 1
-    _, survey = db.surveys.docs[0]
-    assert survey["tenant_id"] == "tara-air"
-    assert survey["overall_sms_maturity"] is not None
-    assert survey["safety_policy"] == 4.4
-    assert isinstance(survey["submitted_at"], datetime)
-    assert survey["submitted_at"].tzinfo is not None
-    assert len(db.responses.docs) == 1
-    _, raw = db.responses.docs[0]
-    assert raw["answers"]["q1_aware"] is True
+    # Scored doc persisted to surveys, raw doc to responses.
+    rows = _fetch_survey_rows("tara-air")
+    assert len(rows["surveys"]) == 1
+    survey = rows["surveys"][0]
+    assert str(survey.tenant_id) == register_tenant("tara-air")
+    assert survey.overall_sms_maturity == 4
+    assert survey.safety_policy == 4
+    assert survey.overall_score_pct is not None
+    assert survey.survey_version == sc.SURVEY_VERSION
+    assert isinstance(survey.submitted_at, datetime)
+    assert survey.submitted_at.tzinfo is not None
+    assert len(rows["responses"]) == 1
+    raw = rows["responses"][0]
+    assert raw.answers["q1_aware"] is True
+    assert raw.submitted_at.tzinfo is not None
     # Audit entry written
     assert len(db.audit.docs) == 1
     assert db.audit.docs[0][1]["action"] == "SURVEY_SUBMITTED"
@@ -272,4 +312,6 @@ def test_survey_route_authenticated_own_tenant(monkeypatch):
     resp = _post({"tenantId": "tara-air", "answers": VALID_ANSWERS},
                  headers={"Authorization": "Bearer faketoken"})
     assert resp.status_code == 201
-    assert len(db.surveys.docs) == 1
+    rows = _fetch_survey_rows("tara-air")
+    assert len(rows["surveys"]) == 1
+    assert len(rows["responses"]) == 1

@@ -1,0 +1,128 @@
+<!--
+==============================================================================
+File: frontend/hazard-analysis.html
+Description: Interactive Hazard Analysis, ICAO 5x5 Risk Tolerability Matrix,
+             and DoD HFACS 7.0 Nanocode Root Cause Analysis (RCA) Interface.
+==============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AviaSAFE — Hazard Analysis & HFACS RCA</title>
+  <style>
+    :root {
+      --bg: #0f1720;
+      --panel: #16212c;
+      --panel-2: #1c2a37;
+      --line: #2a3947;
+      --text: #dbe4ec;
+      --muted: #8ba0b3;
+      --amber: #e8a33d;
+      --act: #d9634f;
+      --precond: #4fa3d9;
+      --super: #7fbf6a;
+      --org: #c48fd9;
+      --mono: "IBM Plex Mono", Consolas, monospace;
+      --sans: "IBM Plex Sans", -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    header { padding: 20px 24px; border-bottom: 1px solid var(--line); background: rgba(15,23,32,0.95); }
+    h1 { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+    .card h2 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; color: var(--amber); }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); }
+    input, select, textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 6px; font-family: var(--sans); }
+    .matrix-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; font-family: var(--mono); font-size: 12px; text-align: center; }
+    .matrix-cell { padding: 8px 4px; border-radius: 4px; font-weight: 700; }
+    .cell-intolerable { background: rgba(217, 99, 79, 0.25); color: #ff7b66; border: 1px solid #d9634f; }
+    .cell-tolerable { background: rgba(232, 163, 61, 0.25); color: #f5b958; border: 1px solid #e8a33d; }
+    .cell-acceptable { background: rgba(127, 191, 106, 0.25); color: #94e07c; border: 1px solid #7fbf6a; }
+    .btn { background: var(--amber); color: #0f1720; font-weight: 700; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="font-family: var(--mono); font-size: 11px; color: var(--amber); text-transform: uppercase;">Safety Risk Management (ICAO Doc 9859 / DoD HFACS 7.0)</div>
+    <h1>Hazard Assessment & RCA Analysis</h1>
+    <div class="sub">Structured root cause identification, 5x5 matrix scoring, and CAPA formulation.</div>
+  </header>
+
+  <div class="container">
+    <!-- Hazard Definition & Risk Evaluation -->
+    <div class="card">
+      <h2>1. Hazard Definition & ICAO Matrix</h2>
+      <div class="form-group">
+        <label>HAZARD TITLE</label>
+        <input type="text" id="hazardTitle" placeholder="e.g., Unstabilized approach in tailwind conditions">
+      </div>
+      <div class="form-group">
+        <label>FUNCTIONAL AREA</label>
+        <select id="functionalArea">
+          <option value="flight_operations">Flight Operations</option>
+          <option value="maintenance_145">Maintenance (Part-145)</option>
+          <option value="camo">Continuing Airworthiness (CAMO)</option>
+          <option value="ground_ops">Ground Operations</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>SEVERITY (1 to 5) & PROBABILITY (A to E)</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <select id="severitySelect">
+            <option value="5">5 - Catastrophic</option>
+            <option value="4" selected>4 - Hazardous</option>
+            <option value="3">3 - Major</option>
+            <option value="2">2 - Minor</option>
+            <option value="1">1 - Negligible</option>
+          </select>
+          <select id="probabilitySelect">
+            <option value="A">A - Frequent</option>
+            <option value="B">B - Occasional</option>
+            <option value="C">C - Remote</option>
+            <option value="D" selected>D - Improbable</option>
+            <option value="E">E - Extremely Improbable</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>CALCULATED TOLERABILITY INDEX</label>
+        <div id="riskIndexDisplay" style="font-family: var(--mono); font-size: 18px; font-weight: 700; color: var(--amber);">4D — Tolerable</div>
+      </div>
+    </div>
+
+    <!-- DoD HFACS 7.0 Nanocode RCA Selector -->
+    <div class="card">
+      <h2>2. Root Cause Analysis (HFACS 7.0 Nanocode)</h2>
+      <div class="form-group">
+        <label>HFACS TIER & CATEGORY</label>
+        <select id="hfacsCat">
+          <option value="ACT">Tier 1: Unsafe Acts (AE100-200 / AV000)</option>
+          <option value="PRECOND" selected>Tier 2: Preconditions (PE100-200 / PC100-500 / PP100)</option>
+          <option value="SUPER">Tier 3: Supervisory Influences (SV000 / SP000 / SI000)</option>
+          <option value="ORG">Tier 4: Organizational Influences (OR000 / OS000 / OP000 / OC000)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>NANOCODE SELECTION</label>
+        <select id="nanocodeSelect">
+          <option value="PE101">PE101 — Environmental Conditions Affecting Vision</option>
+          <option value="AE104">AE104 — Over-Controlled/Under-Controlled Aircraft</option>
+          <option value="SP001">SP001 — Directed Task Beyond Personnel Capabilities</option>
+          <option value="OP001">OP001 — Pace of Ops-tempo/Workload</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>CAUSAL FACTOR NARRATIVE</label>
+        <textarea id="rcaNarrative" rows="4" placeholder="Detail how this causal factor contributed directly to the hazard..."></textarea>
+      </div>
+      <button class="btn" style="width: 100%;">Save Hazard & RCA Factors</button>
+    </div>
+  </div>
+</body>
+</html>

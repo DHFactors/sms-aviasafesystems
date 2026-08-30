@@ -11,13 +11,19 @@ benchmarked against the official SRM Procedure Manual test case:
     (Consolidated BSV ~14) -> "4D" -> "1D" Acceptable
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any, Dict
 from unittest.mock import MagicMock
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import delete, select
 
+from app.db.db_models import Hazard
+from app.db.ids import register_tenant
+from app.db.session import session_scope
 from app.main import app
 from app.core.config import settings
 from app.services import srm_engine
@@ -326,6 +332,27 @@ def client(mock_firebase_and_auth):
     return TestClient(app)
 
 
+def _hazard_row(hazard_id: str):
+    async def _get():
+        async with session_scope() as s:
+            return (
+                await s.scalars(select(Hazard).where(Hazard.id == UUID(hazard_id)))
+            ).one_or_none()
+    return asyncio.run(_get())
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_srm_hazards():
+    yield
+    tid = register_tenant("test_airline")
+
+    async def _wipe():
+        async with session_scope() as s:
+            await s.execute(delete(Hazard).where(Hazard.tenant_id == tid))
+
+    asyncio.run(_wipe())
+
+
 def _auth_header(token="AIRLINE_ADMIN_TOKEN"):
     return {"Authorization": f"Bearer {token}"}
 
@@ -380,8 +407,9 @@ class TestSramCalculateEndpoint:
         assert data["risk_profile"]["resultant_risk"]["index"] == "1D"
         assert data["risk_profile"]["resultant_risk"]["tolerability"] == "Acceptable"
         # NOT persisted.
-        stored = mock_firebase_and_auth.collection("tenants").document("test-airline").collection("hazards").get()
-        assert all(d.to_dict().get("sram_data") is None for d in stored)
+        row = _hazard_row(hazard_id)
+        assert row is not None
+        assert row.sram_data is None
 
     def test_calculate_404_for_missing_hazard(self, client):
         payload = {"severity": {"pax": 0, "worker": 0, "quality": 0, "asset": 0, "rep": 0, "sec": 0, "env": 0}}
@@ -428,11 +456,11 @@ class TestSramSaveEndpoint:
         assert data["risk_level"] == "Low"
         assert data["risk_outcome"] == "Acceptable"
 
-        stored = mock_firebase_and_auth.collection("tenants").document("test-airline").collection("hazards").get()
-        saved = next(d.to_dict() for d in stored if d.id == hazard_id)
-        assert saved["analysis_mode"] == "BOWTIE_SRAM"
-        assert saved["sram_data"]["barriers"]["ncb"][0]["bsv"] == 4
-        assert saved["srm_status"] == "Conducted"
+        row = _hazard_row(hazard_id)
+        assert row is not None
+        assert row.analysis_mode == "BOWTIE_SRAM"
+        assert row.sram_data["barriers"]["ncb"][0]["bsv"] == 4
+        assert row.srm_status == "Conducted"
 
     def test_save_rejects_inconsistent_severity(self, client, mock_firebase_and_auth):
         hazard_id, _ = _create_hazard(client, mock_firebase_and_auth)

@@ -1,11 +1,37 @@
+# ==============================================================================
+# File: backend/app/services/can_cap_service.py
+# Description: Multi-tenant repository and business logic for Corrective Action
+#              Notices (CAN) and Corrective Action Plans (CAP), backed by
+#              PostgreSQL (Supabase).
+#
+#              CanCapService(tenant_id) preserves the legacy sync API used by
+#              the mounted can_cap router. Every method keeps its old
+#              signature / return-shape (dicts with the Firestore-era keys the
+#              route response helpers read) but persists to the `cans`/`caps`
+#              tables via the async engine, dispatching through app.db.runner.
+#
+#              cans.hazard_id is a NOT NULL FK into hazards.id. CAN payloads
+#              carry a business hazard reference (hazard_id text like
+#              "T1-HZ-ORG-01-26" or an opaque id). The reference is resolved to
+#              the linked hazard row; an unresolved reference auto-creates a
+#              minimal stub hazard row so issuance stays faithful to the legacy
+#              behaviour of storing whatever reference the client sent.
+# ==============================================================================
+
+import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 from loguru import logger
+from sqlalchemy import or_, select
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.db.db_models import Can, Cap, Hazard
+from app.db.ids import register_tenant, tenant_slug
+from app.db.isolation import demo_scope
+from app.db.runner import run
+from app.db.session import session_scope
 from app.services.hazard_service import HazardService
-from app.services.users import get_user_department
 from app.services.repository import coerce_utc_datetime
 from app.services.risk_matrix import (
     compute_risk_index,
@@ -13,8 +39,14 @@ from app.services.risk_matrix import (
     risk_outcome,
     get_thresholds,
     get_tolerability_tier,
-    normalize_tolerability,
 )
+from app.services.users import get_user_department
+
+
+def _dt(value: Any):
+    """Coerce a payload timestamp (datetime or ISO string) to an aware datetime
+    for asyncpg timestamptz columns (it rejects raw strings)."""
+    return coerce_utc_datetime(value)
 
 
 CAN_COLLECTION = "can_cap"
@@ -29,42 +61,179 @@ def generate_cap_reference(can_reference: str, sequence: int) -> str:
     return f"{can_reference}-CAP-{sequence:03d}"
 
 
+_CAN_FIXED_COLUMNS = {"id", "tenant_id", "hazard_id", "can_reference", "is_demo", "created_at", "updated_at"}
+_CAN_MUTABLE_COLUMNS = [
+    c.name for c in Can.__table__.columns if c.name not in _CAN_FIXED_COLUMNS
+]
+_CAP_FIXED_COLUMNS = {
+    "id", "tenant_id", "can_id", "cap_reference", "is_demo", "created_at", "updated_at",
+    "submitted_by", "submitted_by_uid",
+}
+_CAP_MUTABLE_COLUMNS = [
+    c.name for c in Cap.__table__.columns if c.name not in _CAP_FIXED_COLUMNS
+]
+_CAP_JSONB_COLUMNS = {
+    "managerial_approval", "caa_acceptance", "residual_sra", "root_causes",
+    "action_items", "sram_data",
+}
+_CAN_JSONB_COLUMNS = {"initial_sra"}
+
+from sqlalchemy import DateTime
+
+_CAN_DT_COLUMNS = {
+    c.name for c in Can.__table__.columns if isinstance(c.type, DateTime)
+}
+_CAP_DT_COLUMNS = {
+    c.name for c in Cap.__table__.columns if isinstance(c.type, DateTime)
+}
+
+_TIME_KEYS = (
+    "created_at", "updated_at", "issued_at", "submitted_at", "reviewed_at",
+    "target_completion_date", "revision_deadline", "sag_signed_at", "closed_at",
+    "ae_signed_at", "ae_review_date", "escalated_at",
+)
+
+
+def _serialize_timestamps(data: dict) -> None:
+    for key in _TIME_KEYS:
+        if key in data and hasattr(data[key], "isoformat"):
+            data[key] = data[key].isoformat()
+
+
+def _json_safe(value: Any) -> Any:
+    """Deep-convert datetimes inside dict/list payloads to ISO strings so the
+    JSONB bind processor can serialise them (json.dumps cannot handle datetime)."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return str(value)
+
+
+def _can_to_dict(row: Can, hazard_id_ref: Optional[str] = None) -> dict:
+    data = {}
+    for col in Can.__table__.columns:
+        value = getattr(row, col.name)
+        if isinstance(value, uuid.UUID):
+            value = str(value)
+        data[col.name] = value
+    data["tenant_id"] = tenant_slug(row.tenant_id)
+    data["hazard_id"] = hazard_id_ref or str(row.hazard_id)
+    _serialize_timestamps(data)
+    return data
+
+
+def _cap_to_dict(
+    row: Cap,
+    can_row: Optional[Can] = None,
+    hazard_id_ref: Optional[str] = None,
+) -> dict:
+    data = {}
+    for col in Cap.__table__.columns:
+        value = getattr(row, col.name)
+        if isinstance(value, uuid.UUID):
+            value = str(value)
+        data[col.name] = value
+    data["tenant_id"] = tenant_slug(row.tenant_id)
+    if can_row is not None:
+        data["can_reference"] = can_row.can_reference
+        data["can_issued_at"] = (
+            can_row.issued_at.isoformat() if getattr(can_row, "issued_at", None) else None
+        )
+        data["priority"] = can_row.priority
+        data["hazard_id"] = hazard_id_ref or str(can_row.hazard_id)
+    _serialize_timestamps(data)
+    return data
+
+
+def _can_lookup_stmt(tid: Optional[str], can_id: str):
+    conds = [Can.can_reference == str(can_id)]
+    try:
+        conds.append(Can.id == uuid.UUID(str(can_id)))
+    except (ValueError, TypeError, AttributeError):
+        pass
+    scope = [Can.is_demo == demo_scope()]
+    if tid:
+        return select(Can).where(Can.tenant_id == tid, *scope, or_(*conds)).limit(1)
+    return select(Can).where(*scope, or_(*conds)).limit(1)
+
+
+def _cap_lookup_stmt(tid: Optional[str], cap_id: str):
+    conds = [Cap.cap_reference == str(cap_id)]
+    try:
+        conds.append(Cap.id == uuid.UUID(str(cap_id)))
+    except (ValueError, TypeError, AttributeError):
+        pass
+    scope = [Cap.is_demo == demo_scope()]
+    if tid:
+        return select(Cap).where(Cap.tenant_id == tid, *scope, or_(*conds)).limit(1)
+    return select(Cap).where(*scope, or_(*conds)).limit(1)
+
+
+async def _resolve_hazard(session, tid: str, ref: str, now: datetime) -> Hazard:
+    """Resolve a business hazard reference to a Hazard row, auto-creating a
+    minimal stub when the reference does not exist (the legacy service stored
+    whatever reference the CAN payload carried)."""
+    ref = str(ref or "").strip()
+    conds: list = []
+    if ref:
+        conds.append(Hazard.hazard_id == ref)
+        try:
+            conds.append(Hazard.id == uuid.UUID(ref))
+        except (ValueError, TypeError, AttributeError):
+            pass
+    if conds:
+        row = (
+            await session.execute(
+                select(Hazard).where(
+                    Hazard.tenant_id == tid,
+                    Hazard.is_demo == demo_scope(),
+                    or_(*conds),
+                ).limit(1)
+            )
+        ).scalars().first()
+        if row:
+            return row
+
+    stub_ref = ref or f"CAN-STUB-{uuid.uuid4().hex[:8]}"
+    stub = Hazard(
+        tenant_id=tid,
+        hazard_id=stub_ref,
+        title=f"Linked hazard reference {stub_ref}",
+        description=(
+            f"Auto-created hazard for a CAN issued against the unresolved "
+            f"reference '{ref}'. Complete the details from the associated CAN."
+        ),
+        source="CAN",
+        source_id=stub_ref,
+        taxonomy="Other",
+        priority="M",
+        status="Open",
+        is_demo=demo_scope(),
+        created_by="system",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(stub)
+    await session.flush()
+    return stub
+
+
+async def _hazard_ref(session, can_row: Can) -> str:
+    """Business hazard_id text echoed on serialised CAN/CAP output."""
+    hazard = (
+        await session.execute(select(Hazard).where(Hazard.id == can_row.hazard_id))
+    ).scalars().first()
+    return hazard.hazard_id if hazard else str(can_row.hazard_id)
+
+
 class CanCapService:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
-
-    def _can_collection(self):
-        return get_tenant_collection(self.tenant_id, CAN_COLLECTION)
-
-    def _caps_collection(self, can_doc_id: str):
-        return self._can_collection().document(can_doc_id).collection(CAP_SUBCOLLECTION)
-
-    def _get_next_can_sequence(self) -> int:
-        try:
-            docs = self._can_collection().get()
-            max_seq = 0
-            for doc in docs:
-                data = doc.to_dict()
-                ref = data.get("can_reference", "")
-                if ref.startswith("CAN-"):
-                    try:
-                        seq = int(ref.split("-")[1])
-                        if seq > max_seq:
-                            max_seq = seq
-                    except (IndexError, ValueError):
-                        pass
-            return max_seq + 1
-        except Exception as e:
-            logger.error(f"Failed to get next CAN sequence: {e}")
-            return 1
-
-    def _get_next_cap_sequence(self, can_doc_id: str, can_reference: str) -> int:
-        try:
-            docs = self._caps_collection(can_doc_id).get()
-            return len(docs) + 1
-        except Exception as e:
-            logger.warning(f"Failed to get next CAP sequence: {e}")
-            return 1
 
     # ── SRA (Safety Risk Assessment) helpers ──
 
@@ -113,881 +282,697 @@ class CanCapService:
     # ── CAN CRUD ──
 
     def issue_can(self, payload: dict, user: dict) -> dict:
+        return run(self._issue_can_async(payload, user))
+
+    async def _issue_can_async(self, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
-        sequence = self._get_next_can_sequence()
-        can_reference = generate_can_reference(self.tenant_id, sequence)
+        tid = register_tenant(self.tenant_id)
 
-        doc_data = {
-            "can_reference": can_reference,
-            "hazard_id": payload["hazard_id"],
-            "title": payload["title"],
-            "description": payload["description"],
-            "required_action": payload["required_action"],
-            "target_completion_date": payload["target_completion_date"],
-            "assigned_to": payload["assigned_to"],
-            "assigned_to_uid": payload.get("assigned_to_uid", ""),
-            "department": payload.get("department")
-            or (
-                get_user_department(
-                    uid=payload.get("assigned_to_uid"), email=payload.get("assigned_to")
+        async with session_scope() as session:
+            refs = (
+                await session.scalars(
+                    select(Can.can_reference).where(
+                        Can.tenant_id == tid,
+                        Can.is_demo == demo_scope(),
+                    )
                 )
-                if payload.get("assigned_to_uid") or payload.get("assigned_to")
-                else ""
-            ),
-            "priority": payload["priority"],
-            "status": "Open",
-            "issued_by": user.get("email", user["uid"]),
-            "issued_by_uid": user["uid"],
-            "issued_at": now,
-            "tenant_id": self.tenant_id,
-            "created_by": user["uid"],
-            "created_at": now,
-            "updated_at": now,
-            # Buddha Air FORM SMSM 8.8.2 — CAN issuance block (all optional)
-            "copies_to": payload.get("copies_to"),
-            "requested_function": payload.get("requested_function"),
-            "addressed_function": payload.get("addressed_function"),
-            "initial_severity": payload.get("initial_severity"),
-            "initial_probability": payload.get("initial_probability"),
-            "initial_risk_index": payload.get("initial_risk_index"),
-            "initial_risk_level": payload.get("initial_risk_level"),
-            "initial_risk_outcome": payload.get("initial_risk_outcome"),
-            "initial_tolerability_tier": payload.get("initial_tolerability_tier"),
-            "initial_sra": payload.get("initial_sra"),
-            "classification_type": payload.get("classification_type"),
-            "classification_level": payload.get("classification_level"),
-        }
+            ).all()
+            max_seq = 0
+            for ref in refs:
+                if ref.startswith("CAN-"):
+                    try:
+                        seq = int(ref.split("-")[1])
+                        if seq > max_seq:
+                            max_seq = seq
+                    except (IndexError, ValueError):
+                        pass
+            can_reference = generate_can_reference(self.tenant_id, max_seq + 1)
 
-        # Server-side SRA canonicalisation: recompute index/level/outcome from the
-        # tenant's configured risk matrix thresholds; never trust the client.
-        initial_sra = self._sra_block(
-            payload.get("initial_severity"),
-            payload.get("initial_probability"),
-            assessed_by=user.get("email", user["uid"]),
-            assessed_at=now,
-            provided=payload.get("initial_sra"),
-        )
-        if initial_sra:
-            doc_data["initial_sra"] = initial_sra
-            doc_data["initial_severity"] = initial_sra["severity"]
-            doc_data["initial_probability"] = initial_sra["probability"]
-            doc_data["initial_risk_index"] = initial_sra["risk_index"]
-            doc_data["initial_risk_level"] = initial_sra["risk_level"]
-            doc_data["initial_risk_outcome"] = initial_sra["risk_outcome"]
-            doc_data["initial_tolerability_tier"] = initial_sra["tolerability_tier"]
-        elif payload.get("initial_risk_index"):
-            # Back-compat: legacy clients that only sent an index get a level too.
-            thresholds = get_thresholds(self.tenant_id)
-            doc_data["initial_risk_level"] = get_risk_level(payload["initial_risk_index"], thresholds)
-            doc_data["initial_risk_outcome"] = risk_outcome(
-                payload.get("initial_severity") or 1,
-                payload.get("initial_probability") or 1,
-                thresholds,
+            hazard = await _resolve_hazard(session, tid, payload["hazard_id"], now)
+
+            severity = payload.get("initial_severity")
+            probability = payload.get("initial_probability")
+            initial_sra = self._sra_block(
+                severity,
+                probability,
+                assessed_by=user.get("email", user["uid"]),
+                assessed_at=now,
+                provided=payload.get("initial_sra"),
             )
-            doc_data["initial_tolerability_tier"] = get_tolerability_tier(payload["initial_risk_index"], thresholds)
 
-        try:
-            ref = self._can_collection().add(doc_data)
-            doc_id = ref[1].id
-            doc_data["id"] = doc_id
-            logger.info(f"CAN {can_reference} issued by {user['uid']}")
+            init = {
+                "initial_severity": severity,
+                "initial_probability": probability,
+                "initial_risk_index": payload.get("initial_risk_index"),
+                "initial_risk_level": payload.get("initial_risk_level"),
+                "initial_risk_outcome": payload.get("initial_risk_outcome"),
+                "initial_tolerability_tier": payload.get("initial_tolerability_tier"),
+                "initial_sra": _json_safe(payload.get("initial_sra")),
+            }
+            if initial_sra:
+                init["initial_severity"] = initial_sra["severity"]
+                init["initial_probability"] = initial_sra["probability"]
+                init["initial_risk_index"] = initial_sra["risk_index"]
+                init["initial_risk_level"] = initial_sra["risk_level"]
+                init["initial_risk_outcome"] = initial_sra["risk_outcome"]
+                init["initial_tolerability_tier"] = initial_sra["tolerability_tier"]
+                init["initial_sra"] = _json_safe(initial_sra)
+            elif payload.get("initial_risk_index"):
+                # Back-compat: legacy clients that only sent an index get a level too.
+                thresholds = get_thresholds(self.tenant_id)
+                init["initial_risk_level"] = get_risk_level(payload["initial_risk_index"], thresholds)
+                init["initial_risk_outcome"] = risk_outcome(
+                    payload.get("initial_severity") or 1,
+                    payload.get("initial_probability") or 1,
+                    thresholds,
+                )
+                init["initial_tolerability_tier"] = get_tolerability_tier(
+                    payload["initial_risk_index"], thresholds
+                )
+
+            row = Can(
+                tenant_id=tid,
+                can_reference=can_reference,
+                hazard_id=hazard.id,
+                title=payload["title"],
+                description=payload["description"],
+                required_action=payload["required_action"],
+                target_completion_date=_dt(payload["target_completion_date"]),
+                assigned_to=payload["assigned_to"],
+                assigned_to_uid=payload.get("assigned_to_uid") or "",
+                department=payload.get("department")
+                or (
+                    get_user_department(
+                        uid=payload.get("assigned_to_uid"), email=payload.get("assigned_to")
+                    )
+                    if payload.get("assigned_to_uid") or payload.get("assigned_to")
+                    else ""
+                ),
+                priority=payload["priority"],
+                status="Open",
+                is_demo=demo_scope(),
+                issued_by=user.get("email", user["uid"]),
+                issued_by_uid=user["uid"],
+                issued_at=now,
+                created_by=user["uid"],
+                created_at=now,
+                updated_at=now,
+                # Buddha Air FORM SMSM 8.8.2 — CAN issuance block (all optional)
+                copies_to=payload.get("copies_to"),
+                requested_function=payload.get("requested_function"),
+                addressed_function=payload.get("addressed_function"),
+                classification_type=payload.get("classification_type"),
+                classification_level=payload.get("classification_level"),
+                **init,
+            )
+            session.add(row)
+            await session.flush()
 
             # Update hazard status to Processing
-            self._update_hazard_status(payload["hazard_id"], "Processing")
+            await self._set_hazard_status(session, hazard.id, "Processing", now)
 
-            return doc_data
-        except Exception as e:
-            logger.error(f"Failed to issue CAN: {e}")
-            raise
+            data = _can_to_dict(row, hazard_id_ref=hazard.hazard_id)
+        data["id"] = str(row.id)
+        logger.info(f"CAN {can_reference} issued by {user['uid']}")
+        return data
+
+    async def _set_hazard_status(
+        self, session, hazard_id: uuid.UUID, status: str, now: datetime
+    ):
+        hazard = (
+            await session.execute(select(Hazard).where(Hazard.id == hazard_id))
+        ).scalars().first()
+        if not hazard:
+            return
+        hazard.status = status
+        hazard.updated_at = now
 
     def get_can(self, can_id: str, user: dict) -> Optional[dict]:
-        try:
-            # Optimized: direct where + doc lookup
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                base = get_cross_tenant_collection(CAN_COLLECTION)
-            else:
-                base = self._can_collection()
-            # Try where can_reference
-            for field in ["can_reference", "__name__"]:
-                try:
-                    q = base.where(field, "==", can_id).limit(1)
-                    docs = list(q.get())
-                    if docs:
-                        doc = docs[0]
-                        data = doc.to_dict()
-                        data["id"] = doc.id
-                        self._serialize_timestamps(data)
-                        try:
-                            caps = doc.reference.collection(CAP_SUBCOLLECTION).order_by("created_at", direction="DESCENDING").limit(1).get()
-                            if caps:
-                                cap_data = caps[0].to_dict()
-                                cap_data["id"] = caps[0].id
-                                self._serialize_timestamps(cap_data)
-                                data["latest_cap"] = cap_data
-                        except Exception:
-                            pass
-                        return data
-                except Exception:
-                    continue
-            # Fallback scan limited
-            docs = list(base.limit(500).get())
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == can_id or data.get("can_reference") == can_id:
-                    data["id"] = doc.id
-                    self._serialize_timestamps(data)
-                    try:
-                        caps = doc.reference.collection(CAP_SUBCOLLECTION).order_by("created_at", direction="DESCENDING").limit(1).get()
-                        if caps:
-                            cap_data = caps[0].to_dict()
-                            cap_data["id"] = caps[0].id
-                            self._serialize_timestamps(cap_data)
-                            data["latest_cap"] = cap_data
-                    except Exception:
-                        pass
-                    return data
-            return None
-        except Exception as e:
-            logger.error(f"Failed to get CAN {can_id}: {e}")
-            raise
+        return run(self._get_can_async(can_id, user))
+
+    async def _get_can_async(self, can_id: str, user: dict) -> Optional[dict]:
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not row:
+                return None
+            cap_row = (
+                await session.scalars(
+                    select(Cap)
+                    .where(Cap.can_id == row.id)
+                    .order_by(Cap.created_at.desc())
+                    .limit(1)
+                )
+            ).first()
+            hazard_ref = await _hazard_ref(session, row)
+            data = _can_to_dict(row, hazard_id_ref=hazard_ref)
+            data["latest_cap"] = None
+            if cap_row:
+                data["latest_cap"] = _cap_to_dict(
+                    cap_row, can_row=row, hazard_id_ref=hazard_ref
+                )
+            return data
 
     def list_cans(self, user: dict, filters: dict = None) -> List[dict]:
+        return run(self._list_cans_async(user, filters))
+
+    async def _list_cans_async(self, user: dict, filters: dict = None) -> List[dict]:
+        filters = filters or {}
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+
         try:
-            filters = filters or {}
-            # Build DB-level where for exact matches; days/search remain Python
-            def _build_query(base):
-                q = base
-                for key, field in [("status", "status"), ("priority", "priority"), ("assigned_to", "assigned_to"), ("department", "department"), ("hazard_id", "hazard_id")]:
-                    val = filters.get(key)
-                    if val:
-                        try:
-                            q = q.where(field, "==", val)
-                        except Exception as e:
-                            logger.warning(f"CAN list_cans DB where failed for {field}: {e}")
-                # Time filter: days -> created_at >= cutoff at DB if possible
-                if filters.get("days"):
-                    try:
-                        cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
-                        q = q.where("created_at", ">=", cutoff)
-                    except Exception:
-                        pass
-                return q
-
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                base = get_cross_tenant_collection(CAN_COLLECTION)
-            else:
-                base = self._can_collection()
-
-            # Limit handling
             limit = min(int(filters.get("limit") or filters.get("page_size") or 100), 500)
-            query = _build_query(base)
-            try:
-                from google.cloud.firestore import Query as FirestoreQuery
-                query = query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(limit)
-            except Exception as e:
-                logger.warning(f"CAN list_cans order/limit failed: {e}")
+        except (TypeError, ValueError):
+            limit = 100
+
+        stmt = (
+            select(Can)
+            .join(Hazard, Can.hazard_id == Hazard.id)
+            .where(Can.is_demo == demo_scope(), Hazard.is_demo == demo_scope())
+        )
+        if tid:
+            stmt = stmt.where(Can.tenant_id == tid)
+            for key, column in [
+                ("status", Can.status),
+                ("priority", Can.priority),
+                ("assigned_to", Can.assigned_to),
+                ("department", Can.department),
+            ]:
+                val = filters.get(key)
+                if val:
+                    stmt = stmt.where(column == val)
+            if filters.get("hazard_id"):
+                stmt = stmt.where(Hazard.hazard_id == str(filters["hazard_id"]))
+            if filters.get("days"):
                 try:
-                    query = query.limit(limit)
-                except Exception:
+                    cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
+                    stmt = stmt.where(Can.created_at >= cutoff)
+                except (TypeError, ValueError):
                     pass
 
-            try:
-                docs = list(query.get())
-            except Exception as e:
-                logger.warning(f"CAN list_cans filtered query failed, fallback: {e}")
-                docs = list(base.limit(limit).get())
+        async with session_scope() as session:
+            rows = (
+                await session.execute(stmt.order_by(Can.created_at.desc()).limit(limit))
+            ).scalars().all()
+            ref_map: Dict[str, str] = {}
+            for r in rows:
+                ref_map[str(r.hazard_id)] = await _hazard_ref(session, r)
 
-            results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                # Python re-check for DB filters + search
-                if filters.get("days"):
-                    cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
-                    issued = coerce_utc_datetime(data.get("issued_at") or data.get("created_at"))
-                    if issued is None or issued < cutoff:
-                        continue
-                if filters.get("hazard_id") and data.get("hazard_id") != filters["hazard_id"]:
+        results = []
+        for row in rows:
+            data = _can_to_dict(row, hazard_id_ref=ref_map.get(str(row.hazard_id)))
+            if filters.get("search"):
+                s = filters["search"].lower()
+                ref = (data.get("can_reference") or "").lower()
+                title = (data.get("title") or "").lower()
+                if s not in ref and s not in title:
                     continue
-                if filters.get("status") and data.get("status") != filters["status"]:
-                    continue
-                if filters.get("priority") and data.get("priority") != filters["priority"]:
-                    continue
-                if filters.get("assigned_to") and data.get("assigned_to") != filters["assigned_to"]:
-                    continue
-                if filters.get("department") and (data.get("department") or "") != filters["department"]:
-                    continue
-                if filters.get("search"):
-                    s = filters["search"].lower()
-                    ref = (data.get("can_reference") or "").lower()
-                    title = (data.get("title") or "").lower()
-                    if s not in ref and s not in title:
-                        continue
-                self._serialize_timestamps(data)
-                results.append(data)
-
-            # If query had order, keep; else sort
-            results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
-            return results
-        except Exception as e:
-            logger.error(f"Failed to list CANs: {e}")
-            raise
+            results.append(data)
+        return results
 
     def update_can(self, can_id: str, payload: dict, user: dict) -> Optional[dict]:
-        try:
-            docs = self._can_collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == can_id or data.get("can_reference") == can_id:
-                    target_id = doc.id
-                    break
+        return run(self._update_can_async(can_id, payload, user))
 
-            if not target_id:
+    async def _update_can_async(self, can_id: str, payload: dict, user: dict) -> Optional[dict]:
+        tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not row:
                 return None
 
-            ref = self._can_collection().document(target_id)
             if "assigned_to" in payload or "assigned_to_uid" in payload:
-                current = ref.get().to_dict() or {}
-                new_uid = payload.get("assigned_to_uid", current.get("assigned_to_uid"))
-                new_email = payload.get("assigned_to", current.get("assigned_to"))
+                new_uid = payload.get("assigned_to_uid", row.assigned_to_uid)
+                new_email = payload.get("assigned_to", row.assigned_to)
                 payload["department"] = get_user_department(uid=new_uid, email=new_email)
-            payload["updated_at"] = datetime.now(timezone.utc)
-            ref.update(payload)
 
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
-            return updated
-        except Exception as e:
-            logger.error(f"Failed to update CAN {can_id}: {e}")
-            raise
+            for key, value in payload.items():
+                if key in _CAN_MUTABLE_COLUMNS:
+                    if key in _CAN_JSONB_COLUMNS:
+                        value = _json_safe(value)
+                    elif key in _CAN_DT_COLUMNS:
+                        value = _dt(value)
+                    setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return _can_to_dict(row, hazard_id_ref=await _hazard_ref(session, row))
 
     def update_can_status(self, can_id: str, status: str, user: dict) -> Optional[dict]:
-        try:
-            docs = self._can_collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == can_id or data.get("can_reference") == can_id:
-                    target_id = doc.id
-                    break
+        return run(self._update_can_status_async(can_id, status, user))
 
-            if not target_id:
+    async def _update_can_status_async(
+        self, can_id: str, status: str, user: dict
+    ) -> Optional[dict]:
+        tid = register_tenant(self.tenant_id)
+        now = datetime.now(timezone.utc)
+        async with session_scope() as session:
+            row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not row:
                 return None
-
-            ref = self._can_collection().document(target_id)
-            now = datetime.now(timezone.utc)
-            ref.update({"status": status, "updated_at": now})
-
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
-            return updated
-        except Exception as e:
-            logger.error(f"Failed to update CAN status {can_id}: {e}")
-            raise
+            row.status = status
+            row.updated_at = now
+            await session.flush()
+            return _can_to_dict(row, hazard_id_ref=await _hazard_ref(session, row))
 
     def delete_can(self, can_id: str) -> bool:
-        try:
-            docs = self._can_collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == can_id or data.get("can_reference") == can_id:
-                    target_id = doc.id
-                    break
+        return run(self._delete_can_async(can_id))
 
-            if not target_id:
+    async def _delete_can_async(self, can_id: str) -> bool:
+        tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not row:
                 return False
-
-            # Delete CAP sub-collection first
-            caps = self._caps_collection(target_id).get()
-            for cap in caps:
-                cap.reference.delete()
-
-            self._can_collection().document(target_id).delete()
+            # Bulk delete caps first (no ORM relationship() exists, so the unit
+            # of work cannot order the deletes; explicit order avoids FK errors).
+            from sqlalchemy import delete as _sql_delete
+            await session.execute(_sql_delete(Cap).where(Cap.can_id == row.id))
+            await session.delete(row)
             logger.info(f"CAN {can_id} deleted")
             return True
-        except Exception as e:
-            logger.error(f"Failed to delete CAN {can_id}: {e}")
-            raise
 
     # ── CAP CRUD ──
 
     def submit_cap(self, can_id: str, payload: dict, user: dict) -> dict:
+        return run(self._submit_cap_async(can_id, payload, user))
+
+    async def _submit_cap_async(self, can_id: str, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
+        tid = register_tenant(self.tenant_id)
 
-        # Resolve CAN
-        docs = self._can_collection().get()
-        can_doc_id = None
-        can_ref = None
-        can_data = {}
-        for doc in docs:
-            data = doc.to_dict()
-            if doc.id == can_id or data.get("can_reference") == can_id:
-                can_doc_id = doc.id
-                can_ref = data.get("can_reference")
-                can_data = data
-                break
+        async with session_scope() as session:
+            can_row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not can_row:
+                raise ValueError("CAN not found")
 
-        if not can_doc_id:
-            raise ValueError("CAN not found")
+            existing = (await session.scalars(select(Cap).where(Cap.can_id == can_row.id))).all()
+            cap_reference = generate_cap_reference(can_row.can_reference, len(existing) + 1)
 
-        can_department = can_data.get("department", "")
-
-        sequence = self._get_next_cap_sequence(can_doc_id, can_ref)
-        cap_reference = generate_cap_reference(can_ref, sequence)
-
-        doc_data = {
-            "cap_reference": cap_reference,
-            "can_id": can_doc_id,
-            "can_reference": can_ref,
-            "tenant_id": self.tenant_id,
-            "department": payload.get("department") or can_department or "",
-            "action_plan": payload["action_plan"],
-            "timeline": payload["timeline"],
-            "resources_required": payload.get("resources_required"),
-            "implementation_plan": payload.get("implementation_plan"),
-            "target_completion_date": payload["target_completion_date"],
-            "status": "In Progress",
-            "submitted_by": user.get("email", user["uid"]),
-            "submitted_by_uid": user["uid"],
-            "submitted_at": now,
-            "created_at": now,
-            "updated_at": now,
-            # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)
-            "company_name": payload.get("company_name"),
-            "base_location": payload.get("base_location"),
-            "area_system_of_interest": payload.get("area_system_of_interest"),
-            "finding_number": payload.get("finding_number"),
-            "file_ref": payload.get("file_ref"),
-            "factual_review": payload.get("factual_review"),
-            "rca": payload.get("rca"),
-            "short_term_ca": payload.get("short_term_ca"),
-            "long_term_ca": payload.get("long_term_ca"),
-            "implementation_timeline": payload.get("implementation_timeline"),
-            "managerial_approval": payload.get("managerial_approval"),
-            "caa_acceptance": payload.get("caa_acceptance"),
-            "residual_severity": payload.get("residual_severity"),
-            "residual_probability": payload.get("residual_probability"),
-            "residual_risk_index": payload.get("residual_risk_index"),
-            "residual_risk_level": payload.get("residual_risk_level"),
-            "residual_risk_outcome": payload.get("residual_risk_outcome"),
-            "residual_tolerability_tier": payload.get("residual_tolerability_tier"),
-            "residual_sra": payload.get("residual_sra"),
-            # Structured RCA (Fishbone / Ishikawa 5M + Management)
-            "root_causes": payload.get("root_causes") or None,
-            "action_items": payload.get("action_items") or None,
-            # Selected RCA methodology ('bow_tie' | 'fishbone')
-            "rca_method": payload.get("rca_method"),
-            "process_owner": payload.get("process_owner"),
-            # CAAN CAR-19 SRM (Bow-Tie) block
-            "sram_data": payload.get("sram_data") or None,
-        }
-
-        # Server-side Residual SRA canonicalisation.
-        residual_sra = self._sra_block(
-            payload.get("residual_severity"),
-            payload.get("residual_probability"),
-            assessed_by=user.get("email", user["uid"]),
-            assessed_at=now,
-            provided=payload.get("residual_sra"),
-        )
-        if residual_sra:
-            doc_data["residual_sra"] = residual_sra
-            doc_data["residual_severity"] = residual_sra["severity"]
-            doc_data["residual_probability"] = residual_sra["probability"]
-            doc_data["residual_risk_index"] = residual_sra["risk_index"]
-            doc_data["residual_risk_level"] = residual_sra["risk_level"]
-            doc_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
-            doc_data["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
-        elif payload.get("residual_risk_index"):
-            thresholds = get_thresholds(self.tenant_id)
-            doc_data["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
-            doc_data["residual_risk_outcome"] = risk_outcome(
-                payload.get("residual_severity") or 1,
-                payload.get("residual_probability") or 1,
-                thresholds,
+            residual_sra = self._sra_block(
+                payload.get("residual_severity"),
+                payload.get("residual_probability"),
+                assessed_by=user.get("email", user["uid"]),
+                assessed_at=now,
+                provided=payload.get("residual_sra"),
             )
-            doc_data["residual_tolerability_tier"] = get_tolerability_tier(payload["residual_risk_index"], thresholds)
 
-        try:
-            ref = self._caps_collection(can_doc_id).add(doc_data)
-            cap_doc_id = ref[1].id
-            doc_data["id"] = cap_doc_id
-            logger.info(f"CAP {cap_reference} submitted for CAN {can_ref}")
+            res: Dict[str, Any] = {
+                "residual_severity": payload.get("residual_severity"),
+                "residual_probability": payload.get("residual_probability"),
+                "residual_risk_index": payload.get("residual_risk_index"),
+                "residual_risk_level": payload.get("residual_risk_level"),
+                "residual_risk_outcome": payload.get("residual_risk_outcome"),
+                "residual_tolerability_tier": payload.get("residual_tolerability_tier"),
+                "residual_sra": _json_safe(payload.get("residual_sra")),
+            }
+            if residual_sra:
+                res["residual_severity"] = residual_sra["severity"]
+                res["residual_probability"] = residual_sra["probability"]
+                res["residual_risk_index"] = residual_sra["risk_index"]
+                res["residual_risk_level"] = residual_sra["risk_level"]
+                res["residual_risk_outcome"] = residual_sra["risk_outcome"]
+                res["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
+                res["residual_sra"] = _json_safe(residual_sra)
+            elif payload.get("residual_risk_index"):
+                thresholds = get_thresholds(self.tenant_id)
+                res["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
+                res["residual_risk_outcome"] = risk_outcome(
+                    payload.get("residual_severity") or 1,
+                    payload.get("residual_probability") or 1,
+                    thresholds,
+                )
+                res["residual_tolerability_tier"] = get_tolerability_tier(
+                    payload["residual_risk_index"], thresholds
+                )
+
+            rca_method = payload.get("rca_method")
+            if rca_method not in ("bow_tie", "fishbone"):
+                rca_method = None
+
+            row = Cap(
+                tenant_id=tid,
+                can_id=can_row.id,
+                cap_reference=cap_reference,
+                department=payload.get("department") or can_row.department or "",
+                action_plan=payload["action_plan"],
+                timeline=payload["timeline"],
+                resources_required=payload.get("resources_required") or "",
+                implementation_plan=payload.get("implementation_plan") or "",
+                target_completion_date=_dt(payload["target_completion_date"]),
+                status="In Progress",
+                is_demo=demo_scope(),
+                submitted_by=user.get("email", user["uid"]),
+                submitted_by_uid=user["uid"],
+                submitted_at=now,
+                created_at=now,
+                updated_at=now,
+                # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)
+                company_name=payload.get("company_name"),
+                base_location=payload.get("base_location"),
+                area_system_of_interest=payload.get("area_system_of_interest"),
+                finding_number=payload.get("finding_number"),
+                file_ref=payload.get("file_ref"),
+                factual_review=payload.get("factual_review"),
+                rca=payload.get("rca"),
+                short_term_ca=payload.get("short_term_ca"),
+                long_term_ca=payload.get("long_term_ca"),
+                implementation_timeline=payload.get("implementation_timeline"),
+                managerial_approval=_json_safe(payload.get("managerial_approval")),
+                caa_acceptance=_json_safe(payload.get("caa_acceptance")),
+                # Structured RCA (Fishbone / Ishikawa 5M + Management)
+                root_causes=_json_safe(payload.get("root_causes")),
+                action_items=_json_safe(payload.get("action_items")),
+                # Selected RCA methodology ('bow_tie' | 'fishbone')
+                rca_method=rca_method,
+                process_owner=payload.get("process_owner"),
+                # CAAN CAR-19 SRM (Bow-Tie) block
+                sram_data=_json_safe(payload.get("sram_data")),
+                **res,
+            )
+            session.add(row)
+            await session.flush()
 
             # Update CAN status to Under Review
-            self._can_collection().document(can_doc_id).update({
-                "status": "Under Review",
-                "updated_at": now,
-            })
+            can_row.status = "Under Review"
+            can_row.updated_at = now
 
-            return doc_data
-        except Exception as e:
-            logger.error(f"Failed to submit CAP: {e}")
-            raise
+            data = _cap_to_dict(row, can_row=can_row, hazard_id_ref=await _hazard_ref(session, can_row))
+            logger.info(f"CAP {cap_reference} submitted for CAN {can_row.can_reference}")
+        data["id"] = str(row.id)
+        return data
 
     def list_caps(self, can_id: str, user: dict) -> List[dict]:
-        try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                docs = self._can_collection().get()
-            can_doc = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == can_id or data.get("can_reference") == can_id:
-                    can_doc = doc
-                    break
+        return run(self._list_caps_async(can_id, user))
 
-            if not can_doc:
+    async def _list_caps_async(self, can_id: str, user: dict) -> List[dict]:
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            can_row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+            if not can_row:
                 return []
-
-            caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
-            results = []
-            for cap in caps:
-                data = cap.to_dict()
-                data["id"] = cap.id
-                self._serialize_timestamps(data)
-                results.append(data)
-
-            results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
-            return results
-        except Exception as e:
-            logger.error(f"Failed to list CAPs for CAN {can_id}: {e}")
-            raise
+            rows = (
+                await session.scalars(
+                    select(Cap).where(Cap.can_id == can_row.id).order_by(Cap.created_at.desc())
+                )
+            ).all()
+            hazard_ref = await _hazard_ref(session, can_row)
+            return [
+                _cap_to_dict(r, can_row=can_row, hazard_id_ref=hazard_ref)
+                for r in rows
+            ]
 
     def list_all_caps(self, user: dict, filters: dict = None) -> List[dict]:
-        """List every CAP across the tenant's CANs, joined with the parent CAN
-        (reference + issued date) so pages can show 'date CAN received' and the
-        CAN a CAP refers to without an extra round-trip.
+        return run(self._list_all_caps_async(user, filters))
 
-        Optimized: single collection_group query for CAPs when tenant_id is present,
-        bounded limits, DB-level where for status/department/days.
-        """
+    async def _list_all_caps_async(self, user: dict, filters: dict = None) -> List[dict]:
+        filters = filters or {}
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+
         try:
-            filters = filters or {}
-            status_f = filters.get("status")
-            can_id_f = filters.get("can_id")
-            department_f = filters.get("department")
-            days_f = filters.get("days")
-            search = (filters.get("search") or "").lower()
-
-            cutoff = None
-            if days_f:
-                try:
-                    cutoff = datetime.now(timezone.utc) - timedelta(days=int(days_f))
-                except Exception:
-                    cutoff = None
-
             limit = min(int(filters.get("limit") or filters.get("page_size") or 100), 500)
+        except (TypeError, ValueError):
+            limit = 100
 
-            # Try optimized collection_group path for CAPs if not filtering by specific can_id (which needs parent join)
-            use_group = not can_id_f
-            caps_via_group: List[Any] = []
-            if use_group:
-                try:
-                    from app.firebase import get_db
-                    db = get_db()
-                    q = db.collection_group(CAP_SUBCOLLECTION)
-                    if not (user.get("role") in settings.CROSS_TENANT_ROLES):
-                        # Tenant isolation via tenant_id field (new caps)
-                        try:
-                            q = q.where("tenant_id", "==", self.tenant_id)
-                        except Exception:
-                            pass
-                    if status_f:
-                        q = q.where("status", "==", status_f)
-                    if department_f:
-                        q = q.where("department", "==", department_f)
-                    if cutoff is not None:
-                        q = q.where("created_at", ">=", cutoff)
-                    from google.cloud.firestore import Query as FirestoreQuery
-                    q = q.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(limit)
-                    caps_via_group = list(q.get())
-                    # If group returned results, join with CAN map
-                    if caps_via_group:
-                        # Build CAN map for join (limited fetch)
-                        if user.get("role") in settings.CROSS_TENANT_ROLES:
-                            can_docs = list(get_cross_tenant_collection(CAN_COLLECTION).limit(500).get())
-                        else:
-                            can_docs = list(self._can_collection().limit(500).get())
-                        can_map = {c.id: c.to_dict() for c in can_docs}
-                        # Also map by can_reference
-                        can_ref_map = {v.get("can_reference"): v for k, v in can_map.items() if v.get("can_reference")}
-                        results = []
-                        for cap in caps_via_group:
-                            data = cap.to_dict()
-                            data["id"] = cap.id
-                            # Resolve parent CAN
-                            parent_id = data.get("can_id") or ""
-                            parent_data = can_map.get(parent_id) or {}
-                            if not parent_data and data.get("can_reference"):
-                                parent_data = can_ref_map.get(data["can_reference"], {})
-                                if parent_data:
-                                    # Find id
-                                    for cid, cd in can_map.items():
-                                        if cd.get("can_reference") == data.get("can_reference"):
-                                            parent_id = cid
-                                            break
-                            # Fallback via path
-                            if not parent_data:
-                                try:
-                                    path = getattr(cap.reference, "path", "") or ""
-                                    if "/can_cap/" in str(path):
-                                        cand = str(path).split("/can_cap/")[1].split("/")[0]
-                                        parent_data = can_map.get(cand, {})
-                                        if parent_data:
-                                            parent_id = cand
-                                except Exception:
-                                    pass
-                            data["can_id"] = parent_id
-                            data["can_reference"] = parent_data.get("can_reference", "")
-                            can_issued = parent_data.get("issued_at")
-                            if hasattr(can_issued, "isoformat"):
-                                can_issued = can_issued.isoformat()
-                            data["can_issued_at"] = can_issued
-                            data["hazard_id"] = parent_data.get("hazard_id", "")
-                            data["priority"] = parent_data.get("priority", "")
-                            dept = data.get("department") or parent_data.get("department", "")
-                            data["department"] = dept
-                            if department_f and (dept or "") != department_f:
-                                continue
-                            self._serialize_timestamps(data)
-                            if search:
-                                hay = " ".join(str(v) for v in [
-                                    data.get("cap_reference", ""),
-                                    data.get("can_reference", ""),
-                                    data.get("action_plan", ""),
-                                    data.get("status", ""),
-                                ]).lower()
-                                if search not in hay:
-                                    continue
-                            results.append(data)
-                        results.sort(key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min, reverse=True)
-                        return results[:limit]
-                except Exception as e:
-                    logger.warning(f"list_all_caps group query failed, fallback to per-CAN: {e}")
+        stmt = (
+            select(Cap, Can, Hazard)
+            .join(Can, Cap.can_id == Can.id)
+            .join(Hazard, Can.hazard_id == Hazard.id)
+            .where(
+                Cap.is_demo == demo_scope(),
+                Can.is_demo == demo_scope(),
+                Hazard.is_demo == demo_scope(),
+            )
+        )
+        if tid:
+            stmt = stmt.where(Cap.tenant_id == tid)
+        if filters.get("status"):
+            stmt = stmt.where(Cap.status == filters["status"])
+        if filters.get("department"):
+            dept = str(filters["department"])
+            stmt = stmt.where(
+                or_(Cap.department == dept, Can.department == dept)
+            )
+        can_id_f = filters.get("can_id")
+        if can_id_f:
+            conds = [Can.can_reference == str(can_id_f)]
+            try:
+                conds.append(Can.id == uuid.UUID(str(can_id_f)))
+            except (ValueError, TypeError, AttributeError):
+                pass
+            stmt = stmt.where(Cap.can_id.in_(
+                select(Can.id).where(
+                    or_(*conds),
+                    Can.is_demo == demo_scope(),
+                )
+            ))
+        if filters.get("days"):
+            try:
+                cutoff = datetime.now(timezone.utc) - timedelta(days=int(filters["days"]))
+                stmt = stmt.where(Cap.created_at >= cutoff)
+            except (TypeError, ValueError):
+                pass
 
-            # Fallback: bounded per-CAN (previous logic but limited)
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                base = get_cross_tenant_collection(CAN_COLLECTION)
-            else:
-                base = self._can_collection()
-            # For can_id filter, use where at DB
-            if can_id_f:
-                try:
-                    q = base.where("can_reference", "==", can_id_f).limit(1)
-                    docs = list(q.get())
-                    if not docs:
-                        q2 = base.limit(500)
-                        docs = [d for d in q2.get() if d.id == can_id_f]
-                    else:
-                        docs = docs
-                except Exception:
-                    docs = list(base.limit(500).get())
-                    docs = [d for d in docs if d.id == can_id_f or d.to_dict().get("can_reference") == can_id_f]
-            else:
-                # Apply department filter at DB for CAN level to reduce fan-out
-                try:
-                    q = base
-                    if department_f:
-                        q = q.where("department", "==", department_f)
-                    from google.cloud.firestore import Query as FirestoreQuery
-                    q = q.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(min(100, limit))
-                    docs = list(q.get())
-                except Exception:
-                    docs = list(base.limit(min(100, limit)).get())
-
+        async with session_scope() as session:
+            rows = (
+                await session.execute(stmt.order_by(Cap.created_at.desc()).limit(limit))
+            ).all()
             results = []
-            for can_doc in docs:
-                can_data = can_doc.to_dict()
-                if can_id_f and can_doc.id != can_id_f and can_data.get("can_reference") != can_id_f:
-                    continue
-                # Bounded caps per CAN
-                try:
-                    cap_coll = can_doc.reference.collection(CAP_SUBCOLLECTION)
-                    # Try filtered caps at DB where possible
-                    qcap = cap_coll
-                    if status_f:
-                        try:
-                            qcap = qcap.where("status", "==", status_f)
-                        except Exception:
-                            pass
-                    if cutoff is not None:
-                        try:
-                            qcap = qcap.where("created_at", ">=", cutoff)
-                        except Exception:
-                            pass
-                    from google.cloud.firestore import Query as FirestoreQuery
-                    qcap = qcap.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(20)
-                    caps = list(qcap.get())
-                except Exception:
-                    try:
-                        caps = list(can_doc.reference.collection(CAP_SUBCOLLECTION).limit(20).get())
-                    except Exception:
-                        caps = list(can_doc.reference.collection(CAP_SUBCOLLECTION).get()) if hasattr(can_doc.reference.collection(CAP_SUBCOLLECTION), "get") else []
-                for cap in caps:
-                    data = cap.to_dict()
-                    if status_f and data.get("status") != status_f:
+            for cap_row, can_row, hazard_row in rows:
+                data = _cap_to_dict(cap_row, can_row=can_row, hazard_id_ref=hazard_row.hazard_id)
+                if filters.get("search"):
+                    hay = " ".join(str(v) for v in [
+                        data.get("cap_reference", ""),
+                        data.get("can_reference", ""),
+                        data.get("action_plan", ""),
+                        data.get("status", ""),
+                    ]).lower()
+                    if filters["search"].lower() not in hay:
                         continue
-                    if cutoff:
-                        submitted = coerce_utc_datetime(data.get("submitted_at") or data.get("created_at"))
-                        if submitted is None or submitted < cutoff:
-                            continue
-                    data["id"] = cap.id
-                    data["can_id"] = can_doc.id
-                    data["can_reference"] = can_data.get("can_reference", "")
-                    can_issued = can_data.get("issued_at")
-                    if hasattr(can_issued, "isoformat"):
-                        can_issued = can_issued.isoformat()
-                    data["can_issued_at"] = can_issued
-                    data["hazard_id"] = can_data.get("hazard_id", "")
-                    data["priority"] = can_data.get("priority", "")
-                    data["department"] = data.get("department") or can_data.get("department", "")
-                    if department_f and (data["department"] or "") != department_f:
-                        continue
-                    self._serialize_timestamps(data)
-                    if search:
-                        hay = " ".join(str(v) for v in [
-                            data.get("cap_reference", ""),
-                            data.get("can_reference", ""),
-                            data.get("action_plan", ""),
-                            data.get("status", ""),
-                        ]).lower()
-                        if search not in hay:
-                            continue
-                    results.append(data)
-                    if len(results) >= limit:
-                        break
-                if len(results) >= limit:
-                    break
-
-            results.sort(key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min, reverse=True)
-            return results[:limit]
-        except Exception as e:
-            logger.error(f"Failed to list all CAPs: {e}")
-            raise
+                results.append(data)
+        results.sort(
+            key=lambda r: r.get("submitted_at") or r.get("created_at") or datetime.min,
+            reverse=True,
+        )
+        return results[:limit]
 
     def get_cap(self, cap_id: str, user: dict) -> Optional[dict]:
-        try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                all_cans = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                all_cans = self._can_collection().get()
+        return run(self._get_cap_async(cap_id, user))
 
-            for can_doc in all_cans:
-                caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
-                for cap in caps:
-                    if cap.id == cap_id:
-                        data = cap.to_dict()
-                        data["id"] = cap.id
-                        self._serialize_timestamps(data)
-                        return data
-            return None
-        except Exception as e:
-            logger.error(f"Failed to get CAP {cap_id}: {e}")
-            raise
+    async def _get_cap_async(self, cap_id: str, user: dict) -> Optional[dict]:
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_cap_lookup_stmt(tid, cap_id))).scalars().first()
+            if not row:
+                return None
+            return _cap_to_dict(row)
 
     def update_cap(self, cap_id: str, payload: dict, user: dict) -> Optional[dict]:
-        try:
-            all_cans = self._can_collection().get()
-            for can_doc in all_cans:
-                caps = self._caps_collection(can_doc.id).get()
-                for cap in caps:
-                    if cap.id == cap_id:
-                        ref = self._caps_collection(can_doc.id).document(cap.id)
-                        payload["updated_at"] = datetime.now(timezone.utc)
-                        ref.update(payload)
-                        updated = ref.get().to_dict()
-                        updated["id"] = cap.id
-                        self._serialize_timestamps(updated)
-                        return updated
-            return None
-        except Exception as e:
-            logger.error(f"Failed to update CAP {cap_id}: {e}")
-            raise
+        return run(self._update_cap_async(cap_id, payload, user))
+
+    async def _update_cap_async(self, cap_id: str, payload: dict, user: dict) -> Optional[dict]:
+        tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_cap_lookup_stmt(tid, cap_id))).scalars().first()
+            if not row:
+                return None
+            for key, value in payload.items():
+                if key in _CAP_MUTABLE_COLUMNS:
+                    if key in _CAP_JSONB_COLUMNS:
+                        value = _json_safe(value)
+                    elif key in _CAP_DT_COLUMNS:
+                        value = _dt(value)
+                    setattr(row, key, value)
+            row.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return _cap_to_dict(row)
 
     def review_cap(self, cap_id: str, review: dict, user: dict) -> Optional[dict]:
-        try:
-            all_cans = self._can_collection().get()
-            for can_doc in all_cans:
-                caps = self._caps_collection(can_doc.id).get()
-                for cap in caps:
-                    if cap.id == cap_id:
-                        ref = self._caps_collection(can_doc.id).document(cap.id)
-                        now = datetime.now(timezone.utc)
-                        update_data = {
-                            "status": review["status"],
-                            "reviewed_by": user.get("email", user["uid"]),
-                            "reviewed_by_uid": user["uid"],
-                            "reviewed_at": now,
-                            "review_comments": review.get("comments"),
-                            "updated_at": now,
-                            # Buddha Air FORM SMSM 8.8.2 — review / sign-off block
-                            "managerial_approval": review.get("managerial_approval"),
-                            "caa_acceptance": review.get("caa_acceptance"),
-                            "rca": review.get("rca"),
-                            "residual_severity": review.get("residual_severity"),
-                            "residual_probability": review.get("residual_probability"),
-                            "residual_risk_index": review.get("residual_risk_index"),
-                            "residual_risk_level": review.get("residual_risk_level"),
-                            "residual_risk_outcome": review.get("residual_risk_outcome"),
-                            "residual_tolerability_tier": review.get("residual_tolerability_tier"),
-                            "residual_sra": review.get("residual_sra"),
-                            "root_causes": review.get("root_causes"),
-                            "action_items": review.get("action_items"),
-                            "ca_acceptance": review.get("ca_acceptance"),
-                            "manager_approval": review.get("manager_approval"),
-                            "manager_confirmation": review.get("manager_confirmation"),
-                            "closing_remarks": review.get("closing_remarks"),
-                            "sag_sign": review.get("sag_sign"),
-                            # Governance escalation (Accountable Executive review)
-                            "escalated_to_ae": review.get("escalated_to_ae"),
-                            "escalated_by": review.get("escalated_by"),
-                            "escalation_reason": review.get("escalation_reason"),
-                            # Formal AE risk-acceptance sign-off record
-                            "ae_signature": review.get("ae_signature"),
-                            "ae_review_interval_days": review.get("ae_review_interval_days"),
-                        }
-                        # Server-side Residual SRA canonicalisation on review.
-                        residual_sra = self._sra_block(
-                            review.get("residual_severity"),
-                            review.get("residual_probability"),
-                            assessed_by=user.get("email", user["uid"]),
-                            assessed_at=now,
-                            provided=review.get("residual_sra"),
-                        )
-                        if residual_sra:
-                            update_data["residual_sra"] = residual_sra
-                            update_data["residual_severity"] = residual_sra["severity"]
-                            update_data["residual_probability"] = residual_sra["probability"]
-                            update_data["residual_risk_index"] = residual_sra["risk_index"]
-                            update_data["residual_risk_level"] = residual_sra["risk_level"]
-                            update_data["residual_risk_outcome"] = residual_sra["risk_outcome"]
-                            update_data["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
-                        elif review.get("residual_risk_index"):
-                            thresholds = get_thresholds(self.tenant_id)
-                            update_data["residual_risk_level"] = get_risk_level(
-                                review["residual_risk_index"], thresholds
-                            )
-                            update_data["residual_risk_outcome"] = risk_outcome(
-                                review.get("residual_severity") or 1,
-                                review.get("residual_probability") or 1,
-                                thresholds,
-                            )
-                            update_data["residual_tolerability_tier"] = get_tolerability_tier(
-                                review["residual_risk_index"], thresholds
-                            )
-                        if review.get("sag_sign"):
-                            update_data["sag_signed_by"] = review.get("sag_signed_by")
-                            update_data["sag_signed_at"] = review.get("sag_signed_at") or now
-                        if review.get("revision_deadline"):
-                            update_data["revision_deadline"] = review["revision_deadline"]
+        return run(self._review_cap_async(cap_id, review, user))
 
-                        if review.get("escalated_to_ae"):
-                            update_data["escalated_at"] = review.get("escalated_at") or now
+    async def _review_cap_async(self, cap_id: str, review: dict, user: dict) -> Optional[dict]:
+        tid = register_tenant(self.tenant_id)
+        now = datetime.now(timezone.utc)
 
-                        # AE risk-acceptance: stamp decision time + mandatory
-                        # review date derived from the chosen interval.
-                        if review.get("ae_signature"):
-                            update_data["ae_signed_at"] = review.get("ae_signed_at") or now
-                            interval = review.get("ae_review_interval_days")
-                            if interval:
-                                update_data["ae_review_date"] = now + timedelta(days=int(interval))
+        async with session_scope() as session:
+            row = (await session.execute(_cap_lookup_stmt(tid, cap_id))).scalars().first()
+            if not row:
+                return None
+            can_row = (
+                await session.execute(select(Can).where(Can.id == row.can_id))
+            ).scalars().first()
 
-                        if review["status"] == "Completed":
-                            update_data["closed_by"] = review.get("closed_by") or user.get("email", user["uid"])
-                            update_data["closed_at"] = review.get("closed_at") or now
-                            update_data["closed_signature"] = review.get("closed_signature")
+            changes: Dict[str, Any] = {
+                "status": review["status"],
+                "reviewed_by": user.get("email", user["uid"]),
+                "reviewed_by_uid": user["uid"],
+                "reviewed_at": now,
+                "review_comments": review.get("comments"),
+                # Buddha Air FORM SMSM 8.8.2 — review / sign-off block
+                "managerial_approval": _json_safe(review.get("managerial_approval")),
+                "caa_acceptance": _json_safe(review.get("caa_acceptance")),
+                "rca": review.get("rca"),
+                "residual_severity": review.get("residual_severity"),
+                "residual_probability": review.get("residual_probability"),
+                "residual_risk_index": review.get("residual_risk_index"),
+                "residual_risk_level": review.get("residual_risk_level"),
+                "residual_risk_outcome": review.get("residual_risk_outcome"),
+                "residual_tolerability_tier": review.get("residual_tolerability_tier"),
+                "residual_sra": _json_safe(review.get("residual_sra")),
+                "root_causes": _json_safe(review.get("root_causes")),
+                "action_items": _json_safe(review.get("action_items")),
+                "ca_acceptance": review.get("ca_acceptance"),
+                "manager_approval": review.get("manager_approval"),
+                "manager_confirmation": review.get("manager_confirmation"),
+                "closing_remarks": review.get("closing_remarks"),
+                "sag_sign": review.get("sag_sign"),
+                # Governance escalation (Accountable Executive review)
+                "escalated_to_ae": review.get("escalated_to_ae"),
+                "escalated_by": review.get("escalated_by"),
+                "escalation_reason": review.get("escalation_reason"),
+                # Formal AE risk-acceptance sign-off record
+                "ae_signature": review.get("ae_signature"),
+                "ae_review_interval_days": review.get("ae_review_interval_days"),
+            }
 
-                        ref.update(update_data)
+            # Server-side Residual SRA canonicalisation on review.
+            residual_sra = self._sra_block(
+                review.get("residual_severity"),
+                review.get("residual_probability"),
+                assessed_by=user.get("email", user["uid"]),
+                assessed_at=now,
+                provided=review.get("residual_sra"),
+            )
+            if residual_sra:
+                changes["residual_sra"] = _json_safe(residual_sra)
+                changes["residual_severity"] = residual_sra["severity"]
+                changes["residual_probability"] = residual_sra["probability"]
+                changes["residual_risk_index"] = residual_sra["risk_index"]
+                changes["residual_risk_level"] = residual_sra["risk_level"]
+                changes["residual_risk_outcome"] = residual_sra["risk_outcome"]
+                changes["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
+            elif review.get("residual_risk_index"):
+                thresholds = get_thresholds(self.tenant_id)
+                changes["residual_risk_level"] = get_risk_level(
+                    review["residual_risk_index"], thresholds
+                )
+                changes["residual_risk_outcome"] = risk_outcome(
+                    review.get("residual_severity") or 1,
+                    review.get("residual_probability") or 1,
+                    thresholds,
+                )
+                changes["residual_tolerability_tier"] = get_tolerability_tier(
+                    review["residual_risk_index"], thresholds
+                )
+            if review.get("sag_sign"):
+                changes["sag_signed_by"] = review.get("sag_signed_by")
+                changes["sag_signed_at"] = _dt(review.get("sag_signed_at")) or now
+            if review.get("revision_deadline"):
+                changes["revision_deadline"] = _dt(review["revision_deadline"])
 
-                        # Update CAN status and hazard if accepted
-                        can_data = can_doc.to_dict()
-                        if review["status"] == "Completed":
-                            self._can_collection().document(can_doc.id).update({
-                                "status": "Closed",
-                                "updated_at": now,
-                            })
-                            hazard_id = can_data.get("hazard_id")
-                            if hazard_id:
-                                self._update_hazard_status(hazard_id, "Under Review")
+            if review.get("escalated_to_ae"):
+                changes["escalated_at"] = _dt(review.get("escalated_at")) or now
 
-                        updated = ref.get().to_dict()
-                        updated["id"] = cap.id
-                        self._serialize_timestamps(updated)
-                        return updated
-            return None
-        except Exception as e:
-            logger.error(f"Failed to review CAP {cap_id}: {e}")
-            raise
+            # AE risk-acceptance: stamp decision time + mandatory review date
+            # derived from the chosen interval.
+            if review.get("ae_signature"):
+                changes["ae_signed_at"] = _dt(review.get("ae_signed_at")) or now
+                interval = review.get("ae_review_interval_days")
+                if interval:
+                    changes["ae_review_date"] = now + timedelta(days=int(interval))
+
+            if review["status"] == "Completed":
+                changes["closed_by"] = review.get("closed_by") or user.get("email", user["uid"])
+                changes["closed_at"] = _dt(review.get("closed_at")) or now
+                changes["closed_signature"] = review.get("closed_signature")
+
+            for key, value in changes.items():
+                if key in _CAP_MUTABLE_COLUMNS:
+                    setattr(row, key, value)
+            row.updated_at = now
+
+            can_data = None
+            # Update CAN status and hazard if accepted
+            if review["status"] == "Completed" and can_row is not None:
+                can_row.status = "Closed"
+                can_row.updated_at = now
+                await self._set_hazard_status(
+                    session, can_row.hazard_id, "Under Review", now
+                )
+            await session.flush()
+            if can_row is not None:
+                return _cap_to_dict(
+                    row, can_row=can_row, hazard_id_ref=await _hazard_ref(session, can_row)
+                )
+            return _cap_to_dict(row)
 
     # ── Stats ──
 
     def get_can_stats(self, user: dict, department: Optional[str] = None) -> Dict[str, Any]:
-        try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                docs = self._can_collection().get()
+        return run(self._get_can_stats_async(user, department))
 
-            stats = {"Open": 0, "Under Review": 0, "Closed": 0}
-            priority_counts = {"High": 0, "Medium": 0, "Low": 0}
-            total = 0
+    async def _get_can_stats_async(
+        self, user: dict, department: Optional[str] = None
+    ) -> Dict[str, Any]:
+        stmt = select(Can).where(Can.is_demo == demo_scope())
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            stmt = stmt.where(Can.tenant_id == register_tenant(self.tenant_id))
+        if department:
+            stmt = stmt.where(Can.department == department)
 
-            for doc in docs:
-                data = doc.to_dict()
-                if department and (data.get("department") or "") != department:
-                    continue
-                status = data.get("status", "Open")
-                if status in stats:
-                    stats[status] += 1
-                pri = data.get("priority")
-                if pri in priority_counts:
-                    priority_counts[pri] += 1
-                total += 1
+        async with session_scope() as session:
+            rows = (await session.scalars(stmt)).all()
 
-            return {
-                "by_status": stats,
-                "by_priority": priority_counts,
-                "total": total,
-            }
-        except Exception as e:
-            logger.error(f"Failed to get CAN stats: {e}")
-            raise
+        stats = {"Open": 0, "Under Review": 0, "Closed": 0}
+        priority_counts = {"High": 0, "Medium": 0, "Low": 0}
+        for row in rows:
+            status = row.status or "Open"
+            if status in stats:
+                stats[status] += 1
+            pri = row.priority
+            if pri in priority_counts:
+                priority_counts[pri] += 1
+
+        return {
+            "by_status": stats,
+            "by_priority": priority_counts,
+            "total": len(rows),
+        }
 
     def get_cap_stats(self, user: dict, department: Optional[str] = None) -> Dict[str, Any]:
-        try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                cans = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                cans = self._can_collection().get()
+        return run(self._get_cap_stats_async(user, department))
 
-            stats = {"In Progress": 0, "Under Review": 0, "Completed": 0, "Revision Required": 0, "Overdue": 0}
-            total = 0
+    async def _get_cap_stats_async(
+        self, user: dict, department: Optional[str] = None
+    ) -> Dict[str, Any]:
+        stmt = (
+            select(Cap)
+            .join(Can, Cap.can_id == Can.id)
+            .where(Cap.is_demo == demo_scope(), Can.is_demo == demo_scope())
+        )
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            stmt = stmt.where(Cap.tenant_id == register_tenant(self.tenant_id))
+        if department:
+            stmt = stmt.where(or_(Cap.department == department, Can.department == department))
 
-            for can_doc in cans:
-                can_data = can_doc.to_dict()
-                if department and (can_data.get("department") or "") != department:
-                    continue
-                caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
-                for cap in caps:
-                    data = cap.to_dict()
-                    status = data.get("status", "In Progress")
-                    if status in stats:
-                        stats[status] += 1
-                    total += 1
+        async with session_scope() as session:
+            rows = (await session.scalars(stmt)).all()
 
-            return {
-                "by_status": stats,
-                "total": total,
-            }
-        except Exception as e:
-            logger.error(f"Failed to get CAP stats: {e}")
-            raise
+        stats = {"In Progress": 0, "Under Review": 0, "Completed": 0, "Revision Required": 0, "Overdue": 0}
+        for row in rows:
+            status = row.status or "In Progress"
+            if status in stats:
+                stats[status] += 1
+
+        return {"by_status": stats, "total": len(rows)}
 
     # ── Hazard integration ──
 
@@ -999,12 +984,3 @@ class CanCapService:
             logger.info(f"Hazard {hazard_id} status updated to {status} via CAN/CAP")
         except Exception as e:
             logger.warning(f"Failed to update hazard {hazard_id} status: {e}")
-
-    # ── Helpers ──
-
-    @staticmethod
-    def _serialize_timestamps(data: dict) -> None:
-        for key in ("created_at", "updated_at", "issued_at", "submitted_at", "reviewed_at",
-                     "target_completion_date", "revision_deadline", "sag_signed_at", "closed_at"):
-            if key in data and hasattr(data[key], "isoformat"):
-                data[key] = data[key].isoformat()

@@ -8,6 +8,7 @@ Tests the complete operational flow:
   4. RBAC enforcement → USER role rejected with 403
 """
 
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -16,7 +17,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 
+from app.db.db_models import Can, Cap, Hazard, Report
+from app.db.ids import register_tenant
+from app.db.session import session_scope
 from app.main import app
 from app.core.config import settings
 
@@ -247,6 +252,29 @@ def mock_firebase_and_gemini(monkeypatch):
                         lambda narrative: {"is_mandatory": True, "category": "A", "confidence": 0.95})
 
     yield fs_client
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_postgres_lifecycle_rows():
+    """Remove reports + auto-created hazards persisted to Postgres per tenant."""
+    yield
+    # NOTE: auth normalises the AIRLINE_ADMIN_TOKEN tenant claim 'test_airline'
+    # to the hyphenated slug 'test-airline', so the app persists every row
+    # under that slug's uuid. Clean up BOTH slopes so leftover CAN/CAP stubs
+    # (e.g. the auto-created 'haz-sra-1' hazard) never collide on re-runs.
+    tid_hyph = register_tenant("test-airline")
+    tid_under = register_tenant("test_airline")
+
+    async def _wipe():
+        async with session_scope() as s:
+            for tid in {tid_hyph, tid_under}:
+                # FK order: CAPs reference CANs reference hazards.
+                await s.execute(delete(Cap).where(Cap.tenant_id == tid))
+                await s.execute(delete(Can).where(Can.tenant_id == tid))
+                await s.execute(delete(Report).where(Report.tenant_id == tid))
+                await s.execute(delete(Hazard).where(Hazard.tenant_id == tid))
+
+    asyncio.run(_wipe())
 
 
 def _auth_header(token: str) -> Dict[str, str]:

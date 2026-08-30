@@ -8,6 +8,14 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.8
+      # Supabase TRANSACTION pooler (PgBouncer, port 6543). asyncpg requires
+      # port 6543 for transaction pooling; sslmode=require is translated to
+      # ssl=require by app/db/session.py and the pgbouncer=true hint is
+      # stripped there. Set the real value in the Render dashboard (secret).
+      # Format:
+      #   postgresql+asyncpg://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
+      - key: DATABASE_URL
+        sync: false
       - key: ALLOWED_ORIGINS
         value: http://localhost:3000,http://localhost:8000,https://aerosafety-sms-prod.web.app,https://sms.aviasafesystems.com,https://sms-beta.web.app
       - key: FIREBASE_PROJECT_ID
