@@ -295,16 +295,21 @@ def test_aggregate_scoped_to_regulator_operators(monkeypatch):
 # ============================================================================
 
 def _patch_survey_maturity_dbs(monkeypatch, surveys):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     class _DB:
         def collection_group(self, name):
-            assert name == "surveys"
-            return _FakeCollection(surveys)
+            return _FakeCollection([])
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
     _patch_reg_db(monkeypatch, _regulator_db(*_sample_regulators()))
-    return DashboardService({"uid": "caan", "role": "CAAN_SMD"})
+    svc = DashboardService({"uid": "caan", "role": "CAAN_SMD"})
+    # Surveys now come from Postgres; patch the service's data fetch so this
+    # test stays focused on regulator scoping of the aggregation.
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
+    return svc
 
 
 def test_survey_maturity_scoped_to_regulator(monkeypatch):

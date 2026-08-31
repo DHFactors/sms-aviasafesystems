@@ -6,6 +6,8 @@ of the register, SSP target handling, and the benchmark wiring.
 
 from datetime import datetime, timedelta, timezone
 
+import asyncio
+
 from app.services.state_risk_service import (
     StateRiskService,
     ICAO_TOP_RISK_CATEGORIES,
@@ -521,18 +523,31 @@ def test_update_ssp_target_requires_admin():
 # ============================================================================
 
 def _survey_svc(monkeypatch, surveys):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
-    def fake_cg(self, name):
-        assert name == "surveys"
-        return _FakeCollection([_FakeDoc(s) for s in surveys])
+    svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+    # Surveys now come from Postgres; patch the service's data fetch to keep
+    # this test focused on the aggregation math (the PG query path is covered
+    # by dedicated integration tests that seed Survey rows).
+    def fake_docs(days=None):
+        return [_PGSurveyDoc(d) for d in surveys]
+
+    monkeypatch.setattr(svc, "_survey_docs", fake_docs)
+
+    def fake_responses(days=0, tenant_ids=None):
+        return [{"tenant_id": d["tenant_id"]} for d in surveys]
+
+    monkeypatch.setattr(svc, "_survey_responses", fake_responses)
 
     class _DB:
+        def collection(self, name):
+            return _FakeCollection([])
+
         def collection_group(self, name):
-            return fake_cg(self, name)
+            return _FakeCollection([])
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
-    return DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+    return svc
 
 
 def test_get_caan_survey_maturity_aggregates_pillars(monkeypatch):
@@ -569,47 +584,145 @@ def test_get_caan_survey_maturity_aggregates_pillars(monkeypatch):
     assert result["operators"][0]["tenant_id"] == "air2"
 
 
-def test_get_caan_survey_maturity_filters_by_days_cutoff(monkeypatch):
-    now = datetime.now(timezone.utc)
-    svc = _survey_svc(monkeypatch, surveys=[
-        {
-            "tenant_id": "air1",
-            "submitted_at": now,
-            "safety_policy": 4.0, "safety_risk_management": 3.0,
-            "safety_assurance": 5.0, "safety_promotion": 4.0,
-            "overall_sms_maturity": 4.0,
-        },
-        {
-            "tenant_id": "air1",
-            "submitted_at": now - timedelta(days=120),
-            "safety_policy": 2.0, "safety_risk_management": 3.0,
-            "safety_assurance": 3.0, "safety_promotion": 4.0,
-            "overall_sms_maturity": 3.0,
-        },
-        {
-            "tenant_id": "air2",
-            "submitted_at": now - timedelta(days=400),
-            "safety_policy": 5.0, "safety_risk_management": 5.0,
-            "safety_assurance": 5.0, "safety_promotion": 5.0,
-            "overall_sms_maturity": 5.0,
-        },
-    ])
-    result = svc.get_caan_survey_maturity(days=90)
-    assert result["state"]["response_count"] == 1
-    by_id = {op["tenant_id"]: op for op in result["operators"]}
-    assert by_id["air1"]["response_count"] == 1
-    assert by_id["air1"]["overall_sms_maturity"] == 4.0
-    assert "air2" not in by_id
+def test_get_caan_survey_maturity_filters_by_days_cutoff():
+    """The days cutoff is now applied in the Postgres SELECT (on the `surveys`
+    table). Seed real Survey rows and verify the query + aggregation."""
+    from app.db.db_models import Survey
+    from app.db.ids import register_tenant
+    from app.db.isolation import demo_scope
+    from app.db.session import session_scope
+    from app.services.dashboard_service import DashboardService
 
-    all_time = svc.get_caan_survey_maturity()
-    assert all_time["state"]["response_count"] == 3
+    tid_air1 = register_tenant("air1")
+    tid_air2 = register_tenant("air2")
+    now = datetime.now(timezone.utc)
+
+    def _seed():
+        async def _go():
+            async with session_scope() as session:
+                session.add(Survey(
+                    tenant_id=tid_air1, submitted_at=now,
+                    safety_policy=4, safety_risk_management=3,
+                    safety_assurance=5, safety_promotion=4,
+                    overall_sms_maturity=4, survey_version="4.0.0",
+                    answers={}, is_demo=demo_scope()))
+                session.add(Survey(
+                    tenant_id=tid_air1, submitted_at=now - timedelta(days=120),
+                    safety_policy=2, safety_risk_management=3,
+                    safety_assurance=3, safety_promotion=4,
+                    overall_sms_maturity=3, survey_version="4.0.0",
+                    answers={}, is_demo=demo_scope()))
+                session.add(Survey(
+                    tenant_id=tid_air2, submitted_at=now - timedelta(days=400),
+                    safety_policy=5, safety_risk_management=5,
+                    safety_assurance=5, safety_promotion=5,
+                    overall_sms_maturity=5, survey_version="4.0.0",
+                    answers={}, is_demo=demo_scope()))
+        import asyncio
+        asyncio.run(_go())
+
+    def _wipe():
+        async def _go():
+            async with session_scope() as session:
+                from sqlalchemy import delete
+                await session.execute(delete(Survey).where(
+                    Survey.tenant_id.in_([tid_air1, tid_air2])))
+        import asyncio
+        asyncio.run(_go())
+
+    _seed()
+    try:
+        from app.services.dashboard_service import DashboardService
+        svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+        result = svc.get_caan_survey_maturity(days=90)
+        assert result["state"]["response_count"] == 1
+        by_id = {op["tenant_id"]: op for op in result["operators"]}
+        assert by_id["air1"]["response_count"] == 1
+        assert by_id["air1"]["overall_sms_maturity"] == 4.0
+        assert "air2" not in by_id
+
+        all_time = svc.get_caan_survey_maturity()
+        assert all_time["state"]["response_count"] == 3
+    finally:
+        _wipe()
+
+
+def test_survey_docs_reads_postgres_rows():
+    """_survey_docs must translate real Survey rows (slug, pillars) and
+    _survey_responses must count raw SurveyResponse rows from Postgres."""
+    from app.db.db_models import Survey, SurveyResponse
+    from app.db.ids import register_tenant
+    from app.db.isolation import demo_scope
+    from app.db.session import session_scope
+    from app.services.dashboard_service import DashboardService
+
+    tid_air1 = register_tenant("surv-pg-air1")
+    tid_air2 = register_tenant("surv-pg-air2")
+    now = datetime.now(timezone.utc)
+
+    async def _go():
+        async with session_scope() as session:
+            session.add(Survey(
+                tenant_id=tid_air1, submitted_at=now,
+                safety_policy=4, safety_risk_management=3,
+                safety_assurance=5, safety_promotion=4,
+                overall_sms_maturity=4, survey_version="4.0.0",
+                question_scores={"q1": 4.0}, answers={}, is_demo=demo_scope()))
+            session.add(Survey(
+                tenant_id=tid_air2, submitted_at=now,
+                safety_policy=5, safety_risk_management=5,
+                safety_assurance=5, safety_promotion=5,
+                overall_sms_maturity=5, survey_version="4.0.0",
+                answers={}, is_demo=demo_scope()))
+            session.add(SurveyResponse(
+                tenant_id=tid_air1, submitted_at=now,
+                survey_version="4.0.0", answers={}, is_demo=demo_scope()))
+            session.add(SurveyResponse(
+                tenant_id=tid_air1, submitted_at=now,
+                survey_version="4.0.0", answers={}, is_demo=demo_scope()))
+            session.add(SurveyResponse(
+                tenant_id=tid_air2, submitted_at=now,
+                survey_version="4.0.0", answers={}, is_demo=demo_scope()))
+    asyncio.run(_go())
+
+    async def _wipe():
+        async with session_scope() as session:
+            from sqlalchemy import delete
+            await session.execute(delete(Survey).where(
+                Survey.tenant_id.in_([tid_air1, tid_air2])))
+            await session.execute(delete(SurveyResponse).where(
+                SurveyResponse.tenant_id.in_([tid_air1, tid_air2])))
+    asyncio.run(_wipe())
+    asyncio.run(_go())
+
+    try:
+        svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+        docs = svc._survey_docs(365)
+        data = {d.to_dict()["tenant_id"]: d.to_dict() for d in docs}
+        assert data["surv-pg-air1"]["safety_policy"] == 4
+        assert data["surv-pg-air1"]["overall_sms_maturity"] == 4
+        assert data["surv-pg-air2"]["overall_sms_maturity"] == 5
+
+        responses = svc._survey_responses(days=365, tenant_ids=None)
+        counts = {}
+        for res in responses:
+            counts[res["tenant_id"]] = counts.get(res["tenant_id"], 0) + 1
+        assert counts["surv-pg-air1"] == 2
+        assert counts["surv-pg-air2"] == 1
+
+        # Regulator scoping excludes air2.
+        scoped = svc._survey_responses(days=365, tenant_ids={"surv-pg-air1"})
+        assert all(r["tenant_id"] == "surv-pg-air1" for r in scoped)
+        assert len(scoped) == 2
+    finally:
+        asyncio.run(_wipe())
 
 
 def test_universal_oversight_includes_all_tenant_types(monkeypatch):
     """CAAN SMD aggregation must treat internal CAAN directorates (caan-directorate
     tenant type) exactly like external service providers — no tenant type is
     excluded from the state payload."""
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     now = datetime.now(timezone.utc)
 
@@ -673,6 +786,14 @@ def test_universal_oversight_includes_all_tenant_types(monkeypatch):
     )
 
     svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+    # Survey data now comes from Postgres; patch the service's data fetches so
+    # this test keeps focusing on tenant-type inclusivity of the aggregation.
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
+    monkeypatch.setattr(
+        svc, "_survey_responses",
+        lambda days=0, tenant_ids=None: [{"tenant_id": r["tenant_id"]} for r in responses])
     result = svc.get_caan_state(days=0, regulator_id="caan")
 
     operator_ids = {o["tenant_id"] for o in result["operators"]}
@@ -701,7 +822,7 @@ def test_get_caan_survey_maturity_empty(monkeypatch):
 
 
 def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     written = {}
 
@@ -727,8 +848,8 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
             return _Coll([])
 
     class _Coll:
-        def __init__(self, docs):
-            self._docs = docs
+        def __init__(self, docs=None):
+            self._docs = docs or []
 
         def get(self):
             return [_Snap(d) for d in self._docs]
@@ -744,12 +865,12 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
             self._surveys = surveys
 
         def collection_group(self, name):
-            return _Coll(self._surveys)
+            return _Coll([])
 
         def collection(self, name):
             return _Coll([])
 
-    db = _DB([
+    surveys = [
         {
             "tenant_id": "air1",
             "safety_policy": 2.0, "safety_risk_management": 2.0,
@@ -765,9 +886,12 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
             "overall_sms_maturity": 5.0,
             "submitted_at": datetime.now(timezone.utc),
         },
-    ])
-    monkeypatch.setattr("app.firebase.get_db", lambda: db)
+    ]
+    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
     svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
     result = svc.get_caan_sms_maturity_assessment(days=90)
 
     assert result["period_days"] == 90
@@ -788,7 +912,7 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
 # ============================================================================
 
 def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     written = {}
 
@@ -814,8 +938,8 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
             return _Coll([])
 
     class _Coll:
-        def __init__(self, docs):
-            self._docs = docs
+        def __init__(self, docs=None):
+            self._docs = docs or []
 
         def get(self):
             return [_Snap(d) for d in self._docs]
@@ -831,14 +955,14 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
             self._surveys = surveys
 
         def collection_group(self, name):
-            return _Coll(self._surveys)
+            return _Coll([])
 
         def collection(self, name):
             return _Coll([])
 
-    docs = []
+    surveys = []
     for _ in range(6):
-        docs.append({
+        surveys.append({
             "tenant_id": "air1",
             "safety_policy": 5.0, "safety_risk_management": 1.0,
             "safety_assurance": 2.0, "safety_promotion": 4.0,
@@ -847,7 +971,7 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
             "submitted_at": datetime.now(timezone.utc),
         })
     # A different tenant's data must never surface for air1's officer.
-    docs.append({
+    surveys.append({
         "tenant_id": "air2",
         "safety_policy": 5.0, "safety_risk_management": 5.0,
         "safety_assurance": 5.0, "safety_promotion": 5.0,
@@ -855,8 +979,11 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
         "submitted_at": datetime.now(timezone.utc),
     })
 
-    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
+    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
     result = svc.get_airline_sms_maturity(days=365)
 
     assert result["tenant_id"] == "air1"
@@ -922,6 +1049,7 @@ def test_get_airline_sms_maturity_empty(monkeypatch):
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
+    monkeypatch.setattr(svc, "_survey_docs", lambda days=None: [])
     result = svc.get_airline_sms_maturity(days=365)
 
     assert result["tenant_id"] == "air1"
@@ -941,7 +1069,7 @@ def test_get_airline_sms_maturity_requires_tenant():
 
 
 def test_get_airline_sms_maturity_missing_pillars(monkeypatch):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     class _Snap:
         def __init__(self, data):
@@ -979,25 +1107,28 @@ def test_get_airline_sms_maturity_missing_pillars(monkeypatch):
             self._surveys = surveys
 
         def collection_group(self, name):
-            return _Coll(self._surveys)
+            return _Coll([])
 
         def collection(self, name):
             return _Coll([])
 
-    docs = []
+    surveys = []
     for _ in range(4):
-        docs.append({
+        surveys.append({
             "tenant_id": "air1",
             "safety_policy": 4.0, "safety_risk_management": 2.0,
             "safety_assurance": 3.0,  # safety_promotion intentionally absent
             "overall_sms_maturity": 3.0,
             "submitted_at": datetime.now(timezone.utc),
         })
-    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
+    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
     monkeypatch.setattr(
         "app.services.dashboard_service.recommend_sms_maturity_actions",
         lambda *a, **k: [{"action": "Mock action A"}, {"action": "Mock action B"}])
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
     result = svc.get_airline_sms_maturity(days=365)
 
     assert result["pillars"]["safety_policy"] == 75.0
@@ -1010,7 +1141,7 @@ def test_get_airline_sms_maturity_missing_pillars(monkeypatch):
 
 
 def test_get_airline_sms_maturity_history_ordering(monkeypatch):
-    from app.services.dashboard_service import DashboardService
+    from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     class _Snap:
         def __init__(self, data):
@@ -1048,13 +1179,13 @@ def test_get_airline_sms_maturity_history_ordering(monkeypatch):
             self._surveys = surveys
 
         def collection_group(self, name):
-            return _Coll(self._surveys)
+            return _Coll([])
 
         def collection(self, name):
             return _Coll([])
 
     older = datetime.now(timezone.utc) - timedelta(days=45)
-    docs = [
+    surveys = [
         # Strong month (2 responses, ~45 days ago)
         {"tenant_id": "air1", "safety_policy": 5.0, "safety_risk_management": 5.0,
          "safety_assurance": 5.0, "safety_promotion": 5.0, "overall_sms_maturity": 5.0,
@@ -1067,8 +1198,11 @@ def test_get_airline_sms_maturity_history_ordering(monkeypatch):
          "safety_assurance": 4.0, "safety_promotion": 4.0, "overall_sms_maturity": 3.0,
          "submitted_at": datetime.now(timezone.utc)},
     ]
-    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(docs))
+    monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
+    monkeypatch.setattr(
+        svc, "_survey_docs",
+        lambda days=None: [_PGSurveyDoc(d) for d in surveys])
     result = svc.get_airline_sms_maturity(days=365)
 
     assert len(result["history"]) == 2

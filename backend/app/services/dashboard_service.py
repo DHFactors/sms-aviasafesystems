@@ -14,7 +14,14 @@ from collections import defaultdict
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
+from sqlalchemy import select
+
 from app.core.config import settings
+from app.db.db_models import Survey, SurveyResponse
+from app.db.ids import register_tenant, tenant_slug
+from app.db.isolation import demo_scope
+from app.db.runner import run
+from app.db.session import session_scope
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
 from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
@@ -33,6 +40,41 @@ TIER_LABELS = {
     "action": "Action Needed",
     "critical": "Critical",
 }
+
+
+class _PGSurveyDoc:
+    """Lightweight Firestore-like wrapper around a Postgres Survey row.
+
+    Presents the row as a document exposing ``to_dict()`` so the shared
+    dashboard aggregation logic (_aggregate_surveys / _survey_history) is
+    reused unchanged. Prevents the survey dashboards from depending on a
+    Firestore collection write that the live API no longer performs.
+    """
+
+    def __init__(self, data: Dict[str, Any]):
+        self._data = data
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._data
+
+
+def _survey_row_to_dict(row: Survey) -> Dict[str, Any]:
+    """Map a Postgres Survey row to the dict shape the survey dashboards expect
+    (identical keys to the legacy Firestore doc). `tenant_id` is the slug."""
+    return {
+        "tenant_id": tenant_slug(row.tenant_id),
+        "submitted_at": row.submitted_at,
+        "respondent_id": row.respondent_id,
+        "answers": row.answers,
+        "question_scores": row.question_scores or {},
+        "element_scores": row.element_scores,
+        "safety_policy": row.safety_policy,
+        "safety_risk_management": row.safety_risk_management,
+        "safety_assurance": row.safety_assurance,
+        "safety_promotion": row.safety_promotion,
+        "overall_sms_maturity": row.overall_sms_maturity,
+        "survey_version": row.survey_version,
+    }
 
 
 class DashboardService:
@@ -533,14 +575,7 @@ class DashboardService:
         # ---- Cross-tenant responses (survey participation) ----
         responses: List[Dict[str, Any]] = []
         try:
-            for snap in get_db().collection_group("responses").stream():
-                d = snap.to_dict() or {}
-                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
-                    continue
-                t = _to_dt(_doc_time(d))
-                if cutoff and (t is None or t < cutoff):
-                    continue
-                responses.append(d)
+            responses = self._survey_responses(days=days, tenant_ids=tenant_ids)
         except Exception as e:
             logger.warning(f"CAAN state responses query failed: {e}")
 
@@ -696,29 +731,70 @@ class DashboardService:
         }
 
     def _survey_docs(self, days: Optional[int] = None) -> list:
-        """Fetch tenants/{id}/surveys docs, optionally filtered to the period."""
+        """Fetch scored surveys from Postgres, optionally filtered to the period.
+
+        Reads the `surveys` table (the system of record; the live submission
+        API writes here) instead of the Firestore collection group, which the
+        API no longer populates. Returns _PGSurveyDoc wrappers so the shared
+        aggregation logic stays unchanged.
+        """
+        self._register_all_tenant_slugs()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+
+        async def _fetch() -> List[Dict[str, Any]]:
+            async with session_scope() as session:
+                stmt = select(Survey).where(Survey.is_demo == demo_scope())
+                if cutoff:
+                    stmt = stmt.where(Survey.submitted_at >= cutoff)
+                rows = (await session.scalars(stmt)).all()
+                return [_survey_row_to_dict(r) for r in rows]
+
         try:
-            from app.firebase import get_db
-            docs = list(get_db().collection_group("surveys").get())
+            return [_PGSurveyDoc(d) for d in run(_fetch())]
         except Exception as e:
             logger.warning(f"CAAN survey maturity query failed: {e}")
             return []
-        if not days:
-            return docs
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        result = []
-        for d in docs:
-            ts = d.to_dict().get("submitted_at")
-            try:
-                if ts is None:
-                    continue
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                if ts >= cutoff:
-                    result.append(d)
-            except Exception:
+
+    def _register_all_tenant_slugs(self) -> None:
+        """Populate the slug<->uuid tenant registry from Firestore so
+        tenant_slug() resolves every tenant's surveys even when only the
+        database row (uuid) is available. Survey data lives in Postgres, but
+        tenant slugs are still authored in Firestore."""
+        try:
+            from app.firebase import get_db
+            for snap in get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
+                register_tenant(snap.id)
+        except Exception as e:
+            logger.warning(f"Failed to register tenant slugs for survey queries: {e}")
+
+    def _survey_responses(
+        self, days: int, tenant_ids: Optional[set]
+    ) -> List[Dict[str, Any]]:
+        """Fetch raw survey participation from the `survey_responses` table.
+
+        Returns per-response dicts keyed by tenant slug so the CAAN state
+        operator-grid `responses` counter reflects the live Postgres rows that
+        the submission API writes, rather than an unpopulated Firestore
+        collection.
+        """
+        self._register_all_tenant_slugs()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
+
+        async def _fetch() -> List[str]:
+            async with session_scope() as session:
+                stmt = select(SurveyResponse).where(SurveyResponse.is_demo == demo_scope())
+                if cutoff:
+                    stmt = stmt.where(SurveyResponse.submitted_at >= cutoff)
+                rows = (await session.scalars(stmt)).all()
+                return [tenant_slug(r.tenant_id) for r in rows]
+
+        slugs = run(_fetch())
+        out: List[Dict[str, Any]] = []
+        for slug in slugs:
+            if tenant_ids is not None and slug not in tenant_ids:
                 continue
-        return result
+            out.append({"tenant_id": slug})
+        return out
 
     def _aggregate_surveys(self, docs) -> Dict[str, Any]:
         by_tenant: Dict[str, Dict[str, Any]] = {}

@@ -156,9 +156,9 @@ async def submit_survey(
     """Submit an ICAO-aligned SMS survey response.
 
     The response is validated against the master question contract, scored
-    into the four ICAO pillars (1-5) server-side, written to both
-    `tenants/{id}/surveys` (scored, consumed by the airline + CAAN SMS maturity
-    dashboards) and `tenants/{id}/responses` (raw, for audit).
+    into the four ICAO pillars (1-5) server-side, then persisted to Postgres:
+    the `surveys` row (scored, consumed by the airline + CAAN SMS maturity
+    dashboards) and the `survey_responses` row (raw, for audit participation).
     """
     tenant_id = payload.tenantId.strip()
     if not tenant_id:
