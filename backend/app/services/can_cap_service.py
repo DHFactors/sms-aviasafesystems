@@ -407,6 +407,7 @@ class CanCapService:
                 addressed_function=payload.get("addressed_function"),
                 classification_type=payload.get("classification_type"),
                 classification_level=payload.get("classification_level"),
+                psoe_assessment_id=payload.get("psoe_assessment_id"),
                 **init,
             )
             session.add(row)

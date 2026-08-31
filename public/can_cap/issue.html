@@ -169,12 +169,14 @@
 <script>
 let hazards = [];
 let initialSraController = null;
+let psoeAssessmentId = null;
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     // Prefill from a PSOE audit "Promote to CAN/CAP" deep link.
     const params = new URLSearchParams(window.location.search);
     if (params.get('source') === 'psoe') {
+        psoeAssessmentId = params.get('psoe_assessment_id') || params.get('psoe_assessment') || null;
         const t = params.get('title');
         const d = params.get('description');
         const r = params.get('required_action');
@@ -280,6 +282,7 @@ async function submitCan() {
         } : null,
         classification_type: document.getElementById('fieldClassType').value || null,
         classification_level: document.getElementById('fieldClassLevel').value || null,
+        psoe_assessment_id: psoeAssessmentId || null,
     };
 
     const btn = document.querySelector('.btn-submit');

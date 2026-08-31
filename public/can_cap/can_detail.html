@@ -97,6 +97,7 @@
                     <div class="value" style="white-space:pre-wrap;" id="fieldRequiredAction"></div>
                 </div>
                 <div class="detail-field"><div class="label">Hazard ID</div><div class="value"><a id="fieldHazardLink" href="#"></a></div></div>
+                <div class="detail-field" id="psoeLinkField" style="display:none;"><div class="label">PSOE Assessment</div><div class="value"><a id="psoeAssessmentLink" href="#" target="_blank"></a></div></div>
                 <div class="detail-field"><div class="label">Priority</div><div class="value" id="fieldPriority"></div></div>
                 <div class="detail-field"><div class="label">Status</div><div class="value" id="fieldStatus"></div></div>
                 <div class="detail-field"><div class="label">Issued By</div><div class="value" id="fieldIssuedBy"></div></div>
@@ -242,6 +243,15 @@ function renderCan() {
     const hazardLink = document.getElementById('fieldHazardLink');
     hazardLink.textContent = c.hazard_id || '-';
     hazardLink.href = `/hazards/detail.html?id=${c.hazard_id}`;
+
+    const psoeId = c.psoe_assessment_id;
+    const psoeField = document.getElementById('psoeLinkField');
+    const psoeLink = document.getElementById('psoeAssessmentLink');
+    if (psoeId && psoeField && psoeLink) {
+        psoeLink.textContent = psoeId;
+        psoeLink.href = `/audits/psoe.html?id=${encodeURIComponent(psoeId)}`;
+        psoeField.style.display = '';
+    }
 
     document.getElementById('fieldPriority').innerHTML = `<span class="badge ${canPriorityBadgeClass(c.priority)}">${c.priority}</span>`;
     document.getElementById('fieldStatus').innerHTML = `<span class="badge ${canStatusBadgeClass(c.status)}">${c.status}</span>`;

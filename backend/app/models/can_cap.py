@@ -181,6 +181,7 @@ class CANCreate(CANFormFields):
     assigned_to_uid: Optional[str] = None
     department: Optional[str] = None
     priority: str = Field(..., pattern="^(High|Medium|Low)$")
+    psoe_assessment_id: Optional[str] = None
 
 
 class CANUpdate(CANFormFields):
@@ -216,6 +217,7 @@ class CANResponse(CANFormFields, CAPFormFields):
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    psoe_assessment_id: Optional[str] = None
     latest_cap: Optional[dict] = None
 
     model_config = {"from_attributes": True}

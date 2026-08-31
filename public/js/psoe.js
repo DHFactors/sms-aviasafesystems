@@ -575,6 +575,7 @@
         var params = new URLSearchParams();
         params.set('source', 'psoe');
         if (state.assessmentId) params.set('psoe_assessment', state.assessmentId);
+        if (state.assessmentId) params.set('psoe_assessment_id', state.assessmentId);
         params.set('title', 'PSOE finding — ' + q.id + ': ' + q.text.slice(0, 80) + (q.text.length > 80 ? '…' : ''));
         var desc = 'Appendix 10 surveillance finding ' + q.id + ' (' + scoreLabel + ').';
         if (rec.comment) desc += '\n\nObservations: ' + rec.comment;

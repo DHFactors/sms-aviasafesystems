@@ -299,6 +299,7 @@ class Can(Base):
     initial_sra: Mapped[object] = mapped_column(JSONB, nullable=True)
     classification_type: Mapped[object] = mapped_column(Text, nullable=True)
     classification_level: Mapped[object] = mapped_column(Text, nullable=True)
+    psoe_assessment_id: Mapped[object] = mapped_column(Text, nullable=True)
 
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

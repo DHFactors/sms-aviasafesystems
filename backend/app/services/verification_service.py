@@ -217,7 +217,16 @@ class VerificationService:
     def reopen_hazard(self, hazard_id: str, reason: str, user: dict) -> Optional[dict]:
         svc_user = {"uid": user["uid"], "role": "AIRLINE_ADMIN", "tenant_id": self.tenant_id}
         logger.info(f"Hazard {hazard_id} reopened: {reason}")
-        return HazardService(self.tenant_id).update_status(hazard_id, "Reopened", svc_user)
+        updated = HazardService(self.tenant_id).update_status(hazard_id, "Reopened", svc_user)
+        # A hazard archived on closure must be fully reactivated on reopen, so
+        # clear the Firestore archived flag to keep the document consistent.
+        hazard_doc_id = self._resolve_hazard_doc_id(hazard_id)
+        if hazard_doc_id:
+            self._hazard_ref(hazard_doc_id).update({
+                "archived": False,
+                "updated_at": datetime.now(timezone.utc),
+            })
+        return updated
 
     def get_verification_stats(self, user: dict) -> Dict[str, Any]:
         try:
