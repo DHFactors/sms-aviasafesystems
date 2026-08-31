@@ -1098,6 +1098,10 @@ function renderSituationalBanner() {
     expEl.className = 'sit-chip ' + (intolerable > 0 ? 'sit-red' : expN > 0 ? 'sit-amber' : 'sit-green');
     expEl.textContent = intolerable + ' intolerable · ' + high + ' high — active';
 
+    // Precursor intelligence composite (Doc 10159) — used by the banner chip
+    // and popover below.
+    const pc = computePrecursorComponents();
+
     // 3. Executive action queue
     const pending = gCaps.filter(function(c) { return c.escalated_to_ae; }).length;
     const qEl = document.getElementById('sitQueue');

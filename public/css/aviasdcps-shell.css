@@ -146,6 +146,20 @@
 }
 .aviasdcps-header-toggle:hover { opacity: 1; }
 
+/* ── Hamburger (mobile) ───────────────────────────────────────────────────── */
+.hamburger-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
+}
+.hamburger-btn:hover { background: rgba(255,255,255,0.08); }
+.hamburger-btn:focus-visible { outline: 2px solid var(--aviasdcps-green); outline-offset: 2px; }
+
 .aviasdcps-period {
     display: flex; align-items: center; gap: 0.35rem;
 }
@@ -216,4 +230,5 @@
     .aviasdcps-sidebar.open { transform: translateX(0); }
     .aviasdcps-main { margin-left: 0; }
     .aviasdcps-header .aviasdcps-period { display: none; }
+    .hamburger-btn { display: block; }
 }

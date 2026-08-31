@@ -31,7 +31,7 @@
 <body>
 
   <!-- 13-Item Categorized Sidebar Navigation -->
-  <aside class="aviasdcps-sidebar">
+  <aside class="aviasdcps-sidebar" id="aviasdcpsSidebar">
     <div class="brand-header">
       <i class="fa-solid fa-shield-halved"></i>
       <span>aviaSDCPS</span>
@@ -110,6 +110,9 @@
   <main class="aviasdcps-workspace">
     <!-- Top Sticky Header -->
     <header class="aviasdcps-header">
+      <button id="sidebarToggle" class="hamburger-btn" aria-label="Toggle navigation" aria-expanded="false">
+        <i class="fa-solid fa-bars"></i>
+      </button>
       <div class="header-title-area">
         <h1 id="currentViewTitle">Home Dashboard</h1>
       </div>
@@ -169,5 +172,29 @@
 
   <!-- Dynamic Router Dispatcher -->
   <script src="js/aviasdcps-router.js"></script>
+
+  <!-- Mobile sidebar toggle (hamburger) -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var toggle = document.getElementById('sidebarToggle');
+      var sidebar = document.getElementById('aviasdcpsSidebar');
+      if (toggle && sidebar) {
+        toggle.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var isOpen = sidebar.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+        // Clicking outside the sidebar closes it (mobile off-canvas drawer).
+        document.addEventListener('click', function (e) {
+          if (sidebar.classList.contains('open') &&
+              !sidebar.contains(e.target) &&
+              !toggle.contains(e.target)) {
+            sidebar.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>
