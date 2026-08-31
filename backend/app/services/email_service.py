@@ -20,11 +20,11 @@ import ssl
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from email.utils import formataddr
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
 
@@ -255,4 +255,303 @@ def send_regulatory_report(
             "reason": f"EMAIL_PROVIDER '{provider}' not configured for regulatory dispatch",
         }
     result["payload_sha256"] = payload_hash
+    return result
+
+
+# ============================================================================
+# CAN / CAP workflow notifications
+# ============================================================================
+
+
+def days_overdue(target_date: Any, now: Optional[datetime] = None) -> int:
+    """Whole days the target completion date is past (0 if not yet past or unset)."""
+    try:
+        if isinstance(target_date, str):
+            dt = datetime.fromisoformat(target_date.replace("Z", "+00:00"))
+        else:
+            dt = target_date
+        now = now or datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        diff = now - dt
+        if diff.total_seconds() <= 0:
+            return 0
+        return int(diff.days)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+def _split_emails(value: Any) -> List[str]:
+    """Normalise a single email, a comma-separated string, or a list into
+    unique non-empty recipient addresses."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        parts = [p.strip() for p in value.replace(";", ",").split(",")]
+    elif isinstance(value, (list, tuple, set)):
+        parts = [str(p).strip() for p in value]
+    else:
+        parts = [str(value).strip()]
+    seen: List[str] = []
+    for p in parts:
+        if p and "@" in p and p not in seen:
+            seen.append(p)
+    return seen
+
+
+def _dispatch_notification(to_list: List[str], subject: str, html_body: str, text_body: str) -> Dict[str, Any]:
+    """Dispatch a simple notification to one or more recipients using the
+    configured EMAIL_PROVIDER (none / smtp / sendgrid). Never raises; returns a
+    per-recipient result list plus an overall summary."""
+    provider = (settings.EMAIL_PROVIDER or "none").strip().lower()
+    recipient_results: List[Dict[str, Any]] = []
+
+    if not to_list:
+        return {
+            "sent": False,
+            "provider": provider,
+            "recipients": 0,
+            "reason": "No recipients provided",
+            "preview": html_body,
+        }
+
+    if provider == "smtp":
+        for to in to_list:
+            recipient_results.append(_retry_with_backoff(_send_notification_smtp, to, subject, html_body, text_body))
+    elif provider == "sendgrid":
+        for to in to_list:
+            recipient_results.append(_retry_with_backoff(_send_notification_sendgrid, to, subject, html_body, text_body))
+    else:
+        for to in to_list:
+            recipient_results.append(
+                {
+                    "sent": False,
+                    "provider": "none",
+                    "to": to,
+                    "reason": "EMAIL_PROVIDER is 'none' — notification logged, not delivered",
+                }
+            )
+
+    sent = sum(1 for r in recipient_results if r.get("sent"))
+    return {
+        "sent": sent > 0,
+        "provider": provider,
+        "recipients": len(recipient_results),
+        "delivered": sent,
+        "results": recipient_results,
+        "preview": html_body if provider == "none" else None,
+    }
+
+
+def _send_notification_smtp(to: str, subject: str, html_body: str, text_body: str) -> Dict[str, Any]:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = formataddr(_from_address())
+    msg["To"] = to
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
+    host = settings.SMTP_HOST
+    if not host:
+        raise ValueError("SMTP_HOST is not configured")
+    port = int(settings.SMTP_PORT or 587)
+    with smtplib.SMTP(host, port, timeout=30) as server:
+        if port in (587, 25):
+            server.starttls(context=ssl.create_default_context())
+        if settings.SMTP_USER and settings.SMTP_PASS:
+            server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.send_message(msg)
+    return {"sent": True, "provider": "smtp", "to": to, "host": host}
+
+
+def _send_notification_sendgrid(to: str, subject: str, html_body: str, text_body: str) -> Dict[str, Any]:
+    api_key = settings.SENDGRID_API_KEY
+    if not api_key:
+        raise ValueError("SENDGRID_API_KEY is not configured")
+    sender_name, sender = _from_address()
+    payload = {
+        "personalizations": [{"to": [{"email": to}]}],
+        "from": {"email": sender, "name": sender_name},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": text_body},
+            {"type": "text/html", "value": html_body},
+        ],
+    }
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=__import__("json").dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        status = resp.status
+    if status != 202:
+        raise RuntimeError(f"SendGrid returned HTTP {status}")
+    return {"sent": True, "provider": "sendgrid", "to": to}
+
+
+def _can_email_context(can_data: Dict[str, Any]) -> Dict[str, str]:
+    target = can_data.get("target_completion_date")
+    target_str = (target.isoformat() if hasattr(target, "isoformat") else str(target)) if target else "Not set"
+    return {
+        "can_reference": can_data.get("can_reference") or "—",
+        "title": can_data.get("title") or "Untitled",
+        "priority": can_data.get("priority") or "—",
+        "hazard_id": can_data.get("hazard_id") or "—",
+        "target_completion_date": target_str,
+        "issued_by": can_data.get("issued_by") or "—",
+        "login_url": settings.APP_LOGIN_URL,
+    }
+
+
+def send_can_issued_email(can_data: Dict[str, Any], to: Any = None) -> Dict[str, Any]:
+    """Notify a CAN's assignee (+ CC copies) that a corrective action notice
+    has been issued to them. Recipients default to `to`, falling back to the
+    CAN's assigned_to and copies_to fields."""
+    ctx = _can_email_context(can_data)
+    recipients = _split_emails(to)
+    if not recipients:
+        recipients = _split_emails(can_data.get("assigned_to"))
+    recipients += _split_emails(can_data.get("copies_to"))
+    recipients = list(dict.fromkeys(recipients))
+
+    subject = f"Action Required: CAN {ctx['can_reference']} issued to you"
+    text_body = (
+        f"Dear assignee,\n\n"
+        f"A Corrective Action Notice has been issued to you.\n\n"
+        f"CAN Reference: {ctx['can_reference']}\n"
+        f"Hazard Reference: {ctx['hazard_id']}\n"
+        f"Title: {ctx['title']}\n"
+        f"Priority: {ctx['priority']}\n"
+        f"Target Completion: {ctx['target_completion_date']}\n"
+        f"Issued By: {ctx['issued_by']}\n\n"
+        f"Please log in to AviaSAFE SMS ({ctx['login_url']}) to review and "
+        f"respond before the target completion date.\n\n"
+        "Regards,\nAviaSAFE SMS Team"
+    )
+    html_body = (
+        f"<p>Dear assignee,</p>"
+        f"<p>A <strong>Corrective Action Notice</strong> has been issued to you.</p>"
+        f"<ul>"
+        f"<li><strong>CAN Reference:</strong> {ctx['can_reference']}</li>"
+        f"<li><strong>Hazard Reference:</strong> {ctx['hazard_id']}</li>"
+        f"<li><strong>Title:</strong> {ctx['title']}</li>"
+        f"<li><strong>Priority:</strong> {ctx['priority']}</li>"
+        f"<li><strong>Target Completion:</strong> {ctx['target_completion_date']}</li>"
+        f"<li><strong>Issued By:</strong> {ctx['issued_by']}</li>"
+        f"</ul>"
+        f"<p>Please log in to <a href=\"{ctx['login_url']}\">AviaSAFE SMS</a> "
+        f"to review and respond before the target completion date.</p>"
+        f"<p>Regards,<br>AviaSAFE SMS Team</p>"
+    )
+    result = _dispatch_notification(recipients, subject, html_body, text_body)
+    logger.info(
+        f"CAN issued notification for {ctx['can_reference']}: "
+        f"provider={result.get('provider')} recipients={result.get('recipients')} sent={result.get('delivered', 0)}"
+    )
+    return result
+
+
+def _cap_email_context(cap_data: Dict[str, Any]) -> Dict[str, str]:
+    target = cap_data.get("target_completion_date")
+    target_str = (target.isoformat() if hasattr(target, "isoformat") else str(target)) if target else "Not set"
+    return {
+        "cap_reference": cap_data.get("cap_reference") or "—",
+        "can_reference": cap_data.get("can_reference") or "—",
+        "action_plan": cap_data.get("action_plan") or "—",
+        "target_completion_date": target_str,
+        "department": cap_data.get("department") or "—",
+        "submitted_by": cap_data.get("submitted_by") or "—",
+        "login_url": settings.APP_LOGIN_URL,
+    }
+
+
+def send_cap_submitted_email(cap_data: Dict[str, Any], to: Any = None) -> Dict[str, Any]:
+    """Notify the Safety Manager (or provided recipients) that a Corrective
+    Action Plan has been submitted for review."""
+    ctx = _cap_email_context(cap_data)
+    recipients = _split_emails(to)
+    recipients = list(dict.fromkeys(recipients))
+
+    subject = f"CAP {ctx['cap_reference']} submitted for review"
+    text_body = (
+        f"Dear Safety Manager,\n\n"
+        f"A Corrective Action Plan has been submitted for your review.\n\n"
+        f"CAP Reference: {ctx['cap_reference']}\n"
+        f"CAN Reference: {ctx['can_reference']}\n"
+        f"Action Plan: {ctx['action_plan']}\n"
+        f"Department: {ctx['department']}\n"
+        f"Target Completion: {ctx['target_completion_date']}\n"
+        f"Submitted By: {ctx['submitted_by']}\n\n"
+        f"Please log in to AviaSAFE SMS ({ctx['login_url']}) to review the plan.\n\n"
+        "Regards,\nAviaSAFE SMS Team"
+    )
+    html_body = (
+        f"<p>Dear Safety Manager,</p>"
+        f"<p>A <strong>Corrective Action Plan</strong> has been submitted for your review.</p>"
+        f"<ul>"
+        f"<li><strong>CAP Reference:</strong> {ctx['cap_reference']}</li>"
+        f"<li><strong>CAN Reference:</strong> {ctx['can_reference']}</li>"
+        f"<li><strong>Action Plan:</strong> {ctx['action_plan']}</li>"
+        f"<li><strong>Department:</strong> {ctx['department']}</li>"
+        f"<li><strong>Target Completion:</strong> {ctx['target_completion_date']}</li>"
+        f"<li><strong>Submitted By:</strong> {ctx['submitted_by']}</li>"
+        f"</ul>"
+        f"<p>Please log in to <a href=\"{ctx['login_url']}\">AviaSAFE SMS</a> to review the plan.</p>"
+        f"<p>Regards,<br>AviaSAFE SMS Team</p>"
+    )
+    result = _dispatch_notification(recipients, subject, html_body, text_body)
+    logger.info(
+        f"CAP submitted notification for {ctx['cap_reference']}: "
+        f"provider={result.get('provider')} recipients={result.get('recipients')} sent={result.get('delivered', 0)}"
+    )
+    return result
+
+
+def send_cap_overdue_email(cap_data: Dict[str, Any], to: Any = None) -> Dict[str, Any]:
+    """Send an overdue reminder for a CAP whose target completion date has
+    passed. Recipients default to `to`, falling back to the CAP's process
+    owner if available."""
+    ctx = _cap_email_context(cap_data)
+    over = days_overdue(cap_data.get("target_completion_date"))
+    recipients = _split_emails(to)
+    if not recipients:
+        recipients = _split_emails(cap_data.get("process_owner"))
+    recipients = list(dict.fromkeys(recipients))
+
+    subject = f"OVERDUE: CAP {ctx['cap_reference']} is {over} day(s) past due"
+    text_body = (
+        f"Dear process owner,\n\n"
+        f"Your Corrective Action Plan is past its target completion date.\n\n"
+        f"CAP Reference: {ctx['cap_reference']}\n"
+        f"CAN Reference: {ctx['can_reference']}\n"
+        f"Action Plan: {ctx['action_plan']}\n"
+        f"Target Completion: {ctx['target_completion_date']}\n"
+        f"Days Overdue: {over}\n\n"
+        f"Please log in to AviaSAFE SMS ({ctx['login_url']}) to update the plan "
+        f"or request an extension.\n\n"
+        "Regards,\nAviaSAFE SMS Team"
+    )
+    html_body = (
+        f"<p>Dear process owner,</p>"
+        f"<p>Your <strong>Corrective Action Plan</strong> is past its target completion date.</p>"
+        f"<ul>"
+        f"<li><strong>CAP Reference:</strong> {ctx['cap_reference']}</li>"
+        f"<li><strong>CAN Reference:</strong> {ctx['can_reference']}</li>"
+        f"<li><strong>Action Plan:</strong> {ctx['action_plan']}</li>"
+        f"<li><strong>Target Completion:</strong> {ctx['target_completion_date']}</li>"
+        f"<li><strong>Days Overdue:</strong> {over}</li>"
+        f"</ul>"
+        f"<p>Please log in to <a href=\"{ctx['login_url']}\">AviaSAFE SMS</a> "
+        f"to update the plan or request an extension.</p>"
+        f"<p>Regards,<br>AviaSAFE SMS Team</p>"
+    )
+    result = _dispatch_notification(recipients, subject, html_body, text_body)
+    logger.info(
+        f"CAP overdue notification for {ctx['cap_reference']}: "
+        f"provider={result.get('provider')} recipients={result.get('recipients')} sent={result.get('delivered', 0)}"
+    )
     return result

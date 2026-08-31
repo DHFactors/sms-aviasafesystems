@@ -235,6 +235,22 @@ class CanCapService:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
 
+    def _safety_manager_email(self) -> Optional[str]:
+        """Resolve the tenant Safety Manager notification email from the
+        Firestore tenant document (safety_manager.email). Returns None when the
+        tenant document or email is unavailable (email is then skipped, never
+        raising into the workflow)."""
+        try:
+            from app.firebase import get_db
+            doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).get()
+            if not doc.exists:
+                return None
+            sm = (doc.to_dict() or {}).get("safety_manager") or {}
+            return sm.get("email") or None
+        except Exception as e:
+            logger.warning(f"Failed to resolve Safety Manager email for {self.tenant_id}: {e}")
+            return None
+
     # ── SRA (Safety Risk Assessment) helpers ──
 
     SEVERITY_LETTERS = ["A", "B", "C", "D", "E"]
@@ -282,7 +298,15 @@ class CanCapService:
     # ── CAN CRUD ──
 
     def issue_can(self, payload: dict, user: dict) -> dict:
-        return run(self._issue_can_async(payload, user))
+        data = run(self._issue_can_async(payload, user))
+        try:
+            from app.services.email_service import send_can_issued_email
+            send_can_issued_email(data, to=payload.get("assigned_to"))
+        except Exception as e:
+            logger.warning(
+                f"CAN issued notification failed for {data.get('can_reference')}: {e}"
+            )
+        return data
 
     async def _issue_can_async(self, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
@@ -557,7 +581,18 @@ class CanCapService:
     # ── CAP CRUD ──
 
     def submit_cap(self, can_id: str, payload: dict, user: dict) -> dict:
-        return run(self._submit_cap_async(can_id, payload, user))
+        data = run(self._submit_cap_async(can_id, payload, user))
+        sm_email = self._safety_manager_email()
+        if not sm_email:
+            sm_email = payload.get("assigned_to")
+        try:
+            from app.services.email_service import send_cap_submitted_email
+            send_cap_submitted_email(data, to=sm_email)
+        except Exception as e:
+            logger.warning(
+                f"CAP submitted notification failed for {data.get('cap_reference')}: {e}"
+            )
+        return data
 
     async def _submit_cap_async(self, can_id: str, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
