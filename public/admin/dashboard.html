@@ -1,0 +1,931 @@
+<!-- ============================================================================
+FILE: dashboard.html
+PATH: public/admin/dashboard.html
+PURPOSE: Unified Super Admin Dashboard. Consolidates into a single page:
+           - Test Portal   (every frontend page, grouped by module)
+           - Tenant Mgmt   (governance: list + activate/suspend)
+           - Production Setup (regulator, tenant, bulk, seed preview/deploy)
+           - Audit Log     (recent seeding/regulator actions)
+           - Dummy Data    (VSR/MOR/CAN/CAP seed & unseed)
+         SUPER_ADMIN only. Relies on AdminUI helpers + /api/v1/admin endpoints.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Dashboard — AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+
+    <style>
+        body { font-family: var(--font-family); }
+
+        /* ---------- Shell ---------- */
+        .admin-shell { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 240px; flex: 0 0 240px;
+            background: var(--color-deep-teal-950, #051a26);
+            color: #fff; display: flex; flex-direction: column;
+            transition: margin-left .25s ease;
+        }
+        .sidebar .brand-side {
+            padding: 18px 20px; font-weight: 800; font-size: .95rem;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            display: flex; align-items: center; gap: 8px; white-space: nowrap;
+        }
+        .sidebar .brand-side .fas { color: #4fc3f7; }
+        .sidebar nav { padding: 12px 0; flex: 1; }
+        .sidebar nav a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 11px 20px; color: #cbd5e1; text-decoration: none;
+            font-size: .875rem; border-left: 3px solid transparent;
+            transition: background .15s, color .15s, border-color .15s;
+        }
+        .sidebar nav a .fas { width: 20px; text-align: center; color: #8aa7bd; }
+        .sidebar nav a:hover { background: rgba(255,255,255,.06); color: #fff; }
+        .sidebar nav a.active { background: rgba(79,195,247,.12); color: #fff; border-left-color: #4fc3f7; }
+        .sidebar nav a.active .fas { color: #4fc3f7; }
+        .sidebar .side-foot {
+            padding: 14px 20px; font-size: .7rem; color: #6b8396;
+            border-top: 1px solid rgba(255,255,255,.08);
+        }
+
+        .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .topbar {
+            background: var(--color-deep-teal-900, #072535); color: #fff;
+            padding: 12px 24px; display: flex; align-items: center;
+            justify-content: space-between; gap: 12px; flex-wrap: wrap;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+        }
+        .topbar .tb-left { display: flex; align-items: center; gap: 10px; }
+        .hamburger {
+            background: none; border: none; color: #4fc3f7; font-size: 1.2rem;
+            cursor: pointer; display: none; padding: 4px;
+        }
+        .topbar .page-title { font-weight: 700; font-size: 1rem; }
+        .topbar .user-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .user-badge { background: rgba(255,255,255,.14); color: #fff; padding: .3rem 1rem; border-radius: 999px; font-size: .82rem; }
+        .user-badge .role-chip { background: #4fc3f7; color: #072535; padding: .02rem .5rem; border-radius: 999px; margin-right: .4rem; font-weight: 700; }
+
+        .content-area { padding: 24px; flex: 1; background: var(--color-bg, #f8fafc); }
+
+        .side-foot2 { text-align: center; color: var(--color-gray-500, #9aa0a6); font-size: .8rem; padding: 18px 0 26px; }
+        .side-foot2 i { color: #e2574c; }
+
+        /* ---------- View wrappers ---------- */
+        .view { display: none; }
+        .view.active { display: block; }
+        .view-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 1.2rem; }
+        .view-head h2 { margin: 0; font-size: 1.35rem; color: var(--color-text-strong, #0f172a); }
+        .view-head .sub { color: var(--color-text-muted, #64748b); font-size: .85rem; }
+
+        .gov-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .gov-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+        .gov-badge.beta { background: var(--color-brand-100); color: var(--color-brand-600); }
+        .gov-empty { padding: 36px; text-align: center; color: var(--color-gray-600); }
+        .gov-table td { vertical-align: middle; }
+
+        .form-inline { display: flex; gap: 10px; margin-top: 12px; }
+
+        /* Access denied */
+        .error-state { max-width: 520px; margin: 5rem auto; text-align: center; background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.08); padding: 3rem 2rem; }
+        .error-state h2 { color: var(--color-text-strong, #0f172a); margin: 1rem 0 .5rem; }
+
+        @media (max-width: 760px) {
+            .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 900; margin-left: -240px; }
+            .sidebar.open { margin-left: 0; }
+            .hamburger { display: inline-block; }
+            .gov-actions { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar" id="sidebar">
+        <div class="brand-side"><i class="fas fa-plane"></i> AviaSAFE Admin</div>
+        <nav>
+            <a href="#" data-view="view-test-portal" class="active"><i class="fas fa-flask"></i> Test Portal</a>
+            <a href="#" data-view="view-tenant-mgmt"><i class="fas fa-building"></i> Tenant Mgmt</a>
+            <a href="#" data-view="view-production-setup"><i class="fas fa-cogs"></i> Production Setup</a>
+            <a href="#" data-view="view-audit-log"><i class="fas fa-clipboard-list"></i> Audit Log</a>
+            <a href="#" data-view="view-dummy-data"><i class="fas fa-database"></i> Dummy Data</a>
+        </nav>
+        <div class="side-foot">Made with <i style="color:#e2574c;">&#9829;</i> from Nepal</div>
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <div class="main-area">
+        <div class="topbar">
+            <div class="tb-left">
+                <button class="hamburger" id="hamburger" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <span class="page-title" id="pageTitle">Super Admin Dashboard</span>
+            </div>
+            <div class="user-info">
+                <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+                <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- Gated area: replaced with the whole dashboard or an access-denied panel -->
+            <div id="gate"></div>
+        </div>
+
+        <div class="side-foot2">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:460px;width:90%;">
+        <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
+        <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeConfirm()">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// PAGE DATA — grouped by module (same inventory as the standalone test portal)
+// ============================================================================
+
+var PORTAL_MODULES = [
+    {
+        icon: "fa-gauge-high", title: "Operator Dashboards", sub: "Safety Manager, AE and operations dashboards",
+        pages: [
+            { title: "Safety Manager Dashboard",  path: "/safety.html",                           roles: ["admin"], status: "ready" },
+            { title: "SMS Maturity Dashboard",    path: "/dashboard/index.html",                   roles: ["admin"], status: "ready" },
+            { title: "Accountable Executive Dashboard", path: "/dashboard/ae-dashboard.html",      roles: ["admin"], status: "beta" },
+            { title: "Risk & Trends",             path: "/risk-trends.html",                      roles: ["admin"], status: "ready" },
+            { title: "Top Hazards",               path: "/top-hazards.html",                      roles: ["admin"], status: "ready" },
+            { title: "My Tasks",                  path: "/dashboard/responsible-manager.html",     roles: ["user"], status: "ready" },
+            { title: "Master Register",           path: "/dashboard/master-register.html",         roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-landmark", title: "CAAN / State Regulator", sub: "Regulator oversight and state risk",
+        pages: [
+            { title: "CAAN SMD Dashboard",  path: "/caan.html",                        roles: ["caan"], status: "ready" },
+            { title: "State Risk Register", path: "/caan-state-risk.html",             roles: ["caan"], status: "ready" },
+            { title: "CAAN SMS Maturity",   path: "/dashboard/caan-sms-maturity.html", roles: ["caan"], status: "ready" },
+            { title: "CAAN Oversight",      path: "/views/caan-oversight.html",        roles: ["caan"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-triangle-exclamation", title: "Safety Risk Management (SRM)", sub: "Hazards and risk analysis",
+        pages: [
+            { title: "Hazard Analysis",           path: "/hazards/index.html",  roles: ["admin"], status: "ready" },
+            { title: "Hazard Detail",             path: "/hazards/detail.html",  roles: ["admin"], status: "ready" },
+            { title: "Create Hazard",             path: "/hazards/create.html",  roles: ["admin"], status: "ready" },
+            { title: "Hazard Analysis Workspace", path: "/hazard-analysis.html", roles: ["admin"], status: "beta" },
+        ]
+    },
+    {
+        icon: "fa-clipboard-check", title: "CAN / CAP", sub: "Corrective Action Notices & Plans",
+        pages: [
+            { title: "Master CAN Register", path: "/can_cap/cans.html",       roles: ["admin"], status: "ready" },
+            { title: "Master CAP Register", path: "/can_cap/caps.html",       roles: ["admin"], status: "ready" },
+            { title: "CAN Detail",          path: "/can_cap/can_detail.html", roles: ["admin"], status: "ready" },
+            { title: "CAP Review",          path: "/can_cap/cap_review.html", roles: ["admin"], status: "ready" },
+            { title: "CAP Submit",          path: "/can_cap/cap_submit.html", roles: ["user"], status: "ready" },
+            { title: "Issue CAN",           path: "/can_cap/issue.html",      roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-magnifying-glass-chart", title: "PSOE Audit", sub: "Audit & surveillance",
+        pages: [
+            { title: "PSOE Audit", path: "/audits/psoe.html", roles: ["admin", "caan"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-file-lines", title: "Reports", sub: "Compile and export reports",
+        pages: [
+            { title: "Reports List",    path: "/reports/index.html",    roles: ["admin"], status: "ready" },
+            { title: "Generate Report", path: "/reports/generate.html", roles: ["admin"], status: "ready" },
+            { title: "View Report",     path: "/reports/view.html",     roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-plane-departure", title: "Flight Diversions", sub: "Diversion reporting",
+        pages: [
+            { title: "Diversions List",  path: "/flight_diversions/index.html",  roles: ["admin"], status: "ready" },
+            { title: "Report Diversion", path: "/flight_diversions/create.html",  roles: ["admin"], status: "ready" },
+            { title: "Diversion Detail", path: "/flight_diversions/detail.html",  roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-database", title: "SDCPS / Data", sub: "Safety data collection & query",
+        pages: [
+            { title: "SDCPS Workspace",    path: "/aviasdcps.html#home", roles: ["admin"], status: "beta" },
+            { title: "SDC Ingestion",      path: "/aviasdcps.html#sdc",  roles: ["admin"], status: "beta" },
+            { title: "Data Query",         path: "/aviasdcps.html#data", roles: ["admin"], status: "beta" },
+            { title: "HRC Tracking",       path: "/aviasdcps.html#hrc",  roles: ["admin"], status: "dev" },
+            { title: "SPI/SPT Monitoring", path: "/aviasdcps.html#spis", roles: ["admin"], status: "dev" },
+        ]
+    },
+    {
+        icon: "fa-user-gear", title: "Administration", sub: "System and team administration",
+        pages: [
+            { title: "Team Management",         path: "/settings/team.html",          roles: ["admin"], status: "ready" },
+            { title: "Administration",          path: "/administration.html",         roles: ["admin"], status: "ready" },
+            { title: "Production Setup",        path: "/admin/production-setup.html", roles: ["super"], status: "ready" },
+            { title: "Super Admin Test Portal", path: "/admin/test-portal.html",      roles: ["super"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-globe", title: "Public Pages", sub: "Guest-facing pages",
+        pages: [
+            { title: "Login",                 path: "/login.html",   roles: ["none"], status: "ready" },
+            { title: "Register Organization", path: "/register.html", roles: ["none"], status: "ready" },
+            { title: "Join Team",             path: "/join.html",    roles: ["none"], status: "ready" },
+            { title: "Survey",                path: "/survey/",      roles: ["none"], status: "ready" },
+            { title: "Homepage",              path: "/index.html",   roles: ["none"], status: "ready" },
+            { title: "Privacy Policy",        path: "/privacy.html", roles: ["none"], status: "ready" },
+            { title: "Terms of Service",      path: "/terms.html",   roles: ["none"], status: "ready" },
+        ]
+    },
+];
+
+var ROLE_CLASS = {
+    "SUPER_ADMIN": "super", "AIRLINE_ADMIN": "admin", "TENANT_ADMIN": "admin",
+    "CAAN_SMD": "caan", "CAAN_INSPECTOR": "caan", "DEPT_ADMIN": "user", "USER": "user"
+};
+var PAGE_ROLE_LABEL = {
+    super: "SUPER_ADMIN", admin: "AIRLINE_ADMIN", caan: "CAAN_SMD", user: "USER", none: "Public"
+};
+
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+
+var currentUser = null;
+var pendingConfirm = null; // { type:'deploy'|'demo', body?, force? }
+
+function esc(v) { return AdminUI.esc(v); }
+function toast(m, t) { AdminUI.toast(m, t); }
+
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+    bindNav();
+    showView('view-test-portal');
+});
+
+function renderAccessDenied() {
+    document.getElementById('gate').innerHTML =
+        '<div class="error-state">' +
+            '<i class="fas fa-lock" style="font-size:3rem;color:#dc3545;"></i>' +
+            '<h2>Access Denied</h2>' +
+            '<p>This page is restricted to SUPER_ADMIN users. You are signed in as <strong>' + esc((currentUser && currentUser.email) || 'a user') + '</strong>.</p>' +
+            '<button class="btn btn-primary" onclick="logout()">Sign out</button>' +
+        '</div>';
+}
+
+function logout() {
+    firebase.auth().signOut().then(function () { window.location.href = '/'; })
+        .catch(function () { window.location.href = '/'; });
+}
+
+// ============================================================================
+// NAVIGATION
+// ============================================================================
+
+var VIEW_TITLES = {
+    'view-test-portal': 'Test Portal',
+    'view-tenant-mgmt': 'Tenant Management',
+    'view-production-setup': 'Production Setup',
+    'view-audit-log': 'Audit Log',
+    'view-dummy-data': 'Dummy Data'
+};
+
+function bindNav() {
+    document.querySelectorAll('.sidebar nav a').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            showView(a.getAttribute('data-view'));
+        });
+    });
+}
+
+function showView(viewId) {
+    document.querySelectorAll('.sidebar nav a').forEach(function (a) {
+        a.classList.toggle('active', a.getAttribute('data-view') === viewId);
+    });
+    document.getElementById('pageTitle').textContent = 'Super Admin · ' + (VIEW_TITLES[viewId] || '');
+    closeSidebar();
+    renderView(viewId);
+}
+
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
+
+function renderView(viewId) {
+    var gate = document.getElementById('gate');
+    if (viewId === 'view-test-portal') renderTestPortal(gate);
+    else if (viewId === 'view-tenant-mgmt') renderTenantMgmt(gate);
+    else if (viewId === 'view-production-setup') renderProductionSetup(gate);
+    else if (viewId === 'view-audit-log') renderAuditLog(gate);
+    else if (viewId === 'view-dummy-data') renderDummyData(gate);
+}
+
+// ============================================================================
+// VIEW 1 — TEST PORTAL
+// ============================================================================
+
+function renderTestPortal(gate) {
+    var totalPages = 0, totalReady = 0;
+    PORTAL_MODULES.forEach(function (m) { m.pages.forEach(function (p) { totalPages++; if (p.status === 'ready') totalReady++; }); });
+
+    var html = '<div class="view active">';
+    html += '<div class="view-head"><div><h2><i class="fas fa-flask" style="color:var(--color-brand-600);"></i> Test Portal</h2>' +
+        '<div class="sub">One-click links to every frontend page, grouped by module.</div></div>' +
+        '<div class="search-box"><i class="fas fa-magnifying-glass"></i><input type="text" id="pageFilter" placeholder="Search pages..." oninput="applyFilter(this.value)"></div></div>';
+
+    html += '<div class="stats-row">' +
+        '<div class="stat-card"><div class="num">' + totalPages + '</div><div class="lbl">Pages</div></div>' +
+        '<div class="stat-card"><div class="num">' + PORTAL_MODULES.length + '</div><div class="lbl">Modules</div></div>' +
+        '<div class="stat-card"><div class="num">' + totalReady + '</div><div class="lbl">Ready</div></div>' +
+        '<div class="stat-card"><div class="num">' + (totalPages - totalReady) + '</div><div class="lbl">Beta / Dev</div></div>' +
+    '</div>';
+
+    html += '<div class="module-grid">';
+    PORTAL_MODULES.forEach(function (m) {
+        html += '<div class="module-card" data-module="' + esc(m.title) + '">' +
+            '<h3><i class="fas ' + m.icon + '"></i>' + esc(m.title) + '</h3>' +
+            '<p class="module-sub">' + esc(m.sub || '') + '</p>';
+        m.pages.forEach(function (p) {
+            html += '<a class="page-link" href="' + esc(p.path) + '">' +
+                '<span class="p-title">' + esc(p.title) + '<span class="p-path">' + esc(p.path) + '</span></span>' +
+                '<span class="page-tags">' + roleTags(p.roles) + statusTag(p.status) + '</span></a>';
+        });
+        html += '</div>';
+    });
+    html += '</div>';
+    html += '<div id="filterEmpty" class="empty-state" style="display:none;"></div>';
+    html += '</div>';
+
+    gate.innerHTML = html;
+}
+
+function roleTags(roles) {
+    return (roles || []).map(function (r) {
+        var cls = (ROLE_CLASS[r] || 'user');
+        return '<span class="role-tag ' + cls + '">' + PAGE_ROLE_LABEL[cls] + '</span>';
+    }).join('');
+}
+function statusTag(status) {
+    return '<span class="status-badge status-' + esc(status) + '">' + esc(status) + '</span>';
+}
+
+function applyFilter(value) {
+    var q = (value || '').trim().toLowerCase();
+    var anyVisible = false;
+    var cards = document.querySelectorAll('.module-card');
+    cards.forEach(function (card) {
+        var moduleTitle = (card.getAttribute('data-module') || '').toLowerCase();
+        var links = card.querySelectorAll('.page-link');
+        var shown = 0;
+        links.forEach(function (link) {
+            var text = (link.textContent || '').toLowerCase();
+            var visible = !q || text.indexOf(q) !== -1 || moduleTitle.indexOf(q) !== -1;
+            link.style.display = visible ? '' : 'none';
+            if (visible) shown++;
+        });
+        card.style.display = (shown > 0) ? '' : 'none';
+        if (shown > 0) anyVisible = true;
+    });
+    var empty = document.getElementById('filterEmpty');
+    if (empty) {
+        empty.style.display = q && !anyVisible ? '' : 'none';
+        empty.innerHTML = q && !anyVisible ? 'No pages match "' + esc(value) + '".' : '';
+    }
+}
+
+// ============================================================================
+// VIEW 2 — TENANT MANAGEMENT (governance)
+// ============================================================================
+
+var GOVERNANCE_TENANTS = [];
+
+function renderTenantMgmt(gate) {
+    var html = '<div class="view active">';
+    html += '<div class="view-head"><div><h2><i class="fas fa-building" style="color:var(--color-brand-600);"></i> Tenant Management</h2>' +
+        '<div class="sub">Activate or suspend tenants. Suspended tenants\u2019 users are locked out server-side.</div></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="loadGovernance()"><i class="fas fa-sync"></i> Refresh</button></div>';
+    html += '<div class="gov-actions" style="margin-bottom:14px;"><span id="govSummary" class="sub"></span></div>';
+    html += '<div id="govWrap" class="admin-card"><div class="gov-empty"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div></div>';
+    html += '</div>';
+    gate.innerHTML = html;
+    loadGovernance();
+}
+
+async function loadGovernance() {
+    var wrap = document.getElementById('govWrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="gov-empty"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div>';
+    try {
+        var data = await AdminUI.apiGet('/api/v1/admin/tenants/governance');
+        GOVERNANCE_TENANTS = (data && data.tenants) ? data.tenants : [];
+        renderGovernance();
+    } catch (err) {
+        wrap.innerHTML = '<div class="gov-empty"><i class="fas fa-exclamation-triangle" style="color:#ea4335;"></i> Error loading tenants: ' + esc(err.message || 'unknown error') + '</div>';
+    }
+}
+
+function renderGovernance() {
+    var wrap = document.getElementById('govWrap');
+    var summary = document.getElementById('govSummary');
+    if (!GOVERNANCE_TENANTS.length) {
+        wrap.innerHTML = '<div class="gov-empty"><i class="fas fa-building"></i> No tenants found.</div>';
+        if (summary) summary.textContent = '0 tenants';
+        return;
+    }
+    var active = GOVERNANCE_TENANTS.filter(function (t) { return t.status === 'ACTIVE'; }).length;
+    var suspended = GOVERNANCE_TENANTS.filter(function (t) { return t.status === 'SUSPENDED'; }).length;
+    summary.textContent = GOVERNANCE_TENANTS.length + ' total · ' + active + ' active · ' + suspended + ' suspended';
+
+    var html = '<div style="overflow-x:auto;"><table class="gov-table"><thead><tr>' +
+        '<th>Organization Name</th><th>Tenant ID</th><th>Classification</th><th>Primary Admin</th>' +
+        '<th>Created</th><th>Sandbox</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+    GOVERNANCE_TENANTS.forEach(function (t) {
+        html += '<tr><td><strong>' + esc(t.name || t.tenant_id) + '</strong></td>' +
+            '<td><code>' + esc(t.tenant_id) + '</code></td>' +
+            '<td>' + esc(t.classification || '—') + '</td>' +
+            '<td>' + esc(t.admin_email || '—') + '</td>' +
+            '<td style="white-space:nowrap;">' + fmtDate(t.created_at) + '</td>' +
+            '<td>' + (t.is_beta_sandbox ? '<span class="gov-badge beta">Beta</span>' : '—') + '</td>' +
+            '<td>' + badgeFor(t.status) + '</td>' +
+            '<td><div class="gov-actions">' + actionButtons(t) + '</div></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+}
+
+function fmtDate(v) {
+    if (!v) return '—';
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleString();
+}
+
+function badgeFor(status) {
+    if (status === 'ACTIVE') return '<span class="badge badge-success">ACTIVE</span>';
+    if (status === 'SUSPENDED') return '<span class="badge badge-danger">SUSPENDED</span>';
+    return '<span class="badge badge-warn">PENDING_REVIEW</span>';
+}
+
+function actionButtons(row) {
+    var tid = esc(row.tenant_id);
+    if (row.status === 'ACTIVE') {
+        return '<button class="btn btn-danger btn-sm" onclick="govToggle(\'' + tid + '\',\'SUSPENDED\')"><i class="fas fa-pause"></i> Suspend</button>';
+    }
+    if (row.status === 'SUSPENDED') {
+        return '<button class="btn btn-success btn-sm" onclick="govToggle(\'' + tid + '\',\'ACTIVE\')"><i class="fas fa-play"></i> Activate</button>';
+    }
+    return '<button class="btn btn-success btn-sm" onclick="govToggle(\'' + tid + '\',\'ACTIVE\')"><i class="fas fa-check"></i> Approve</button> ' +
+        '<button class="btn btn-danger btn-sm" onclick="govToggle(\'' + tid + '\',\'SUSPENDED\')"><i class="fas fa-pause"></i> Suspend</button>';
+}
+
+async function govToggle(tenantId, newStatus) {
+    var row = null;
+    GOVERNANCE_TENANTS.forEach(function (t) { if (t.tenant_id === tenantId) row = t; });
+    var label = row ? (row.name || row.tenant_id) : tenantId;
+    var verb = newStatus === 'ACTIVE' ? 'Activate' : 'Suspend';
+    var msg = newStatus === 'ACTIVE'
+        ? 'Reactivate tenant "' + label + '"? Its users will regain access immediately.'
+        : 'Suspend tenant "' + label + '"? All of its users will be locked out immediately.';
+    if (!window.confirm(msg)) return;
+    try {
+        var updated = await ApiClient.patch('/api/v1/admin/tenants/' + encodeURIComponent(tenantId) + '/status', { status: newStatus });
+        var t = (updated && updated.tenant) ? updated.tenant : null;
+        if (t) {
+            for (var i = 0; i < GOVERNANCE_TENANTS.length; i++) if (GOVERNANCE_TENANTS[i].tenant_id === t.tenant_id) { GOVERNANCE_TENANTS[i] = t; break; }
+        } else {
+            await loadGovernance();
+        }
+        renderGovernance();
+        toast('Tenant "' + label + '" ' + (newStatus === 'ACTIVE' ? 'activated' : 'suspended'), 'success');
+    } catch (err) {
+        toast('Error: ' + (err.message || 'failed'), 'error');
+    }
+}
+
+// ============================================================================
+// VIEW 3 — PRODUCTION SETUP
+// ============================================================================
+
+function renderProductionSetup(gate) {
+    var html = '<div class="view active">';
+    html += '<div class="view-head"><div><h2><i class="fas fa-cogs" style="color:var(--color-brand-600);"></i> Production Setup</h2>' +
+        '<div class="sub">Create regulators, add tenants, then preview and deploy the seed plan. Mutations require the admin setup key.</div></div></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">A</span>Create State Regulator</h2>' +
+        '<form onsubmit="createRegulator(event)"><div class="form-row">' +
+        '<div class="form-group"><label>Regulator ID *</label><input type="text" id="regId" placeholder="caan" required pattern="[a-z0-9-]+"><small>Lowercase letters, numbers, hyphens</small></div>' +
+        '<div class="form-group"><label>Full Name *</label><input type="text" id="regName" placeholder="Civil Aviation Authority of Nepal" required></div>' +
+        '<div class="form-group"><label>Short Name</label><input type="text" id="regShort" placeholder="CAAN"></div></div>' +
+        '<div class="form-row">' +
+        '<div class="form-group"><label>Country Code</label><input type="text" id="regCountry" placeholder="NP" maxlength="2"></div>' +
+        '<div class="form-group"><label>Country Name</label><input type="text" id="regCountryName" placeholder="Nepal"></div>' +
+        '<div class="form-group"><label>Domain</label><input type="text" id="regDomain" placeholder="ssp.caanepal.gov.np"></div></div>' +
+        '<div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>' +
+        '<button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button></form></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">B</span>Add Operator Tenant</h2>' +
+        '<form onsubmit="createTenant(event)"><div class="form-row">' +
+        '<div class="form-group"><label>Tenant ID *</label><input type="text" id="tenantId" placeholder="sita-air" required pattern="[a-z0-9-]+"></div>' +
+        '<div class="form-group"><label>Organization Name *</label><input type="text" id="tenantName" placeholder="Sita Air" required></div>' +
+        '<div class="form-group"><label>ICAO</label><input type="text" id="tenantIcao" placeholder="STA" maxlength="3"></div>' +
+        '<div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>' +
+        '<div class="form-group"><label>Regulator ID</label><input type="text" id="tenantRegulator" placeholder="caan"></div></div>' +
+        '<button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>' +
+        '<button type="button" class="btn btn-outline" onclick="bulkImport()"><i class="fas fa-file-import"></i> Bulk Import</button></form>' +
+        '<textarea id="bulkTextarea" placeholder="CSV (paste below), e.g.:' + "\n" +
+        'tenant_id,name,icao,country,regulator_id' + "\n" +
+        'nepal-airlines,Nepal Airlines,NAL,Nepal,caan' + "\n" +
+        'shree-airlines,Shree Airlines,SHA,Nepal,caan' + '" style="display:none;margin-top:12px;"></textarea></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">C</span>Bulk Import</h2>' +
+        '<p class="card-sub">Paste the CSV above (header <code>tenant_id,name,icao,country,regulator_id</code>) or a JSON array, then click <strong>Bulk Import</strong>.</p>' +
+        '<pre id="bulkHelp" style="background:#f1f5f9;padding:10px;border-radius:6px;font-size:.78rem;white-space:pre-wrap;">tenant_id,name,icao,country,regulator_id' + "\n" +
+        'nepal-airlines,Nepal Airlines,NAL,Nepal,caan</pre></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">D</span>Preview Seed Plan</h2>' +
+        '<p class="card-sub">Preview the CAAN seed plan against this environment before deploying.</p>' +
+        '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">' +
+        '<button class="btn btn-primary" onclick="loadPreview()"><i class="fas fa-eye"></i> Preview Seed Plan</button></div>' +
+        '<div id="previewArea"><div class="empty-state">Not previewed yet.</div></div></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">E</span>Deploy Seed Plan</h2>' +
+        '<p class="card-sub">Deploy writes the regulator, tags operators, and seeds surveys + hazards + reports.</p>' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;margin-bottom:12px;">' +
+        '<input type="checkbox" id="forceReseed"> Force re-seed (replaces existing surveys)</label>' +
+        '<button class="btn btn-danger" onclick="deploySeed()"><i class="fas fa-rocket"></i> Deploy to Database</button></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">F</span>Existing Regulators</h2>' +
+        '<div style="margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="loadExistingRegulators()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
+        '<div id="regulatorList"><div class="empty-state">Not loaded.</div></div></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">G</span>Existing Tenants</h2>' +
+        '<div style="margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="loadExistingTenants()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
+        '<div id="tenantList"><div class="empty-state">Not loaded.</div></div></div>';
+
+    html += '</div>';
+    gate.innerHTML = html;
+    loadExistingRegulators();
+    loadExistingTenants();
+}
+
+async function createRegulator(e) {
+    e.preventDefault();
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        regulator: {
+            id: document.getElementById('regId').value.trim().toLowerCase(),
+            name: document.getElementById('regName').value.trim(),
+            short_name: document.getElementById('regShort').value.trim(),
+            country: document.getElementById('regCountry').value.trim().toUpperCase(),
+            country_name: document.getElementById('regCountryName').value.trim(),
+            domain: document.getElementById('regDomain').value.trim(),
+            operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+        }
+    };
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
+        toast('Regulator "' + resp.regulator.id + '" created.', 'success');
+        e.target.reset();
+        loadExistingRegulators();
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+async function createTenant(e) {
+    e.preventDefault();
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        tenant: {
+            tenant_id: document.getElementById('tenantId').value.trim().toLowerCase(),
+            name: document.getElementById('tenantName').value.trim(),
+            icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
+            country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
+            regulator_id: document.getElementById('tenantRegulator').value.trim() || null,
+        }
+    };
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/tenants', payload);
+        toast('Tenant "' + resp.tenant.tenant_id + '" created.', 'success');
+        e.target.reset();
+        loadExistingTenants();
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+function bulkImport() {
+    var ta = document.getElementById('bulkTextarea');
+    if (ta.style.display === 'none') { ta.style.display = 'block'; return; }
+    var text = ta.value.trim();
+    if (!text) { toast('Paste CSV or JSON into the box first.', 'error'); return; }
+    var body = { setup_key: AdminUI.ensureSetupKey() };
+    if (text.charAt(0) === '[') {
+        try { body.records = JSON.parse(text); }
+        catch (err) { toast('Invalid JSON: ' + err.message, 'error'); return; }
+    } else { body.csv = text; }
+    AdminUI.apiPost('/api/v1/admin/tenants/bulk', body).then(function (resp) {
+        toast('Bulk import: ' + resp.ok + '/' + resp.total + ' created.', resp.ok === resp.total ? 'success' : 'warn');
+        var failed = (resp.results || []).filter(function (r) { return r.status !== 'ok'; });
+        if (failed.length) {
+            window.alert('Bulk import finished. ' + resp.ok + '/' + resp.total + ' created.\n\nFailures:\n' +
+                failed.map(function (r) { return (r.tenant_id || '?') + ' — ' + (r.detail || r.status); }).join('\n'));
+        }
+        ta.style.display = 'none'; ta.value = '';
+        loadExistingTenants();
+    }).catch(function (err) { toast('Bulk import failed: ' + err.message, 'error'); });
+}
+
+async function loadPreview() {
+    var area = document.getElementById('previewArea');
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Computing seed preview...</div>';
+    try {
+        var plan = await AdminUI.apiGet('/api/v1/admin/seed/preview');
+        var ops = plan.operators || [];
+        var tagged = ops.filter(function (o) { return o.tagged; }).length;
+        var withSurveys = ops.filter(function (o) { return o.surveys_existing > 0; }).length;
+        var html = '<div class="preview-grid">' +
+            '<div class="preview-stat"><div class="num">' + (plan.regulator ? (plan.regulator.exists ? 'yes' : 'no') : '—') + '</div><div class="lbl">Regulator exists</div></div>' +
+            '<div class="preview-stat"><div class="num">' + ops.length + '</div><div class="lbl">Operators in plan</div></div>' +
+            '<div class="preview-stat"><div class="num">' + tagged + '</div><div class="lbl">Tagged to regulator</div></div>' +
+            '<div class="preview-stat"><div class="num">' + withSurveys + '</div><div class="lbl">Operators w/ surveys</div></div></div>';
+        html += '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Operator</th><th>Exists</th><th>Tagged</th><th>Surveys</th><th>Hazards</th><th>Reports</th></tr></thead><tbody>';
+        ops.forEach(function (o) {
+            html += '<tr><td><strong>' + esc(o.name) + '</strong> <code>' + esc(o.id) + '</code></td>' +
+                '<td>' + (o.exists ? '<span class="badge badge-success">yes</span>' : '<span class="badge badge-warn">no</span>') + '</td>' +
+                '<td>' + (o.tagged ? '<span class="badge badge-success">yes</span>' : '<span class="badge badge-danger">no</span>') + '</td>' +
+                '<td>' + o.surveys_existing + ' (target ' + o.surveys_target + ')</td>' +
+                '<td>' + o.hazards_existing + '</td><td>' + o.reports_existing + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        html += '<p class="card-sub" style="margin-top:10px;">Previewed at ' + AdminUI.fmtDate(plan.previewed_at) + '.</p>';
+        area.innerHTML = html;
+    } catch (err) { area.innerHTML = '<div class="status-box error">Preview failed: ' + esc(err.message) + '</div>'; }
+}
+
+function deploySeed() {
+    var force = document.getElementById('forceReseed').checked;
+    openConfirm(
+        'Confirm Deploy',
+        'Deploy the CAAN demo seed plan? This ' + (force ? '<strong>force re-seeds</strong> (replaces existing surveys)' : 'skips operators that already have surveys') +
+        ' and writes the regulator, tenant tags, and seeded hazards/reports to the current database.',
+        { type: 'deploy', force: force }
+    );
+}
+
+async function execDeploy(force) {
+    var area = document.getElementById('previewArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Deploying seed plan...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/seed/deploy', { setup_key: AdminUI.ensureSetupKey(), force: force });
+        toast('Seed plan deployed.', 'success');
+        if (area) {
+            area.innerHTML = '<div class="status-box success"><strong>Deploy complete.</strong>' +
+                (resp.result ? ' ' + esc(typeof resp.result === 'string' ? resp.result : JSON.stringify(resp.result)) : '') + '</div>';
+        }
+        loadExistingRegulators();
+        loadExistingTenants();
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">Deploy failed: ' + esc(err.message) + '</div>';
+        toast('Deploy failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// VIEW 4 — AUDIT LOG
+// ============================================================================
+
+function renderAuditLog(gate) {
+    var html = '<div class="view active">';
+    html += '<div class="view-head"><div><h2><i class="fas fa-clipboard-list" style="color:var(--color-brand-600);"></i> Audit Log</h2>' +
+        '<div class="sub">Every regulator / tenant / seed action, newest first (50 most recent).</div></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="loadAuditLog()"><i class="fas fa-rotate"></i> Refresh</button></div>';
+    html += '<div id="auditArea" class="admin-card"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading audit log...</div></div>';
+    html += '</div>';
+    gate.innerHTML = html;
+    loadAuditLog();
+}
+
+async function loadAuditLog() {
+    var area = document.getElementById('auditArea');
+    if (!area) return;
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading audit log...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/seed/logs?limit=50');
+        var logs = resp.logs || [];
+        if (!logs.length) { area.innerHTML = '<div class="empty-state">No audit entries yet.</div>'; return; }
+        var html = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Result</th><th>Detail</th></tr></thead><tbody>';
+        logs.forEach(function (l) {
+            html += '<tr><td>' + AdminUI.fmtDate(l.timestamp || l.created_at) + '</td>' +
+                '<td>' + esc((l.actor && l.actor.email) || l.actor || '—') + '</td>' +
+                '<td><code>' + esc(l.action) + '</code></td>' +
+                '<td>' + esc(l.target || '—') + '</td>' +
+                '<td>' + (l.result === 'error' ? '<span class="badge badge-danger">error</span>' : '<span class="badge badge-success">success</span>') + '</td>' +
+                '<td style="max-width:340px;">' + esc(l.detail || '') + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        area.innerHTML = html;
+    } catch (err) { area.innerHTML = '<div class="status-box error">Failed to load audit log: ' + esc(err.message) + '</div>'; }
+}
+
+// ============================================================================
+// VIEW 5 — DUMMY DATA
+// ============================================================================
+
+function renderDummyData(gate) {
+    var html = '<div class="view active">';
+    html += '<div class="view-head"><div><h2><i class="fas fa-database" style="color:var(--color-brand-600);"></i> Dummy Data</h2>' +
+        '<div class="sub">Seed or unseed operational dummy data (VSR/MOR/CAN/CAP). Unseed removes only documents created by this seeder.</div></div></div>';
+
+    html += '<div class="admin-card"><div class="form-row">' +
+        '<div class="form-group"><label>Scope</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="all" checked onchange="demoScopeChanged()"> All tenants</label>' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="one" onchange="demoScopeChanged()"> Single tenant</label>' +
+        '<select id="demoTenantSelect" disabled style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"><option value="">— select tenant —</option></select>' +
+        '</div></div>' +
+        '<div class="form-group"><label>Data types</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="vsr" checked> VSR</label>' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="mor" checked> MOR</label>' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="can" checked> CAN</label>' +
+        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="cap" checked> CAP</label>' +
+        '</div></div></div>' +
+        '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' +
+        '<button class="btn btn-success" onclick="demoData(\'seed\')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>' +
+        '<button class="btn btn-danger" onclick="demoData(\'unseed\')"><i class="fas fa-broom"></i> Unseed Dummy Data</button></div>' +
+        '<div id="demoDataArea" style="margin-top:14px;"></div></div>';
+    html += '</div>';
+    gate.innerHTML = html;
+    loadDemoTenants();
+}
+
+async function loadDemoTenants() {
+    var sel = document.getElementById('demoTenantSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— select tenant —</option>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        (resp.tenants || []).forEach(function (t) {
+            var opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = (t.name || t.id) + ' (' + t.id + ')';
+            sel.appendChild(opt);
+        });
+    } catch (err) { /* non-fatal */ }
+}
+
+function demoScopeChanged() {
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var sel = document.getElementById('demoTenantSelect');
+    if (sel) sel.disabled = scope !== 'one';
+}
+
+function demoData(action) {
+    var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
+    if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP).', 'error'); return; }
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var body = { setup_key: AdminUI.ensureSetupKey(), action: action, kinds: kinds };
+    if (scope === 'one') {
+        var tid = document.getElementById('demoTenantSelect').value;
+        if (!tid) { toast('Select a tenant.', 'error'); return; }
+        body.all = false; body.tenant_ids = [tid];
+    } else { body.all = true; }
+
+    var verb = action === 'seed' ? 'Seed' : 'Unseed';
+    openConfirm(
+        'Confirm ' + verb,
+        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + '</strong>' +
+        (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
+        '? Unseed removes only the documents created by this seeder — real data is untouched.',
+        { type: 'demo', body: body }
+    );
+}
+
+async function execDemo(body) {
+    var area = document.getElementById('demoDataArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' +
+        (body.action === 'seed' ? 'Seeding' : 'Unseeding') + ' dummy data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/demo-data', body);
+        var rows = (resp.results || []).map(function (r) {
+            var payload = r.seeded || r.removed || {};
+            var detail = Object.keys(payload).map(function (k) { return k.toUpperCase() + '=' + payload[k]; }).join(', ');
+            return '<tr><td><code>' + esc(r.tenant_id) + '</code></td>' +
+                '<td>' + (r.error ? '<span class="badge badge-danger">' + esc(r.error) + '</span>' : esc(detail || 'ok')) + '</td></tr>';
+        }).join('');
+        if (area) {
+            area.innerHTML = '<div class="status-box success"><strong>' +
+                (body.action === 'seed' ? 'Seed complete' : 'Unseed complete') + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
+                (rows ? '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Tenant</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '');
+        }
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>';
+        toast((body.action === 'seed' ? 'Seed' : 'Unseed') + ' failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// EXISTING REGULATORS & TENANTS (View 3, sections F & G)
+// ============================================================================
+
+async function loadExistingRegulators() {
+    var el = document.getElementById('regulatorList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+        var regs = resp.regulators || [];
+        if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>ID</th><th>Name</th><th>Country</th><th>Operators</th><th>Active</th></tr></thead><tbody>' +
+            regs.map(function (r) {
+                return '<tr><td><code>' + esc(r.id) + '</code></td><td>' + esc(r.name) + '</td>' +
+                    '<td>' + esc(r.country_name || r.country || '—') + '</td>' +
+                    '<td>' + ((r.operator_tenant_ids || []).length) + '</td>' +
+                    '<td>' + (r.active ? '<span class="badge badge-success">active</span>' : '<span class="badge badge-danger">inactive</span>') + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
+}
+
+async function loadExistingTenants() {
+    var el = document.getElementById('tenantList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        var tenants = resp.tenants || [];
+        if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>ID</th><th>Name</th><th>Country</th><th>Regulator</th><th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Status</th></tr></thead><tbody>' +
+            tenants.map(function (t) {
+                var c = t.counts || {};
+                var st = t.status || (t.active === false ? 'Inactive' : 'Active');
+                return '<tr><td><code>' + esc(t.id) + '</code></td><td>' + esc(t.name || t.id) + '</td>' +
+                    '<td>' + esc(t.country || '—') + '</td><td>' + esc(t.regulator_id || '—') + '</td>' +
+                    '<td>' + c.surveys + '</td><td>' + c.hazards + '</td><td>' + c.reports + '</td><td>' + (c.cans || 0) + '</td>' +
+                    '<td>' + statusBadge(st) + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
+}
+
+function statusBadge(st) {
+    st = st || 'Active';
+    var cls = st === 'Active' ? 'badge-success' : (st === 'Trial' ? 'badge-info' : 'badge-danger');
+    return '<span class="badge ' + cls + '">' + esc(st) + '</span>';
+}
+
+// ============================================================================
+// SHARED CONFIRM MODAL
+// ============================================================================
+
+function openConfirm(title, html, action) {
+    pendingConfirm = action;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').innerHTML = html;
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function closeConfirm() {
+    document.getElementById('confirmModal').style.display = 'none';
+    pendingConfirm = null;
+}
+
+document.getElementById('confirmOkBtn').addEventListener('click', function () {
+    var action = pendingConfirm;
+    document.getElementById('confirmModal').style.display = 'none';
+    pendingConfirm = null;
+    if (!action) return;
+    if (action.type === 'deploy') execDeploy(action.force);
+    else if (action.type === 'demo') execDemo(action.body);
+});
+</script>
+
+</body>
+</html>
