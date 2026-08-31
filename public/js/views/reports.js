@@ -21,9 +21,7 @@ const AviaSDCPSReports = (function () {
    * which must read the response as a blob (the standard API wrapper is JSON-only).
    */
   function apiBaseUrl() {
-    return window.location.origin.includes('localhost')
-      ? 'http://localhost:8000/api/v1'
-      : 'https://aviasafe-unified-platform.onrender.com/api/v1';
+    return 'https://aviasafe-unified-platform.onrender.com/api/v1';
   }
   function authHeaders(extra) {
     const token = sessionStorage.getItem('aviasafe_token') || localStorage.getItem('aviasafe_token') || null;

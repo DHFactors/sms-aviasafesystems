@@ -28,12 +28,6 @@ CANONICAL_ALLOWED_ORIGINS = (
     "https://smssurvey.gsacharya.com",
     "https://sms.nac.com.np",
     "https://ssp.caanepal.gov.np",
-    # Local development / static file servers (5005 = firebase serve hosting emulator for the local Docker demo)
-    "http://localhost:5000",
-    "http://localhost:5005",
-    "http://127.0.0.1:5005",
-    "http://localhost:8000",
-    "http://127.0.0.1:5500",
 )
 
 # Every header the frontend (and the multi-tenant demo/routing layer) sends on

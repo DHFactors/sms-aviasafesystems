@@ -213,7 +213,7 @@ function isProductionEnvironment() {
         return window.APP_CONFIG.environment === 'production';
     }
     var host = window.location.hostname || '';
-    return host.indexOf('beta') === -1 && host !== 'localhost' && host !== '127.0.0.1';
+    return host.indexOf('beta') === -1;
 }
 
 var IS_PRODUCTION = isProductionEnvironment();

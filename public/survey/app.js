@@ -59,8 +59,7 @@ function resolveTenantContext() {
     const routes = {
         'smssurvey.gsacharya.com': 'sita-air',
         'sms.nac.com.np': 'nepal-airlines',
-        'ssp.caanepal.gov.np': 'caan-ops', // CAAN operating as an infrastructure service provider tenant
-        'localhost': 'sita-air' // Development environment bypass targeting test instance
+        'ssp.caanepal.gov.np': 'caan-ops' // CAAN operating as an infrastructure service provider tenant
     };
 
     return routes[host] || 'unknown-tenant';

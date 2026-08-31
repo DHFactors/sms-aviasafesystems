@@ -10,9 +10,7 @@ const AviaSDCPSApi = (function () {
 
   // Base API configuration
   const API_CONFIG = {
-    baseUrl: window.location.origin.includes('localhost') 
-      ? 'http://localhost:8000/api/v1' 
-      : 'https://aviasafe-unified-platform.onrender.com/api/v1',
+    baseUrl: 'https://aviasafe-unified-platform.onrender.com/api/v1',
     defaultTenant: 'fishtail-air'
   };
 

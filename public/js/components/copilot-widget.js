@@ -104,26 +104,15 @@
 
     // Single runtime mapping: Firebase Hosting URL -> Render backend.
     // Priority (first hit wins):
-    //   1. localStorage 'aviasafe:localApiBaseUrl' — set once in console to point Copilot
-    //      at a locally-running backend (Docker on http://localhost:8000):
-    //        localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
-    //      Demo pages served on http://localhost:5005 rely on this override.
-    //   2. window.APP_CONFIG.apiBaseUrl (set by public/js/firebase.js — the
+    //   1. window.APP_CONFIG.apiBaseUrl (set by public/js/firebase.js — the
     //      single consolidated backend URL).
-    //   3. Hostname-based fallback. Deployed frontend never defaults to
-    //      localhost — localhost only when hostname is localhost.
+    //   2. window.API_BASE_URL fallback.
+    //   3. Consolidated Render backend (single unified default).
     //
     // Guest (unauthenticated) mode is pinned to the same unified backend.
     function resolveApiBase() {
-        try {
-            var local = window.localStorage && window.localStorage.getItem('aviasafe:localApiBaseUrl');
-            if (local && local.trim()) return local.trim().replace(/\/+$/, '');
-        } catch (e) { /* ignore storage errors (incognito) */ }
         if (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) return window.APP_CONFIG.apiBaseUrl;
         if (window.API_BASE_URL) return window.API_BASE_URL;
-        var isLocalhost = ['localhost', '127.0.0.1'].indexOf((window.location.hostname || '').toLowerCase()) !== -1;
-        // Single unified backend. Local dev uses the local API when set.
-        if (isLocalhost) return 'https://aviasafe-unified-platform.onrender.com';
         return 'https://aviasafe-unified-platform.onrender.com';
     }
 

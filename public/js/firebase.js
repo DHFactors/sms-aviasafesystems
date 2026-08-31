@@ -16,7 +16,7 @@
 // Single consolidated environment (2026): the whole platform runs against the
 // `sms-db` named Firestore database in the aerosafety-sms-prod project. The
 // former isolated `sms-db-beta` environment (and its beta host detection) has
-// been decommissioned — every host, including localhost, uses the same config.
+// been decommissioned — every host uses the same config.
 const IS_BETA_ENV = false;
 
 const PROD_CONFIG = {
@@ -38,18 +38,8 @@ const firebaseConfig = PROD_CONFIG;
 const RECAPTCHA_SITE_KEY = firebaseConfig.appCheckSiteKey || '';
 
 // Centralized application configuration (single source of truth)
-// Local-demo override: set once in the browser console to point every
-// ApiClient call at a locally running backend (e.g. Docker on :8000):
-//   localStorage.setItem('aviasafe:localApiBaseUrl', 'http://localhost:8000')
-// Remove it with localStorage.removeItem('aviasafe:localApiBaseUrl').
-const LOCAL_API_BASE_URL = (() => {
-    try { return window.localStorage.getItem('aviasafe:localApiBaseUrl'); }
-    catch (e) { return null; }
-})();
-
 const APP_CONFIG = {
-    apiBaseUrl: LOCAL_API_BASE_URL
-        || 'https://aviasafe-unified-platform.onrender.com',
+    apiBaseUrl: 'https://aviasafe-unified-platform.onrender.com',
     environment: 'production',
     recaptchaSiteKey: RECAPTCHA_SITE_KEY,
     pagination: { defaultPageSize: 20, maxPageSize: 100 },
@@ -292,19 +282,9 @@ function initAppCheckSafe(app) {
     if (!siteKey || siteKey === "YOUR_RECAPTCHA_SITE_KEY") {
       console.warn("[AppCheck] No valid reCAPTCHA site key found; bypassing App Check.");
       // Clear any stored throttle timestamp from prior runs
-      clearAppCheckThrottle();
-      return null;
-    }
-
-    // Skip App Check on local development where the reCAPTCHA domain is not
-    // registered (matches the initAppCheck() orchestration below).
-    if (
-      location.hostname === "localhost" ||
-      location.hostname === "127.0.0.1"
-    ) {
-      console.log("[AppCheck] Skipped on localhost");
-      return null;
-    }
+    clearAppCheckThrottle();
+    return null;
+  }
 
     const appCheck = initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(siteKey),
@@ -349,10 +329,6 @@ function initAppCheck() {
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('appcheck') === 'false') {
         console.log('ℹ️ App Check skipped via ?appcheck=false');
-        return;
-    }
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-        console.log('ℹ️ App Check skipped (localhost)');
         return;
     }
     // Attempt safe App Check initialization — never blocks Auth/Firestore
