@@ -539,3 +539,11 @@ select.form-control { appearance: auto; }
     color: var(--color-primary-dark);
     text-decoration-thickness: 2px;
 }
+
+/* ========== ROLE-BASED VISIBILITY ========== */
+/* Operational-only controls (e.g. the "My Tasks" button) are hidden for
+   safety-management roles. The <body> profile class is toggled by the
+   auth-state role-class switch in js/firebase.js. */
+body.role-safety .operational {
+    display: none !important;
+}

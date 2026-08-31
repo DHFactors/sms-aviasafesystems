@@ -669,6 +669,53 @@ function getRoleDestination(user) {
     return '/safety.html';
 }
 
+// ── Role-class toggle for element visibility ───────────────────────────────
+// Drives CSS (e.g. `body.role-safety .operational { display:none }`) by adding
+// a profile class to <body> once auth resolves. Operational/departmental
+// logins (ops@, camo@, 145, pilot@) become `role-operational` and keep
+// operational-only controls; safety-management accounts (safety@, airline/tenant
+// admins, CAAN/SUPER) become `role-safety` and hide them. Runs centrally on
+// every page that loads this file -- no page-specific hardcoding.
+function isSafetyManagementRole(email, role) {
+    var e = String(email || '').toLowerCase();
+    if (e.indexOf('safety@') === 0) return true;
+    var r = String(role || '').toUpperCase();
+    if (r === 'SUPER_ADMIN' || r === 'CAAN_SMD') return true;
+    // Accountable Executives (ae@) are AIRLINE_ADMIN but sit on the executive
+    // governance surface, not the operational workspaces, so keep them operational.
+    if (r === 'AIRLINE_ADMIN' || r === 'TENANT_ADMIN') {
+        return !(e.indexOf('ae@') === 0 || e.indexOf('ae.') === 0);
+    }
+    return false;
+}
+window.isSafetyManagementRole = isSafetyManagementRole;
+
+function initRoleClassToggle() {
+    function apply(user) {
+        try {
+            var body = document.body;
+            if (!body) return;
+            body.classList.remove('role-safety', 'role-operational');
+            var email = (user && user.email) || '';
+            var claims = (user && user.claims) || {};
+            var role = claims.role || (user && user.role) || 'USER';
+            body.classList.add(isSafetyManagementRole(email, role)
+                ? 'role-safety'
+                : 'role-operational');
+        } catch (e) { /* never block auth */ }
+    }
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        try { firebase.auth().onAuthStateChanged(apply); } catch (e) { /* ignore */ }
+    }
+}
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initRoleClassToggle);
+    } else {
+        initRoleClassToggle();
+    }
+}
+
 // ── Auth-state sync for tenant + mirroring contexts ────────────────────────
 // 1) Keeps sessionStorage demo tenant in sync with the signed-in user's
 //    actual tenant_id (fixes safety.html showing air-dynasty-demo when logged
