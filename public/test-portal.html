@@ -1,0 +1,28 @@
+<!-- ============================================================================
+FILE: test-portal.html
+PATH: public/test-portal.html
+PURPOSE: Convenience redirect stub. The canonical SUPER_ADMIN test portal lives
+         at /admin/test-portal.html; this root-level page forwards there so both
+         sms.aviasafesystems.com/test-portal.html and
+         sms.aviasafesystems.com/admin/test-portal.html resolve.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting — AviaSAFE Test Portal</title>
+    <meta http-equiv="refresh" content="0; url=/admin/test-portal.html">
+    <script>
+        // Canonical redirect target; runs even if the meta refresh is not applied.
+        window.location.replace('/admin/test-portal.html');
+    </script>
+</head>
+<body>
+    <noscript>
+        <p>Redirecting to the <a href="/admin/test-portal.html">Super Admin Test Portal</a>…</p>
+    </noscript>
+</body>
+</html>

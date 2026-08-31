@@ -1,0 +1,378 @@
+<!-- ============================================================================
+FILE: test-portal.html
+PATH: public/admin/test-portal.html
+PURPOSE: SUPER_ADMIN-only index of every frontend page/module in the system.
+         Provides direct, one-click links to all dashboards and pages so a
+         super admin can rapidly test any fix or feature without navigating
+         the normal role-based flow.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Test Portal — AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+
+    <style>
+        .test-portal { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .test-top { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .test-head-title { font-size: 1.4rem; margin: 0; color: #0b2a42; }
+        .test-head-title i { color: #1a6b8a; margin-right: 0.5rem; }
+        .test-tools { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .user-badge { background: #1a6b8a; color: #fff; padding: 0.3rem 1rem; border-radius: 999px; font-size: 0.85rem; }
+        .user-badge .role-chip { background: rgba(255,255,255,0.25); padding: 0.05rem 0.5rem; border-radius: 999px; margin-right: 0.4rem; font-weight: 700; }
+        .search-box { position: relative; }
+        .search-box input { padding: 0.5rem 0.9rem 0.5rem 2rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; width: 280px; }
+        .search-box .fas { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.85rem; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1rem 1.25rem; border-left: 4px solid #1a6b8a; }
+        .stat-card .num { font-size: 1.6rem; font-weight: 800; color: #0b2a42; line-height: 1; }
+        .stat-card .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; margin-top: 0.3rem; }
+
+        .module-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
+        .module-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem; border-top: 4px solid #1a6b8a; }
+        .module-card h3 { margin: 0 0 0.25rem 0; font-size: 1rem; color: #0b2a42; display: flex; align-items: center; gap: 0.5rem; }
+        .module-card h3 i { color: #1a6b8a; width: 18px; text-align: center; }
+        .module-card .module-sub { font-size: 0.75rem; color: #94a3b8; margin: 0 0 1rem 0; }
+        .page-link { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; text-decoration: none; color: #0b2a42; transition: background 0.15s; border-bottom: 1px solid #f1f5f9; }
+        .page-link:hover { background: #f0f6f9; }
+        .page-link .p-title { flex: 0 1 auto; }
+        .page-link .p-path { font-size: 0.72rem; color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: block; }
+        .page-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+        .role-tag { font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 999px; background: #f1f5f9; color: #64748b; font-weight: 600; white-space: nowrap; }
+        .role-tag.super { background: #fde8e8; color: #dc3545; }
+        .role-tag.admin { background: #e3f2fd; color: #1565c0; }
+        .role-tag.caan { background: #e8f0f8; color: #1a6b8a; }
+        .role-tag.user { background: #e8f5e9; color: #2e7d32; }
+        .status-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; }
+        .status-ready { background: #e8f5e9; color: #2e7d32; }
+        .status-beta { background: #fff3cd; color: #856404; }
+        .status-dev { background: #fce8e6; color: #c5221f; }
+
+        .error-state { max-width: 520px; margin: 5rem auto; text-align: center; background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 3rem 2rem; }
+        .error-state h2 { color: #0b2a42; margin: 1rem 0 0.5rem; }
+        .error-state p { color: #64748b; margin-bottom: 1.5rem; }
+
+        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #1a6b8a; text-decoration: none; margin-bottom: 1rem; font-size: 0.85rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .module-grid { grid-template-columns: 1fr; }
+            .search-box input { width: 100%; }
+        }
+    </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-topbar">
+    <span class="brand"><i class="fas fa-flask"></i> AviaSAFE — Test Portal</span>
+    <div class="user-info">
+        <a href="/admin/production-setup.html" class="btn btn-outline btn-sm" style="color:#4fc3f7;border-color:#4fc3f7;">Production Setup</a>
+        <span id="userDisplay">—</span>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<div id="authGate"></div>
+
+<script>
+// ============================================================================
+// PAGE DATA — grouped by module.
+// roles: array of role tokens matched against the role-tag CSS classes.
+// status: ready | beta | dev  (drives the status-badge color).
+// ============================================================================
+
+var PORTAL_MODULES = [
+    {
+        icon: "fa-gauge-high",
+        title: "Operator Dashboards",
+        sub: "Safety Manager, AE and operations dashboards",
+        pages: [
+            { title: "Safety Manager Dashboard",  path: "/safety.html",                           roles: ["admin"], status: "ready" },
+            { title: "SMS Maturity Dashboard",    path: "/dashboard/index.html",                   roles: ["admin"], status: "ready" },
+            { title: "Accountable Executive Dashboard", path: "/dashboard/ae-dashboard.html",      roles: ["admin"], status: "beta" },
+            { title: "Risk &amp; Trends",         path: "/risk-trends.html",                      roles: ["admin"], status: "ready" },
+            { title: "Top Hazards",               path: "/top-hazards.html",                      roles: ["admin"], status: "ready" },
+            { title: "My Tasks",                  path: "/dashboard/responsible-manager.html",     roles: ["user"], status: "ready" },
+            { title: "Master Register",           path: "/dashboard/master-register.html",         roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-landmark",
+        title: "CAAN / State Regulator",
+        sub: "Regulator oversight and state risk",
+        pages: [
+            { title: "CAAN SMD Dashboard",      path: "/caan.html",                          roles: ["caan"], status: "ready" },
+            { title: "State Risk Register",     path: "/caan-state-risk.html",               roles: ["caan"], status: "ready" },
+            { title: "CAAN SMS Maturity",       path: "/dashboard/caan-sms-maturity.html",   roles: ["caan"], status: "ready" },
+            { title: "CAAN Oversight",          path: "/views/caan-oversight.html",          roles: ["caan"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-triangle-exclamation",
+        title: "Safety Risk Management (SRM)",
+        sub: "Hazards and risk analysis",
+        pages: [
+            { title: "Hazard Analysis",           path: "/hazards/index.html",  roles: ["admin"], status: "ready" },
+            { title: "Hazard Detail",             path: "/hazards/detail.html",  roles: ["admin"], status: "ready" },
+            { title: "Create Hazard",             path: "/hazards/create.html",  roles: ["admin"], status: "ready" },
+            { title: "Hazard Analysis Workspace", path: "/hazard-analysis.html", roles: ["admin"], status: "beta" },
+        ]
+    },
+    {
+        icon: "fa-clipboard-check",
+        title: "CAN / CAP",
+        sub: "Corrective Action Notices & Plans",
+        pages: [
+            { title: "Master CAN Register", path: "/can_cap/cans.html",         roles: ["admin"], status: "ready" },
+            { title: "Master CAP Register", path: "/can_cap/caps.html",         roles: ["admin"], status: "ready" },
+            { title: "CAN Detail",          path: "/can_cap/can_detail.html",   roles: ["admin"], status: "ready" },
+            { title: "CAP Review",          path: "/can_cap/cap_review.html",   roles: ["admin"], status: "ready" },
+            { title: "CAP Submit",          path: "/can_cap/cap_submit.html",   roles: ["user"], status: "ready" },
+            { title: "Issue CAN",           path: "/can_cap/issue.html",        roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-magnifying-glass-chart",
+        title: "PSOE Audit",
+        sub: "Audit & surveillance",
+        pages: [
+            { title: "PSOE Audit", path: "/audits/psoe.html", roles: ["admin", "caan"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-file-lines",
+        title: "Reports",
+        sub: "Compile and export reports",
+        pages: [
+            { title: "Reports List",      path: "/reports/index.html",    roles: ["admin"], status: "ready" },
+            { title: "Generate Report",   path: "/reports/generate.html", roles: ["admin"], status: "ready" },
+            { title: "View Report",       path: "/reports/view.html",     roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-plane-departure",
+        title: "Flight Diversions",
+        sub: "Diversion reporting",
+        pages: [
+            { title: "Diversions List",   path: "/flight_diversions/index.html",  roles: ["admin"], status: "ready" },
+            { title: "Report Diversion",  path: "/flight_diversions/create.html",  roles: ["admin"], status: "ready" },
+            { title: "Diversion Detail",  path: "/flight_diversions/detail.html",  roles: ["admin"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-database",
+        title: "SDCPS / Data",
+        sub: "Safety data collection & query",
+        pages: [
+            { title: "SDCPS Workspace",  path: "/aviasdcps.html#home", roles: ["admin"], status: "beta" },
+            { title: "SDC Ingestion",    path: "/aviasdcps.html#sdc",  roles: ["admin"], status: "beta" },
+            { title: "Data Query",       path: "/aviasdcps.html#data", roles: ["admin"], status: "beta" },
+            { title: "HRC Tracking",     path: "/aviasdcps.html#hrc",  roles: ["admin"], status: "dev" },
+            { title: "SPI/SPT Monitoring", path: "/aviasdcps.html#spis", roles: ["admin"], status: "dev" },
+        ]
+    },
+    {
+        icon: "fa-user-gear",
+        title: "Administration",
+        sub: "System and team administration",
+        pages: [
+            { title: "Team Management",       path: "/settings/team.html",          roles: ["admin"], status: "ready" },
+            { title: "Administration",        path: "/administration.html",         roles: ["admin"], status: "ready" },
+            { title: "Production Setup",      path: "/admin/production-setup.html", roles: ["super"], status: "ready" },
+            { title: "Super Admin Test Portal", path: "/admin/test-portal.html",    roles: ["super"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-globe",
+        title: "Public Pages",
+        sub: "Guest-facing pages",
+        pages: [
+            { title: "Login",                   path: "/login.html",     roles: ["none"], status: "ready" },
+            { title: "Register Organization",   path: "/register.html",  roles: ["none"], status: "ready" },
+            { title: "Join Team",               path: "/join.html",      roles: ["none"], status: "ready" },
+            { title: "Survey",                  path: "/survey/",        roles: ["none"], status: "ready" },
+            { title: "Homepage",                path: "/index.html",     roles: ["none"], status: "ready" },
+            { title: "Privacy Policy",          path: "/privacy.html",   roles: ["none"], status: "ready" },
+            { title: "Terms of Service",        path: "/terms.html",     roles: ["none"], status: "ready" },
+        ]
+    },
+    {
+        icon: "fa-users",
+        title: "Team &amp; Settings",
+        sub: "Onboarding and configuration",
+        pages: [
+            { title: "Join Team",        path: "/join.html",          roles: ["none"], status: "ready" },
+            { title: "Team Management",  path: "/settings/team.html", roles: ["admin"], status: "ready" },
+            { title: "Administration",   path: "/administration.html", roles: ["admin"], status: "ready" },
+        ]
+    },
+];
+
+var ROLE_CLASS = {
+    "SUPER_ADMIN": "super",
+    "AIRLINE_ADMIN": "admin",
+    "TENANT_ADMIN": "admin",
+    "CAAN_SMD": "caan",
+    "CAAN_INSPECTOR": "caan",
+    "DEPT_ADMIN": "user",
+    "USER": "user",
+};
+
+var PAGE_ROLE_LABEL = {
+    "super": "SUPER_ADMIN",
+    "admin": "AIRLINE_ADMIN",
+    "caan": "CAAN_SMD",
+    "user": "USER",
+    "none": "Public",
+};
+
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+
+var currentUser = null;
+
+document.addEventListener('DOMContentLoaded', function () {
+    AdminUI.requireAdmin().then(function (user) {
+        if (!user) return;
+        currentUser = user;
+        document.getElementById('userDisplay').textContent = 'SUPER_ADMIN · ' + user.email;
+        renderPortal();
+    });
+});
+
+function logout() {
+    firebase.auth().signOut().then(function () {
+        window.location.href = '/';
+    });
+}
+
+// ============================================================================
+// RENDER
+// ============================================================================
+
+function renderPortal() {
+    var gate = document.getElementById('authGate');
+    var isSuper = currentUser && currentUser.role === 'SUPER_ADMIN';
+
+    if (!isSuper) {
+        gate.innerHTML =
+            '<div class="error-state">' +
+                '<i class="fas fa-lock" style="font-size:3rem;color:#dc3545;"></i>' +
+                '<h2>Access Denied</h2>' +
+                '<p>This page is restricted to SUPER_ADMIN users.</p>' +
+                '<a href="/safety.html" class="btn btn-primary">Back to Dashboard</a>' +
+            '</div>';
+        return;
+    }
+
+    var totalPages = 0;
+    var totalReady = 0;
+    var totalModules = PORTAL_MODULES.length;
+    PORTAL_MODULES.forEach(function (m) {
+        m.pages.forEach(function (p) {
+            totalPages++;
+            if (p.status === 'ready') totalReady++;
+        });
+    });
+
+    var html = '<div class="test-portal">';
+    html += '<a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Production Setup</a>';
+    html += '<div class="test-top">' +
+        '<h1 class="test-head-title"><i class="fas fa-flask"></i>Super Admin Test Portal</h1>' +
+        '<div class="test-tools">' +
+            '<span class="user-badge"><span class="role-chip">SUPER_ADMIN</span>' + esc(currentUser.email) + '</span>' +
+            '<div class="search-box"><i class="fas fa-magnifying-glass"></i><input type="text" id="pageFilter" placeholder="Search pages..." oninput="applyFilter(this.value)"></div>' +
+        '</div>' +
+    '</div>';
+
+    html += '<div class="stats-row">' +
+        '<div class="stat-card"><div class="num">' + totalModules + '</div><div class="lbl">Modules</div></div>' +
+        '<div class="stat-card"><div class="num">' + totalPages + '</div><div class="lbl">Pages</div></div>' +
+        '<div class="stat-card"><div class="num">' + totalReady + '</div><div class="lbl">Ready</div></div>' +
+        '<div class="stat-card"><div class="num">' + (totalPages - totalReady) + '</div><div class="lbl">Beta / Dev</div></div>' +
+    '</div>';
+
+    html += '<div class="module-grid">';
+    PORTAL_MODULES.forEach(function (m) {
+        html += '<div class="module-card" data-module="' + esc(m.title) + '">' +
+            '<h3><i class="fas ' + m.icon + '"></i>' + m.title + '</h3>' +
+            '<p class="module-sub">' + (m.sub || '') + '</p>';
+        m.pages.forEach(function (p) {
+            html += '<a class="page-link" href="' + esc(p.path) + '">' +
+                '<span class="p-title">' + esc(p.title) +
+                    '<span class="p-path">' + esc(p.path) + '</span>' +
+                '</span>' +
+                '<span class="page-tags">' + roleTags(p.roles) + statusTag(p.status) + '</span>' +
+            '</a>';
+        });
+        html += '</div>';
+    });
+    html += '</div></div>';
+
+    gate.innerHTML = html;
+}
+
+function roleTags(roles) {
+    return (roles || []).map(function (r) {
+        var cls = (ROLE_CLASS[r] || 'user');
+        return '<span class="role-tag ' + cls + '">' + PAGE_ROLE_LABEL[cls] + '</span>';
+    }).join('');
+}
+
+function statusTag(status) {
+    return '<span class="status-badge status-' + esc(status) + '">' + esc(status) + '</span>';
+}
+
+function applyFilter(value) {
+    var q = (value || '').trim().toLowerCase();
+    var anyVisible = false;
+    var cards = document.querySelectorAll('.module-card');
+    cards.forEach(function (card) {
+        var moduleTitle = (card.getAttribute('data-module') || '').toLowerCase();
+        var links = card.querySelectorAll('.page-link');
+        var shown = 0;
+        links.forEach(function (link) {
+            var text = (link.textContent || '').toLowerCase();
+            var visible = !q || text.indexOf(q) !== -1 || moduleTitle.indexOf(q) !== -1;
+            link.style.display = visible ? '' : 'none';
+            if (visible) shown++;
+        });
+        card.style.display = (shown > 0) ? '' : 'none';
+        if (shown > 0) anyVisible = true;
+    });
+    var empty = document.getElementById('filterEmpty');
+    if (!empty) {
+        empty = document.createElement('div');
+        empty.id = 'filterEmpty';
+        document.querySelector('.test-portal').appendChild(empty);
+    }
+    empty.className = 'empty-state';
+    empty.style.display = q && !anyVisible ? '' : 'none';
+    empty.innerHTML = q && !anyVisible ? 'No pages match "' + esc(value) + '".' : '';
+}
+
+function esc(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+
+</body>
+</html>
