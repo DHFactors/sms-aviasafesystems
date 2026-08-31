@@ -1,115 +1,151 @@
 # AviaSAFE — Project Status & Architecture Report
 
-**Date:** 2026-08-22 · **Release:** Virtual Tenant Mirroring + Survey v4.0.0
-**Scope:** Chunks 1–16 implemented and deployed · Chunk 17 (cleanup/docs) this report.
+**Date:** 2026-08-31 · **Release:** Single-Database Consolidation + Minimal Clean Seed + PG-backed Survey Dashboards
+**Scope:** Beta environment retired · consolidated `sms-db` · 2-airline DEMO seed · Supabase operational layer · dashboard survey analytics on PostgreSQL
 
 ---
 
 ## 1. Executive Summary
 
-AviaSAFE now ships a complete **prospect demonstration platform** built on
-Virtual Tenant Mirroring: instead of duplicating data per operator, two master
-archetype datasets (`demo-fixed-wing`, `demo-rotary-wing`) carry a full
-365-day seasonal SMS history — hazards, corrective-action notices (CANs),
-corrective-action plans (CAPs), Bow-Tie SRM barrier data, PSOE audits, and
-baseline survey scoring — while each of the **20 prospect Accountable
-Executives** sees the same master data re-branded with their own company,
-executive name, fleet, base, and IATA reference codes.
+AviaSAFE has completed the **beta → production consolidation**. All
+`sms-db-beta` / `aerosafety-sms-beta` references have been removed and the
+platform now runs on a **single consolidated database** (`FIREBASE_DATABASE_ID=sms-db`,
+project `aerosafety-sms-prod`). The decommissioned beta hosting targets, the
+beta CI seed workflow, and the beta CLI guards were deleted; deployment is a
+single-service Render Blueprint at the repo root.
 
-Alongside the demo platform, the production survey engine was upgraded to the
-**v4.0.0 contract — 31 bilingual questions scored across the 12 ICAO SMS
-elements with proportional normalization** — fully backward-compatible with
-the 23-question v3.0.0 submissions.
+The operational environment was reset and reseeded to a **minimal clean state**
+for controlled rollout:
 
-All sixteen implementation chunks are complete; quality gates are green
-(537 backend tests, 53/53 inline-script checks), and both Firebase Hosting
-targets plus the Firestore ruleset (now enforcing demo session isolation)
-are deployed.
+* **4 Firestore tenants plus a STATE system tenant**: `buddha-air` (DEMO),
+  `yeti-airlines` (DEMO), `caan` (STATE regulator), `system` (STATE internal).
+* **6 Firebase Auth users** — 2 per DEMO airline (`safety@` / `ops@`),
+  the CAAN Safety Management Division account (`smd@caanepal.gov.np`), and the
+  platform super admin. `caan` is scoped to `[buddha-air, yeti-airlines]`.
+* **Supabase PostgreSQL operational tables all at 0 rows** (`reports`,
+  `hazards`, `hazard_assessments`, `hazard_capas`, `safety_deficiencies`,
+  `surveys`, `survey_responses`) — data lands only through the live API.
+
+Tenant records now carry the lifecycle contract (`category` `DEMO|CONTRACTED|STATE`,
+`status` `ACTIVE|SUSPENDED|EXPIRED`, `trial_expires_at`) with DEMO tenants seeded
+on a 30-day trial. Credentials were renamed to the simplified `{role}@{domain}`
+scheme (`safety@…` / `ops@…`, `admin@…` retired), which drives the **email-prefix
+role routing** used across dashboards.
+
+The Supabase integration is schema-tracked and reproducible: `config.toml`,
+a full remote-schema migration, and the HFACS + ICAO ADREP reference datasets
+are versioned. All quality gates are green (**631 backend tests**), and the
+latest UI/hotfix releases (survey multi-tenant engine, App Check hardening,
+`btn-primary` contrast fix) are deployed to Firebase Hosting.
 
 ## 2. System Architecture
 
 ```
-Prospect AE (ae@{operator})                      CAAN SMD (smd@caanepal.gov.np)
-        │ login → archetypeId claim                       │
-        ▼                                                 ▼
-┌─────────────────────────────┐            ┌──────────────────────────────┐
-│ ae-dashboard.html           │            │ caan.html aggregate          │
-│ window.DEMO_CONTEXT         │◄───────────│ regulators/caan              │
-│ localStorage(demo_context)  │   union    │ operator_tenant_ids (13)     │
-└──────────────┬──────────────┘            └──────────────┬───────────────┘
-               │ ?archetypeId=demo-* (safe fallback)      │
-               ▼                                          ▼
-   ═══════════ MASTER ARCHETYPE TENANTS (immutable from client) ═══════════
-   tenants/demo-fixed-wing   (FW-HZ/FW-CAN/FW-CAP refs, ATR/STOL pools)
-   tenants/demo-rotary-wing  (RW-HZ/RW-CAN/RW-CAP refs, HEMS/mountain pools)
-   tenants/caan              (state regulator)
-   ════════════════════════════════════════════════════════════════════════
-               ▲ session overlays only (demo_sessions/*, 24h TTL)
-   Prospect decisions never touch masters — enforced by API guard +
-   firestore.rules (demo_sessions/** & demo_analytics/** deny-all to clients).
+Westin-prefix role routing (live accounts, email ⇒ role ⇒ surface)
+    safety@…  → Safety Manager (AIRLINE_ADMIN)      → /safety.html
+    ops@…     → Flight Operations (USER)            → /dashboard/responsible-manager.html
+    smd@…     → CAAN SMD (CROSS_TENANT, scoped)     → CAAN aggregate
+    super-admin → platform console                  → /administration.html
+
+═══ SINGLE CONSOLIDATED DATABASE (aerosafety-sms-prod / sms-db) ═══
+   Firebase Auth  → identity + custom claims (role, tenant_id)
+   Firestore      → tenants/, users/, reports/, hazards/, demographics, ...
+   Supabase (PG)  → operational tables, tenant-keyed, 0 rows until live
+                    traffic (reports, hazards, hazard_assessments,
+                    hazard_capas, safety_deficiencies, surveys,
+                    survey_responses) — all with tenant_id indexes
+   ═══════════════════════════════════════════════════════════════
+   Tenant model: category (DEMO|CONTRACTED|STATE) · status
+                 (ACTIVE|SUSPENDED|EXPIRED) · trial_expires_at
 ```
 
-**Master archetypes**
+**Tenant isolation** is enforced server-side end-to-end: PG rows are
+tenant-keyed, cross-tenant API access is rejected unless the caller
+holds a CAAN cross-tenant role, and dashboards filter by tenant. Third-party
+cross-tenant reads (e.g. JAL cybersecurity assessments) are scoped explicitly.
 
-| Tenant | Kind | Mirror profile | Volume (365d seasonal) |
-|---|---|---|---|
-| `demo-fixed-wing` | Fixed-wing (ATR/turboprop/STOL) | buddha-air shape | ~158–168 hazards · 31 CANs · 67 CAPs |
-| `demo-rotary-wing` | Rotary-wing (HEMS/mountain) | fishtail-air shape | ~156–167 hazards · 27 CANs · 56 CAPs |
+**Multi-tenant survey engine** (`public/survey/`): a standalone bilingual
+(EN/NE) v4.0.0 survey resolves the tenant from a `?tenant=` parameter or a
+hostname mapping (`smssurvey.gsacharya.com`, `sms.nac.com.np`, etc.), enforces
+the per-tenant survey window from the tenant doc's `survey_config`, and submits
+via `POST /api/v1/surveys/` with the `tenantId` validated against the tenant's
+records — responses land keyed to the submitting tenant only.
 
-Seasonal engine: Jan–May pre-monsoon (8–12 haz/mo), Jun–Aug monsoon surge
-(15–20, deeper barrier degradation, higher severity), Sep–Nov festive peak
-(12–16), Dec recovery — scaled by operator workforce, annual floor 52.
+### Survey analytics on PostgreSQL (single source of truth)
 
-**Supporting systems**: `caanepal` state-regulator tier aggregates both
-archetypes *and* the 11 live operators through `regulators/caan`
-(`operator_tenant_ids` union-merged). Survey v4 adds elements E1–E12 with
-proportional normalization and the CAAN Appendix 10 weighted composite
-(Policy 10 / SRM 40 / Assurance 30 / Promotion 20).
+The dashboard survey aggregates previously read **Firestore**
+`collection_group("surveys")` / `collection_group("responses")` — collections
+the live API no longer writes to — so newly submitted survey responses were
+persisted to Supabase but never surfaced on the dashboards. This gap is closed
+by making **PostgreSQL the exclusive source of truth for survey analytics**:
+
+* `backend/app/services/dashboard_service.py` now queries the `surveys` and
+  `survey_responses` tables directly via `session_scope()`/`select()` —
+  scoped by `is_demo == demo_scope()` with the `submitted_at` cutoff applied
+  in SQL — through `_survey_docs`, `_survey_responses`, `_PGSurveyDoc`, and
+  `_register_all_tenant_slugs`.
+* The airline SMS maturity, CAAN survey maturity, CAAN SMS maturity
+  assessment, and CAAN state "Survey Responses" counter all flow from the
+  same Postgres rows the `POST /api/v1/surveys/` endpoint writes.
+* The `submit_survey` route docstring was corrected to describe Postgres
+  persistence (scored `surveys` + raw `survey_responses`).
+* **Quality gate:** 137 backend tests passing, including new integration
+  tests that seed real `Survey` / `SurveyResponse` rows and verify the SQL
+  cutoff, slug translation, per-tenant response counting, and regulator
+  scoping.
+* `backend/scripts/cleanup_firestore_surveys.py` purges the legacy
+  `surveys` / `responses` Firestore collections, leaving PostgreSQL (Supabase)
+  as the exclusive store.
 
 ## 3. Quality Gates
 
 | Gate | Result |
 |---|---|
-| Backend test suite | **537 / 537 passing** |
-| Frontend inline-script checker | **53 / 53 passing** |
-| Survey scoring (Chunk 9 suite) | 14 / 14 |
-| Archetype API scoping tests | 7 / 7 |
-| Demo session isolation tests | 7 / 7 |
-| Seasonal seed validation | 122 / 122 checks |
-| Registry contract (20 operators) | verified |
-| Login-routing matrix (6 accounts) | verified |
-| Personalization + formatter smoke | verified |
+| Backend test suite | **631 / 631 passing** |
+| Survey analytics (PG-backed dashboard) suite | **137 passing** (surveys, state/CAAN maturity, regulator scoping, tenant SMS) |
+| Survey scoring suite | green |
+| Demo/tenant scoping + isolation tests | green |
+| Frontend inline-script / sandbox checks (Firebase App Check, tenant context, dashboard, input guard) | green |
+| Full-repo `sms-db-beta` sweep | clean (residual refs only in historical/archived docs and tests asserting decommissioned behavior) |
+| Seed validation | minimal 4+system tenants · 6 Auth users · CAAN scoped · PG 0 rows |
 
 ## 4. Deployment Endpoints
 
 | Surface | URL / Target |
 |---|---|
-| Hosting (beta) | https://sms-beta.web.app · https://aerosafety-sms-beta.web.app |
 | Hosting (prod) | https://aerosafety-sms-prod.web.app · https://sms.aviasafesystems.com |
-| API (beta, Render) | https://aviasafe-unified-platform.onrender.com |
-| API (prod, Render) | https://aviasafe-unified-platform.onrender.com |
-| Firestore rules | `firestore/firestore.rules` (released with Chunk 16 deploy) |
-| Backend repo hook | Render auto-deploy on push (see §6) |
+| Survey hosting | https://smssurvey.gsacharya.com |
+| API (Render) | https://aviasafe-unified-platform.onrender.com |
+| Firebase project | `aerosafety-sms-prod` · database `sms-db` |
+| Deploy plumbing | root `render.yaml` (single-service, `dockerContext: backend`) · Firebase Hosting |
+| Supabase | project ref `bftwNljNpnpniksmalnk` (config.toml tracked; remote schema migration tracked) |
 
-## 5. Operational Guide — Running an AE Demonstration
+## 5. Operational Notes
 
-Full playbook: [`docs/PROSPECT_DEMO_GUIDE.md`](PROSPECT_DEMO_GUIDE.md).
-
-Quick sequence:
-1. Provision/rotate the prospect's `ae@…` password in Firebase Console.
-2. Share `https://sms-beta.web.app/login.html` (or tenant portal URL).
-3. The executive lands on their branded governance dashboard.
-4. Optional sales mode: append **`?demo=true`** → floating Quick-Switch
-   toolbar (Buddha Air ↔ Fishtail Air) + subtle "🔬 Demo Environment" badge.
-5. Decisions made during the demo persist for 24 h in the isolated session
-   ledger (`demo_sessions/{session_id}/decisions`) — masters stay pristine.
-6. Telemetry lands in `demo_analytics/{ae-email}/events` for follow-up scoring.
+* **Logging in**: share `https://sms.aviasafesystems.com/login.html` with the
+  tenant's safety (`safety@…`) or operations (`ops@…`) account. Passwords are
+  never committed — provision/rotate in Firebase Console or via
+  `backend/seed/reset_passwords.py`.
+* **Reseeding**: `backend/seed/seeder.py` provides the minimal-reset flow
+  (`--reset-minimal`) that purges Firestore/Auth (keeping the protected super
+  admin and CAAN SMD accounts) and re-creates the 2 DEMO airlines.
+* **Empty PG by design**: operational data is written only through the API, so
+  the persisted model is exercised first.
+* **Survey campaigns**: tenants control their own window via `survey_open_date` /
+  `survey_close_date` / `is_survey_active` on the tenant doc; the page enforces it
+  per tenant (no cross-tenant bleed). Survey submissions persist to the Supabase
+  `surveys` / `survey_responses` tables, and all survey dashboards read those
+  same tables — Postgres is the single source of truth for survey data.
 
 ## 6. Known Follow-Ups
 
-* Render service picks up backend changes (Chunks 6–7 API layer) on the next
-  push-triggered deploy — verify after this release.
-* Prospect AE Auth users are provisioned per engagement (Firebase Console or
-  Admin SDK); passwords are never committed.
-* `backend/remove_caan.py`-style one-off scripts were removed in Chunk 17;
-  keep scratch tooling out of the repository root.
+* Operator survey hostname map (`public/survey/app.js` `routes`) still maps only
+  `sita-air`, `nepal-airlines`, `caan-ops`; the live DEMO tenants use
+  `?tenant=buddha-air` / `?tenant=yeti-airlines` links until their own
+  subdomains are added.
+* Optional: per-employee survey issuance (unique links / `respondentId`) on top
+  of the existing tenant-keyed storage if employee-scoped collection is required.
+* Legacy Firestore `surveys` / `responses` collections (if any historical docs
+  remain) can be purged with `backend/scripts/cleanup_firestore_surveys.py`.
+* `data/icao_adrep_taxonomies.csv` is imported to Supabase; keep reference CSVs
+  versioned alongside `hfacs_nanocodes.csv`.
