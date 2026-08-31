@@ -53,6 +53,9 @@ RATE_LIMITS = {
     "invite":        (20, 3600),     # 20/hour per IP (admin invite issuance)
     "register":      (10, 3600),     # 10/hour per IP (legacy /api/v1/auth/register)
     "copilot":       (120, 3600),    # 120/hour (beta; AI chat assistant per tenant)
+    "sdc_validate":  (200, 3600),    # 200/hour per tenant (batch validation 404 fix)
+    "sdc_ingest":    (100, 3600),    # 100/hour per tenant (batch commit / ingestion)
+    "data_query":    (600, 3600),    # 600/hour per tenant (universal data query)
 }
 
 # Strict sliding-window limits enforced with Redis sorted sets (each request is
