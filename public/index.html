@@ -87,6 +87,24 @@
     </head>
 <body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white min-h-screen flex flex-col">
 
+    <script>
+    // Survey tenant entry: route a landing-page hit carrying a tenant query
+    // parameter straight to the survey application. The marketing homepage is
+    // not a survey host — a `?tenant=` link (e.g. ?tenant=yeti-airlines) must
+    // resolve to /survey/, whose runtime (survey/app.js resolveTenantContext)
+    // validates the tenant against the tenant records before rendering.
+    (function() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const tenant = (params.get('tenant') || '').trim().toLowerCase();
+            if (tenant) {
+                const target = '/survey/?tenant=' + encodeURIComponent(tenant);
+                window.location.replace(target);
+            }
+        } catch (e) { /* never block the marketing page on a malformed URL */ }
+    })();
+    </script>
+
     <!-- TOP NAVIGATION BAR (Clean & Crisp Header) -->
     <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
