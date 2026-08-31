@@ -190,6 +190,67 @@ async def submit_survey(
     if not tenant_snap.exists:
         raise HTTPException(status_code=400, detail=f"Unknown tenant: {tenant_id}")
 
+    # Enforce the survey open/close window server-side. The client-side checks
+    # can be bypassed by a crafted request, so a submission outside the window
+    # (or with the survey explicitly disabled) must be rejected here.
+    tenant_data = tenant_snap.to_dict() or {}
+    config_map = dict(tenant_data.get("config") or {})
+    survey_cfg = dict(tenant_data.get("surveyConfig") or {})
+
+    def _cfg(camel_key: str, snake_key: str):
+        if snake_key in config_map:
+            return config_map[snake_key]
+        if camel_key in survey_cfg:
+            return survey_cfg[camel_key]
+        return None
+
+    is_active = _cfg("isActive", "is_survey_active")
+    if is_active is None:
+        is_active = True
+    if is_active is False:
+        raise HTTPException(status_code=400, detail="Survey is currently closed.")
+
+    open_date = _cfg("openDate", "survey_open_date")
+    close_date = _cfg("closeDate", "survey_close_date")
+
+    now = datetime.now(timezone.utc)
+
+    def _parse_window(value: Any, start_of_day: bool) -> Optional[datetime]:
+        """Parse a survey window boundary into a tz-aware datetime.
+
+        Handles full ISO-8601 timestamps and the documented date-only
+        (YYYY-MM-DD) form. Date-only values expand to the full day boundary so
+        the open date opens at 00:00 and the close date closes at 23:59:59.
+        Returns None (treated as unconstrained) when unset or malformed.
+        """
+        if value is None or str(value).strip() == "":
+            return None
+        text = str(value).strip()
+        day_only = "T" not in text and " " not in text
+        try:
+            dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                dt = datetime.strptime(text, "%Y-%m-%d")
+            except ValueError:
+                return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if day_only:
+            if start_of_day:
+                dt = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+        return dt
+
+    open_dt = _parse_window(open_date, start_of_day=True)
+    if open_dt is not None and now < open_dt:
+        raise HTTPException(status_code=400, detail=f"Survey opens on {open_date}.")
+
+    close_dt = _parse_window(close_date, start_of_day=False)
+    if close_dt is not None and now > close_dt:
+        raise HTTPException(status_code=400, detail=f"Survey closed on {close_date}.")
+
     # Resolve the active question contract (explicit version wins, otherwise
     # auto-detect from the answered v4-only questions).
     survey_version = payload.survey_version or detect_survey_version(payload.answers)
