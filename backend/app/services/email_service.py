@@ -14,6 +14,7 @@
 
 import hashlib
 import logging
+import os
 import random
 import smtplib
 import ssl
@@ -76,6 +77,83 @@ def render_welcome_email(context: Dict[str, Any]) -> Dict[str, str]:
     )
     subject = f"Welcome to AviaSAFE SMS - Your {ctx['tenant_name']} Tenant Credentials"
     return {"subject": subject, "html": html, "text": text}
+
+
+def _is_smtp_configured() -> bool:
+    """True only when a full SMTP configuration is present.
+
+    Used as a final safety net: if no real delivery channel is configured we
+    must never attempt a blind network send — we fall back to test-mode logging.
+    """
+    return bool(
+        os.getenv("SMTP_HOST")
+        and os.getenv("SMTP_USER")
+        and os.getenv("SMTP_PASS")
+    )
+
+
+def _is_test_mode(recipients: List[str]) -> bool:
+    """Determine if we should log emails instead of sending.
+
+    Returns True if ANY of the following hold:
+    - ENVIRONMENT is "test", "development", or "demo"
+    - Any recipient email contains the ".test" domain
+    - SMTP is not configured (no real delivery channel available)
+    """
+    env = os.getenv("ENVIRONMENT", "development")
+
+    if env in ("test", "development", "demo"):
+        return True
+
+    for recipient in recipients:
+        if recipient and ".test" in recipient:
+            return True
+
+    if not _is_smtp_configured():
+        return True
+
+    return False
+
+
+def _log_only_result(to_list: List[str], provider: str, html_body: str, reason: str, subject: str = "", text_body: str = "") -> Dict[str, Any]:
+    """Build the standard 'logged, not sent' result used in test mode and emit
+    the readable [TEST MODE] audit block to the logger.
+
+    One entry per recipient so callers (and the audit log) see exactly which
+    addresses were NOT delivered.
+    """
+    recipient_results = [
+        {
+            "sent": False,
+            "provider": provider,
+            "to": to,
+            "test_mode": True,
+            "reason": reason,
+        }
+        for to in to_list
+    ]
+
+    log_payload = text_body or html_body
+    logger.info("=" * 70)
+    logger.info("[TEST MODE] Email would be sent:")
+    logger.info(f"To: {', '.join(to_list) or '(none)'}")
+    logger.info(f"Subject: {subject or '(no subject)'}")
+    logger.info(f"Body:")
+    logger.info(log_payload[:1000])
+    if len(log_payload) > 1000:
+        logger.info(f"... (truncated, total length: {len(log_payload)} chars)")
+    logger.info(f"Reason: {reason}")
+    logger.info("=" * 70)
+
+    return {
+        "sent": False,
+        "provider": provider,
+        "recipients": len(recipient_results),
+        "delivered": 0,
+        "test_mode": True,
+        "results": recipient_results,
+        "preview": html_body,
+    }
 
 
 def _from_address() -> tuple:
@@ -185,7 +263,17 @@ def send_welcome_email(to: str, context: Dict[str, Any]) -> Dict[str, Any]:
         payload_hash = sha256_string(rendered.get("html", ""))
         provider = (settings.EMAIL_PROVIDER or "none").strip().lower()
 
-        if provider == "smtp":
+        if _is_test_mode(_split_emails(to)):
+            result = _log_only_result(
+                _split_emails(to),
+                provider,
+                rendered["html"],
+                "test mode (ENVIRONMENT development/test/demo, .test recipient, "
+                "or SMTP unconfigured) — welcome email logged, not delivered",
+                subject=rendered["subject"],
+                text_body=rendered["text"],
+            )
+        elif provider == "smtp":
             result = _retry_with_backoff(_send_smtp, to, rendered)
         elif provider == "sendgrid":
             result = _retry_with_backoff(_send_sendgrid, to, rendered)
@@ -245,7 +333,17 @@ def send_regulatory_report(
             server.send_message(msg)
         return {"sent": True, "provider": "smtp", "to": to_addr, "host": host}
 
-    if provider == "smtp":
+    if _is_test_mode(_split_emails(to)):
+        result = _log_only_result(
+            _split_emails(to),
+            provider,
+            html_body,
+            "test mode (ENVIRONMENT development/test/demo, .test recipient, "
+            "or SMTP unconfigured) — regulatory report logged, not delivered",
+            subject=subject,
+            text_body=text_body,
+        )
+    elif provider == "smtp":
         result = _retry_with_backoff(_send_fn, to, rendered)
     else:
         result = {
@@ -314,6 +412,17 @@ def _dispatch_notification(to_list: List[str], subject: str, html_body: str, tex
             "reason": "No recipients provided",
             "preview": html_body,
         }
+
+    if _is_test_mode(to_list):
+        return _log_only_result(
+            to_list,
+            provider,
+            html_body,
+            "test mode (ENVIRONMENT development/test/demo, .test recipients, "
+            "or SMTP unconfigured) — notification logged, not delivered",
+            subject=subject,
+            text_body=text_body,
+        )
 
     if provider == "smtp":
         for to in to_list:
