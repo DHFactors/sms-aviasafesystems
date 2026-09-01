@@ -13,6 +13,7 @@
 #
 # Usage (from backend/):
 #   python -m seed.seeder                            # tenants + users upsert
+#   python -m seed.seeder --generic                  # seed 4 generic demo tenants + users
 #   python -m seed.seeder --reset-minimal --dry-run  # preview the reset+seed
 #   python -m seed.seeder --reset-minimal            # execute the reset+seed
 # ============================================================================
@@ -124,6 +125,187 @@ def seed_tenants_and_users(
             f"(op tables untouched)"
         )
     return counts
+
+
+# ============================================================================
+# Generic demo tenants (fixedwing / rotarywing / demoairport / demostate)
+#
+# A small, self-contained tenant set used to exercise tenant isolation and
+# role-based dashboards without the real operator tenants. Each tenant carries
+# an OperationalScope classification and is tagged is_demo=True so it never
+# masquerades as a real provider.
+#
+# Users are provisioned with the deterministic password pattern
+#   {role_token}_{shorthand}_2026   (e.g. ae_fw_2026, staff_rw_2026)
+# and role + tenant_id custom claims. The Super Admin (ezondiza.dhf@gmail.com)
+# is NEVER created or modified here.
+# ============================================================================
+
+GENERIC_TENANT_CONFIG = [
+    {
+        "id": "fixedwing",
+        "name": "Fixed-Wing Operator",
+        "shorthand": "fw",
+        "classification": "AIRLINE_FIXED_WING",
+    },
+    {
+        "id": "rotarywing",
+        "name": "Rotary-Wing Operator",
+        "shorthand": "rw",
+        "classification": "AIRLINE_ROTARY",
+    },
+    {
+        "id": "demoairport",
+        "name": "Demo Airport",
+        "shorthand": "ap",
+        "classification": "AERODROME",
+    },
+    {
+        "id": "demostate",
+        "name": "Demo State Regulator",
+        "shorthand": "st",
+        "classification": "STATE_REGULATOR",
+    },
+]
+
+# role_token -> (display role, full_name, department). Used to build each
+# tenant's role-based user set.
+_GENERIC_ROLE_META = {
+    "ae": {"role": "AIRLINE_ADMIN", "full_name": "Accountable Executive", "department": ""},
+    "safety": {"role": "AIRLINE_ADMIN", "full_name": "Safety Manager", "department": "Safety"},
+    "camo": {"role": "DEPT_ADMIN", "full_name": "CAMO Manager", "department": "CAMO"},
+    "145": {"role": "DEPT_ADMIN", "full_name": "Part-145 Maintenance Manager", "department": "Part-145"},
+    "ops": {"role": "DEPT_ADMIN", "full_name": "Operations Manager", "department": "Flight Operations"},
+    "staff": {"role": "USER", "full_name": "Staff Member", "department": ""},
+    "smd": {"role": "CAAN_SMD", "full_name": "State Regulator (SMD)", "department": ""},
+}
+
+# Role tokens provisioned per generic tenant (order matters for readability).
+GENERIC_TENANT_USERS = {
+    "fixedwing": ["ae", "safety", "camo", "145", "ops", "staff"],
+    "rotarywing": ["ae", "safety", "camo", "145", "ops", "staff"],
+    "demoairport": ["ae", "safety", "ops", "staff"],
+    "demostate": ["smd"],
+}
+
+
+def _create_generic_tenant(db, cfg: dict) -> str:
+    """Create a single generic tenant document (idempotent)."""
+    from app.core.config import settings
+
+    tenant_id = cfg["id"]
+    now = datetime.now(timezone.utc)
+    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
+    tenant_doc = tenant_ref.get()
+
+    tenant_data = {
+        "name": cfg["name"],
+        "type": cfg["classification"],
+        "tenant_type": cfg["classification"],
+        "classification": cfg["classification"],
+        "shorthand": cfg["shorthand"],
+        "category": "DEMO",
+        "status": "ACTIVE",
+        "active": True,
+        "is_demo": True,
+        "created_at": now,
+        "updated_at": now,
+        "seed_version": SEED_VERSION,
+    }
+
+    if not tenant_doc.exists:
+        tenant_ref.set(tenant_data)
+        logger.info(f"Created generic tenant: {cfg['name']} ({tenant_id})")
+    else:
+        tenant_ref.update(tenant_data)
+        logger.info(f"Updated generic tenant: {cfg['name']} ({tenant_id})")
+
+    metadata = tenant_ref.collection(settings.FIREBASE_COLLECTION_METADATA).document(
+        settings.FIREBASE_DOCUMENT_INFO
+    )
+    metadata.set({
+        "tenant_name": cfg["name"],
+        "tenant_type": cfg["classification"],
+        "classification": cfg["classification"],
+        "shorthand": cfg["shorthand"],
+        "seed_version": SEED_VERSION,
+    }, merge=True)
+
+    return tenant_id
+
+
+def _generic_user_spec(tid: str, shorthand: str, token: str) -> dict:
+    meta = _GENERIC_ROLE_META[token]
+    return {
+        "uid": f"{token}-{tid}-001",
+        "email": f"{token}@{tid}.test",
+        "password": f"{token}_{shorthand}_2026",
+        "full_name": meta["full_name"],
+        "organization": next(t["name"] for t in GENERIC_TENANT_CONFIG if t["id"] == tid),
+        "role": meta["role"],
+        "tenant_id": tid,
+        "department": meta["department"],
+    }
+
+
+def seed_generic_tenants_and_users(db=None, auth=None, print_counts: bool = True) -> dict:
+    """Seed the 4 generic demo tenants + their role-based users (idempotent).
+
+    Creates tenant docs (is_demo=True, active=True) and Firebase Auth accounts
+    with role/tenant_id claims. Never touches the Super Admin account.
+    """
+    from app.firebase import get_db, get_auth
+    from seed.users import create_user
+
+    if db is None:
+        db = get_db()
+    if auth is None:
+        auth = get_auth()
+
+    created_tenants = []
+    for cfg in GENERIC_TENANT_CONFIG:
+        created_tenants.append(_create_generic_tenant(db, cfg))
+
+    created_users = []
+    skipped_users = []
+    for cfg in GENERIC_TENANT_CONFIG:
+        tid = cfg["id"]
+        shorthand = cfg["shorthand"]
+        for token in GENERIC_TENANT_USERS[tid]:
+            spec = _generic_user_spec(tid, shorthand, token)
+            email = spec["email"]
+            if _user_exists(auth, uid=spec["uid"], email=email):
+                skipped_users.append(email)
+                logger.info(f"Generic user already exists, skipping: {email}")
+                continue
+            result = create_user(auth, spec)
+            created_users.append(result["uid"])
+
+    counts = {
+        "tenants": created_tenants,
+        "users_created": created_users,
+        "users_skipped": skipped_users,
+    }
+    if print_counts:
+        logger.info(
+            f"Generic tenants+users seed complete: {len(created_tenants)} tenants "
+            f"({', '.join(created_tenants)}), {len(created_users)} users created, "
+            f"{len(skipped_users)} skipped (op tables untouched)"
+        )
+    return counts
+
+
+def _user_exists(auth, uid: str, email: str) -> bool:
+    try:
+        auth.get_user(uid)
+        return True
+    except Exception:
+        pass
+    try:
+        auth.get_user_by_email(email)
+        return True
+    except Exception:
+        return False
 
 
 # ============================================================================
@@ -286,9 +468,27 @@ def main(argv=None) -> int:
                         help="Skip the CAAN state-regulator tenant.")
     parser.add_argument("--reset-minimal", action="store_true",
                         help="Destructive reset to the minimal 2-airline demo dataset.")
+    parser.add_argument("--generic", action="store_true",
+                        help="Seed the 4 generic demo tenants (fixedwing, rotarywing, "
+                             "demoairport, demostate) + role-based users.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Print the planned actions without writing anything.")
     args = parser.parse_args(argv)
+
+    if args.generic:
+        if args.dry_run:
+            print("Generic seed DRY RUN (no writes):")
+            print(f"  would create {len(GENERIC_TENANT_CONFIG)} tenants: "
+                  f"{', '.join(t['id'] for t in GENERIC_TENANT_CONFIG)}")
+            total = sum(len(u) for u in GENERIC_TENANT_USERS.values())
+            print(f"  would create {total} users (Super Admin untouched)")
+            return 0
+        result = seed_generic_tenants_and_users()
+        print("\nGeneric seed complete:")
+        print(f"  tenants       : {', '.join(result['tenants'])}")
+        print(f"  users created : {len(result['users_created'])}")
+        print(f"  users skipped : {len(result['users_skipped'])}")
+        return 0
 
     if args.reset_minimal:
         result = reset_and_seed_minimal(dry_run=args.dry_run)
