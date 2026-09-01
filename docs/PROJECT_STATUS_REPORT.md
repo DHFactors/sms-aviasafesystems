@@ -1,7 +1,7 @@
 # AviaSAFE — Project Status & Architecture Report
 
-**Date:** 2026-08-31 · **Release:** Single-Database Consolidation + Minimal Clean Seed + PG-backed Survey Dashboards
-**Scope:** Beta environment retired · consolidated `sms-db` · 2-airline DEMO seed · Supabase operational layer · dashboard survey analytics on PostgreSQL
+**Date:** 2026-08-31 · **Release:** Safety-workflow hardening + Admin console + localhost cleanup
+**Scope:** Beta retired · consolidated `sms-db` · 2-airline DEMO seed · PG survey analytics · Priority 1–6 fixes · unified Super Admin dashboard · HFACS 109 nanocodes · PSOE→CAN persistent link
 
 ---
 
@@ -34,9 +34,44 @@ role routing** used across dashboards.
 
 The Supabase integration is schema-tracked and reproducible: `config.toml`,
 a full remote-schema migration, and the HFACS + ICAO ADREP reference datasets
-are versioned. All quality gates are green (**631 backend tests**), and the
-latest UI/hotfix releases (survey multi-tenant engine, App Check hardening,
-`btn-primary` contrast fix) are deployed to Firebase Hosting.
+are versioned. All quality gates are green, and the latest feature/hotfix
+releases are deployed to Firebase Hosting — see **Recent Work** below.
+
+## 1a. Recent Work (Aug 2026)
+
+Completed, committed, and deployed since the previous status report:
+
+* **Priority 1–6 safety-workflow fixes** — AE banner fix, SDCPS mobile
+  hamburger, SDC validate/ingest + universal data query endpoints, report
+  generation aligned to the backend contract, survey open/close window
+  enforcement, and CAN/CAP email notifications with an overdue-check job.
+* **Localhost cleanup** — removed every `localhost`/`127.0.0.1` runtime
+  reference across the frontend (SDCPS API, reports, shared client, Firebase
+  config, Copilot widget, survey app) and backend CORS/dev-host branches and
+  reserved-tenant arrays. All inline scripts pass `node --check`.
+* **Unified Super Admin Dashboard** (`/admin/dashboard.html`) — a single
+  sidebar-navigated console consolidating the Test Portal (44 page links with
+  search), Tenant Management (governance list + activate/suspend),
+  Production Setup (regulator/tenant/bulk/seed preview + deploy), Audit Log,
+  and Dummy Data. SUPER_ADMIN-gated; login now redirects admins here.
+* **HFACS catalog completed to 109 nanocodes** — added `AE203`
+  (Judgment & Decision-Making Errors), `PC320` (Physical Problem), and
+  `OR006` (Resource Problems) to `public/data/hfacs_nanocodes.json`, closing
+  the gap between the declared 109 and the 106 present. Full 109 unique codes,
+  no duplicates, all four tiers (ACT/PRECOND/SUPER/ORG) represented, and the
+  hazard-analysis HFACS dropdown + tier filter load them.
+* **PSOE → CAN persistent link** — CAN records now store
+  `psoe_assessment_id` (new `cans` table column + `CANCreate`/`CANResponse`
+  fields). `promoteToCan()` passes the assessment id through the deep link,
+  `issue.html` forwards it into the CAN submission payload, and
+  `can_detail.html` shows a link back to the originating PSOE assessment.
+* **Archived-flag fix on reopen** — `VerificationService.reopen_hazard` now
+  clears the Firestore `archived` flag (set `True` at closure) so a reopened
+  hazard is restored to a fully active state instead of an inconsistent
+  "archived + reopened" state.
+
+All of the above is committed (`86c2db3` latest), pushed to `origin/main`,
+and deployed to Firebase Hosting.
 
 ## 2. System Architecture
 
