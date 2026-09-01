@@ -1,0 +1,87 @@
+<!-- public/dashboard/spi-dashboard.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPI/SPT Dashboard - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/spi-dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/js/chart-theme.js"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <div id="authGate" style="padding:3rem;text-align:center;color:#64748b;">
+            <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+            <p>Loading SPI/SPT Dashboard...</p>
+        </div>
+
+        <div id="spiContent" style="display:none;">
+            <div class="section-head">
+                <div>
+                    <h2><i class="fas fa-gauge-high" style="color:#1a6b8a;"></i> SPI/SPT Dashboard</h2>
+                    <div class="section-sub">Safety Performance Indicators & Targets — Leading & Lagging</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                    <button class="btn btn-primary btn-sm" onclick="loadSpiData()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+            </div>
+
+            <!-- SPI Summary -->
+            <div class="spi-summary" id="spiSummary"></div>
+
+            <!-- Leading Indicators -->
+            <div class="card">
+                <h3><i class="fas fa-arrow-trend-up" style="color:#34a853;"></i> Leading Indicators</h3>
+                <div class="spi-grid" id="leadingIndicators"></div>
+            </div>
+
+            <!-- Lagging Indicators -->
+            <div class="card">
+                <h3><i class="fas fa-arrow-trend-down" style="color:#dc3545;"></i> Lagging Indicators</h3>
+                <div class="spi-grid" id="laggingIndicators"></div>
+            </div>
+
+            <!-- SPI Trend Chart -->
+            <div class="card">
+                <h3><i class="fas fa-chart-line" style="color:#1a6b8a;"></i> SPI Trend (Last 6 Months)</h3>
+                <div class="chart-wrap"><canvas id="spiTrendChart"></canvas></div>
+            </div>
+
+            <!-- State Comparison -->
+            <div class="card">
+                <h3><i class="fas fa-building" style="color:#1a6b8a;"></i> Operator vs State Average</h3>
+                <div class="chart-wrap"><canvas id="spiComparisonChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    window.SHELL_CONFIG = {
+        brand: 'AviaSAFE',
+        roleLabel: 'Operator SPI/SPT Dashboard',
+        nav: [
+            { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+            { href: '/dashboard/index.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+            { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+            { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+            { href: '/dashboard/nhrc-dashboard.html', label: 'N-HRC KPIs', icon: 'fa-triangle-exclamation' },
+            { href: '/dashboard/spi-dashboard.html', label: 'SPI/SPT', icon: 'fa-gauge-high' },
+            { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
+            { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN'] },
+        ],
+    };
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/shell.js"></script>
+    <script src="/js/spi-dashboard.js"></script>
+</body>
+</html>

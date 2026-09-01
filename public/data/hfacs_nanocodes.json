@@ -1,8 +1,3 @@
-// ==============================================================================
-// File: public/data/hfacs_nanocodes.json
-// Description: Full 109 DoD HFACS 7.0 Nanocodes Dataset categorized across
-//              Unsafe Acts, Preconditions, Supervision, and Organization.
-// ==============================================================================
 [
   {"code":"AE101","cat":"ACT","sub":"Performance-Based Errors","def":"Unintended Operation of Equipment"},
   {"code":"AE102","cat":"ACT","sub":"Performance-Based Errors","def":"Checklist Not Followed Correctly"},

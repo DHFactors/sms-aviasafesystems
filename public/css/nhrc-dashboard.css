@@ -1,0 +1,190 @@
+/* public/css/nhrc-dashboard.css */
+
+.nhrc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.nhrc-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    padding: 1.25rem;
+    border-top: 4px solid #1a6b8a;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.nhrc-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.nhrc-card .nhrc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.nhrc-card .nhrc-code {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #0b2a42;
+}
+
+.nhrc-card .nhrc-name {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.nhrc-card .nhrc-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.nhrc-card .nhrc-stat {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+.nhrc-card .nhrc-stat .num {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0b2a42;
+}
+
+.nhrc-card .nhrc-stat .lbl {
+    font-size: 0.65rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.nhrc-card .nhrc-trend {
+    font-size: 0.8rem;
+    color: #475569;
+    font-weight: 500;
+    margin: 0.25rem 0 0.5rem;
+}
+
+.nhrc-card .nhrc-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-ok {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.status-watch {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-action {
+    background: #fce8e6;
+    color: #c5221f;
+}
+
+.nhrc-card .nhrc-sei-link {
+    font-size: 0.78rem;
+    color: #1a6b8a;
+    text-decoration: none;
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+
+.nhrc-card .nhrc-sei-link:hover {
+    text-decoration: underline;
+}
+
+.nhrc-empty,
+.nhrc-error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+.nhrc-error {
+    color: #c5221f;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #64748b;
+}
+
+.modal-close:hover {
+    color: #0b2a42;
+}
+
+.modal-content h4 {
+    color: #0b2a42;
+    margin: 1rem 0 0.5rem;
+}
+
+.modal-content ul {
+    margin: 0 0 0.5rem;
+    padding-left: 1.25rem;
+    line-height: 1.6;
+    color: #334155;
+}
+
+/* Chart wrap */
+.chart-wrap {
+    position: relative;
+    height: 300px;
+}
+
+@media (max-width: 640px) {
+    .nhrc-grid {
+        grid-template-columns: 1fr;
+    }
+    .chart-wrap {
+        height: 240px;
+    }
+}

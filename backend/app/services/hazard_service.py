@@ -35,7 +35,7 @@ from app.db.db_models import (
     HazardRcaEntry,
     HazardRcaFactor,
 )
-from app.db.ids import register_tenant, tenant_slug, tenant_uuid
+from app.db.ids import get_tenant_shorthand, register_tenant, tenant_slug, tenant_uuid
 from app.db.isolation import demo_scope
 from app.db.runner import run
 from app.db.schema_init import ensure_v2_schema_async
@@ -63,19 +63,22 @@ SEVERITY_LABELS = {5: "Catastrophic", 4: "Hazardous", 3: "Major", 2: "Minor", 1:
 PROBABILITY_LABELS = {"A": "Frequent", "B": "Occasional", "C": "Remote", "D": "Improbable", "E": "Extremely Improbable"}
 
 
-def generate_hazard_id(tenant_id: str, taxonomy: str, year: int, sequence: int) -> str:
-    tenant_code = tenant_id[:2].upper()
-    taxonomy_code_map = {
-        "Organizational-Facilities": "ORG",
-        "Organizational-Documentation, Processes and Procedures": "DOC",
-        "Technical": "TEC",
-        "Wildlife": "WLD",
-        "Human Factors": "HUM",
-        "Environmental": "ENV",
-        "Other": "OTH",
-    }
-    taxonomy_code = taxonomy_code_map.get(taxonomy, "GEN")[:3].upper()
-    return f"{tenant_code}-HZ-{taxonomy_code}-{sequence:02d}-{str(year)[-2:]}"
+def generate_hazard_id(tenant_code: str, priority: str, year: int, seq: int) -> str:
+    """Generate the hazard reference per the CAAN SRM Procedure Manual format.
+
+    Format: {TENANT_CODE}-{SEQ:03d}-{PRIORITY}-{YEAR}
+    Example: FW-001-H-2026
+
+    Args:
+        tenant_code: 2-letter tenant code (FW, RW, AP, ST).
+        priority: H, M, or L.
+        year: 4-digit year (e.g. 2026).
+        seq: Sequence number (e.g. 1, 2, 3).
+    """
+    priority_code = (priority or "M").upper()
+    if priority_code not in ("H", "M", "L"):
+        priority_code = "M"
+    return f"{tenant_code.upper()}-{seq:03d}-{priority_code}-{year}"
 
 
 _HZ_MUTABLE_COLUMNS = [
@@ -186,16 +189,19 @@ class HazardService:
             )
             max_seq = 0
             for hid in existing:
+                # FW-001-H-2026
                 parts = hid.split("-")
-                if len(parts) == 5 and parts[4] == str(year)[-2:]:
+                if len(parts) == 4 and parts[3] == str(year):
                     try:
-                        seq = int(parts[3])
+                        seq = int(parts[1])
                         if seq > max_seq:
                             max_seq = seq
                     except ValueError:
                         pass
             sequence = max_seq + 1
-            hazard_id = generate_hazard_id(self.tenant_id, taxonomy, year, sequence)
+            priority = payload.get("priority") or "M"
+            tenant_code = get_tenant_shorthand(self.tenant_id)
+            hazard_id = generate_hazard_id(tenant_code, priority, year, sequence)
 
             row = Hazard(
                 tenant_id=tid,

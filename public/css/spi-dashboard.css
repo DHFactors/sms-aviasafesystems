@@ -1,0 +1,130 @@
+/* public/css/spi-dashboard.css */
+
+.spi-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.spi-summary-item {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    border-top: 4px solid #1a6b8a;
+}
+
+.spi-summary-item .num {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0b2a42;
+}
+
+.spi-summary-item .lbl {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+.spi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.spi-card {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 4px solid #1a6b8a;
+}
+
+.spi-card .spi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.spi-card .spi-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0b2a42;
+}
+
+.spi-card .spi-status {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.spi-status-nominal {
+    background: #e6f4ea;
+    color: #1e7e34;
+}
+
+.spi-status-watch {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.spi-status-alert {
+    background: #fce8e6;
+    color: #c5221f;
+}
+
+.spi-card .spi-values {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
+.spi-card .spi-values .current {
+    font-weight: 700;
+    color: #0b2a42;
+}
+
+.spi-card .spi-target {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+.spi-card .spi-trend {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.trend-improving { color: #34a853; }
+.trend-stable { color: #f9a825; }
+.trend-deteriorating { color: #dc3545; }
+
+.spi-empty,
+.spi-error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+.spi-error {
+    color: #c5221f;
+}
+
+.chart-wrap {
+    position: relative;
+    height: 300px;
+}
+
+@media (max-width: 640px) {
+    .spi-grid {
+        grid-template-columns: 1fr;
+    }
+}

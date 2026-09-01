@@ -66,7 +66,10 @@ async function loadNanocodes() {
   try {
     const res = await fetch('/data/hfacs_nanocodes.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load HFACS catalog`);
-    nanocodesData = await res.json();
+    const raw = await res.text();
+    nanocodesData = JSON.parse(
+      raw.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    );
     populateNanocodes();
   } catch (err) {
     console.error('Failed to load HFACS dataset:', err);

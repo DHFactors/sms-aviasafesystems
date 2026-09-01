@@ -12,7 +12,7 @@
 #
 #              cans.hazard_id is a NOT NULL FK into hazards.id. CAN payloads
 #              carry a business hazard reference (hazard_id text like
-#              "T1-HZ-ORG-01-26" or an opaque id). The reference is resolved to
+#              "FW-001-H-2026" or an opaque id). The reference is resolved to
 #              the linked hazard row; an unresolved reference auto-creates a
 #              minimal stub hazard row so issuance stays faithful to the legacy
 #              behaviour of storing whatever reference the client sent.
@@ -54,11 +54,13 @@ CAP_SUBCOLLECTION = "caps"
 
 
 def generate_can_reference(tenant_id: str, sequence: int) -> str:
-    return f"CAN-{sequence:03d}"
+    year = datetime.now(timezone.utc).strftime("%y")
+    return f"CAN-{year}-{sequence:03d}"
 
 
-def generate_cap_reference(can_reference: str, sequence: int) -> str:
-    return f"{can_reference}-CAP-{sequence:03d}"
+def generate_cap_reference(tenant_id: str, sequence: int) -> str:
+    year = datetime.now(timezone.utc).strftime("%y")
+    return f"CAP-{year}-{sequence:03d}"
 
 
 _CAN_FIXED_COLUMNS = {"id", "tenant_id", "hazard_id", "can_reference", "is_demo", "created_at", "updated_at"}
@@ -321,11 +323,14 @@ class CanCapService:
                     )
                 )
             ).all()
+            year = now.strftime("%y")
             max_seq = 0
             for ref in refs:
-                if ref.startswith("CAN-"):
+                # CAN-YY-NNN
+                parts = ref.split("-")
+                if len(parts) == 3 and parts[0] == "CAN" and parts[1] == year:
                     try:
-                        seq = int(ref.split("-")[1])
+                        seq = int(parts[2])
                         if seq > max_seq:
                             max_seq = seq
                     except (IndexError, ValueError):
@@ -604,8 +609,27 @@ class CanCapService:
             if not can_row:
                 raise ValueError("CAN not found")
 
-            existing = (await session.scalars(select(Cap).where(Cap.can_id == can_row.id))).all()
-            cap_reference = generate_cap_reference(can_row.can_reference, len(existing) + 1)
+            cap_refs = (
+                await session.scalars(
+                    select(Cap.cap_reference).where(
+                        Cap.tenant_id == tid,
+                        Cap.is_demo == demo_scope(),
+                    )
+                )
+            ).all()
+            year = now.strftime("%y")
+            max_seq = 0
+            for ref in cap_refs:
+                # CAP-YY-NNN
+                parts = ref.split("-")
+                if len(parts) == 3 and parts[0] == "CAP" and parts[1] == year:
+                    try:
+                        seq = int(parts[2])
+                        if seq > max_seq:
+                            max_seq = seq
+                    except (IndexError, ValueError):
+                        pass
+            cap_reference = generate_cap_reference(self.tenant_id, max_seq + 1)
 
             residual_sra = self._sra_block(
                 payload.get("residual_severity"),

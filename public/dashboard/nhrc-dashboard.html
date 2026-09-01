@@ -1,0 +1,114 @@
+<!-- public/dashboard/nhrc-dashboard.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-HRC Dashboard - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/nhrc-dashboard.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/js/chart-theme.js"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <div id="authGate" style="padding:3rem;text-align:center;color:#64748b;">
+            <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+            <p>Loading N-HRC Dashboard...</p>
+        </div>
+
+        <div id="nhrcContent" style="display:none;">
+            <!-- Header -->
+            <div class="section-head">
+                <div>
+                    <h2><i class="fas fa-triangle-exclamation" style="color:#1a6b8a;"></i> N-HRC KPI Dashboard</h2>
+                    <div class="section-sub">National High-Risk Categories — Based on Nepal NASP 2023-2025</div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+                    <button class="btn btn-primary btn-sm" onclick="loadNhrcData()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="stat-grid" id="nhrcStats">
+                <div class="stat-card gold">
+                    <div class="num" id="statTotalHazards">—</div>
+                    <div class="lbl">Total Hazards</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="num" id="statActionRequired">—</div>
+                    <div class="lbl">Action Required</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="num" id="statStable">—</div>
+                    <div class="lbl">Stable / OK</div>
+                </div>
+                <div class="stat-card">
+                    <div class="num" id="statAvgRisk">—</div>
+                    <div class="lbl">Avg Risk Index</div>
+                </div>
+            </div>
+
+            <!-- N-HRC Cards Grid -->
+            <div class="nhrc-grid" id="nhrcGrid">
+                <!-- Dynamic N-HRC cards will be rendered here -->
+            </div>
+
+            <!-- N-HRC Trend Chart -->
+            <div class="card">
+                <h3><i class="fas fa-chart-line" style="color:#1a6b8a;"></i> N-HRC Trend (Last 6 Months)</h3>
+                <div class="chart-wrap"><canvas id="nhrcTrendChart"></canvas></div>
+            </div>
+
+            <!-- N-HRC Distribution Chart -->
+            <div class="card">
+                <h3><i class="fas fa-chart-bar" style="color:#1a6b8a;"></i> N-HRC Distribution</h3>
+                <div class="chart-wrap"><canvas id="nhrcDistributionChart"></canvas></div>
+            </div>
+
+            <!-- State Comparison -->
+            <div class="card">
+                <h3><i class="fas fa-building" style="color:#1a6b8a;"></i> Operator vs State Average</h3>
+                <div class="chart-wrap"><canvas id="nhrcComparisonChart"></canvas></div>
+            </div>
+
+            <!-- SEI Recommendations Modal -->
+            <div id="seiModal" class="modal" style="display:none;">
+                <div class="modal-content">
+                    <span class="modal-close" onclick="closeSeiModal()">&times;</span>
+                    <h3 id="seiModalTitle">Safety Enhancement Initiatives</h3>
+                    <div id="seiModalBody"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    window.SHELL_CONFIG = {
+        brand: 'AviaSAFE',
+        roleLabel: 'Operator N-HRC Dashboard',
+        nav: [
+            { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+            { href: '/dashboard/index.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+            { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
+            { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
+            { href: '/dashboard/nhrc-dashboard.html', label: 'N-HRC KPIs', icon: 'fa-triangle-exclamation' },
+            { href: '/dashboard/spi-dashboard.html', label: 'SPI/SPT', icon: 'fa-gauge-high' },
+            { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
+            { href: '/audits/psoe.html', label: 'PSOE Audit', icon: 'fa-clipboard-check', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'CAAN_SMD', 'SUPER_ADMIN', 'safety'] },
+            { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'safety'] },
+        ],
+    };
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/shell.js"></script>
+    <script src="/js/nhrc-dashboard.js"></script>
+</body>
+</html>

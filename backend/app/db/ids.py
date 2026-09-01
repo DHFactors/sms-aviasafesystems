@@ -13,6 +13,33 @@ from typing import Dict, List
 
 _NS = uuid.NAMESPACE_DNS
 
+# Tenant slug -> uppercase shorthand code used in business references
+# (e.g. hazard IDs "FW-001-H-2026"). Kept here so services stay decoupled
+# from seeder/demo data.
+TENANT_SHORTHANDS: Dict[str, str] = {
+    "fixedwing": "FW",
+    "rotarywing": "RW",
+    "demoairport": "AP",
+    "demostate": "ST",
+}
+
+
+def get_tenant_shorthand(tenant_id: str) -> str:
+    """Return the uppercase shorthand code for a tenant slug.
+
+    Args:
+        tenant_id: The tenant slug (e.g. "fixedwing").
+
+    Returns:
+        Uppercase shorthand (e.g. "FW"). Falls back to the first two letters
+        of the slug for unknown tenants.
+    """
+    shorthand = TENANT_SHORTHANDS.get(tenant_id)
+    if shorthand:
+        return shorthand
+    return tenant_id[:2].upper()
+
+
 # In-process registry mapping slug <-> uuid so services can emit the WHOLE
 # tenant slug (as the API contract expects) while Postgres stores the uuid.
 _slug_by_uuid: Dict[str, str] = {}
