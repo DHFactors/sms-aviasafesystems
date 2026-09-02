@@ -101,7 +101,7 @@ def test_example_accounts_from_scheme_doc():
 def _route(user):
     role = user.get("role") or "USER"
     if role == "SUPER_ADMIN":
-        return "/admin/production-setup.html"
+        return "/admin/dashboard.html"
     if role == "CAAN_SMD":
         return "/caan.html"
     if role == "USER":

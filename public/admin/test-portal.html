@@ -82,7 +82,7 @@ AUTHOR: AviaSAFE Systems
 <div class="admin-topbar">
     <span class="brand"><i class="fas fa-flask"></i> AviaSAFE — Test Portal</span>
     <div class="user-info">
-        <a href="/admin/production-setup.html" class="btn btn-outline btn-sm" style="color:#4fc3f7;border-color:#4fc3f7;">Production Setup</a>
+        <a href="/admin/dashboard.html" class="btn btn-outline btn-sm" style="color:#4fc3f7;border-color:#4fc3f7;">Admin Dashboard</a>
         <span id="userDisplay">—</span>
         <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
     </div>
@@ -194,7 +194,7 @@ var PORTAL_MODULES = [
         pages: [
             { title: "Team Management",       path: "/settings/team.html",          roles: ["admin"], status: "ready" },
             { title: "Administration",        path: "/administration.html",         roles: ["admin"], status: "ready" },
-            { title: "Production Setup",      path: "/admin/production-setup.html", roles: ["super"], status: "ready" },
+            { title: "Super Admin Dashboard",   path: "/admin/dashboard.html",         roles: ["super"], status: "ready" },
             { title: "Super Admin Test Portal", path: "/admin/test-portal.html",    roles: ["super"], status: "ready" },
         ]
     },
@@ -293,7 +293,7 @@ function renderPortal() {
     });
 
     var html = '<div class="test-portal">';
-    html += '<a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Production Setup</a>';
+    html += '<a href="/admin/dashboard.html" class="back-link"><i class="fas fa-arrow-left"></i> Admin Dashboard</a>';
     html += '<div class="test-top">' +
         '<h1 class="test-head-title"><i class="fas fa-flask"></i>Super Admin Test Portal</h1>' +
         '<div class="test-tools">' +

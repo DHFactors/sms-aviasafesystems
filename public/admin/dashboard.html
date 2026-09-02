@@ -246,7 +246,7 @@ var PORTAL_MODULES = [
         pages: [
             { title: "Team Management",         path: "/settings/team.html",          roles: ["admin"], status: "ready" },
             { title: "Administration",          path: "/administration.html",         roles: ["admin"], status: "ready" },
-            { title: "Production Setup",        path: "/admin/production-setup.html", roles: ["super"], status: "ready" },
+            { title: "Super Admin Dashboard",   path: "/admin/dashboard.html",         roles: ["super"], status: "ready" },
             { title: "Super Admin Test Portal", path: "/admin/test-portal.html",      roles: ["super"], status: "ready" },
         ]
     },
@@ -539,9 +539,10 @@ async function govToggle(tenantId, newStatus) {
 function renderProductionSetup(gate) {
     var html = '<div class="view active">';
     html += '<div class="view-head"><div><h2><i class="fas fa-cogs" style="color:var(--color-brand-600);"></i> Production Setup</h2>' +
-        '<div class="sub">Create regulators, add tenants, then preview and deploy the seed plan. Mutations require the admin setup key.</div></div></div>';
+        '<div class="sub">Full rollout flow (Steps 1&ndash;5): regulators, tenants, seed deploy, audit log, dummy data. Mutations require the admin setup key.</div></div></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">A</span>Create State Regulator</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Step 1</span>Create State Regulator</h2>' +
+        '<p class="card-sub">The state civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</p>' +
         '<form onsubmit="createRegulator(event)"><div class="form-row">' +
         '<div class="form-group"><label>Regulator ID *</label><input type="text" id="regId" placeholder="caan" required pattern="[a-z0-9-]+"><small>Lowercase letters, numbers, hyphens</small></div>' +
         '<div class="form-group"><label>Full Name *</label><input type="text" id="regName" placeholder="Civil Aviation Authority of Nepal" required></div>' +
@@ -553,7 +554,8 @@ function renderProductionSetup(gate) {
         '<div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>' +
         '<button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button></form></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">B</span>Add Operator Tenant</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Step 2</span>Add Operator Tenants</h2>' +
+        '<p class="card-sub">Create operator tenants individually, or paste a CSV / JSON list and use Bulk Import.</p>' +
         '<form onsubmit="createTenant(event)"><div class="form-row">' +
         '<div class="form-group"><label>Tenant ID *</label><input type="text" id="tenantId" placeholder="sita-air" required pattern="[a-z0-9-]+"></div>' +
         '<div class="form-group"><label>Organization Name *</label><input type="text" id="tenantName" placeholder="Sita Air" required></div>' +
@@ -567,30 +569,36 @@ function renderProductionSetup(gate) {
         'nepal-airlines,Nepal Airlines,NAL,Nepal,caan' + "\n" +
         'shree-airlines,Shree Airlines,SHA,Nepal,caan' + '" style="display:none;margin-top:12px;"></textarea></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">C</span>Bulk Import</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Step 2</span>Bulk Import</h2>' +
         '<p class="card-sub">Paste the CSV above (header <code>tenant_id,name,icao,country,regulator_id</code>) or a JSON array, then click <strong>Bulk Import</strong>.</p>' +
         '<pre id="bulkHelp" style="background:#f1f5f9;padding:10px;border-radius:6px;font-size:.78rem;white-space:pre-wrap;">tenant_id,name,icao,country,regulator_id' + "\n" +
         'nepal-airlines,Nepal Airlines,NAL,Nepal,caan</pre></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">D</span>Preview Seed Plan</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Step 3</span>Preview Seed Plan</h2>' +
         '<p class="card-sub">Preview the CAAN seed plan against this environment before deploying.</p>' +
         '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">' +
         '<button class="btn btn-primary" onclick="loadPreview()"><i class="fas fa-eye"></i> Preview Seed Plan</button></div>' +
         '<div id="previewArea"><div class="empty-state">Not previewed yet.</div></div></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">E</span>Deploy Seed Plan</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Step 3</span>Deploy Seed Plan</h2>' +
         '<p class="card-sub">Deploy writes the regulator, tags operators, and seeds surveys + hazards + reports.</p>' +
         '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;margin-bottom:12px;">' +
         '<input type="checkbox" id="forceReseed"> Force re-seed (replaces existing surveys)</label>' +
         '<button class="btn btn-danger" onclick="deploySeed()"><i class="fas fa-rocket"></i> Deploy to Database</button></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">F</span>Existing Regulators</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Existing</span>Regulators</h2>' +
         '<div style="margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="loadExistingRegulators()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
         '<div id="regulatorList"><div class="empty-state">Not loaded.</div></div></div>';
 
-    html += '<div class="admin-card"><h2><span class="step-badge">G</span>Existing Tenants</h2>' +
+    html += '<div class="admin-card"><h2><span class="step-badge">Existing</span>Tenants</h2>' +
         '<div style="margin-bottom:10px;"><button class="btn btn-outline btn-sm" onclick="loadExistingTenants()"><i class="fas fa-rotate"></i> Refresh</button></div>' +
         '<div id="tenantList"><div class="empty-state">Not loaded.</div></div></div>';
+
+    html += '<div class="admin-card"><h2><span class="step-badge">Steps 4 &amp; 5</span>Finish the Rollout</h2>' +
+        '<p class="card-sub">Review every seeding action in the Audit Log, then seed dummy operational data (VSR / MOR / CAN / CAP) from their dedicated views.</p>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+        '<button class="btn btn-outline" onclick="showView(\'view-audit-log\')"><i class="fas fa-clipboard-list"></i> Step 4 — Audit Log</button>' +
+        '<button class="btn btn-outline" onclick="showView(\'view-dummy-data\')"><i class="fas fa-database"></i> Step 5 — Dummy Data</button></div></div>';
 
     html += '</div>';
     gate.innerHTML = html;

@@ -421,7 +421,7 @@
     }
 
     function viewTenant() {
-        window.location.href = '/admin/production-setup.html';
+        window.location.href = '/admin/dashboard.html';
     }
 
     function startNewTenant() {

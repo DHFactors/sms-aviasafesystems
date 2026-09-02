@@ -366,7 +366,7 @@ async def seed_demo_data(
 
 
 # ============================================================================
-# Super-Admin web seeding panel (production-setup.html)
+# Super-Admin web seeding panel (admin/dashboard.html)
 # ============================================================================
 
 class RegulatorCreate(BaseModel):
@@ -696,7 +696,7 @@ async def admin_send_tenant_welcome(
 
 
 # ============================================================================
-# Tenant lifecycle status + demo-data seeding (production-setup.html)
+# Tenant lifecycle status + demo-data seeding (admin/dashboard.html)
 # ============================================================================
 
 class TenantStatusRequest(BaseModel):

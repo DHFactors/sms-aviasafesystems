@@ -1,77 +1,103 @@
 # AviaSAFE — Project Status & Architecture Report
 
-**Date:** 2026-08-31 · **Release:** Safety-workflow hardening + Admin console + localhost cleanup
-**Scope:** Beta retired · consolidated `sms-db` · 2-airline DEMO seed · PG survey analytics · Priority 1–6 fixes · unified Super Admin dashboard · HFACS 109 nanocodes · PSOE→CAN persistent link
+**Date:** 2026-09-01 · **Release:** Safety Performance Framework — SPI/SPT + N-HRC dashboards · DEMO data platform
+**Scope:** Consolidated `sms-db` · DEMO operator platform (4 tenants) · full seeders CLI · SPI/SPT & N-HRC API + dashboards · UAT sweep · Render auto-deploy
 
 ---
 
 ## 1. Executive Summary
 
-AviaSAFE has completed the **beta → production consolidation**. All
-`sms-db-beta` / `aerosafety-sms-beta` references have been removed and the
-platform now runs on a **single consolidated database** (`FIREBASE_DATABASE_ID=sms-db`,
-project `aerosafety-sms-prod`). The decommissioned beta hosting targets, the
-beta CI seed workflow, and the beta CLI guards were deleted; deployment is a
-single-service Render Blueprint at the repo root.
+AviaSAFE runs on a **single consolidated database** (`FIREBASE_DATABASE_ID=sms-db`,
+project `aerosafety-sms-prod`) with one Render Blueprint deploy. The platform now
+ships a **fully seeded DEMO operator environment** alongside the state/regulator
+surfaces:
 
-The operational environment was reset and reseeded to a **minimal clean state**
-for controlled rollout:
-
-* **4 Firestore tenants plus a STATE system tenant**: `buddha-air` (DEMO),
-  `yeti-airlines` (DEMO), `caan` (STATE regulator), `system` (STATE internal).
-* **6 Firebase Auth users** — 2 per DEMO airline (`safety@` / `ops@`),
-  the CAAN Safety Management Division account (`smd@caanepal.gov.np`), and the
-  platform super admin. `caan` is scoped to `[buddha-air, yeti-airlines]`.
-* **Supabase PostgreSQL operational tables all at 0 rows** (`reports`,
-  `hazards`, `hazard_assessments`, `hazard_capas`, `safety_deficiencies`,
-  `surveys`, `survey_responses`) — data lands only through the live API.
-
-Tenant records now carry the lifecycle contract (`category` `DEMO|CONTRACTED|STATE`,
-`status` `ACTIVE|SUSPENDED|EXPIRED`, `trial_expires_at`) with DEMO tenants seeded
-on a 30-day trial. Credentials were renamed to the simplified `{role}@{domain}`
-scheme (`safety@…` / `ops@…`, `admin@…` retired), which drives the **email-prefix
-role routing** used across dashboards.
-
-The Supabase integration is schema-tracked and reproducible: `config.toml`,
-a full remote-schema migration, and the HFACS + ICAO ADREP reference datasets
-are versioned. All quality gates are green, and the latest feature/hotfix
-releases are deployed to Firebase Hosting — see **Recent Work** below.
+* **4 Firestore tenants**: `fixedwing` (DEMO airline), `rotarywing` (DEMO
+  helicopter operator), `demoairport` (DEMO aerodrome), `demostate` (STATE).
+* **Seeded operational data (idempotent)** — Postgres (Supabase) holds the
+  Hazard/Report/CAN/CAP registers; Firestore holds diversions, PSOE assessments,
+  and the SSP (state safety program) reference store:
+  * Postgres: **hazards 26, reports 10, cans 6, caps 6** (survey responses 1).
+  * Firestore: **tenants 4, flight_diversions 7** (fixedwing 3 · rotarywing 2 ·
+    demoairport 2 · demostate 0), **SSP 29** (spis 8 + risk_register 14 + nhrcs 7),
+    **PSOE 6** (3 demo assessments + 3 legacy production audits).
+  * Seeding is reproducible via a single CLI: `python -m seeders.cli --all`
+    (dry-run today: **87 created, 0 skipped, 0 errors**).
+* **New safety-performance layer** on the `/api/v1` API:
+  * **SPI/SPT** (`/api/v1/spi/*`) — 8 ICAO-compliant Safety Performance
+    Indicators (leading + lagging) computed from live registers, with per-tenant
+    values/status/trend, state aggregation, and adjustable targets.
+  * **N-HRC** (`/api/v1/nhrc/*`) — National High-Risk Category KPI aggregates
+    for the 7 ICAO categories (CFIT, LOC-I, MAC, RE, RI, ARC, WS).
+  * Operator dashboards `/dashboard/spi-dashboard.html` and
+    `/dashboard/nhrc-dashboard.html`, wired into the shell navigation across all
+    operator-facing pages.
+* **Data source of truth for diversions is Firestore** (`tenants/{tid}/flight_diversions`),
+  matching the app's operational `flight_diversion_service`; the Postgres
+  `flight_diversions` table is no longer read (deprecated for reads).
+* The **pre-UAT verification sweep** is green at the API/data level and the
+  current backend is **live on Render** (auto-deploy from `main`,
+  commit `82b4cc6`).
 
 ## 1a. Recent Work (Aug 2026)
 
-Completed, committed, and deployed since the previous status report:
+Completed, committed, and deployed in the previous cycle (report of 2026-08-31):
 
 * **Priority 1–6 safety-workflow fixes** — AE banner fix, SDCPS mobile
   hamburger, SDC validate/ingest + universal data query endpoints, report
   generation aligned to the backend contract, survey open/close window
   enforcement, and CAN/CAP email notifications with an overdue-check job.
-* **Localhost cleanup** — removed every `localhost`/`127.0.0.1` runtime
-  reference across the frontend (SDCPS API, reports, shared client, Firebase
-  config, Copilot widget, survey app) and backend CORS/dev-host branches and
-  reserved-tenant arrays. All inline scripts pass `node --check`.
-* **Unified Super Admin Dashboard** (`/admin/dashboard.html`) — a single
-  sidebar-navigated console consolidating the Test Portal (44 page links with
-  search), Tenant Management (governance list + activate/suspend),
-  Production Setup (regulator/tenant/bulk/seed preview + deploy), Audit Log,
-  and Dummy Data. SUPER_ADMIN-gated; login now redirects admins here.
-* **HFACS catalog completed to 109 nanocodes** — added `AE203`
-  (Judgment & Decision-Making Errors), `PC320` (Physical Problem), and
-  `OR006` (Resource Problems) to `public/data/hfacs_nanocodes.json`, closing
-  the gap between the declared 109 and the 106 present. Full 109 unique codes,
-  no duplicates, all four tiers (ACT/PRECOND/SUPER/ORG) represented, and the
-  hazard-analysis HFACS dropdown + tier filter load them.
-* **PSOE → CAN persistent link** — CAN records now store
-  `psoe_assessment_id` (new `cans` table column + `CANCreate`/`CANResponse`
-  fields). `promoteToCan()` passes the assessment id through the deep link,
-  `issue.html` forwards it into the CAN submission payload, and
-  `can_detail.html` shows a link back to the originating PSOE assessment.
-* **Archived-flag fix on reopen** — `VerificationService.reopen_hazard` now
-  clears the Firestore `archived` flag (set `True` at closure) so a reopened
-  hazard is restored to a fully active state instead of an inconsistent
-  "archived + reopened" state.
+* **Localhost cleanup** — every `localhost`/`127.0.0.1` runtime reference
+  removed across frontend and backend.
+* **Unified Super Admin Dashboard** (`/admin/dashboard.html`) — SUPER_ADMIN-gated
+  console consolidating Test Portal, Tenant Management, Production Setup,
+  Audit Log, and Dummy Data.
+* **HFACS catalog to 109 nanocodes** (ACT/PRECOND/SUPER/ORG tiers) wired into
+  the hazard-analysis dropdown.
+* **PSOE → CAN persistent link** (`psoe_assessment_id`) and the **archived-flag
+  fix on reopen** (`VerificationService.reopen_hazard`).
 
-All of the above is committed (`86c2db3` latest), pushed to `origin/main`,
-and deployed to Firebase Hosting.
+## 1b. Recent Work (Sep 2026)
+
+Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
+(this cycle):
+
+* **Seeding platform (Task 22 / Chunk 7)** — `backend/seeders/` is a full,
+  idempotent, dry-run-capable seeding suite: `runner.py` (orchestration +
+  summary), `cli.py` (`--all / --module / --unseed / --dry-run`), and eight
+  seeders — tenants, hazards, reports, CAN/CAP, PSOE, SSP, diversions, survey
+  reference. `seed_manager.bat` convenience wrapper. A tracked Supabase
+  migration adds the CAN `psoe_assessment_id` column.
+* **N-HRC engine (Task 23)** — `models/nhrc.py`, `services/nhrc_service.py`
+  (sync facade over Postgres), `api/v1/nhrc.py` registered under `/api/v1`;
+  SSP seeder writes the 7 N-HRC references to Firestore `state/ssp/nhrcs/{code}`.
+  Validated: 35 state-risk/N-HRC tests pass.
+* **SPI/SPT framework (Task 25)** — `models/spi.py` (SPI, SPITarget,
+  SPICalculation), `services/spi_service.py`, `api/v1/spi.py` (7 routes under
+  `/api/v1/spi`). Eight SPIs computed from the live registers with
+  direction-aware status (`lower_is_better` for diversion/occurrence) and
+  calendar-month trend buckets. Safety culture falls back to a deterministic
+  demo score when surveys are absent.
+* **Dashboards + navigation (Tasks 24/25 UI)** — `nhrc-dashboard.html` and
+  `spi-dashboard.html` (with CSS/JS) use the standard `SHELL_CONFIG` + auth-gate
+  pattern; N-HRC and SPI/SPT nav items added to all operator-facing pages
+  (`safety`, `risk-trends`, `top-hazards`, `administration`, `settings/team`,
+  `audits/psoe`, and both dashboards). CAAN/state-facing pages intentionally
+  untouched.
+* **HFACS JSON correction** — `hfacs_nanocodes.json` had a 5-line `//` comment
+  header that broke both `json.load` and the browser `fetch().json()` at
+  `hazard-analysis.js:67`; header removed → valid JSON, **109 codes, 0 dupes**.
+* **Diversion rate reads Firestore (UAT fix)** — `spi_service.py` now computes
+  `diversion_rate` from `tenants/{tid}/flight_diversions` via
+  `FlightDiversionService` (state view aggregates minus `demostate`). The
+  Postgres `flight_diversions` query was removed. Verified through the live
+  API: fixedwing **3.0** · rotarywing **2.0** · demoairport **2.0** ·
+  demostate **0.0** · state **7.0**.
+* **Pre-UAT verification sweep** — services import cleanly, seeders report
+  **87 created / 0 errors**, DB counts match the target exactly, HFACS 109
+  loads, navigation present with no duplicates, and all API routes respond 200.
+  Live endpoints previously 404 (`/api/v1/nhrc/*`, `/api/v1/spi/*`) are now
+  green after the Render **auto-deploy** from `main`.
 
 ## 2. System Architecture
 
@@ -84,65 +110,45 @@ Westin-prefix role routing (live accounts, email ⇒ role ⇒ surface)
 
 ═══ SINGLE CONSOLIDATED DATABASE (aerosafety-sms-prod / sms-db) ═══
    Firebase Auth  → identity + custom claims (role, tenant_id)
-   Firestore      → tenants/, users/, reports/, hazards/, demographics, ...
-   Supabase (PG)  → operational tables, tenant-keyed, 0 rows until live
-                    traffic (reports, hazards, hazard_assessments,
-                    hazard_capas, safety_deficiencies, surveys,
-                    survey_responses) — all with tenant_id indexes
+   Firestore      → tenants/{tid}/flight_diversions (source of truth),
+                    psoe_assessments, state/ssp/{spis,risk_register,nhrcs}
+   Supabase (PG)  → operational registers, tenant-keyed: hazards, reports,
+                    cans, caps, surveys, survey_responses, state risk
    ═══════════════════════════════════════════════════════════════
-   Tenant model: category (DEMO|CONTRACTED|STATE) · status
-                 (ACTIVE|SUSPENDED|EXPIRED) · trial_expires_at
+   Tenant model: fixedwing · rotarywing · demoairport · demostate
 ```
 
 **Tenant isolation** is enforced server-side end-to-end: PG rows are
-tenant-keyed, cross-tenant API access is rejected unless the caller
-holds a CAAN cross-tenant role, and dashboards filter by tenant. Third-party
-cross-tenant reads (e.g. JAL cybersecurity assessments) are scoped explicitly.
+tenant-keyed, cross-tenant API access is rejected unless the caller holds a
+CAAN cross-tenant role (`CROSS_TENANT_ROLES = ["CAAN_SMD", "SUPER_ADMIN"]`),
+and dashboards filter by tenant.
 
-**Multi-tenant survey engine** (`public/survey/`): a standalone bilingual
-(EN/NE) v4.0.0 survey resolves the tenant from a `?tenant=` parameter or a
-hostname mapping (`smssurvey.gsacharya.com`, `sms.nac.com.np`, etc.), enforces
-the per-tenant survey window from the tenant doc's `survey_config`, and submits
-via `POST /api/v1/surveys/` with the `tenantId` validated against the tenant's
-records — responses land keyed to the submitting tenant only.
+**SPI/SPT service** (`backend/app/services/spi_service.py`) loads a single
+Postgres snapshot per call (hazards, reports as VSR/MOR, CANs/CAPs, surveys)
+and merges **Firestore diversions** into that snapshot, so per-tenant values,
+status, previous-month and monthly trend series all read one consistent view:
 
-### Survey analytics on PostgreSQL (single source of truth)
-
-The dashboard survey aggregates previously read **Firestore**
-`collection_group("surveys")` / `collection_group("responses")` — collections
-the live API no longer writes to — so newly submitted survey responses were
-persisted to Supabase but never surfaced on the dashboards. This gap is closed
-by making **PostgreSQL the exclusive source of truth for survey analytics**:
-
-* `backend/app/services/dashboard_service.py` now queries the `surveys` and
-  `survey_responses` tables directly via `session_scope()`/`select()` —
-  scoped by `is_demo == demo_scope()` with the `submitted_at` cutoff applied
-  in SQL — through `_survey_docs`, `_survey_responses`, `_PGSurveyDoc`, and
-  `_register_all_tenant_slugs`.
-* The airline SMS maturity, CAAN survey maturity, CAAN SMS maturity
-  assessment, and CAAN state "Survey Responses" counter all flow from the
-  same Postgres rows the `POST /api/v1/surveys/` endpoint writes.
-* The `submit_survey` route docstring was corrected to describe Postgres
-  persistence (scored `surveys` + raw `survey_responses`).
-* **Quality gate:** 137 backend tests passing, including new integration
-  tests that seed real `Survey` / `SurveyResponse` rows and verify the SQL
-  cutoff, slug translation, per-tenant response counting, and regulator
-  scoping.
-* `backend/scripts/cleanup_firestore_surveys.py` purges the legacy
-  `surveys` / `responses` Firestore collections, leaving PostgreSQL (Supabase)
-  as the exclusive store.
+* `SPI_DEFINITIONS` — 8 SPIs (hazard id, VSR, diversion, risk reduction,
+  MOR occurrence, CAN closure, CAP closure, safety culture) with
+  target/warning/alert thresholds per indicator.
+* Status is direction-aware (`_LOWER_IS_BETTER = {DIVERSION_RATE, OCCURRENCE_RATE}`);
+  trend series are calendar-month bucketed.
+* Sync facade (`_load_snapshot` → `run(_load_snapshot_async)`) matches the
+  N-HRC / CAN-CAP service pattern.
 
 ## 3. Quality Gates
 
 | Gate | Result |
 |---|---|
-| Backend test suite | **631 / 631 passing** |
-| Survey analytics (PG-backed dashboard) suite | **137 passing** (surveys, state/CAAN maturity, regulator scoping, tenant SMS) |
-| Survey scoring suite | green |
-| Demo/tenant scoping + isolation tests | green |
-| Frontend inline-script / sandbox checks (Firebase App Check, tenant context, dashboard, input guard) | green |
-| Full-repo `sms-db-beta` sweep | clean (residual refs only in historical/archived docs and tests asserting decommissioned behavior) |
-| Seed validation | minimal 4+system tenants · 6 Auth users · CAAN scoped · PG 0 rows |
+| SPI suite (`tests/test_spi.py`) | **18 / 18 passing** (models, status/trend logic, closure rates, Firestore diversion rates, API routes) |
+| State-risk / N-HRC / risk-matrix regression | **56 / 56 passing** (test_state_risk 35 + test_risk_matrix 21) |
+| UAT API smoke (`scripts/run_uat_smoke.py`) | **8 / 8 passing** (/health, state-risk agg + PDF, tenant SMS summary + PDF, weekly SSP cron, audit logs) |
+| Live Render API | `/health` 200 (firebase + database connected); `/api/v1/nhrc/*`, `/api/v1/spi/*` 200 |
+| Seeder CLI dry-run | **87 created, 0 skipped, 0 errors** |
+| DB counts | PG hazards 26 · reports 10 · cans 6 · caps 6; Firestore tenants 4 · diversions 7 · SSP 29 · PSOE 6 |
+| HFACS catalog | **109 codes, 0 duplicates**, valid JSON (fetch-parseable) |
+| Navigation | N-HRC + SPI/SPT items on all operator pages, no duplicates |
+| Baseline (Aug 31) | 631 backend tests passing |
 
 ## 4. Deployment Endpoints
 
@@ -152,35 +158,44 @@ by making **PostgreSQL the exclusive source of truth for survey analytics**:
 | Survey hosting | https://smssurvey.gsacharya.com |
 | API (Render) | https://aviasafe-unified-platform.onrender.com |
 | Firebase project | `aerosafety-sms-prod` · database `sms-db` |
-| Deploy plumbing | root `render.yaml` (single-service, `dockerContext: backend`) · Firebase Hosting |
+| Deploy plumbing | root `render.yaml` (`autoDeploy: true`, `healthCheckPath: /live`, `dockerContext: backend`) |
 | Supabase | project ref `bftwNljNpnpniksmalnk` (config.toml tracked; remote schema migration tracked) |
+| Deployed commit | `82b4cc6` (feat(spi): fix diversion rate to read from Firestore) |
 
 ## 5. Operational Notes
 
 * **Logging in**: share `https://sms.aviasafesystems.com/login.html` with the
-  tenant's safety (`safety@…`) or operations (`ops@…`) account. Passwords are
-  never committed — provision/rotate in Firebase Console or via
-  `backend/seed/reset_passwords.py`.
-* **Reseeding**: `backend/seed/seeder.py` provides the minimal-reset flow
-  (`--reset-minimal`) that purges Firestore/Auth (keeping the protected super
-  admin and CAAN SMD accounts) and re-creates the 2 DEMO airlines.
-* **Empty PG by design**: operational data is written only through the API, so
-  the persisted model is exercised first.
-* **Survey campaigns**: tenants control their own window via `survey_open_date` /
-  `survey_close_date` / `is_survey_active` on the tenant doc; the page enforces it
-  per tenant (no cross-tenant bleed). Survey submissions persist to the Supabase
-  `surveys` / `survey_responses` tables, and all survey dashboards read those
-  same tables — Postgres is the single source of truth for survey data.
+  demo tenant accounts. Passwords are never committed — provision/rotate in
+  Firebase Console or via `backend/seed/reset_passwords.py`.
+* **Seeding / reseeding**: `python -m seeders.cli --all` (from `backend/`)
+  seeds the 4-tenant demo platform idempotently; add `--dry-run` to preview,
+  `-m <module>` for a single seeder, `-u` to unseed. Human bypass:
+  `seed_manager.bat`.
+* **New dashboards**: `/dashboard/spi-dashboard.html` (SPI/SPT) and
+  `/dashboard/nhrc-dashboard.html` (N-HRC KPIs) follow the standard
+  `SHELL_CONFIG` + auth-gate + `ApiClient` pattern and are reachable from the
+  sidebar on every operator page.
+* **Diversion data**: authored and read exclusively in
+  `tenants/{tid}/flight_diversions` (Firestore). The Postgres
+  `flight_diversions` table still exists in the schema for rollback but is not
+  read by any service.
+* **Empty SPIs are meaningful**: with all seeded diversions/CANs dated inside
+  the current month, diversion status is `alert` (rate 3.0 vs 0.5 target,
+  lower-is-better) and closure rates are 0% — an honest, mixed-status demo.
+* **Manual UAT outstanding**: visual/browser verification of the two new
+  dashboards (charts, status badges, nav) on the live host.
 
 ## 6. Known Follow-Ups
 
 * Operator survey hostname map (`public/survey/app.js` `routes`) still maps only
-  `sita-air`, `nepal-airlines`, `caan-ops`; the live DEMO tenants use
-  `?tenant=buddha-air` / `?tenant=yeti-airlines` links until their own
-  subdomains are added.
+  `sita-air`, `nepal-airlines`, `caan-ops`; the demo tenants use
+  `?tenant=fixedwing|rotarywing|demoairport` links until their subdomains are added.
 * Optional: per-employee survey issuance (unique links / `respondentId`) on top
   of the existing tenant-keyed storage if employee-scoped collection is required.
-* Legacy Firestore `surveys` / `responses` collections (if any historical docs
-  remain) can be purged with `backend/scripts/cleanup_firestore_surveys.py`.
+* State-level SPI surfaces for CAAN (operator breakdown across all four demo
+  tenants on the state/CAAN pages) have not been built yet — the operator
+  SPI/SPT dashboard is the current deliverable.
 * `data/icao_adrep_taxonomies.csv` is imported to Supabase; keep reference CSVs
   versioned alongside `hfacs_nanocodes.csv`.
+* Legacy Firestore `surveys` / `responses` collections (if any historical docs
+  remain) can be purged with `backend/scripts/cleanup_firestore_surveys.py`.
