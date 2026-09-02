@@ -37,10 +37,10 @@ from app.services.risk_matrix import (
 from app.services.nhrc_service import NHRC_REFERENCE_DATA
 
 
-# Single state regulator tenant that owns the SSP (State Safety Programme).
+# Single state regulator that owns the SSP (State Safety Programme).
 REGULATOR_TENANT = "demostate"
 
-# Operator operator tenant ids contributing to the state risk register.
+# Operator tenants contributing to the state risk register.
 _CONTRIBUTING_TENANTS = ["fixedwing", "rotarywing", "demoairport"]
 
 # Immediate-period register to seed (current half of the year).
@@ -373,9 +373,9 @@ class SspSeeder(BaseSeeder):
     # ------------------------------------------------------------------
 
     def _should_run(self) -> bool:
-        """SSP is state-level; only run when the regulator tenant is targeted
-        (default all-demo-tenant set includes demostate)."""
-        return REGULATOR_TENANT in self._get_tenant_ids()
+        """SSP is state-level and writes to the ``state`` collection; always
+        run when invoked (not scoped to individual tenants)."""
+        return True
 
     def seed(self) -> Dict[str, Any]:
         """Seed SPIs + risk register entries for the state regulator."""

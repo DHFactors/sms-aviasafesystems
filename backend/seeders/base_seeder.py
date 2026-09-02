@@ -49,11 +49,11 @@ class BaseSeeder(ABC):
     
     def _is_demo_tenant(self, tenant_id: str) -> bool:
         """Check if a tenant is a demo tenant."""
-        demo_tenants = ["fixedwing", "rotarywing", "demoairport", "demostate"]
+        demo_tenants = ["fixedwing", "rotarywing", "demoairport"]
         return tenant_id in demo_tenants
     
     def _get_tenant_ids(self) -> List[str]:
         """Get tenant IDs to seed. If self.tenant_ids is None, return all demo tenants."""
         if self.tenant_ids:
             return self.tenant_ids
-        return ["fixedwing", "rotarywing", "demoairport", "demostate"]
+        return ["fixedwing", "rotarywing", "demoairport"]

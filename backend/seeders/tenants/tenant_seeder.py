@@ -1,14 +1,18 @@
 # ============================================================================
 # FILE: tenant_seeder.py
 # PATH: backend/seeders/tenants/tenant_seeder.py
-# PURPOSE: Seed / unseed the generic demo tenants and their role-based users.
+# PURPOSE: Seed / unseed the generic demo tenants, regulators, and their
+#          role-based users.
 #
 # Seeding:
+#   * creates each regulator document in Firestore regulators collection
 #   * creates each tenant document in Firestore (idempotent, is_demo=True)
+#     with regulator_id + country linking operators to their regulator
 #   * creates each role-based user in Firebase Auth with role + tenant_id
 #     claims and the deterministic password {role_token}_{shorthand}_2026
 #
 # Unseeding:
+#   * removes every regulator EXCEPT protected_regulators
 #   * removes every tenant EXCEPT protected_tenants
 #   * removes every Auth user EXCEPT ezondiza.dhf@gmail.com (SUPER_ADMIN)
 #
@@ -28,11 +32,26 @@ SUPER_ADMIN_UID = "hLXs4mvtf5bb1hRSifnh6HuUHpC2"
 # Tenants that must NEVER be removed by unseed().
 PROTECTED_TENANTS: List[str] = []
 
+# Regulators that must NEVER be removed by unseed().
+PROTECTED_REGULATORS: List[str] = []
+
 TENANTS: List[Dict[str, Any]] = [
-    {"id": "fixedwing", "name": "Fixed-Wing Operator", "shorthand": "fw", "classification": "AIRLINE_FIXED_WING"},
-    {"id": "rotarywing", "name": "Rotary-Wing Operator", "shorthand": "rw", "classification": "AIRLINE_ROTARY"},
-    {"id": "demoairport", "name": "Demo Airport", "shorthand": "ap", "classification": "AERODROME"},
-    {"id": "demostate", "name": "Demo State Regulator", "shorthand": "st", "classification": "STATE_REGULATOR"},
+    {"id": "fixedwing", "name": "Fixed-Wing Operator", "shorthand": "fw", "classification": "AIRLINE_FIXED_WING", "regulator_id": "demostate", "country": "Nepal"},
+    {"id": "rotarywing", "name": "Rotary-Wing Operator", "shorthand": "rw", "classification": "AIRLINE_ROTARY", "regulator_id": "demostate", "country": "Nepal"},
+    {"id": "demoairport", "name": "Demo Airport", "shorthand": "ap", "classification": "AERODROME", "regulator_id": "demostate", "country": "Nepal"},
+]
+
+REGULATORS: List[Dict[str, Any]] = [
+    {
+        "id": "demostate",
+        "name": "Demo State Regulator",
+        "short_name": "DSR",
+        "country_code": "NP",
+        "country_name": "Nepal",
+        "operator_tenant_ids": ["fixedwing", "rotarywing", "demoairport"],
+        "status": "active",
+        "is_demo": True,
+    },
 ]
 
 # role_token metadata: (role, full_name, department)
@@ -69,9 +88,6 @@ USERS: Dict[str, List[Dict[str, str]]] = {
         {"email": "ops@demoairport.test", "role": "DEPT_ADMIN", "department": "Flight Operations"},
         {"email": "staff@demoairport.test", "role": "USER", "department": ""},
     ],
-    "demostate": [
-        {"email": "smd@demostate.test", "role": "CAAN_SMD", "department": ""},
-    ],
 }
 
 
@@ -90,7 +106,7 @@ def _tenant_by_id(tenant_id: str) -> Optional[Dict[str, Any]]:
 
 
 class TenantSeeder(BaseSeeder):
-    """Seeds/unseeds the 4 generic demo tenants and their role-based users."""
+    """Seeds/unseeds demo tenants, regulators, and their role-based users."""
 
     def __init__(self, tenant_ids: Optional[List[str]] = None, dry_run: bool = False):
         super().__init__(tenant_ids=tenant_ids, dry_run=dry_run)
@@ -132,7 +148,7 @@ class TenantSeeder(BaseSeeder):
             self.log_info(f"Tenant already exists, skipping: {tenant_id}")
             return False
 
-        ref.set({
+        doc = {
             "name": tenant["name"],
             "type": tenant["classification"],
             "tenant_type": tenant["classification"],
@@ -145,8 +161,39 @@ class TenantSeeder(BaseSeeder):
             "created_at": now,
             "updated_at": now,
             "seed_version": "2.4.0",
-        })
+        }
+        if tenant.get("regulator_id"):
+            doc["regulator_id"] = tenant["regulator_id"]
+        if tenant.get("country"):
+            doc["country"] = tenant["country"]
+
+        ref.set(doc)
         self.log_info(f"Created tenant: {tenant['name']} ({tenant_id})")
+        return True
+
+    def _create_regulator_doc(self, regulator: Dict[str, Any]) -> bool:
+        """Create a regulator document if it does not exist. Returns True if created."""
+        reg_id = regulator["id"]
+        now = datetime.now(timezone.utc)
+        ref = self.db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(reg_id)
+
+        if ref.get().exists:
+            self.log_info(f"Regulator already exists, skipping: {reg_id}")
+            return False
+
+        ref.set({
+            "name": regulator["name"],
+            "short_name": regulator.get("short_name", ""),
+            "country_code": regulator.get("country_code", ""),
+            "country_name": regulator.get("country_name", ""),
+            "operator_tenant_ids": list(regulator.get("operator_tenant_ids", [])),
+            "status": regulator.get("status", "active"),
+            "is_demo": regulator.get("is_demo", True),
+            "created_at": now,
+            "updated_at": now,
+            "seed_version": "2.4.0",
+        })
+        self.log_info(f"Created regulator: {regulator['name']} ({reg_id})")
         return True
 
     def _create_user(
@@ -207,11 +254,23 @@ class TenantSeeder(BaseSeeder):
     # ------------------------------------------------------------------
 
     def seed(self) -> Dict[str, Any]:
-        """Create tenants + users for all configured demo tenants."""
+        """Create regulators, tenants, and users for all configured demo data."""
         self.created_count = 0
         self.skipped_count = 0
         self.errors = []
 
+        # 1) Regulators first (tenants reference them)
+        for reg in REGULATORS:
+            reg_id = reg["id"]
+            if self.dry_run:
+                self.log_info(f"[dry-run] would create regulator {reg_id}")
+                continue
+            if self._create_regulator_doc(reg):
+                self.created_count += 1
+            else:
+                self.skipped_count += 1
+
+        # 2) Tenants + users
         target_ids = self._get_tenant_ids()
         for tenant in TENANTS:
             tenant_id = tenant["id"]
@@ -270,12 +329,12 @@ class TenantSeeder(BaseSeeder):
         return removed
 
     def unseed(self) -> Dict[str, Any]:
-        """Remove all tenants (except protected) and all users except the
-        Super Admin."""
+        """Remove all tenants, regulators, and users except the Super Admin."""
         self.created_count = 0
         self.skipped_count = 0
         self.errors = []
 
+        # 1) Tenants
         removed_tenants = 0
         target_ids = self._get_tenant_ids()
         for doc in self.db.collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
@@ -292,7 +351,24 @@ class TenantSeeder(BaseSeeder):
             doc.reference.delete()
             removed_tenants += 1
             self.log_info(f"Deleted tenant {doc.id}")
-        self.created_count = removed_tenants
+
+        # 2) Regulators
+        removed_regulators = 0
+        for doc in self.db.collection(settings.FIREBASE_COLLECTION_REGULATORS).stream():
+            if doc.id in PROTECTED_REGULATORS:
+                self.log_info(f"Protected regulator, skipping: {doc.id}")
+                continue
+            if target_ids and doc.id not in target_ids:
+                continue
+            if self.dry_run:
+                self.log_info(f"[dry-run] would delete regulator {doc.id}")
+                removed_regulators += 1
+                continue
+            doc.reference.delete()
+            removed_regulators += 1
+            self.log_info(f"Deleted regulator {doc.id}")
+
+        self.created_count = removed_tenants + removed_regulators
 
         removed_users = self._delete_user_except_super_admin()
         self.skipped_count = removed_users  # tracked for reporting clarity
