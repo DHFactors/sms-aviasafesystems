@@ -215,34 +215,79 @@ async function getAppCheckHeader() {
 // backend returns a one-time custom token we exchange through the Firebase SDK,
 // so the existing onAuthStateChanged session flow (fresh claims, role-based
 // redirect) continues to work unchanged.
+// The login request is bounded client-side so a slow or cold-booting API can
+// never hold the form hostage for the browser's default timeout (observed as
+// 40s+ during UAT). Distinct failure classes surface distinct, actionable
+// messages instead of a blanket "invalid credentials".
+var LOGIN_TIMEOUT_MS = 12000;
+
 async function signIn(email, password) {
-    var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/login', {
-        method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, await getAppCheckHeader()),
-        body: JSON.stringify({ email: email, password: password })
-    });
-    var data = await resp.json().catch(function () { return {}; });
-
-    if (!resp.ok) {
-        if (resp.status === 429) {
-            var rateErr = new Error(
-                (data && (data.detail || data.message)) ||
-                'Too many login attempts from this network. Please wait a few minutes and try again.'
-            );
-            rateErr.code = 'rate_limited';
-            throw rateErr;
+    var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = null;
+    try {
+        if (controller) {
+            timer = setTimeout(function () { controller.abort(); }, LOGIN_TIMEOUT_MS);
         }
-        var credErr = new Error(
-            (data && data.detail) || 'Invalid email or password. Please try again.'
-        );
-        credErr.code = 'invalid_credentials';
-        throw credErr;
-    }
+        var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/login', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, await getAppCheckHeader()),
+            body: JSON.stringify({ email: email, password: password }),
+            signal: controller ? controller.signal : undefined
+        });
+        var data = await resp.json().catch(function () { return {}; });
 
-    await waitForFirebase();
-    await firebase.auth().signInWithCustomToken(data.custom_token);
-    var user = await getCurrentUser();
-    return user;
+        if (!resp.ok) {
+            // 404 means the deployed API build is stale or mid-deploy — never
+            // report it as bad credentials.
+            if (resp.status === 404) {
+                var notFoundErr = new Error('The login service is temporarily unavailable (404). Please try again in a moment.');
+                notFoundErr.code = 'service_unavailable';
+                throw notFoundErr;
+            }
+            if (resp.status === 429) {
+                var rateErr = new Error(
+                    (data && (data.detail || data.message)) ||
+                    'Too many login attempts from this network. Please wait a few minutes and try again.'
+                );
+                rateErr.code = 'rate_limited';
+                throw rateErr;
+            }
+            // 5xx (auth provider down, unhandled errors) should not masquerade
+            // as invalid credentials either.
+            if (resp.status >= 500) {
+                var serverErr = new Error(
+                    (data && data.detail) || 'The login service is having trouble right now. Please try again shortly.'
+                );
+                serverErr.code = 'service_unavailable';
+                throw serverErr;
+            }
+            var credErr = new Error(
+                (data && data.detail) || 'Invalid email or password. Please try again.'
+            );
+            credErr.code = 'invalid_credentials';
+            throw credErr;
+        }
+
+        await waitForFirebase();
+        await firebase.auth().signInWithCustomToken(data.custom_token);
+        var user = await getCurrentUser();
+        return user;
+    } catch (error) {
+        // Distinguish client-side timeouts / network failures from server errors.
+        if (controller && controller.signal.aborted) {
+            var timeoutErr = new Error('Login is taking too long. Please check your connection and try again.');
+            timeoutErr.code = 'login_timeout';
+            throw timeoutErr;
+        }
+        if (error && error.name && (error.name === 'TypeError' || error.name === 'NetworkError')) {
+            var netErr = new Error('Could not reach the login service. Please check your internet connection and try again.');
+            netErr.code = 'network_error';
+            throw netErr;
+        }
+        throw error;
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
 }
 
 // ============================================================================

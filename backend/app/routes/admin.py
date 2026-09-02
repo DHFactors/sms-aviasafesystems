@@ -854,7 +854,7 @@ async def list_feedback(
 
 
 # ============================================================================
-# Developer / SuperAdmin tenant governance (admin/admin-tenants.html)
+# Developer / SuperAdmin tenant governance (admin/dashboard.html)
 # ============================================================================
 # Governance statuses control whether a tenant's users can authenticate. They
 # live on the tenant document's `status` field (ACTIVE / SUSPENDED /

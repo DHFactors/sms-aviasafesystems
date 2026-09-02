@@ -247,7 +247,6 @@ var PORTAL_MODULES = [
             { title: "Team Management",         path: "/settings/team.html",          roles: ["admin"], status: "ready" },
             { title: "Administration",          path: "/administration.html",         roles: ["admin"], status: "ready" },
             { title: "Super Admin Dashboard",   path: "/admin/dashboard.html",         roles: ["super"], status: "ready" },
-            { title: "Super Admin Test Portal", path: "/admin/test-portal.html",      roles: ["super"], status: "ready" },
         ]
     },
     {
@@ -435,6 +434,11 @@ function renderTenantMgmt(gate) {
     html += '<div class="view-head"><div><h2><i class="fas fa-building" style="color:var(--color-brand-600);"></i> Tenant Management</h2>' +
         '<div class="sub">Activate or suspend tenants. Suspended tenants\u2019 users are locked out server-side.</div></div>' +
         '<button class="btn btn-primary btn-sm" onclick="loadGovernance()"><i class="fas fa-sync"></i> Refresh</button></div>';
+    html += '<div style="margin-bottom:12px;">' +
+        '<button class="btn btn-primary" onclick="window.location.href=\'/admin/tenant-credentials.html\'">' +
+        '<i class="fas fa-user-plus"></i> Onboard New Operator (Full Wizard)' +
+        '</button>' +
+        '</div>';
     html += '<div class="gov-actions" style="margin-bottom:14px;"><span id="govSummary" class="sub"></span></div>';
     html += '<div id="govWrap" class="admin-card"><div class="gov-empty"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div></div>';
     html += '</div>';
