@@ -438,27 +438,28 @@ def _seed_tenant(db, tid="tara-air", **extra):
 
 def test_derive_tenant_status_explicit():
     from app.services.admin_data_service import derive_tenant_status
-    assert derive_tenant_status({}, None, explicit="Trial") == "Trial"
-    assert derive_tenant_status({}, None, explicit="Inactive") == "Inactive"
+    assert derive_tenant_status({}, None, explicit="Trial") == "TRIAL"
+    assert derive_tenant_status({}, None, explicit="Inactive") == "INACTIVE"
+    assert derive_tenant_status({}, None, explicit="demo") == "DEMO"
 
 
 def test_derive_tenant_status_unpaid_is_inactive():
     from app.services.admin_data_service import derive_tenant_status
-    assert derive_tenant_status({}, "Unpaid") == "Inactive"
+    assert derive_tenant_status({}, "Unpaid") == "INACTIVE"
 
 
 def test_derive_tenant_status_expired_contract():
     from datetime import date, timedelta
     from app.services.admin_data_service import derive_tenant_status
     yesterday = (date.today() - timedelta(days=1)).isoformat()
-    assert derive_tenant_status({"end_date": yesterday}, "Paid") == "Inactive"
+    assert derive_tenant_status({"end_date": yesterday}, "paid") == "INACTIVE"
 
 
 def test_derive_tenant_status_future_contract_is_trial():
     from datetime import date, timedelta
     from app.services.admin_data_service import derive_tenant_status
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
-    assert derive_tenant_status({"start_date": tomorrow}, "Paid") == "Trial"
+    assert derive_tenant_status({"start_date": tomorrow}, "Paid") == "TRIAL"
 
 
 def test_update_tenant_status_explicit(monkeypatch):
@@ -467,23 +468,40 @@ def test_update_tenant_status_explicit(monkeypatch):
     from app.services.admin_data_service import update_tenant_status
     doc = update_tenant_status("tara-air", _admin_user(), status="Trial")
     stored = db._stores["tenants"]["tara-air"]
-    assert stored["status"] == "Trial"
+    assert stored["status"] == "TRIAL"
     assert stored["active"] is False
     assert any(l["action"] == "TENANT_STATUS_UPDATED" for l in db._stores["audit_logs"].values())
-    assert doc["status"] == "Trial"
+    assert doc["status"] == "TRIAL"
 
 
 def test_update_tenant_status_derived_from_contract(monkeypatch):
+    from datetime import date, timedelta
     db = _patch_db(monkeypatch)
     _seed_tenant(db)
     from app.services.admin_data_service import update_tenant_status
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    next_year = (date.today() + timedelta(days=366)).isoformat()
     update_tenant_status("tara-air", _admin_user(),
-                         contract_start_date="2026-09-01", contract_end_date="2027-08-31")
+                         contract_start_date=tomorrow, contract_end_date=next_year)
     stored = db._stores["tenants"]["tara-air"]
     # Contract starts in the future -> Trial
-    assert stored["status"] == "Trial"
-    assert stored["contract"]["start_date"] == "2026-09-01"
-    assert stored["contract"]["end_date"] == "2027-08-31"
+    assert stored["status"] == "TRIAL"
+    assert stored["contract"]["start_date"] == tomorrow
+    assert stored["contract"]["end_date"] == next_year
+
+
+def test_update_tenant_status_demo_with_trial_end(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import update_tenant_status
+    doc = update_tenant_status("tara-air", _admin_user(), status="demo",
+                               payment_status="Not Applicable", trial_end_date="2026-09-30")
+    stored = db._stores["tenants"]["tara-air"]
+    assert stored["status"] == "DEMO"
+    assert stored["active"] is False
+    assert stored["payment_status"] == "not_applicable"
+    assert stored["contract"]["trial_end_date"] == "2026-09-30"
+    assert doc["status"] == "DEMO"
 
 
 def test_update_tenant_status_unpaid(monkeypatch):
@@ -491,8 +509,8 @@ def test_update_tenant_status_unpaid(monkeypatch):
     _seed_tenant(db)
     from app.services.admin_data_service import update_tenant_status
     update_tenant_status("tara-air", _admin_user(), payment_status="Unpaid")
-    assert db._stores["tenants"]["tara-air"]["status"] == "Inactive"
-    assert db._stores["tenants"]["tara-air"]["payment_status"] == "Unpaid"
+    assert db._stores["tenants"]["tara-air"]["status"] == "INACTIVE"
+    assert db._stores["tenants"]["tara-air"]["payment_status"] == "unpaid"
 
 
 def test_update_tenant_status_missing_tenant(monkeypatch):
@@ -582,7 +600,7 @@ def test_admin_tenant_status_route(monkeypatch):
         "payment_status": "Paid",
     })
     assert resp.status_code == 200
-    assert resp.json()["tenant"]["status"] == "Inactive"
+    assert resp.json()["tenant"]["status"] == "INACTIVE"
     assert db._stores["tenants"]["tara-air"]["active"] is False
 
 
