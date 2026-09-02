@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import delete, select
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import distribute_dates_across_period
 from app.db.ids import register_tenant
 from app.db.isolation import demo_scope
 from app.db.runner import run
@@ -502,7 +503,9 @@ class HazardSeeder(BaseSeeder):
 
         return run(_query())
 
-    def _create_hazard(self, tenant_id: str, hazard_data: Dict) -> Optional[str]:
+    def _create_hazard(
+        self, tenant_id: str, hazard_data: Dict, created_at: Optional[Any] = None
+    ) -> Optional[str]:
         """Create a single hazard in PostgreSQL. Skip if already exists."""
         title = hazard_data["title"]
 
@@ -525,26 +528,26 @@ class HazardSeeder(BaseSeeder):
                 "role": "SUPER_ADMIN",
                 "tenant_id": tenant_id,
             }
-            # source_id == SEED_SOURCE_ID tags the row so unseed() can remove
-            # exactly the seeded hazards.
-            result = service.create_hazard_v1(
-                {
-                    "title": title,
-                    "description": hazard_data["description"],
-                    "taxonomy": hazard_data["taxonomy"],
-                    "priority": hazard_data["priority"],
-                    "severity": hazard_data["severity"],
-                    "probability": hazard_data["probability"],
-                    "source": hazard_data.get("source", "Hazard Seeder"),
-                    "source_id": SEED_SOURCE_ID,
-                    "department": hazard_data.get("department", ""),
-                    "occurrence_type": hazard_data.get(
-                        "occurrence_type", "Incident"
-                    ),
-                    "hfacs_codes": hazard_data.get("hfacs", []),
-                },
-                seeder_user,
-            )
+            # created_at spreads the hazard across the look-back period so the
+            # Hazard -> CAN -> CAP chain stays chronologically valid.
+            payload = {
+                "title": title,
+                "description": hazard_data["description"],
+                "taxonomy": hazard_data["taxonomy"],
+                "priority": hazard_data["priority"],
+                "severity": hazard_data["severity"],
+                "probability": hazard_data["probability"],
+                "source": hazard_data.get("source", "Hazard Seeder"),
+                "source_id": SEED_SOURCE_ID,
+                "department": hazard_data.get("department", ""),
+                "occurrence_type": hazard_data.get(
+                    "occurrence_type", "Incident"
+                ),
+                "hfacs_codes": hazard_data.get("hfacs", []),
+            }
+            if created_at is not None:
+                payload["created_at"] = created_at
+            result = service.create_hazard_v1(payload, seeder_user)
             self.created_count += 1
             self.log_info(f"Created hazard: {title}")
             return result.get("id")
@@ -584,9 +587,17 @@ class HazardSeeder(BaseSeeder):
             self.log_info(f"Seeding hazards for tenant: {tenant}")
             hazards = self._get_hazards_for_tenant(tenant)
             self.log_info(f"  Found {len(hazards)} hazard templates")
-            for hazard in hazards:
+            # Spread hazard created_at across the 2-year look-back window so
+            # the Hazard -> CAN -> CAP chain stays chronologically consistent.
+            created_dates = distribute_dates_across_period(
+                count=len(hazards),
+                period_days=730,
+                min_gap_days=1,
+                max_gap_days=90,
+            )
+            for hazard, created_at in zip(hazards, created_dates):
                 self._validate_hfacs(hazard.get("hfacs", []))
-                self._create_hazard(tenant, hazard)
+                self._create_hazard(tenant, hazard, created_at)
 
         self.log_info("=" * 60)
         self.log_info(

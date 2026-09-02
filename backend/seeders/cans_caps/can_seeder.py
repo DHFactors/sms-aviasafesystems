@@ -22,11 +22,14 @@
 
 import json
 import sys
+import random
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import delete, select
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import get_random_date
 from app.db.ids import register_tenant
 from app.db.isolation import demo_scope
 from app.db.runner import run
@@ -78,7 +81,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Mr. Dipak Rai",
             "assigned_to_email": "145@fixedwing.test",
             "department": "Part-145",
-            "target_completion_date": "2026-09-15",
             "hazard_keywords": ["engine oil pressure", "oil pressure"],
         },
         {
@@ -99,7 +101,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Mr. Suresh Ghale",
             "assigned_to_email": "camo@fixedwing.test",
             "department": "CAMO",
-            "target_completion_date": "2026-09-30",
             "hazard_keywords": ["cabin pressurization", "pressurization"],
         },
         {
@@ -118,7 +119,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Capt. Sanjay Gurung",
             "assigned_to_email": "ops@fixedwing.test",
             "department": "Flight Operations",
-            "target_completion_date": "2026-10-15",
             "hazard_keywords": ["unstabilized approach", "unstable approach"],
         },
     ],
@@ -140,7 +140,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Mr. Shiva Tamang",
             "assigned_to_email": "145@rotarywing.test",
             "department": "Part-145",
-            "target_completion_date": "2026-09-15",
             "hazard_keywords": ["tail rotor blade", "tail rotor", "crack"],
         },
         {
@@ -161,7 +160,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Capt. Ram Koirala",
             "assigned_to_email": "ops@rotarywing.test",
             "department": "Flight Operations",
-            "target_completion_date": "2026-09-30",
             "hazard_keywords": ["tail rotor effectiveness", "lte"],
         },
     ],
@@ -182,7 +180,6 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "assigned_to_name": "Mr. Ramesh Adhikari",
             "assigned_to_email": "ops@demoairport.test",
             "department": "Airport Operations",
-            "target_completion_date": "2026-09-21",
             "hazard_keywords": ["foreign object", "fod", "debris"],
         },
     ],
@@ -203,13 +200,13 @@ class CanSeeder(BaseSeeder):
 
     def _find_hazard_for_keywords(
         self, tenant_id: str, keywords: List[str]
-    ) -> Optional[str]:
-        """Return the id (uuid) of a seeded hazard matching any keyword, else
-        None."""
+    ) -> Optional[Dict[str, Any]]:
+        """Return the id (uuid) and created_at of a seeded hazard matching any
+        keyword, else None."""
         tid = register_tenant(tenant_id)
         lowered = [k.lower() for k in keywords if k]
 
-        async def _query() -> Optional[str]:
+        async def _query() -> Optional[Dict[str, Any]]:
             async with session_scope() as session:
                 rows = (
                     await session.execute(
@@ -223,7 +220,10 @@ class CanSeeder(BaseSeeder):
                     title = (h.title or "").lower()
                     desc = (h.description or "").lower()
                     if any(k in title or k in desc for k in lowered):
-                        return str(h.id)
+                        return {
+                            "id": str(h.id),
+                            "created_at": h.created_at,
+                        }
                 return None
 
         return run(_query())
@@ -261,15 +261,16 @@ class CanSeeder(BaseSeeder):
             return None
 
         # Resolve the linked hazard so we never create stub hazards.
-        hazard_id = self._find_hazard_for_keywords(
+        hazard = self._find_hazard_for_keywords(
             tenant_id, can_data.get("hazard_keywords", [])
         )
-        if not hazard_id:
+        if not hazard:
             self.log_warning(
                 f"Skipping CAN with no matching seeded hazard: {title}"
             )
             self.skipped_count += 1
             return None
+        hazard_id = hazard["id"]
 
         issuer = ISSUERS.get(
             tenant_id, {"email": "safety@aviasafe.com", "name": "Safety Manager"}
@@ -280,6 +281,21 @@ class CanSeeder(BaseSeeder):
             "role": "AIRLINE_ADMIN",
             "tenant_id": tenant_id,
         }
+
+        # Issue the CAN AFTER the linked hazard was created, so the chain
+        # Hazard -> CAN is chronologically valid. Issued within 1-90 days of
+        # the hazard being created, with a target 30-90 days after issuance.
+        hazard_created = hazard.get("created_at") or get_random_date(
+            start_days_ago=700, end_days_ago=30
+        )
+        if hasattr(hazard_created, "date"):
+            can_base = hazard_created
+            delta_days = random.randint(1, 90)
+        else:
+            can_base = get_random_date(start_days_ago=700, end_days_ago=30)
+            delta_days = 0
+        can_date = can_base + timedelta(days=delta_days)
+        target_date = can_date + timedelta(days=random.randint(30, 90))
 
         # assigned_to holds the assignee email (used by notifications and
         # department resolution). The display name is kept in the template.
@@ -294,7 +310,8 @@ class CanSeeder(BaseSeeder):
             "assigned_to": can_data["assigned_to_email"],
             "assigned_to_uid": _uid_for(can_data["assigned_to_email"]),
             "department": can_data["department"],
-            "target_completion_date": can_data["target_completion_date"],
+            "target_completion_date": target_date,
+            "issued_at": can_date,
             "copies_to": None,
         }
 
@@ -302,7 +319,10 @@ class CanSeeder(BaseSeeder):
             service = CanCapService(tenant_id=tenant_id)
             result = service.issue_can(payload, issuer_user)
             self.created_count += 1
-            self.log_info(f"Created CAN: {title}")
+            self.log_info(
+                f"Created CAN: {title} (issued_at={can_date.isoformat()}, "
+                f"target={target_date.date().isoformat()})"
+            )
             return result.get("id")
         except Exception as e:
             self.log_error(f"Failed to create CAN {title}: {e}")

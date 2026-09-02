@@ -23,11 +23,17 @@
 
 import json
 import sys
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import delete, select
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import (
+    get_random_date,
+    get_random_date_parts,
+    distribute_dates_across_period,
+)
 from app.db.ids import register_tenant
 from app.db.isolation import demo_scope
 from app.db.runner import run
@@ -59,7 +65,7 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "title": "Engine Chip Light Activation - Flight FW-567",
         "report_type": "mandatory",
         "narrative": "Mr. Dipak Rai (Part-145 Manager) submitted a mandatory "
-        "occurrence report on 20 August 2026 regarding engine chip light "
+        "occurrence report on {day} {month} {year} regarding engine chip light "
         "activation during post-flight inspection of aircraft 9N-ABC. Chip "
         "detector revealed metal particles. Engine oil analysis confirmed "
         "bearing material. Engine removed for overhaul. Aircraft grounded "
@@ -73,14 +79,13 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 2,
         "aircraft_registration": "9N-ABC",
         "flight_number": "FW-567",
-        "occurrence_date": "2026-08-20",
     },
     {
         # MOR - CAMO
         "title": "AD Compliance - Inspection Overdue",
         "report_type": "mandatory",
         "narrative": "Mr. Suresh Ghale (CAMO Manager) submitted a mandatory "
-        "occurrence report on 15 August 2026 regarding AD 2025-08-01 "
+        "occurrence report on {day} {month} {year} regarding AD 2025-08-01 "
         "inspection overdue for aircraft 9N-DEF. The inspection was due at "
         "15,000 hours but aircraft operated until 15,200 hours. CAMO "
         "identified the error during records review. Corrective action "
@@ -93,14 +98,13 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "severity": 3,
         "probability": 2,
         "aircraft_registration": "9N-DEF",
-        "occurrence_date": "2026-08-15",
     },
     {
         # MOR - Ops
         "title": "Tailstrike During Takeoff - Flight FW-902",
         "report_type": "mandatory",
         "narrative": "Capt. Sanjay Gurung (Operations Manager) submitted a "
-        "mandatory occurrence report on 22 August 2026 regarding a tailstrike "
+        "mandatory occurrence report on {day} {month} {year} regarding a tailstrike "
         "incident during takeoff on aircraft 9N-GHI. Aircraft rotated at "
         "excessive pitch attitude (12° vs standard 8°) resulting in tail "
         "scrape. Post-flight inspection confirmed damage to tail skid. "
@@ -114,14 +118,13 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 2,
         "aircraft_registration": "9N-GHI",
         "flight_number": "FW-902",
-        "occurrence_date": "2026-08-22",
     },
     {
         # VSR - Staff
         "title": "Tailwind Gust on Final Approach",
         "report_type": "voluntary",
         "narrative": "F/O Prashant Karki submitted a voluntary safety report "
-        "on 18 August 2026 about a tailwind gust encountered during final "
+        "on {day} {month} {year} about a tailwind gust encountered during final "
         "approach to Runway 25 on flight FW-123. Aircraft temporarily exceeded "
         "approach speed by 20kts. Crew executed go-around and landed safely on "
         "second attempt. No injuries or damage.",
@@ -134,7 +137,6 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 3,
         "aircraft_registration": "9N-JKL",
         "flight_number": "FW-123",
-        "occurrence_date": "2026-08-18",
     },
 ]
 
@@ -148,7 +150,7 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "title": "Tail Rotor Blade Crack - Helo RW-203",
         "report_type": "mandatory",
         "narrative": "Mr. Shiva Tamang (Part-145 Manager) submitted a "
-        "mandatory occurrence report on 19 August 2026 regarding a crack "
+        "mandatory occurrence report on {day} {month} {year} regarding a crack "
         "discovered in the tail rotor blade of helicopter 9N-RWX during "
         "scheduled 100-hour inspection. The crack measured 2.5 inches from the "
         "root. Fleet-wide inspection ordered. Blade replaced and helicopter "
@@ -162,14 +164,13 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 1,
         "aircraft_registration": "9N-RWX",
         "flight_number": "RW-203",
-        "occurrence_date": "2026-08-19",
     },
     {
         # MOR - CAMO
         "title": "Life-Limited Part Exceedance - Helo RW-210",
         "report_type": "mandatory",
         "narrative": "Mr. Kiran Gurung (CAMO Manager) submitted a mandatory "
-        "occurrence report on 16 August 2026 regarding a life-limited part "
+        "occurrence report on {day} {month} {year} regarding a life-limited part "
         "(main rotor gearbox) that exceeded its service life by 50 hours. The "
         "error was identified during records review. Component removed and "
         "sent for overhaul. Investigation found record-keeping discrepancy.",
@@ -181,14 +182,13 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "severity": 3,
         "probability": 2,
         "aircraft_registration": "9N-RWY",
-        "occurrence_date": "2026-08-16",
     },
     {
         # MOR - Ops
         "title": "LTE Encounter at High-Altitude Helipad - RW-118",
         "report_type": "mandatory",
         "narrative": "Capt. Ram Koirala (Operations Manager) submitted a "
-        "mandatory occurrence report on 21 August 2026 regarding a loss of "
+        "mandatory occurrence report on {day} {month} {year} regarding a loss of "
         "tail rotor effectiveness (LTE) incident during approach to a "
         "high-altitude helipad (11,500ft AMSL). Helicopter experienced a 45° "
         "yaw due to sudden tailwind shift. Pilot recovered control and landed "
@@ -202,14 +202,13 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 2,
         "aircraft_registration": "9N-RWZ",
         "flight_number": "RW-118",
-        "occurrence_date": "2026-08-21",
     },
     {
         # VSR - Staff
         "title": "Sudden Visibility Deterioration - Mountain Crossing",
         "report_type": "voluntary",
         "narrative": "F/O Bikram Malla submitted a voluntary safety report on "
-        "17 August 2026 about a sudden visibility deterioration during a "
+        "{day} {month} {year} about a sudden visibility deterioration during a "
         "mountain crossing at 12,000ft. Visibility dropped from 8km to <1km "
         "due to unexpected valley fog. Pilot executed 180° turn and returned "
         "to base. Flight conducted under VFR.",
@@ -222,7 +221,6 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "probability": 3,
         "aircraft_registration": "9N-RWV",
         "flight_number": "RW-156",
-        "occurrence_date": "2026-08-17",
     },
 ]
 
@@ -236,7 +234,7 @@ AIRPORT_REPORTS: List[Dict[str, Any]] = [
         "title": "FOD on Runway 25 - Demo Airport",
         "report_type": "mandatory",
         "narrative": "Mr. Ramesh Adhikari (Airport Operations Manager) "
-        "submitted a mandatory occurrence report on 23 August 2026 regarding "
+        "submitted a mandatory occurrence report on {day} {month} {year} regarding "
         "foreign object debris (FOD) found on Runway 25. Debris included metal "
         "fragments and rubber deposits from recent construction work. Runway "
         "was closed for 45 minutes for inspection and cleanup. No aircraft "
@@ -248,14 +246,13 @@ AIRPORT_REPORTS: List[Dict[str, Any]] = [
         "location": "Runway 25",
         "severity": 3,
         "probability": 4,
-        "occurrence_date": "2026-08-23",
     },
     {
         # VSR - Staff
         "title": "Apron Near-Miss - Ground Vehicle and Aircraft",
         "report_type": "voluntary",
         "narrative": "Mr. Purna Singh submitted a voluntary safety report on "
-        "24 August 2026 about a near-miss incident on the apron involving a "
+        "{day} {month} {year} about a near-miss incident on the apron involving a "
         "ground vehicle and a taxiing aircraft. Vehicle crossed the taxiway "
         "without clearance. ATC alerted the aircraft crew who stopped "
         "immediately. No collision occurred.",
@@ -266,7 +263,6 @@ AIRPORT_REPORTS: List[Dict[str, Any]] = [
         "location": "Apron Area",
         "severity": 3,
         "probability": 2,
-        "occurrence_date": "2026-08-24",
     },
 ]
 
@@ -291,17 +287,25 @@ class ReportSeeder(BaseSeeder):
     # ------------------------------------------------------------------
 
     def _find_existing_report(
-        self, tenant_id: str, narrative: str
+        self, tenant_id: str, report_data: Dict
     ) -> Optional[str]:
-        """Return the id of an existing report with this narrative, else None."""
+        """Return the id of an existing seeded report matching this template,
+        else None.  Idempotency is keyed on flight_number + occurrence_type +
+        reporter_email (stable per template) because the narrative now embeds
+        a randomised occurrence date."""
         tid = register_tenant(tenant_id)
+        flight_number = report_data.get("flight_number")
+        occurrence_type = report_data.get("occurrence_type")
+        reporter_email = report_data.get("created_by_email")
 
         async def _query() -> Optional[str]:
             async with session_scope() as session:
                 result = await session.scalar(
                     select(Report.id).where(
                         Report.tenant_id == tid,
-                        Report.narrative == narrative,
+                        Report.flight_number == flight_number,
+                        Report.occurrence_type == occurrence_type,
+                        Report.reporter_email == reporter_email,
                         Report.is_demo == demo_scope(),
                     )
                 )
@@ -309,17 +313,27 @@ class ReportSeeder(BaseSeeder):
 
         return run(_query())
 
-    def _create_report(self, tenant_id: str, report_data: Dict) -> Optional[str]:
+    def _create_report(
+        self, tenant_id: str, report_data: Dict, occurrence_date: Optional[datetime] = None
+    ) -> Optional[str]:
         """Create a single report in PostgreSQL. Skip if already exists."""
         title = report_data["title"]
-        narrative = report_data["narrative"]
 
         if self.dry_run:
             self.log_info(f"[DRY RUN] Would create report: {title}")
             self.created_count += 1
             return "dry-run-id"
 
-        existing = self._find_existing_report(tenant_id, narrative)
+        # Generate the occurrence date / narrative placeholders.  A caller may
+        # pass a pre-computed (distributed) date; otherwise a random date is
+        # generated so narrative and occurrence_date stay in sync.
+        report_date = occurrence_date or get_random_date(
+            start_days_ago=730, end_days_ago=7
+        )
+        date_parts = get_random_date_parts(report_date)
+        narrative = report_data["narrative"].format(**date_parts)
+
+        existing = self._find_existing_report(tenant_id, report_data)
         if existing:
             self.skipped_count += 1
             self.log_info(f"Skipped existing report: {title}")
@@ -343,7 +357,7 @@ class ReportSeeder(BaseSeeder):
             "occurrence_type": report_data.get("occurrence_type"),
             "department": report_data.get("department", ""),
             "location": report_data.get("location", ""),
-            "occurrence_date": report_data.get("occurrence_date"),
+            "occurrence_date": date_parts["iso_date"],
             "aircraft_registration": report_data.get("aircraft_registration"),
             "flight_number": report_data.get("flight_number"),
             "reporter_name": report_data["created_by"],
@@ -351,13 +365,17 @@ class ReportSeeder(BaseSeeder):
             "severity_level": report_data.get("severity"),
             "probability_level": report_data.get("probability"),
             "status": "NEW",
+            "is_demo": True,
         }
 
         try:
             service = ReportService(tenant_id=tenant_id)
             result = service.create_report(payload, reporter_user)
             self.created_count += 1
-            self.log_info(f"Created report: {title}")
+            self.log_info(
+                f"Created report: {title} (occurrence_date="
+                f"{date_parts['iso_date']})"
+            )
             return result.get("id")
         except Exception as e:
             self.log_error(f"Failed to create report {title}: {e}")
@@ -387,8 +405,13 @@ class ReportSeeder(BaseSeeder):
             self.log_info(f"Seeding reports for tenant: {tenant}")
             reports = self._get_reports_for_tenant(tenant)
             self.log_info(f"  Found {len(reports)} report templates")
-            for report in reports:
-                self._create_report(tenant, report)
+            # Distribute report occurrence dates evenly across the 2-year
+            # look-back period so the data does not cluster near today.
+            distributed_dates = distribute_dates_across_period(
+                count=len(reports), period_days=730
+            )
+            for i, report in enumerate(reports):
+                self._create_report(tenant, report, distributed_dates[i])
 
         self.log_info("=" * 60)
         self.log_info(
@@ -413,27 +436,41 @@ class ReportSeeder(BaseSeeder):
             if not self._is_demo_tenant(tenant):
                 continue
             tid = register_tenant(tenant)
-            seeded_narratives = [
-                r["narrative"] for r in self._get_reports_for_tenant(tenant)
-            ]
-            if not seeded_narratives:
+            templates = self._get_reports_for_tenant(tenant)
+            if not templates:
                 continue
+            template_keys = [
+                (r.get("flight_number"), r.get("occurrence_type"),
+                 r.get("created_by_email"))
+                for r in templates
+            ]
 
             if self.dry_run:
                 self.log_info(
-                    f"[DRY RUN] Would remove {len(seeded_narratives)} "
+                    f"[DRY RUN] Would remove {len(template_keys)} "
                     f"seeded reports for tenant: {tenant}"
                 )
                 continue
 
             async def _remove() -> int:
                 async with session_scope() as session:
-                    result = await session.execute(
-                        delete(Report).where(
-                            Report.tenant_id == tid,
-                            Report.narrative.in_(seeded_narratives),
-                            Report.is_demo == demo_scope(),
+                    rows = (
+                        await session.execute(
+                            select(Report).where(
+                                Report.tenant_id == tid,
+                                Report.is_demo == demo_scope(),
+                            )
                         )
+                    ).scalars().all()
+                    matched = [
+                        r.id for r in rows
+                        if (r.flight_number, r.occurrence_type, r.reporter_email)
+                        in template_keys
+                    ]
+                    if not matched:
+                        return 0
+                    result = await session.execute(
+                        delete(Report).where(Report.id.in_(matched))
                     )
                     return result.rowcount or 0
 

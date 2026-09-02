@@ -247,7 +247,7 @@ class HazardService:
                 remarks=payload.get("remarks"),
                 is_demo=demo_scope(),
                 created_by=user.get("uid"),
-                created_at=now,
+                created_at=payload.get("created_at") or now,
                 updated_at=now,
             )
             session.add(row)

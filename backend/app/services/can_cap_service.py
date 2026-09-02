@@ -402,7 +402,7 @@ class CanCapService:
                 is_demo=demo_scope(),
                 issued_by=user.get("email", user["uid"]),
                 issued_by_uid=user["uid"],
-                issued_at=now,
+                issued_at=payload.get("issued_at") or now,
                 created_by=user["uid"],
                 created_at=now,
                 updated_at=now,
@@ -686,7 +686,7 @@ class CanCapService:
                 is_demo=demo_scope(),
                 submitted_by=user.get("email", user["uid"]),
                 submitted_by_uid=user["uid"],
-                submitted_at=now,
+                submitted_at=payload.get("submitted_at") or now,
                 created_at=now,
                 updated_at=now,
                 # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)

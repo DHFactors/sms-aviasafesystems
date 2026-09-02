@@ -25,10 +25,10 @@
 
 import json
 import sys
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import get_random_date
 from app.services.state_risk_service import ICAO_TOP_RISK_CATEGORIES
 from app.services.risk_matrix import (
     get_tolerability_tier,
@@ -218,7 +218,7 @@ class SspSeeder(BaseSeeder):
     def _seed_spis(self) -> int:
         """Write the SPI documents. Returns count of new/updated SPIs."""
         created = 0
-        now = datetime.now(timezone.utc)
+        now = get_random_date(start_days_ago=180, end_days_ago=30)
         for spi in SPI_TEMPLATES:
             spi_id = spi["id"]
             if self.dry_run:
@@ -271,7 +271,7 @@ class SspSeeder(BaseSeeder):
         """Write the state risk register entries directly (matching the shape
         StateRiskService.sync_register_from_aggregation writes)."""
         created = 0
-        now = datetime.now(timezone.utc)
+        now = get_random_date(start_days_ago=365, end_days_ago=60)
         for cat_def in ICAO_TOP_RISK_CATEGORIES:
             cat = cat_def["category"]
             entry_id = self._register_entry_id(cat)
@@ -339,7 +339,7 @@ class SspSeeder(BaseSeeder):
         """Persist the NASP 2023-2025 N-HRC reference data (SEIs +
         contributing factors) to Firestore under state/ssp/nhrcs/{code}."""
         created = 0
-        now = datetime.now(timezone.utc)
+        now = get_random_date(start_days_ago=365, end_days_ago=60)
         for ref in NHRC_REFERENCE_DATA:
             code = ref["code"]
             if self.dry_run:

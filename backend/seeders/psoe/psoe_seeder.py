@@ -24,10 +24,10 @@
 
 import json
 import sys
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import get_random_date
 from app.models.psoe import PSOEAnswer
 from app.services.psoe_service import score_assessment, TEMPLATE_VERSION
 
@@ -151,7 +151,8 @@ class PsoeSeeder(BaseSeeder):
         ]
 
         scores = score_assessment(responses)
-        now = datetime.now(timezone.utc)
+        assessment_date = get_random_date(start_days_ago=365, end_days_ago=7)
+        now = assessment_date
         owner = OWNERS.get(
             tenant_id, {"email": "safety@aviasafe.com", "name": "Safety Manager"}
         )
@@ -167,7 +168,7 @@ class PsoeSeeder(BaseSeeder):
             "scope": template.get("scope"),
             "auditor_name": auditor["name"],
             "assessor_email": auditor["email"],
-            "assessment_date": now,
+            "assessment_date": assessment_date,
             "template_version": TEMPLATE_VERSION,
             "responses": [r.model_dump() for r in responses],
             "component_scores": scores["component_scores"],

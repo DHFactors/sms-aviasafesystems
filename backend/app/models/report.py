@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, EmailStr
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -160,7 +160,9 @@ class MorCreate(BaseModel):
     reporter_organisation: str = Field(..., min_length=2, max_length=100)
     reporter_email: EmailStr = Field(...)
     reporter_phone: Optional[str] = None
-    reporting_date: datetime = Field(default_factory=datetime.utcnow)
+    reporting_date: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
     aircraft_make: str = Field(..., min_length=2, max_length=50)
     aircraft_model: str = Field(..., min_length=2, max_length=50)

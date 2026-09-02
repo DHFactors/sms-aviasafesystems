@@ -23,10 +23,10 @@
 
 import json
 import sys
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from seeders import BaseSeeder
+from seeders.utils.date_utils import get_random_date
 from app.services.flight_diversion_service import FlightDiversionService
 
 
@@ -249,7 +249,7 @@ class DiversionSeeder(BaseSeeder):
         }
 
         payload = {
-            "date": datetime.now(timezone.utc),
+            "date": get_random_date(start_days_ago=730, end_days_ago=7),
             "flight_number": div_data["flight_number"],
             "aircraft_registration": div_data["aircraft_registration"],
             "sector_from": div_data["sector_from"],

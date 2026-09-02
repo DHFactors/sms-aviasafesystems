@@ -21,6 +21,7 @@
 # ============================================================================
 
 import json
+import random
 import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -209,7 +210,11 @@ class CapSeeder(BaseSeeder):
                     title = (c.title or "").lower()
                     desc = (c.description or "").lower()
                     if any(k in title or k in desc for k in lowered):
-                        return {"id": str(c.id), "can_reference": c.can_reference}
+                        return {
+                            "id": str(c.id),
+                            "can_reference": c.can_reference,
+                            "issued_at": c.issued_at,
+                        }
                 return None
 
         return run(_query())
@@ -271,8 +276,17 @@ class CapSeeder(BaseSeeder):
             "tenant_id": tenant_id,
         }
 
+        # Date the CAP relative to the linked CAN's issue date so the chain
+        # Report -> CAN -> CAP is chronologically consistent (CAP never before
+        # the CAN it responds to).
+        can_issued_at = can.get("issued_at")
+        if can_issued_at is None:
+            can_issued_at = datetime.now(timezone.utc)
+        else:
+            can_issued_at = can_issued_at.replace(tzinfo=timezone.utc)
         offset_days = int(cap_data.get("target_completion_offset_days", 30))
-        target_date = datetime.now(timezone.utc) + timedelta(days=offset_days)
+        target_date = can_issued_at + timedelta(days=offset_days)
+        submitted_at = can_issued_at + timedelta(days=random.randint(1, 7))
 
         payload = {
             "can_id": can["id"],
@@ -283,6 +297,7 @@ class CapSeeder(BaseSeeder):
             "residual_severity": cap_data["residual_severity"],
             "residual_probability": cap_data["residual_probability"],
             "target_completion_date": target_date,
+            "submitted_at": submitted_at,
         }
 
         try:
@@ -290,7 +305,9 @@ class CapSeeder(BaseSeeder):
             result = service.submit_cap(can["id"], payload, submitter_user)
             self.created_count += 1
             self.log_info(
-                f"Created CAP: {action_plan} (linked to {can['can_reference']})"
+                f"Created CAP: {action_plan} (linked to {can['can_reference']}, "
+                f"submitted_at={submitted_at.isoformat()}, "
+                f"target={target_date.date().isoformat()})"
             )
             return result.get("id")
         except Exception as e:
