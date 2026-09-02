@@ -1,8 +1,9 @@
 <!-- ============================================================================
 FILE: index.html
 PATH: public/admin/index.html
-PURPOSE: Legacy admin portal entry point. Superseded by the unified Super Admin
-         Dashboard (/admin/dashboard.html). Redirects there automatically.
+PURPOSE: Legacy admin portal entry point. Superseded by the standalone Super
+         Admin Production Setup page (/admin/production-setup.html). Redirects
+         there automatically.
 AUTHOR: AviaSAFE Systems
 ============================================================================ -->
 
@@ -11,7 +12,7 @@ AUTHOR: AviaSAFE Systems
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting to Super Admin Dashboard — AviaSAFE</title>
+    <title>Redirecting to Production Setup — AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <style>
         body { font-family: var(--font-family); background: var(--color-bg, #f8fafc); display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
@@ -26,10 +27,10 @@ AUTHOR: AviaSAFE Systems
 <body>
     <div class="card">
         <i class="fas fa-plane"></i>
-        <h1>Super Admin Dashboard</h1>
-        <p><span class="spinner"></span>Redirecting you to the unified admin dashboard…</p>
-        <a href="/admin/dashboard.html" style="color:var(--color-brand-600);">Continue now</a>
+        <h1>Production Setup</h1>
+        <p><span class="spinner"></span>Redirecting you to the super-admin Production Setup…</p>
+        <a href="/admin/production-setup.html" style="color:var(--color-brand-600);">Continue now</a>
     </div>
-    <script>window.location.replace('/admin/dashboard.html');</script>
+    <script>window.location.replace('/admin/production-setup.html');</script>
 </body>
 </html>

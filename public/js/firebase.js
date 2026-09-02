@@ -622,7 +622,7 @@ window.getStoredDemoContext = getStoredDemoContext;
 
 function getRoleDestination(user) {
     var role = (user && user.role) || 'USER';
-    if (role === 'SUPER_ADMIN') return '/admin/dashboard.html';
+    if (role === 'SUPER_ADMIN') return '/admin/production-setup.html';
     if (role === 'CAAN_SMD') return '/caan.html';
     // Accountable Executive accounts (ae@{domain}) get the executive
     // governance dashboard — top-level SMS oversight per ICAO Annex 19 /

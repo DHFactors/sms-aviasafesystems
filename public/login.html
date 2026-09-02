@@ -616,10 +616,10 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             // The onAuthStateChanged listener will handle the redirect with fresh claims,
             // but call it directly here for immediate response
             if (developerPersonaActive) {
-                // Developer / Super-Admin: always land on the unified admin dashboard
+                // Developer / Super-Admin: always land on the Production Setup flow
                 // regardless of tenant scoping (role claim SUPER_ADMIN is verified by
-                // the dashboard's access guard).
-                window.location.href = '/admin/dashboard.html';
+                // the page's access guard).
+                window.location.href = '/admin/production-setup.html';
                 return;
             }
             redirectBasedOnRole(user);

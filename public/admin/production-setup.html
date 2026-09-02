@@ -1,17 +1,710 @@
+<!-- ============================================================================
+FILE: production-setup.html
+PATH: public/admin/production-setup.html
+PURPOSE: Standalone Production Setup page for SUPER_ADMIN only. The first page a
+         super-admin lands on after login. Consolidates the full rollout flow,
+         fully data-driven (no hardcoded tenants/regulators):
+           Step 1 — Create State Regulator
+           Step 2 — Add Operator Tenants (+ Bulk Import, Detailed Wizard)
+           Step 4 — Audit Log
+           Step 5 — Dummy Data (VSR / MOR / CAN / CAP / Survey)
+           Step 6 — PSOE Baseline Assessments
+           Step 7 — State Risk Register Reference
+         Mutations require the admin setup key. Relies on AdminUI helpers and
+         the /api/v1/admin endpoints.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting — AviaSAFE Admin</title>
-    <meta http-equiv="refresh" content="0; url=/admin/dashboard.html">
-    <script>
-        window.location.replace('/admin/dashboard.html');
-    </script>
+    <title>Production Setup — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+
+    <style>
+        body { font-family: var(--font-family); background: var(--color-bg, #f1f5f9); color: var(--color-text, #1e293b); }
+
+        /* ---------- Shell ---------- */
+        .admin-shell { min-height: 100vh; display: flex; flex-direction: column; }
+        .topbar {
+            background: linear-gradient(135deg, var(--color-deep-teal-950, #051a26), var(--color-deep-teal-900, #0b3a4d));
+            color: #fff; padding: 14px 26px; display: flex; align-items: center;
+            justify-content: space-between; gap: 14px; flex-wrap: wrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,.18); position: sticky; top: 0; z-index: 20;
+        }
+        .tb-left { display: flex; align-items: center; gap: 12px; }
+        .tb-brand { font-weight: 800; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .tb-brand i { color: #4fc3f7; }
+        .tb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .tb-actions a.nav-link {
+            color: #cbd5e1; text-decoration: none; font-size: .82rem; padding: 6px 12px;
+            border-radius: 8px; transition: background .15s, color .15s;
+        }
+        .tb-actions a.nav-link:hover { background: rgba(255,255,255,.1); color: #fff; }
+        .user-badge { background: rgba(255,255,255,.14); color: #fff; padding: .3rem 1rem; border-radius: 999px; font-size: .82rem; }
+        .user-badge .role-chip { background: #4fc3f7; color: #072535; padding: .02rem .5rem; border-radius: 999px; margin-right: .4rem; font-weight: 700; }
+
+        .content-area { padding: 26px; flex: 1; max-width: 1080px; width: 100%; margin: 0 auto; }
+
+        .page-head h1 { margin: 0 0 4px; font-size: 1.5rem; color: var(--color-text-strong, #0f172a); }
+        .page-head .sub { color: var(--color-text-muted, #64748b); font-size: .9rem; }
+
+        /* ---------- Step progress ---------- */
+        .step-progress { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 22px; }
+        .step-progress .sp-chip {
+            display: inline-flex; align-items: center; gap: 7px; font-size: .76rem; font-weight: 600;
+            padding: 6px 12px; border-radius: 999px; background: #fff; color: #475569;
+            border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+        }
+        .step-progress .sp-chip .sp-num {
+            width: 20px; height: 20px; border-radius: 50%; background: var(--color-brand-600, #0ea5e9);
+            color: #fff; display: inline-flex; align-items: center; justify-content: center;
+            font-size: .7rem; font-weight: 700;
+        }
+        .step-progress .sp-chip.done { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+        .step-progress .sp-chip.done .sp-num { background: #10b981; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+        .admin-card {
+            background: #fff; border-radius: 14px; padding: 22px;
+            box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6;
+        }
+        .admin-card .card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+        .admin-card h2 { margin: 0; font-size: 1.05rem; color: var(--color-text-strong, #0f172a); display: flex; align-items: center; gap: 10px; }
+        .admin-card .card-sub { color: var(--color-text-muted, #64748b); font-size: .84rem; margin: 0 0 14px; line-height: 1.5; }
+        .step-badge {
+            background: var(--color-brand-100, #e0f2fe); color: var(--color-brand-700, #0369a1);
+            font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+            padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+        }
+
+        .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .form-group { flex: 1; min-width: 150px; }
+        .form-group label { display: block; font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 9px 11px; border: 1px solid var(--color-border, #cbd5e1);
+            border-radius: 8px; font-size: .86rem; box-sizing: border-box;
+        }
+        .form-group small { display: block; color: #94a3b8; font-size: .72rem; margin-top: 3px; }
+
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        .empty-state { padding: 22px; text-align: center; color: #94a3b8; font-size: .85rem; background: #f8fafc; border-radius: 8px; }
+        .loading { padding: 18px; text-align: center; color: #64748b; font-size: .85rem; }
+        .status-box { padding: 12px 14px; border-radius: 8px; font-size: .85rem; margin-top: 12px; }
+        .status-box.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+        .status-box.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .status-box.warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+        .section-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; margin: 26px 0 10px; }
+
+        .admin-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+        .admin-table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; }
+        .admin-table td { padding: 9px 10px; border-bottom: 1px solid #eef2f6; vertical-align: middle; }
+        .admin-table tr:hover td { background: #f8fafc; }
+
+        .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-danger { background: #fee2e2; color: #b91c1c; }
+        .badge-info { background: #e0f2fe; color: #075985; }
+        .badge-demo { background: #f3e8ff; color: #6b21a8; }
+        .badge-trial { background: #fff7ed; color: #c2410c; }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-inactive { background: #f1f5f9; color: #475569; }
+        .badge-paid { background: #dcfce7; color: #166534; }
+        .badge-unpaid { background: #fee2e2; color: #b91c1c; }
+        .badge-notapp { background: #f1f5f9; color: #64748b; }
+
+        .side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
+        .side-foot i { color: #e2574c; }
+
+        @media (max-width: 720px) { .content-area { padding: 16px; } }
+    </style>
 </head>
-<body>
-    <noscript>
-        <p>Redirecting to the <a href="/admin/dashboard.html">Super Admin Dashboard</a>…</p>
-    </noscript>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title" style="font-weight:600;font-size:.9rem;color:#bcd6e3;">Production Setup</span>
+        </div>
+        <div class="tb-actions">
+            <a href="/admin/dashboard.html" class="nav-link"><i class="fas fa-th-large"></i> Full Admin</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-cogs" style="color:var(--color-brand-600);"></i> Production Setup</h1>
+            <div class="sub">Full rollout flow (Steps 1&ndash;7), fully data-driven. Mutations require the admin setup key.</div>
+        </div>
+
+        <div class="step-progress" id="stepProgress">
+            <span class="sp-chip"><span class="sp-num">1</span> Regulator</span>
+            <span class="sp-chip"><span class="sp-num">2</span> Tenants</span>
+            <span class="sp-chip"><span class="sp-num">4</span> Audit Log</span>
+            <span class="sp-chip"><span class="sp-num">5</span> Dummy Data</span>
+            <span class="sp-chip"><span class="sp-num">6</span> PSOE</span>
+            <span class="sp-chip"><span class="sp-num">7</span> State Risk</span>
+        </div>
+
+        <div class="grid">
+
+            <!-- ============ STEP 1 — REGULATOR ============ -->
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 1</span></div>
+                <h2>Create State Regulator</h2>
+                <p class="card-sub">The state civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</p>
+                <form onsubmit="createRegulator(event)">
+                    <div class="form-row">
+                        <div class="form-group"><label>Regulator ID *</label><input type="text" id="regId" placeholder="caan" required pattern="[a-z0-9-]+"><small>Lowercase letters, numbers, hyphens</small></div>
+                        <div class="form-group"><label>Full Name *</label><input type="text" id="regName" placeholder="Civil Aviation Authority of Nepal" required></div>
+                        <div class="form-group"><label>Short Name</label><input type="text" id="regShort" placeholder="CAAN"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Country Code</label><input type="text" id="regCountry" placeholder="NP" maxlength="2"></div>
+                        <div class="form-group"><label>Country Name</label><input type="text" id="regCountryName" placeholder="Nepal"></div>
+                        <div class="form-group"><label>Domain</label><input type="text" id="regDomain" placeholder="ssp.caanepal.gov.np"></div>
+                    </div>
+                    <div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ============ STEP 2 — TENANTS ============ -->
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 2</span></div>
+                <h2>Add Operator Tenants</h2>
+                <p class="card-sub">Create operator tenants individually (data-driven, regulator assigned here), or paste a CSV / JSON list and use Bulk Import. For full onboarding &mdash; Auth user provisioning with generated passwords &mdash; use the detailed wizard.</p>
+                <div class="btn-row" style="margin-bottom:14px;">
+                    <a href="/admin/tenant-credentials.html" class="btn btn-outline"><i class="fas fa-user-plus"></i> Detailed Onboarding Wizard</a>
+                </div>
+                <form onsubmit="createTenant(event)">
+                    <div class="form-row">
+                        <div class="form-group"><label>Tenant ID *</label><input type="text" id="tenantId" placeholder="sita-air" required pattern="[a-z0-9-]+"></div>
+                        <div class="form-group"><label>Organization Name *</label><input type="text" id="tenantName" placeholder="Sita Air" required></div>
+                        <div class="form-group"><label>ICAO</label><input type="text" id="tenantIcao" placeholder="STA" maxlength="3"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>
+                        <div class="form-group"><label>Regulator ID</label><input type="text" id="tenantRegulator" placeholder="caan"></div>
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>
+                        <button type="button" class="btn btn-outline" onclick="bulkImport()"><i class="fas fa-file-import"></i> Bulk Import</button>
+                    </div>
+                </form>
+                <textarea id="bulkTextarea" placeholder="CSV (paste below), e.g.:
+tenant_id,name,icao,country,regulator_id
+nepal-airlines,Nepal Airlines,NAL,Nepal,caan
+shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14px;width:100%;min-height:110px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:.82rem;box-sizing:border-box;"></textarea>
+            </div>
+
+            <!-- ============ STEP 6 — PSOE ============ -->
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 6</span></div>
+                <h2>PSOE Baseline Assessments</h2>
+                <p class="card-sub">Seed CAAN/ICAO Appendix 10 baseline surveillance assessments (one COMPLETED + one DRAFT) data-driven for the Step-2 tenants you select. Repeat runs skip existing docs unless Force is checked.</p>
+                <div class="btn-row" style="margin-bottom:12px;">
+                    <select id="psoeTenant" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"><option value="__all__">All Step-2 tenants</option></select>
+                    <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="psoeForce"> Force re-seed</label>
+                </div>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="seedPsoe()"><i class="fas fa-clipboard-check"></i> Seed PSOE Baselines</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="loadSeedTenants('psoeTenant')"><i class="fas fa-rotate"></i> Refresh list</button>
+                </div>
+                <div id="psoeArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
+            </div>
+
+            <!-- ============ STEP 7 — STATE RISK ============ -->
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 7</span></div>
+                <h2>State Risk Register Reference</h2>
+                <p class="card-sub">Write the ICAO top-risk reference categories that the state-level SSP risk register measures against. Global reference data &mdash; not tied to any specific tenant.</p>
+                <button class="btn btn-primary" onclick="seedStateRisk()"><i class="fas fa-shield-halved"></i> Seed State Risk Reference</button>
+                <div id="stateRiskArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
+            </div>
+        </div>
+
+        <!-- ============ EXISTING REGULATORS ============ -->
+        <div class="section-title"><i class="fas fa-landmark"></i> Existing Regulators</div>
+        <div class="admin-card">
+            <div class="btn-row" style="margin-bottom:12px;">
+                <button class="btn btn-outline btn-sm" onclick="loadExistingRegulators()"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+            <div id="regulatorList"><div class="empty-state">Not loaded.</div></div>
+        </div>
+
+        <!-- ============ EXISTING TENANTS ============ -->
+        <div class="section-title"><i class="fas fa-building"></i> Existing Tenants</div>
+        <div class="admin-card">
+            <div class="btn-row" style="margin-bottom:12px;">
+                <button class="btn btn-outline btn-sm" onclick="loadExistingTenants()"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+            <div id="tenantList"><div class="empty-state">Not loaded.</div></div>
+        </div>
+
+        <!-- ============ STEP 4 — AUDIT LOG ============ -->
+        <div class="section-title"><i class="fas fa-clipboard-list"></i> Step 4 — Audit Log</div>
+        <div class="admin-card">
+            <div class="btn-row" style="margin-bottom:12px;">
+                <button class="btn btn-primary btn-sm" onclick="loadAuditLog()"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+            <div id="auditArea" style="overflow-x:auto;"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading audit log...</div></div>
+        </div>
+
+        <!-- ============ STEP 5 — DUMMY DATA ============ -->
+        <div class="section-title"><i class="fas fa-database"></i> Step 5 — Dummy Data</div>
+        <div class="admin-card">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Scope</label>
+                    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="all" checked onchange="demoScopeChanged()"> All tenants</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="one" onchange="demoScopeChanged()"> Single tenant</label>
+                        <select id="demoTenantSelect" disabled style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"><option value="">— select tenant —</option></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data types</label>
+                    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="vsr" checked> VSR</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="mor" checked> MOR</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="can" checked> CAN</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="cap" checked> CAP</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="survey" checked> Survey</label>
+                    </div>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-success" onclick="demoData('seed')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>
+                <button class="btn btn-danger" onclick="demoData('unseed')"><i class="fas fa-broom"></i> Unseed Dummy Data</button>
+            </div>
+            <div id="demoDataArea" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:460px;width:90%;">
+        <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
+        <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeConfirm()">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+
+var currentUser = null;
+var pendingConfirm = null; // { type:'demo', body? }
+var EXISTING_TENANTS = [];
+
+function esc(v) { return AdminUI.esc(v); }
+function toast(m, t) { AdminUI.toast(m, t); }
+
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+    loadExistingRegulators();
+    loadExistingTenants();
+    loadSeedTenants('psoeTenant');
+    loadAuditLog();
+    loadDemoTenants();
+    markProgress();
+});
+
+function renderAccessDenied() {
+    var gate = document.createElement('div');
+    gate.style.cssText = 'max-width:520px;margin:5rem auto;text-align:center;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);padding:3rem 2rem;';
+    gate.innerHTML =
+        '<i class="fas fa-lock" style="font-size:3rem;color:#dc3545;"></i>' +
+        '<h2 style="color:#0f172a;margin:1rem 0 .5rem;">Access Denied</h2>' +
+        '<p>This page is restricted to SUPER_ADMIN users. You are signed in as <strong>' + esc((currentUser && currentUser.email) || 'a user') + '</strong>.</p>' +
+        '<button class="btn btn-primary" onclick="logout()">Sign out</button>';
+    document.body.appendChild(gate);
+}
+
+function logout() {
+    firebase.auth().signOut().then(function () { window.location.href = '/'; })
+        .catch(function () { window.location.href = '/'; });
+}
+
+function markProgress() {
+    // Optional: mark completed steps based on existing data — simple no-op hook kept for clarity.
+}
+
+// ============================================================================
+// STEP 1 — CREATE REGULATOR
+// ============================================================================
+
+async function createRegulator(e) {
+    e.preventDefault();
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        regulator: {
+            id: document.getElementById('regId').value.trim().toLowerCase(),
+            name: document.getElementById('regName').value.trim(),
+            short_name: document.getElementById('regShort').value.trim(),
+            country: document.getElementById('regCountry').value.trim().toUpperCase(),
+            country_name: document.getElementById('regCountryName').value.trim(),
+            domain: document.getElementById('regDomain').value.trim(),
+            operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+        }
+    };
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
+        toast('Regulator "' + resp.regulator.id + '" created.', 'success');
+        e.target.reset();
+        loadExistingRegulators();
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+// ============================================================================
+// STEP 2 — CREATE / BULK IMPORT TENANTS
+// ============================================================================
+
+async function createTenant(e) {
+    e.preventDefault();
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        tenant: {
+            tenant_id: document.getElementById('tenantId').value.trim().toLowerCase(),
+            name: document.getElementById('tenantName').value.trim(),
+            icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
+            country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
+            regulator_id: document.getElementById('tenantRegulator').value.trim() || null,
+        }
+    };
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/tenants', payload);
+        toast('Tenant "' + resp.tenant.tenant_id + '" created.', 'success');
+        e.target.reset();
+        loadExistingTenants();
+        loadSeedTenants('psoeTenant');
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+function bulkImport() {
+    var ta = document.getElementById('bulkTextarea');
+    if (ta.style.display === 'none') { ta.style.display = 'block'; return; }
+    var text = ta.value.trim();
+    if (!text) { toast('Paste CSV or JSON into the box first.', 'error'); return; }
+    var body = { setup_key: AdminUI.ensureSetupKey() };
+    if (text.charAt(0) === '[') {
+        try { body.records = JSON.parse(text); }
+        catch (err) { toast('Invalid JSON: ' + err.message, 'error'); return; }
+    } else { body.csv = text; }
+    AdminUI.apiPost('/api/v1/admin/tenants/bulk', body).then(function (resp) {
+        toast('Bulk import: ' + resp.ok + '/' + resp.total + ' created.', resp.ok === resp.total ? 'success' : 'warn');
+        var failed = (resp.results || []).filter(function (r) { return r.status !== 'ok'; });
+        if (failed.length) {
+            window.alert('Bulk import finished. ' + resp.ok + '/' + resp.total + ' created.\n\nFailures:\n' +
+                failed.map(function (r) { return (r.tenant_id || '?') + ' — ' + (r.detail || r.status); }).join('\n'));
+        }
+        ta.style.display = 'none'; ta.value = '';
+        loadExistingTenants();
+        loadSeedTenants('psoeTenant');
+    }).catch(function (err) { toast('Bulk import failed: ' + err.message, 'error'); });
+}
+
+// ============================================================================
+// EXISTING REGULATORS & TENANTS
+// ============================================================================
+
+async function loadExistingRegulators() {
+    var el = document.getElementById('regulatorList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+        var regs = resp.regulators || [];
+        if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>Regulator</th><th>Country</th><th>Status</th><th>Operators</th></tr></thead><tbody>' +
+            regs.map(function (r) {
+                var ops = r.operator_tenant_ids || [];
+                return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
+                    '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
+                    '<td>' + regulatorBadge(r.status || (r.active ? 'active' : 'inactive')) + '</td>' +
+                    '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td></tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
+}
+
+async function loadExistingTenants() {
+    var el = document.getElementById('tenantList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        var tenants = resp.tenants || [];
+        EXISTING_TENANTS = tenants;
+        if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Status</th><th>Payment</th><th>Contract</th>' +
+            '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th></tr></thead><tbody>' +
+            tenants.map(buildTenantRow).join('') + '</tbody></table></div>';
+    } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
+}
+
+async function loadSeedTenants(selectId) {
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        var tenants = resp.tenants || [];
+        var prev = sel.value;
+        sel.innerHTML = '<option value="__all__">All Step-2 tenants</option>' +
+            tenants.map(function (t) {
+                return '<option value="' + esc(t.id) + '">' + esc(t.name || t.id) + ' (' + esc(t.id) + ')</option>';
+            }).join('');
+        if (prev && prev !== '__all__' && tenants.some(function (t) { return t.id === prev; })) sel.value = prev;
+    } catch (err) { console.error('loadSeedTenants failed', err); }
+}
+
+function buildTenantRow(t) {
+    var c = t.counts || {};
+    var reg = t.regulator_name
+        ? esc(t.regulator_name) + (t.regulator_country ? ' <span style="color:#94a3b8;">(' + esc(t.regulator_country) + ')</span>' : '')
+        : esc(t.regulator_id || '—');
+    var contract = (t.contract && (t.contract.start_date || t.contract.end_date))
+        ? esc((t.contract.start_date || '?') + ' \u2192 ' + (t.contract.end_date || '?'))
+        : '—';
+    var st = t.status || (t.active === false ? 'INACTIVE' : 'ACTIVE');
+    return '<tr><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
+        '<td>' + reg + '</td>' +
+        '<td>' + esc(t.country || '—') + '</td>' +
+        '<td>' + statusBadge(st) + '</td>' +
+        '<td>' + paymentBadge(t.payment_status) + '</td>' +
+        '<td style="white-space:nowrap;">' + contract + '</td>' +
+        '<td>' + (c.surveys || 0) + '</td><td>' + (c.hazards || 0) + '</td><td>' + (c.reports || 0) + '</td><td>' + (c.cans || 0) + '</td></tr>';
+}
+
+function statusBadge(st) {
+    st = (st || '').toUpperCase();
+    if (st === 'DEMO') return '<span class="badge badge-demo">DEMO</span>';
+    if (st === 'TRIAL') return '<span class="badge badge-trial">TRIAL</span>';
+    if (st === 'ACTIVE') return '<span class="badge badge-active">ACTIVE</span>';
+    if (st === 'INACTIVE') return '<span class="badge badge-inactive">INACTIVE</span>';
+    return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
+}
+
+function paymentBadge(p) {
+    p = (p || '').toLowerCase();
+    if (p === 'paid') return '<span class="badge badge-paid">Paid</span>';
+    if (p === 'unpaid') return '<span class="badge badge-unpaid">Unpaid</span>';
+    if (p === 'not_applicable' || p === 'n/a' || p === 'na') return '<span class="badge badge-notapp">N/A</span>';
+    return '<span class="badge badge-info">' + esc(p || '—') + '</span>';
+}
+
+function regulatorBadge(st) {
+    st = (st || '').toLowerCase();
+    if (st === 'active') return '<span class="badge badge-success">active</span>';
+    return '<span class="badge badge-danger">inactive</span>';
+}
+
+// ============================================================================
+// STEP 4 — AUDIT LOG
+// ============================================================================
+
+async function loadAuditLog() {
+    var area = document.getElementById('auditArea');
+    if (!area) return;
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading audit log...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/seed/logs?limit=50');
+        var logs = resp.logs || [];
+        if (!logs.length) { area.innerHTML = '<div class="empty-state">No audit entries yet.</div>'; return; }
+        var html = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Result</th><th>Detail</th></tr></thead><tbody>';
+        logs.forEach(function (l) {
+            html += '<tr><td>' + AdminUI.fmtDate(l.timestamp || l.created_at) + '</td>' +
+                '<td>' + esc((l.actor && l.actor.email) || l.actor || '—') + '</td>' +
+                '<td><code>' + esc(l.action) + '</code></td>' +
+                '<td>' + esc(l.target || '—') + '</td>' +
+                '<td>' + (l.result === 'error' ? '<span class="badge badge-danger">error</span>' : '<span class="badge badge-success">success</span>') + '</td>' +
+                '<td style="max-width:340px;">' + esc(l.detail || '') + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        area.innerHTML = html;
+    } catch (err) { area.innerHTML = '<div class="status-box error">Failed to load audit log: ' + esc(err.message) + '</div>'; }
+}
+
+// ============================================================================
+// STEP 5 — DUMMY DATA
+// ============================================================================
+
+async function loadDemoTenants() {
+    var sel = document.getElementById('demoTenantSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— select tenant —</option>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        (resp.tenants || []).forEach(function (t) {
+            var opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = (t.name || t.id) + ' (' + t.id + ')';
+            sel.appendChild(opt);
+        });
+    } catch (err) { /* non-fatal */ }
+}
+
+function demoScopeChanged() {
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var sel = document.getElementById('demoTenantSelect');
+    if (sel) sel.disabled = scope !== 'one';
+}
+
+function demoData(action) {
+    var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
+    if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP/Survey).', 'error'); return; }
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var body = { setup_key: AdminUI.ensureSetupKey(), action: action, kinds: kinds };
+    if (scope === 'one') {
+        var tid = document.getElementById('demoTenantSelect').value;
+        if (!tid) { toast('Select a tenant.', 'error'); return; }
+        body.all = false; body.tenant_ids = [tid];
+    } else { body.all = true; }
+
+    var verb = action === 'seed' ? 'Seed' : 'Unseed';
+    openConfirm(
+        'Confirm ' + verb,
+        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + '</strong>' +
+        (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
+        '? Unseed removes only the documents created by this seeder — real data is untouched.',
+        { type: 'demo', body: body }
+    );
+}
+
+async function execDemo(body) {
+    var area = document.getElementById('demoDataArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' +
+        (body.action === 'seed' ? 'Seeding' : 'Unseeding') + ' dummy data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/demo-data', body);
+        var rows = (resp.results || []).map(function (r) {
+            var payload = r.seeded || r.removed || {};
+            var detail = Object.keys(payload).map(function (k) { return k.toUpperCase() + '=' + payload[k]; }).join(', ');
+            return '<tr><td><code>' + esc(r.tenant_id) + '</code></td>' +
+                '<td>' + (r.error ? '<span class="badge badge-danger">' + esc(r.error) + '</span>' : esc(detail || 'ok')) + '</td></tr>';
+        }).join('');
+        if (area) {
+            area.innerHTML = '<div class="status-box success"><strong>' +
+                (body.action === 'seed' ? 'Seed complete' : 'Unseed complete') + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
+                (rows ? '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Tenant</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '');
+        }
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>';
+        toast((body.action === 'seed' ? 'Seed' : 'Unseed') + ' failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// STEP 6 — PSOE BASELINE ASSESSMENTS
+// ============================================================================
+
+async function seedPsoe() {
+    var area = document.getElementById('psoeArea');
+    if (!area) return;
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding PSOE baselines...</div>';
+    var sel = document.getElementById('psoeTenant');
+    var val = sel ? sel.value : '__all__';
+    var force = !!(document.getElementById('psoeForce') && document.getElementById('psoeForce').checked);
+    var body = { setup_key: AdminUI.ensureSetupKey(), force: force };
+    if (val && val !== '__all__') body.tenant_ids = [val];
+    else body.all = true;
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/psoe', body);
+        var results = (resp.results || []).map(function (r) {
+            if (r.error) return '<li>' + esc(r.tenant_id || '?') + ' — error: ' + esc(r.error) + '</li>';
+            var count = (r.assessments || []).length;
+            return '<li>' + esc(r.tenant_id) + ' — ' + count + ' assessment(s)</li>';
+        }).join('');
+        area.innerHTML = '<div class="status-box success"><strong>PSOE seeding complete.</strong><ul style="margin:10px 0 0 18px;">' + results + '</ul></div>';
+        toast('PSOE baselines seeded.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        area.innerHTML = '<div class="status-box error">PSOE seeding failed: ' + esc(err.message) + '</div>';
+    }
+}
+
+// ============================================================================
+// STEP 7 — STATE RISK REFERENCE
+// ============================================================================
+
+async function seedStateRisk() {
+    var area = document.getElementById('stateRiskArea');
+    if (!area) return;
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding state risk reference...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk', { setup_key: AdminUI.ensureSetupKey() });
+        area.innerHTML = '<div class="status-box success"><strong>State risk reference seeded:</strong> ' +
+            (resp.categories || resp.result && resp.result.categories || 0) + ' ICAO categories.</div>';
+        toast('State risk reference seeded.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        area.innerHTML = '<div class="status-box error">State risk seeding failed: ' + esc(err.message) + '</div>';
+    }
+}
+
+// ============================================================================
+// SHARED CONFIRM MODAL
+// ============================================================================
+
+function openConfirm(title, html, action) {
+    pendingConfirm = action;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').innerHTML = html;
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function closeConfirm() {
+    document.getElementById('confirmModal').style.display = 'none';
+    pendingConfirm = null;
+}
+
+document.getElementById('confirmOkBtn').addEventListener('click', function () {
+    var action = pendingConfirm;
+    document.getElementById('confirmModal').style.display = 'none';
+    pendingConfirm = null;
+    if (!action) return;
+    if (action.type === 'demo') execDemo(action.body);
+});
+</script>
+
 </body>
 </html>
