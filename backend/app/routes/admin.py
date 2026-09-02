@@ -668,6 +668,7 @@ class DemoDataRequest(BaseModel):
     all: bool = True
     tenant_ids: Optional[List[str]] = None
     kinds: List[str] = ["vsr", "mor", "can", "cap", "survey"]
+    counts: Optional[Dict[str, int]] = None
 
 
 class PsoeSetupRequest(BaseModel):
@@ -744,11 +745,13 @@ async def admin_demo_data(
             detail="No tenants to target — create tenants first or pass tenant_ids",
         )
 
-    fn = seed_tenant_demo_data if req.action == "seed" else unseed_tenant_demo_data
     results = []
     for tid in tenant_ids:
         try:
-            results.append(await fn(tid, req.kinds, user))
+            if req.action == "seed":
+                results.append(await seed_tenant_demo_data(tid, req.kinds, user, counts=req.counts))
+            else:
+                results.append(await unseed_tenant_demo_data(tid, req.kinds, user))
         except ValueError as e:
             results.append({"tenant_id": tid, "error": str(e)})
         except Exception as e:

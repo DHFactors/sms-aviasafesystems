@@ -203,6 +203,27 @@ def _normalize_kinds(kinds: List[str]) -> List[str]:
     return out
 
 
+def _resolve_seed_counts(kinds: List[str], counts: Optional[Dict[str, Any]] = None) -> Dict[str, int]:
+    """Return the per-kind seed counts for the requested kinds.
+
+    Uses the caller-supplied ``counts`` map (per kind) when present and > 0,
+    otherwise falls back to ``DEFAULT_SEED_COUNTS``. Counts are clamped to a
+    sane upper bound (1..500) to protect the demo database. CAPs are children
+    of CANs (FK) so the CAP count cannot exceed the CAN count.
+    """
+    counts = counts or {}
+    resolved: Dict[str, int] = {}
+    for k in DEFAULT_SEED_COUNTS:
+        val = counts.get(k, DEFAULT_SEED_COUNTS[k])
+        try:
+            val = max(1, min(int(val), 500))
+        except (TypeError, ValueError):
+            val = DEFAULT_SEED_COUNTS[k]
+        resolved[k] = val
+    resolved["cap"] = min(resolved["cap"], resolved["can"])
+    return resolved
+
+
 def _tid(slug: str) -> str:
     """Resolve a tenant slug to its deterministic Postgres uuid."""
     register_tenant(slug)
@@ -293,27 +314,29 @@ async def _seed_surveys(session, tid: str, count: int, base: datetime) -> int:
     return count
 
 
-async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
+async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any],
+                                counts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Seed dummy VSR/MOR/CAN/CAP/Survey rows into PostgreSQL for one tenant."""
     tid = _validate_id(tenant_id, "tenant id")
     _get_tenant(tid)  # 404 if missing
     kinds = _normalize_kinds(kinds)
+    seed_counts = _resolve_seed_counts(kinds, counts)
+    n_can = seed_counts["can"] if ("can" in kinds or "cap" in kinds) else 0
 
-    counts = {k: 0 for k in kinds}
+    counts_total = {k: 0 for k in kinds}
     base = _now()
 
     async with session_scope() as session:
         if "vsr" in kinds:
-            counts["vsr"] = await _seed_reports(session, _tid(tid), "voluntary", DEFAULT_SEED_COUNTS["vsr"], base)
+            counts_total["vsr"] = await _seed_reports(session, _tid(tid), "voluntary", seed_counts.get("vsr", 0), base)
         if "mor" in kinds:
-            counts["mor"] = await _seed_reports(session, _tid(tid), "mandatory", DEFAULT_SEED_COUNTS["mor"], base)
+            counts_total["mor"] = await _seed_reports(session, _tid(tid), "mandatory", seed_counts.get("mor", 0), base)
         if "survey" in kinds:
-            counts["survey"] = await _seed_surveys(session, _tid(tid), DEFAULT_SEED_COUNTS["survey"], base)
+            counts_total["survey"] = await _seed_surveys(session, _tid(tid), seed_counts.get("survey", 0), base)
 
         if "can" in kinds or "cap" in kinds:
-            n = DEFAULT_SEED_COUNTS["can"]
             can_ids = []
-            for i in range(n):
+            for i in range(n_can):
                 sev, prob, idx, lvl = _risk(random.randint(2, 4), random.randint(2, 4))
                 cat = random.choice(_ICAO_CATEGORIES)
                 created = base - timedelta(days=i)
@@ -365,10 +388,12 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                 session.add(can)
                 session.flush()
                 can_ids.append((can.id, can.can_reference, created))
-            counts["can"] = n
+            counts_total["can"] = len(can_ids)
 
             if "cap" in kinds:
-                for j, (can_id, can_ref, created) in enumerate(can_ids):
+                n_cap = min(seed_counts["cap"], len(can_ids))
+                for j in range(n_cap):
+                    can_id, can_ref, created = can_ids[j]
                     session.add(Cap(
                         tenant_id=uuid.UUID(tid),
                         can_id=can_id,
@@ -386,12 +411,12 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                         created_at=created,
                         updated_at=created,
                     ))
-                counts["cap"] = len(can_ids)
+                counts_total["cap"] = n_cap
 
     _audit("DEMO_DATA_SEED", actor, tid,
-           f"Seeded {', '.join(f'{k}={counts[k]}' for k in kinds)} for tenant {tid}")
-    logger.info(f"Demo data seeded for {tid}: {counts}")
-    return {"tenant_id": tid, "seeded": counts}
+           f"Seeded {', '.join(f'{k}={counts_total[k]}' for k in kinds)} for tenant {tid}")
+    logger.info(f"Demo data seeded for {tid}: {counts_total}")
+    return {"tenant_id": tid, "seeded": counts_total}
 
 
 async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:

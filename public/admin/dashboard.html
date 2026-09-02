@@ -774,13 +774,13 @@ function renderDummyData(gate) {
         '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="one" onchange="demoScopeChanged()"> Single tenant</label>' +
         '<select id="demoTenantSelect" disabled style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"><option value="">— select tenant —</option></select>' +
         '</div></div>' +
-        '<div class="form-group"><label>Data types</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
-        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="vsr" checked> VSR</label>' +
-        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="mor" checked> MOR</label>' +
-        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="can" checked> CAN</label>' +
-        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="cap" checked> CAP</label>' +
-        '<label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="checkbox" class="demo-kind" value="survey" checked> Survey</label>' +
-        '</div></div></div>' +
+        '<div class="form-group"><label>Data types &amp; quantities</label><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+        '<label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="vsr" checked onchange="demoKindChanged()"> VSR <input type="number" class="demo-count" data-kind="vsr" value="5" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>' +
+        '<label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="mor" checked onchange="demoKindChanged()"> MOR <input type="number" class="demo-count" data-kind="mor" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>' +
+        '<label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="can" checked onchange="demoKindChanged()"> CAN <input type="number" class="demo-count" data-kind="can" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>' +
+        '<label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="cap" checked onchange="demoKindChanged()"> CAP <input type="number" class="demo-count" data-kind="cap" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>' +
+        '<label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="survey" checked onchange="demoKindChanged()"> Survey <input type="number" class="demo-count" data-kind="survey" value="12" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>' +
+        '</div><small>Enter how many of each record to create per tenant. Disabled types are skipped.</small></div></div>' +
         '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' +
         '<button class="btn btn-success" onclick="demoData(\'seed\')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>' +
         '<button class="btn btn-danger" onclick="demoData(\'unseed\')"><i class="fas fa-broom"></i> Unseed Dummy Data</button></div>' +
@@ -811,6 +811,13 @@ function demoScopeChanged() {
     if (sel) sel.disabled = scope !== 'one';
 }
 
+function demoKindChanged() {
+    document.querySelectorAll('.demo-kind').forEach(function (cb) {
+        var count = cb.closest('.demo-kind-wrap').querySelector('.demo-count');
+        if (count) count.disabled = !cb.checked;
+    });
+}
+
 function demoData(action) {
     var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
     if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP/Survey).', 'error'); return; }
@@ -823,11 +830,25 @@ function demoData(action) {
     } else { body.all = true; }
 
     var verb = action === 'seed' ? 'Seed' : 'Unseed';
+    var quantLabel = '';
+    if (action === 'seed') {
+        body.counts = {};
+        kinds.forEach(function (k) {
+            var input = document.querySelector('.demo-count[data-kind="' + k + '"]');
+            var val = input ? parseInt(input.value, 10) : NaN;
+            body.counts[k] = (isFinite(val) && val >= 1) ? Math.min(val, 500) : NaN;
+        });
+        quantLabel = ' — ' + kinds.map(function (k) {
+            var v = body.counts[k];
+            return k.toUpperCase() + ' x' + (isFinite(v) ? v : '?');
+        }).join(', ');
+    }
+
     openConfirm(
         'Confirm ' + verb,
-        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + '</strong>' +
+        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + quantLabel + '</strong>' +
         (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
-        '? Unseed removes only the documents created by this seeder — real data is untouched.',
+        ' per tenant. Unseed removes only the documents created by this seeder — real data is untouched.',
         { type: 'demo', body: body }
     );
 }
