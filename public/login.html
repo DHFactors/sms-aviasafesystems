@@ -217,9 +217,11 @@ async function getAppCheckHeader() {
 // redirect) continues to work unchanged.
 // The login request is bounded client-side so a slow or cold-booting API can
 // never hold the form hostage for the browser's default timeout (observed as
-// 40s+ during UAT). Distinct failure classes surface distinct, actionable
-// messages instead of a blanket "invalid credentials".
-var LOGIN_TIMEOUT_MS = 12000;
+// 40s+ during UAT). The budget must also tolerate a Render free-tier cold boot
+// (instance sleeps after ~15 min idle and can take 30-60s to wake) — aborting
+// too early would reject a legitimate login. Distinct failure classes surface
+// distinct, actionable messages instead of a blanket "invalid credentials".
+var LOGIN_TIMEOUT_MS = 60000;
 
 async function signIn(email, password) {
     var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
