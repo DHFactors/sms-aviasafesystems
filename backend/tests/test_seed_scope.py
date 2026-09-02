@@ -9,8 +9,9 @@ Locks the behaviour added for the beta verification run:
     so the CAAN SMS-maturity overview has data.
   * The CAAN state-regulator account is a single smd@caanepal.gov.np identity
     and is always protected from automated unseed runs.
-  * production_seed.SEED_OPERATORS matches the 11 active beta providers
-    (CAAN oversight runs through the single `caan` regulator tenant).
+  * The legacy `seed/` package still models the 11-provider beta set; the
+    Production Setup panel itself is data-driven (tenants created at Step 2),
+    so it no longer hardcodes an operator list.
 """
 
 from datetime import datetime, timezone
@@ -101,12 +102,6 @@ def test_caan_regulator_account_is_protected():
     assert acct["email"] in PROTECTED_ADMIN_ACCOUNTS["emails"]
     assert acct["uid"] in PROTECTED_ADMIN_ACCOUNTS["uids"]
     assert PROTECTED_ADMIN_ACCOUNTS["roles"] == {"SUPER_ADMIN"}
-
-
-def test_production_seed_operators_match_active_providers():
-    from app.services.production_seed import SEED_OPERATORS
-    active = {p["id"] for p in OPERATOR_PROFILES}
-    assert {o["id"] for o in SEED_OPERATORS} == active
 
 
 class _FakeRef:

@@ -334,17 +334,13 @@ async def create_seed_users(
     req: AdminSetupRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Create seed users in Firebase Auth (skips users that already exist)."""
-    if settings.DISABLE_DESTRUCTIVE_ENDPOINTS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint disabled")
-    _verify_admin_setup(req.setup_key)
-    from seed.users import create_all_users
-    try:
-        created = create_all_users(get_auth())
-        return {"success": True, "created": len(created), "users": created}
-    except Exception as e:
-        logger.error(f"Create seed users failed: {e}")
-        return {"success": False, "error": str(e)}
+    """Legacy hardcoded seed-user path — removed.
+
+    Auth-user provisioning is now achieved data-driven from the Production
+    Setup panel (Step 2 user rows / the tenant-credentials wizard), not from a
+    hardcoded operator list.
+    """
+    raise HTTPException(status_code=404, detail="Endpoint removed — use the Production Setup tenant flow")
 
 
 @router.post("/seed-demo-data", status_code=status.HTTP_200_OK)
@@ -352,17 +348,12 @@ async def seed_demo_data(
     req: AdminSetupRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Run the demo data seeder against production Firestore."""
-    if settings.DISABLE_DESTRUCTIVE_ENDPOINTS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Endpoint disabled")
-    _verify_admin_setup(req.setup_key)
-    from seed.runner import run
-    try:
-        result = run(db=get_db(), auth=get_auth(), force=True)
-        return {"success": True, "result": result}
-    except Exception as e:
-        logger.error(f"Seed failed: {e}")
-        return {"success": False, "error": str(e)}
+    """Legacy hardcoded demo-data path — removed.
+
+    Operational dummy data (VSR/MOR/CAN/CAP/Survey) is now seeded data-driven
+    from the Production Setup Step 5 tool into PostgreSQL (is_demo=true).
+    """
+    raise HTTPException(status_code=404, detail="Endpoint removed — use Production Setup Step 5 (Dummy Data)")
 
 
 # ============================================================================
@@ -399,11 +390,6 @@ class TenantBulkRequest(BaseModel):
     setup_key: str
     records: Optional[List[TenantCreate]] = None
     csv: Optional[str] = None
-
-
-class SeedDeployRequest(BaseModel):
-    setup_key: str
-    force: bool = False
 
 
 class RegulatorSetupRequest(BaseModel):
@@ -526,42 +512,6 @@ async def admin_list_tenants(
     """
     from app.services.production_seed import list_tenants_admin_pg
     return {"success": True, "tenants": await list_tenants_admin_pg()}
-
-
-@router.get("/seed/preview", status_code=status.HTTP_200_OK)
-async def admin_seed_preview(
-    user: Dict[str, Any] = Depends(get_admin_user),
-):
-    """Preview the CAAN demo seed plan against the current database (SUPER_ADMIN)."""
-    from app.services.production_seed import preview_seed
-    try:
-        plan = preview_seed(actor=user)
-        return {"success": True, **plan}
-    except Exception as e:
-        logger.error(f"Seed preview failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/seed/deploy", status_code=status.HTTP_200_OK)
-async def admin_seed_deploy(
-    req: SeedDeployRequest,
-    user: Dict[str, Any] = Depends(get_admin_user),
-):
-    """Deploy the CAAN demo seed plan (SUPER_ADMIN + setup key).
-
-    Writes the regulator, tags the operator tenants, and seeds surveys +
-    hazards + reports. Runs against the backend's configured database
-    (sms-db, the single consolidated database).
-    """
-    _verify_admin_setup(req.setup_key)
-    from app.services import production_seed
-    try:
-        result = production_seed.deploy_seed(force=req.force, actor=user)
-        return {"success": True, "result": result}
-    except Exception as e:
-        logger.error(f"Seed deploy failed: {e}")
-        production_seed._audit("SEED_DEPLOY", user, "caan", f"Deploy failed: {str(e)}", result="error")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/seed/logs", status_code=status.HTTP_200_OK)
@@ -717,7 +667,18 @@ class DemoDataRequest(BaseModel):
     action: str = "seed"
     all: bool = True
     tenant_ids: Optional[List[str]] = None
-    kinds: List[str] = ["vsr", "mor", "can", "cap"]
+    kinds: List[str] = ["vsr", "mor", "can", "cap", "survey"]
+
+
+class PsoeSetupRequest(BaseModel):
+    setup_key: str
+    all: bool = True
+    tenant_ids: Optional[List[str]] = None
+    force: bool = False
+
+
+class StateRiskSetupRequest(BaseModel):
+    setup_key: str
 
 
 @router.post("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
@@ -760,10 +721,11 @@ async def admin_demo_data(
     req: DemoDataRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Seed or unseed dummy operational data (VSR/MOR/CAN/CAP).
+    """Seed or unseed dummy operational data (VSR/MOR/CAN/CAP/Survey).
 
-    Targets one tenant (tenant_ids) or every tenant (all=True). Unseed only
-    removes documents created by this seeder (marked admin-demo-1).
+    Targets one tenant (tenant_ids) or every tenant (all=True) and writes to
+    PostgreSQL with is_demo=true. Unseed only removes rows created by this
+    seeder (marked admin-demo-1).
     """
     _verify_admin_setup(req.setup_key)
     from app.services.admin_data_service import (
@@ -786,7 +748,7 @@ async def admin_demo_data(
     results = []
     for tid in tenant_ids:
         try:
-            results.append(fn(tid, req.kinds, user))
+            results.append(await fn(tid, req.kinds, user))
         except ValueError as e:
             results.append({"tenant_id": tid, "error": str(e)})
         except Exception as e:
@@ -799,6 +761,54 @@ async def admin_demo_data(
         "kinds": req.kinds,
         "results": results,
     }
+
+
+@router.post("/psoe", status_code=status.HTTP_200_OK)
+async def admin_seed_psoe(
+    req: PsoeSetupRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Seed PSOE baseline assessments (COMPLETED + DRAFT) data-driven.
+
+    Targets one tenant (tenant_ids) or every Step-2 tenant (all=True). Existing
+    assessments are skipped unless ``force`` replaces them. Data-driven — there
+    is no hardcoded tenant list.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import demo_data_scope
+    from app.services.seed_surfaces import seed_psoe_all, seed_psoe_tenant
+
+    tenant_ids = demo_data_scope(req.tenant_ids, all_tenants=req.all)
+    if not tenant_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="No tenants to target — create tenants first (Step 2) or pass tenant_ids",
+        )
+
+    if len(tenant_ids) == 1 and not req.all:
+        try:
+            result = await seed_psoe_tenant(tenant_ids[0], user, force=req.force)
+            return {"success": True, "results": [result]}
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    result = await seed_psoe_all(tenant_ids, user, force=req.force)
+    return {"success": True, "results": result["results"]}
+
+
+@router.post("/state-risk", status_code=status.HTTP_200_OK)
+async def admin_seed_state_risk(
+    req: StateRiskSetupRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Write the ICAO state-risk reference categories (global reference data)."""
+    _verify_admin_setup(req.setup_key)
+    from app.services.seed_surfaces import seed_state_risk_reference
+    try:
+        result = await seed_state_risk_reference(user)
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"State risk reference seed failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/feedback")

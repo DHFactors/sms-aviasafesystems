@@ -1,11 +1,17 @@
 """Super-Admin web seeding panel tests.
 
 Covers the production_seed service (regulator/tenant creation, bulk import,
-seed preview + deploy, audit logs) and the /api/v1/admin/* routes
+audit logs), tenant lifecycle status, and the /api/v1/admin/* routes
 (SUPER_ADMIN authz + setup-key gate).
+
+Operational dummy-data seeding now runs against PostgreSQL via the Step-5
+tool (is_demo=true); the old Firestore-subcollection writer tests were
+dropped, so this module focuses on the Firestore-backed identity/status logic.
 """
 
 from datetime import datetime, timezone
+
+import asyncio
 
 from fastapi.testclient import TestClient
 
@@ -127,6 +133,31 @@ class _FakeSubColl:
         return _QueryResult([_SubSnap(self._db, self._tid, self._sub, d)
                              for d in self._db._subs.get((self._tid, self._sub), [])][:n])
 
+    def document(self, doc_id):
+        store = self._db._subs.get((self._tid, self._sub))
+        if not isinstance(store, dict):
+            store = {}
+            self._db._subs[(self._tid, self._sub)] = store
+        return _SubDocRef(store, doc_id)
+
+    def get_docs(self):
+        store = self._db._subs.get((self._tid, self._sub))
+        return store if isinstance(store, dict) else {}
+
+
+class _SubDocRef:
+    def __init__(self, store, doc_id):
+        self._store = store
+        self._id = doc_id
+
+    def set(self, data):
+        self._store[self._id] = dict(data)
+        return self
+
+    def limit(self, n):
+        return _QueryResult([_SubSnap(self._db, self._tid, self._sub, d)
+                             for d in self._db._subs.get((self._tid, self._sub), [])][:n])
+
 
 class _FakeColl:
     def __init__(self, db, name):
@@ -186,6 +217,7 @@ def _patch_db(monkeypatch, db=None):
     db = db or _FakeDB()
     monkeypatch.setattr("app.services.production_seed.get_db", lambda: db)
     monkeypatch.setattr("app.services.admin_data_service.get_db", lambda: db)
+    monkeypatch.setattr("app.services.seed_surfaces.get_db", lambda: db)
     return db
 
 
@@ -276,44 +308,6 @@ def test_bulk_create_tenants_json(monkeypatch):
     assert db._stores["tenants"].keys() >= {"a-air", "b-air"}
 
 
-def test_preview_seed(monkeypatch):
-    db = _patch_db(monkeypatch)
-    from app.services.production_seed import preview_seed
-    plan = preview_seed(actor=_admin_user())
-    assert plan["regulator"]["id"] == "caan"
-    assert plan["regulator"]["exists"] is False
-    assert len(plan["operators"]) == 11
-    assert all(o["surveys_existing"] == 0 for o in plan["operators"])
-
-
-def test_deploy_seed(monkeypatch):
-    db = _patch_db(monkeypatch)
-    from app.services.production_seed import deploy_seed
-    result = deploy_seed(force=False, actor=_admin_user())
-    assert result["operators"] == 11
-    assert db._stores["regulators"]["caan"]["id"] == "caan"
-    assert db._stores["regulators"]["caan"]["operator_tenant_ids"]
-    # Every operator tagged + has seeded data
-    for op in db._stores["tenants"].values():
-        assert op.get("regulator_id") == "caan"
-    assert db._subs.get(("buddha-air", "surveys"))
-    assert db._subs.get(("buddha-air", "hazards"))
-    assert db._subs.get(("buddha-air", "reports"))
-    assert db._subs.get(("buddha-air", "responses"))
-    assert any(l["action"] == "SEED_DEPLOY" for l in db._stores["audit_logs"].values())
-
-
-def test_deploy_seed_skips_existing_surveys(monkeypatch):
-    db = _patch_db(monkeypatch)
-    db._subs[("buddha-air", "surveys")] = [{"tenant_id": "buddha-air", "seed_version": "x"}]
-    from app.services.production_seed import deploy_seed
-    result = deploy_seed(force=False, actor=_admin_user())
-    # buddha-air's existing surveys are not replaced (other operators are seeded)
-    assert "buddha-air: surveys exist, skipped" in result["details"]
-    assert len(db._subs[("buddha-air", "surveys")]) == 1
-    assert db._subs[("buddha-air", "surveys")][0]["seed_version"] == "x"
-
-
 def test_list_audit_logs(monkeypatch):
     db = _patch_db(monkeypatch)
     from app.services.production_seed import _audit, list_audit_logs
@@ -344,7 +338,7 @@ def _client(user=None):
 
 def test_admin_routes_require_token():
     # No override -> real get_current_user -> 401/403
-    resp = TestClient(app).get("/api/v1/admin/seed/preview")
+    resp = TestClient(app).get("/api/v1/admin/seed/logs")
     assert resp.status_code in (401, 403)
 
 
@@ -354,7 +348,7 @@ def test_admin_routes_403_non_super(monkeypatch):
     # runs and rejects a non-SUPER_ADMIN role.
     app.dependency_overrides[get_current_user] = lambda: _admin_user(role="AIRLINE_ADMIN")
     try:
-        resp = TestClient(app).get("/api/v1/admin/seed/preview")
+        resp = TestClient(app).get("/api/v1/admin/seed/logs")
     finally:
         app.dependency_overrides.pop(get_current_user, None)
     assert resp.status_code == 403
@@ -379,23 +373,6 @@ def test_admin_create_regulator_wrong_key(monkeypatch):
         "setup_key": "wrong", "regulator": {"id": "caan", "name": "CAAN"},
     })
     assert resp.status_code == 403
-
-
-def test_admin_seed_preview_route(monkeypatch):
-    _patch_db(monkeypatch)
-    resp = _client().get("/api/v1/admin/seed/preview")
-    assert resp.status_code == 200
-    assert resp.json()["success"] is True
-    assert len(resp.json()["operators"]) == 11
-
-
-def test_admin_seed_deploy_route(monkeypatch):
-    db = _patch_db(monkeypatch)
-    _patch_secret(monkeypatch)
-    resp = _client().post("/api/v1/admin/seed/deploy", json={"setup_key": "test-setup-key", "force": False})
-    assert resp.status_code == 200
-    assert resp.json()["result"]["operators"] == 11
-    assert "caan" in db._stores["regulators"]
 
 
 def test_admin_seed_logs_route(monkeypatch):
@@ -523,71 +500,6 @@ def test_update_tenant_status_missing_tenant(monkeypatch):
         assert "not found" in str(e)
 
 
-# ============================================================================
-# Demo-data seed / unseed (admin_data_service)
-# ============================================================================
-
-def test_seed_demo_data_service(monkeypatch):
-    db = _patch_db(monkeypatch)
-    _seed_tenant(db)
-    from app.services.admin_data_service import seed_tenant_demo_data
-    result = seed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
-    assert result["seeded"]["vsr"] == 5
-    assert result["seeded"]["mor"] == 3
-    assert result["seeded"]["can"] == 3
-    assert result["seeded"]["cap"] == 3
-
-    reports = db._subs[("tara-air", "reports")]
-    assert sum(1 for r in reports if r["report_type"] == "voluntary") == 5
-    assert sum(1 for r in reports if r["report_type"] == "mandatory") == 3
-    assert len(db._subs[("tara-air", "can_cap")]) == 3
-    assert len(db._subs[("tara-air", "hazards")]) == 3
-    assert len(db._subs[("sub-doc", "caps")]) == 3
-    assert any(l["action"] == "DEMO_DATA_SEED" for l in db._stores["audit_logs"].values())
-
-
-def test_unseed_demo_data_service(monkeypatch):
-    db = _patch_db(monkeypatch)
-    _seed_tenant(db)
-    from app.services.admin_data_service import seed_tenant_demo_data, unseed_tenant_demo_data
-    seed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
-    result = unseed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
-    assert result["removed"]["vsr"] == 5
-    assert result["removed"]["mor"] == 3
-    assert result["removed"]["can"] == 3
-    assert result["removed"]["cap"] == 3
-    assert db._subs.get(("tara-air", "reports")) == []
-    assert db._subs.get(("tara-air", "can_cap")) == []
-    assert db._subs.get(("tara-air", "hazards")) == []
-    assert db._subs.get(("sub-doc", "caps")) == []
-
-
-def test_unseed_caps_only_keeps_cans(monkeypatch):
-    db = _patch_db(monkeypatch)
-    _seed_tenant(db)
-    from app.services.admin_data_service import seed_tenant_demo_data, unseed_tenant_demo_data
-    seed_tenant_demo_data("tara-air", ["can", "cap"], _admin_user())
-    unseed_tenant_demo_data("tara-air", ["cap"], _admin_user())
-    assert len(db._subs[("tara-air", "can_cap")]) == 3
-    assert len(db._subs[("tara-air", "hazards")]) == 3
-    assert db._subs.get(("sub-doc", "caps")) == []
-
-
-def test_unseed_does_not_touch_real_data(monkeypatch):
-    db = _patch_db(monkeypatch)
-    _seed_tenant(db)
-    db._subs[("tara-air", "reports")] = [{"report_type": "voluntary", "seed_version": "real"}]
-    db._subs[("tara-air", "can_cap")] = [{"can_reference": "CAN-001", "seed_version": "real"}]
-    from app.services.admin_data_service import unseed_tenant_demo_data
-    unseed_tenant_demo_data("tara-air", ["vsr", "mor", "can", "cap"], _admin_user())
-    assert len(db._subs[("tara-air", "reports")]) == 1
-    assert len(db._subs[("tara-air", "can_cap")]) == 1
-
-
-# ============================================================================
-# Route-level: tenant status + demo-data
-# ============================================================================
-
 def test_admin_tenant_status_route(monkeypatch):
     db = _patch_db(monkeypatch)
     _patch_secret(monkeypatch)
@@ -614,64 +526,98 @@ def test_admin_tenant_status_route_bad_key(monkeypatch):
     assert resp.status_code == 403
 
 
-def test_admin_demo_data_route_seed(monkeypatch):
+def test_seed_psoe_tenant_writes_baselines(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.seed_surfaces import seed_psoe_tenant
+    result = asyncio.run(seed_psoe_tenant("tara-air", _admin_user(), force=False))
+    assert "assessments" in result
+    ids = [a["id"] for a in result["assessments"]]
+    assert "tara-air-baseline-completed" in ids
+    assert "tara-air-baseline-draft" in ids
+    docs = db._stores["psoe_assessments"]
+    assert len(docs) == 2
+    with_tenant = [v for v in docs.values() if v.get("tenant_id") == "tara-air"]
+    assert len(with_tenant) == 2
+    statuses = [v.get("status") for v in with_tenant]
+    assert "completed" in statuses and "draft" in statuses
+
+
+def test_seed_psoe_requires_existing_tenant(monkeypatch):
+    _patch_db(monkeypatch)
+    from app.services.seed_surfaces import seed_psoe_tenant
+    try:
+        asyncio.run(seed_psoe_tenant("missing-air", _admin_user(), force=False))
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "not found" in str(e)
+
+
+def test_seed_state_risk_reference(monkeypatch):
+    db = _patch_db(monkeypatch)
+    from app.services.seed_surfaces import ICAO_TOP_RISK_CATEGORIES, seed_state_risk_reference
+    result = asyncio.run(seed_state_risk_reference(_admin_user()))
+    assert result["categories"] == len(ICAO_TOP_RISK_CATEGORIES)
+    store = db._subs.get(("icao_top_risks", "categories"))
+    assert isinstance(store, dict) and len(store) == len(ICAO_TOP_RISK_CATEGORIES)
+
+
+def test_admin_psoe_route_seeds(monkeypatch):
     db = _patch_db(monkeypatch)
     _patch_secret(monkeypatch)
-    _seed_tenant(db, tid="sita-air")
-    resp = _client().post("/api/v1/admin/demo-data", json={
-        "setup_key": "test-setup-key",
-        "action": "seed",
-        "all": False,
-        "tenant_ids": ["sita-air"],
-        "kinds": ["vsr", "mor"],
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/psoe", json={
+        "setup_key": "test-setup-key", "all": True, "force": False,
     })
     assert resp.status_code == 200
-    body = resp.json()
-    assert body["results"][0]["tenant_id"] == "sita-air"
-    assert body["results"][0]["seeded"]["vsr"] == 5
-    assert len(db._subs[("sita-air", "reports")]) == 8
+    results = resp.json()["results"]
+    assert len(results) == 1
+    assert results[0]["tenant_id"] == "tara-air"
+    assert len(results[0]["assessments"]) == 2
 
 
-def test_admin_demo_data_route_unseed(monkeypatch):
+def test_admin_psoe_route_single_tenant(monkeypatch):
     db = _patch_db(monkeypatch)
     _patch_secret(monkeypatch)
-    _seed_tenant(db, tid="sita-air")
-    from app.services.admin_data_service import seed_tenant_demo_data
-    seed_tenant_demo_data("sita-air", ["vsr"], _admin_user())
-    resp = _client().post("/api/v1/admin/demo-data", json={
-        "setup_key": "test-setup-key",
-        "action": "unseed",
-        "all": False,
-        "tenant_ids": ["sita-air"],
-        "kinds": ["vsr"],
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/psoe", json={
+        "setup_key": "test-setup-key", "all": False, "tenant_ids": ["tara-air"],
     })
     assert resp.status_code == 200
-    assert resp.json()["results"][0]["removed"]["vsr"] == 5
-    assert db._subs.get(("sita-air", "reports")) == []
+    assert len(resp.json()["results"]) == 1
 
 
-def test_admin_demo_data_route_no_tenants(monkeypatch):
+def test_admin_psoe_route_no_tenants(monkeypatch):
     _patch_db(monkeypatch)
     _patch_secret(monkeypatch)
-    resp = _client().post("/api/v1/admin/demo-data", json={
-        "setup_key": "test-setup-key",
-        "action": "seed",
-        "all": True,
-        "kinds": ["vsr"],
+    resp = _client().post("/api/v1/admin/psoe", json={
+        "setup_key": "test-setup-key", "all": True,
     })
     assert resp.status_code == 400
 
 
-def test_admin_demo_data_route_invalid_kind(monkeypatch):
+def test_admin_psoe_route_bad_key(monkeypatch):
     db = _patch_db(monkeypatch)
     _patch_secret(monkeypatch)
     _seed_tenant(db)
-    resp = _client().post("/api/v1/admin/demo-data", json={
-        "setup_key": "test-setup-key",
-        "action": "seed",
-        "all": False,
-        "tenant_ids": ["tara-air"],
-        "kinds": ["bogus"],
+    resp = _client().post("/api/v1/admin/psoe", json={
+        "setup_key": "wrong", "all": True,
     })
+    assert resp.status_code == 403
+
+
+def test_admin_state_risk_route(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    resp = _client().post("/api/v1/admin/state-risk", json={"setup_key": "test-setup-key"})
     assert resp.status_code == 200
-    assert resp.json()["results"][0]["error"]
+    from app.services.seed_surfaces import ICAO_TOP_RISK_CATEGORIES
+    assert resp.json()["categories"] == len(ICAO_TOP_RISK_CATEGORIES)
+
+
+def test_admin_state_risk_route_bad_key(monkeypatch):
+    _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    resp = _client().post("/api/v1/admin/state-risk", json={"setup_key": "wrong"})
+    assert resp.status_code == 403
+

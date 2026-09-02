@@ -13,26 +13,27 @@
 # ============================================================================
 
 import random
+import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
+from sqlalchemy import delete
 
 from app.core.config import settings
 from app.firebase import get_db
+from app.db.ids import register_tenant, tenant_uuid
+from app.db.session import session_scope
+from app.db.db_models import Can, Cap, Hazard, Report, Survey, SurveyResponse
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.production_seed import _audit, _validate_id
 
 TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "INACTIVE"}
 PAYMENT_STATUSES = {"paid", "unpaid", "not_applicable"}
-DEMO_KINDS = {"vsr", "mor", "can", "cap"}
+DEMO_KINDS = {"vsr", "mor", "can", "cap", "survey"}
 
 ADMIN_DEMO_SEED_VERSION = "admin-demo-1"
 ADMIN_DEMO_CREATOR = "admin-seed"
-
-_HAZARDS_COLLECTION = "hazards"
-_CAN_CAP_COLLECTION = "can_cap"
-_CAPS_SUBCOLLECTION = "caps"
 
 _DEPARTMENTS = ["Flight Operations", "Maintenance & Engineering",
                 "Ground Handling", "Cabin Crew", "Administration"]
@@ -48,7 +49,7 @@ _ICAO_TO_TAXONOMY = {
     "WX": "Environmental", "OTHER": "Other",
 }
 
-DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 1}
+DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 3, "survey": 12}
 
 
 def _tenant_ref(tenant_id: str):
@@ -181,114 +182,13 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
 
 
 # ============================================================================
-# Dummy data doc builders (marked so unseed only touches its own docs)
+# Dummy data — PostgreSQL writer
 # ============================================================================
+# All operational dummy data (VSR/MOR/CAN/CAP/Survey) is written to PostgreSQL
+# with `is_demo=True` so the Super-Admin tenants table (which reads Postgres
+# counts) reconciles and unseed can remove exactly what this seeder wrote, for
+# one tenant or every tenant.     Firestore stays reserved for auth/RBAC/claims.
 
-def _report_doc(tenant_id: str, report_type: str, idx: int, created_at: datetime) -> dict:
-    severity = random.randint(2, 5)
-    probability = random.randint(1, 4)
-    risk_index = compute_risk_index(severity, probability)
-    return {
-        "tenant_id": tenant_id,
-        "tenantId": tenant_id,
-        "report_type": report_type,
-        "status": "NEW",
-        "ai_status": "PENDING",
-        "narrative": f"Dummy {'voluntary' if report_type == 'voluntary' else 'mandatory'} safety report {idx + 1} for {tenant_id}.",
-        "location": random.choice(["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]),
-        "occurrence_type": "Report",
-        "occurrence_category": random.choice(_ICAO_CATEGORIES),
-        "severity": str(severity),
-        "severity_level": severity,
-        "probability": probability,
-        "probability_level": probability,
-        "risk_index": risk_index,
-        "risk_level": get_risk_level(risk_index),
-        "is_anonymous": random.random() < 0.5,
-        "occurrence_date": created_at.isoformat(),
-        "created_by": ADMIN_DEMO_CREATOR,
-        "created_at": created_at,
-        "updated_at": created_at,
-        "seed_version": ADMIN_DEMO_SEED_VERSION,
-        "admin_seed": True,
-    }
-
-
-def _hazard_doc(tenant_id: str, idx: int, created_at: datetime) -> dict:
-    severity = random.randint(2, 4)
-    probability = random.randint(2, 4)
-    risk_index = compute_risk_index(severity, probability)
-    cat = random.choice(_ICAO_CATEGORIES)
-    return {
-        "tenant_id": tenant_id,
-        "hazard_id": f"{tenant_id}-HZ-DEMO-{idx + 1:03d}",
-        "title": f"Dummy hazard {idx + 1} at {tenant_id}",
-        "description": f"Dummy demonstration hazard {idx + 1} created by the Super-Admin seed tool.",
-        "source": "Internal Audit",
-        "occurrence_category": cat,
-        "taxonomy": _ICAO_TO_TAXONOMY.get(cat, "Other"),
-        "severity": severity,
-        "probability": probability,
-        "risk_index": risk_index,
-        "risk_level": get_risk_level(risk_index),
-        "priority": "H" if risk_index >= 12 else "M" if risk_index >= 6 else "L",
-        "status": "Open",
-        "created_by": ADMIN_DEMO_CREATOR,
-        "created_at": created_at,
-        "updated_at": created_at,
-        "seed_version": ADMIN_DEMO_SEED_VERSION,
-        "admin_seed": True,
-    }
-
-
-def _can_doc(tenant_id: str, hazard_id: str, idx: int, created_at: datetime) -> dict:
-    priority = random.choice(["High", "Medium", "Low"])
-    return {
-        "can_reference": f"CAN-DEMO-{idx + 1:03d}",
-        "hazard_id": hazard_id,
-        "title": f"Dummy corrective action {idx + 1}",
-        "description": f"Dummy corrective action notice {idx + 1} for {tenant_id}.",
-        "required_action": "Implement the agreed corrective action and report back.",
-        "target_completion_date": (created_at + timedelta(days=random.randint(14, 60))).date().isoformat(),
-        "assigned_to": "admin-seed",
-        "assigned_to_uid": "admin-seed",
-        "department": random.choice(_DEPARTMENTS),
-        "priority": priority,
-        "status": "Open",
-        "issued_by": ADMIN_DEMO_CREATOR,
-        "issued_by_uid": ADMIN_DEMO_CREATOR,
-        "issued_at": created_at,
-        "tenant_id": tenant_id,
-        "created_by": ADMIN_DEMO_CREATOR,
-        "created_at": created_at,
-        "updated_at": created_at,
-        "seed_version": ADMIN_DEMO_SEED_VERSION,
-        "admin_seed": True,
-    }
-
-
-def _cap_doc(can_reference: str, idx: int, created_at: datetime) -> dict:
-    return {
-        "cap_reference": f"{can_reference}-CAP-{idx + 1:03d}",
-        "action_plan": "Dummy corrective/preventive action plan describing the mitigation steps.",
-        "timeline": f"{random.randint(30, 90)} days",
-        "resources_required": "Manpower and materials per the plan",
-        "implementation_plan": "Phase the work, verify effectiveness, and close out.",
-        "target_completion_date": (created_at + timedelta(days=random.randint(30, 90))).date().isoformat(),
-        "status": "In Progress",
-        "submitted_by": ADMIN_DEMO_CREATOR,
-        "submitted_by_uid": ADMIN_DEMO_CREATOR,
-        "submitted_at": created_at,
-        "created_at": created_at,
-        "updated_at": created_at,
-        "seed_version": ADMIN_DEMO_SEED_VERSION,
-        "admin_seed": True,
-    }
-
-
-# ============================================================================
-# Seed / unseed dummy data
-# ============================================================================
 
 def _normalize_kinds(kinds: List[str]) -> List[str]:
     out = []
@@ -299,49 +199,194 @@ def _normalize_kinds(kinds: List[str]) -> List[str]:
         if k not in out:
             out.append(k)
     if not out:
-        raise ValueError("at least one kind is required (vsr, mor, can, cap)")
+        raise ValueError("at least one kind is required (vsr, mor, can, cap, survey)")
     return out
 
 
-def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
-    """Seed dummy VSR/MOR/CAN/CAP documents for one tenant."""
+def _tid(slug: str) -> str:
+    """Resolve a tenant slug to its deterministic Postgres uuid."""
+    register_tenant(slug)
+    return tenant_uuid(slug)
+
+
+def _risk(sev, prob):
+    idx = compute_risk_index(sev, prob)
+    return sev, prob, idx, get_risk_level(idx)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def _seed_reports(session, tid: str, report_type: str, count: int, base: datetime) -> int:
+    for i in range(count):
+        sev, prob, idx, lvl = _risk(random.randint(2, 5), random.randint(1, 4))
+        created = base - timedelta(days=i)
+        session.add(Report(
+            tenant_id=uuid.UUID(tid),
+            report_type=report_type,
+            status="NEW",
+            ai_status="PENDING",
+            narrative=(
+                f"Dummy {'voluntary' if report_type == 'voluntary' else 'mandatory'} safety "
+                f"report {i + 1} for demonstration."
+            ),
+            location=random.choice(["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]),
+            occurrence_date=created,
+            occurrence_type="Report",
+            occurrence_category=random.choice(_ICAO_CATEGORIES),
+            severity_level=sev,
+            probability_level=prob,
+            risk_index=idx,
+            risk_level=lvl,
+            is_anonymous=random.random() < 0.5,
+            is_demo=True,
+            created_by=ADMIN_DEMO_CREATOR,
+            created_at=created,
+            updated_at=created,
+        ))
+    return count
+
+
+async def _seed_surveys(session, tid: str, count: int, base: datetime) -> int:
+    for i in range(count):
+        policy = random.randint(3, 5)
+        srm = random.randint(3, 5)
+        assurance = random.randint(3, 5)
+        promotion = random.randint(3, 5)
+        overall = round((policy + srm + assurance + promotion) / 4)
+        scored = overall >= 3
+        session.add(Survey(
+            tenant_id=uuid.UUID(tid),
+            submitted_at=base - timedelta(days=i * 2),
+            respondent_id=f"demo-respondent-{i + 1}",
+            department=random.choice(_DEPARTMENTS),
+            employee_category=random.choice(["Pilot", "Cabin Crew", "Engineer", "Ground", "Admin"]),
+            years_experience=random.choice(["1-5", "6-10", "11-20", "20+"]),
+            language_used="English",
+            survey_version="sms-maturity-v1",
+            answers={},
+            question_scores={},
+            element_scores={},
+            safety_policy=policy,
+            safety_risk_management=srm,
+            safety_assurance=assurance,
+            safety_promotion=promotion,
+            overall_sms_maturity=overall,
+            overall_score_pct=float(overall * 20),
+            is_demo=True,
+            seed_version=ADMIN_DEMO_SEED_VERSION,
+        ))
+        if scored:
+            session.add(SurveyResponse(
+                tenant_id=uuid.UUID(tid),
+                respondent_id=f"demo-respondent-{i + 1}",
+                answers={},
+                department=random.choice(_DEPARTMENTS),
+                employee_category="Pilot",
+                years_experience="11-20",
+                language_used="English",
+                submitted_at=base - timedelta(days=i * 2),
+                survey_version="sms-maturity-v1",
+                is_demo=True,
+            ))
+    return count
+
+
+async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Seed dummy VSR/MOR/CAN/CAP/Survey rows into PostgreSQL for one tenant."""
     tid = _validate_id(tenant_id, "tenant id")
     _get_tenant(tid)  # 404 if missing
     kinds = _normalize_kinds(kinds)
 
-    now = datetime.now(timezone.utc)
-    ref = _tenant_ref(tid)
     counts = {k: 0 for k in kinds}
+    base = _now()
 
-    if "vsr" in kinds or "mor" in kinds:
+    async with session_scope() as session:
         if "vsr" in kinds:
-            for i in range(DEFAULT_SEED_COUNTS["vsr"]):
-                ref.collection(settings.FIREBASE_COLLECTION_REPORTS).add(
-                    _report_doc(tid, "voluntary", i, now - timedelta(days=i)))
-            counts["vsr"] = DEFAULT_SEED_COUNTS["vsr"]
+            counts["vsr"] = await _seed_reports(session, _tid(tid), "voluntary", DEFAULT_SEED_COUNTS["vsr"], base)
         if "mor" in kinds:
-            for i in range(DEFAULT_SEED_COUNTS["mor"]):
-                ref.collection(settings.FIREBASE_COLLECTION_REPORTS).add(
-                    _report_doc(tid, "mandatory", i, now - timedelta(days=i)))
-            counts["mor"] = DEFAULT_SEED_COUNTS["mor"]
+            counts["mor"] = await _seed_reports(session, _tid(tid), "mandatory", DEFAULT_SEED_COUNTS["mor"], base)
+        if "survey" in kinds:
+            counts["survey"] = await _seed_surveys(session, _tid(tid), DEFAULT_SEED_COUNTS["survey"], base)
 
-    if "can" in kinds or "cap" in kinds:
-        n = DEFAULT_SEED_COUNTS["can"]
-        hazard_ids = []
-        for i in range(n):
-            hz = ref.collection(_HAZARDS_COLLECTION).add(
-                _hazard_doc(tid, i, now - timedelta(days=i)))
-            hazard_ids.append(hz[1].id)
-        for i, hazard_id in enumerate(hazard_ids):
-            ref.collection(_CAN_CAP_COLLECTION).add(_can_doc(tid, hazard_id, i, now - timedelta(days=i)))
-        counts["can"] = n
+        if "can" in kinds or "cap" in kinds:
+            n = DEFAULT_SEED_COUNTS["can"]
+            can_ids = []
+            for i in range(n):
+                sev, prob, idx, lvl = _risk(random.randint(2, 4), random.randint(2, 4))
+                cat = random.choice(_ICAO_CATEGORIES)
+                created = base - timedelta(days=i)
+                hazard = Hazard(
+                    tenant_id=uuid.UUID(tid),
+                    hazard_id=f"{tid}-HZ-DEMO-{i + 1:03d}",
+                    title=f"Dummy hazard {i + 1} for demonstration",
+                    description="Dummy demonstration hazard created by the Super-Admin seed tool.",
+                    source="Internal Audit",
+                    source_id="",
+                    occurrence_type="Hazard",
+                    taxonomy=_ICAO_TO_TAXONOMY.get(cat, "Other"),
+                    severity=sev,
+                    probability=prob,
+                    risk_index=idx,
+                    risk_level=lvl,
+                    priority="H" if idx >= 12 else "M" if idx >= 6 else "L",
+                    status="Open",
+                    srm_conducted=True,
+                    analysis_mode="FISHBONE_ONLY",
+                    is_demo=True,
+                    created_by=ADMIN_DEMO_CREATOR,
+                    created_at=created,
+                    updated_at=created,
+                )
+                session.add(hazard)
+                session.flush()
+                can = Can(
+                    tenant_id=uuid.UUID(tid),
+                    hazard_id=hazard.id,
+                    can_reference=f"CAN-DEMO-{i + 1:03d}",
+                    title=f"Dummy corrective action {i + 1}",
+                    description=f"Dummy corrective action notice {i + 1}.",
+                    required_action="Implement the agreed corrective action and report back.",
+                    target_completion_date=created + timedelta(days=random.randint(14, 60)),
+                    assigned_to=ADMIN_DEMO_CREATOR,
+                    assigned_to_uid=ADMIN_DEMO_CREATOR,
+                    department=random.choice(_DEPARTMENTS),
+                    priority=random.choice(["High", "Medium", "Low"]),
+                    status="Open",
+                    issued_by=ADMIN_DEMO_CREATOR,
+                    issued_by_uid=ADMIN_DEMO_CREATOR,
+                    issued_at=created,
+                    is_demo=True,
+                    created_by=ADMIN_DEMO_CREATOR,
+                    created_at=created,
+                    updated_at=created,
+                )
+                session.add(can)
+                session.flush()
+                can_ids.append((can.id, can.can_reference, created))
+            counts["can"] = n
 
-        if "cap" in kinds:
-            can_docs = ref.collection(_CAN_CAP_COLLECTION).where("seed_version", "==", ADMIN_DEMO_SEED_VERSION).get()
-            for i, snap in enumerate(can_docs):
-                data = snap.to_dict() or {}
-                snap.reference.collection(_CAPS_SUBCOLLECTION).add(_cap_doc(data.get("can_reference", f"CAN-DEMO-{i + 1:03d}"), i, now - timedelta(days=i)))
-            counts["cap"] = len(can_docs)
+            if "cap" in kinds:
+                for j, (can_id, can_ref, created) in enumerate(can_ids):
+                    session.add(Cap(
+                        tenant_id=uuid.UUID(tid),
+                        can_id=can_id,
+                        cap_reference=f"{can_ref}-CAP-{j + 1:03d}",
+                        action_plan="Dummy corrective/preventive action plan describing the mitigation steps.",
+                        timeline=f"{random.randint(30, 90)} days",
+                        resources_required="Manpower and materials per the plan",
+                        implementation_plan="Phase the work, verify effectiveness, and close out.",
+                        target_completion_date=created + timedelta(days=random.randint(30, 90)),
+                        status="In Progress",
+                        submitted_by=ADMIN_DEMO_CREATOR,
+                        submitted_by_uid=ADMIN_DEMO_CREATOR,
+                        submitted_at=created,
+                        is_demo=True,
+                        created_at=created,
+                        updated_at=created,
+                    ))
+                counts["cap"] = len(can_ids)
 
     _audit("DEMO_DATA_SEED", actor, tid,
            f"Seeded {', '.join(f'{k}={counts[k]}' for k in kinds)} for tenant {tid}")
@@ -349,63 +394,48 @@ def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any
     return {"tenant_id": tid, "seeded": counts}
 
 
-def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
-    """Remove only the Super-Admin-seeded dummy docs for one tenant."""
+async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove only the Super-Admin-seeded dummy rows for one tenant."""
     tid = _validate_id(tenant_id, "tenant id")
     _get_tenant(tid)
     kinds = _normalize_kinds(kinds)
 
-    ref = _tenant_ref(tid)
     counts = {k: 0 for k in kinds}
+    tuuid = _tid(tid)
 
-    if "vsr" in kinds or "mor" in kinds:
-        report_types = []
-        if "vsr" in kinds:
-            report_types.append("voluntary")
-        if "mor" in kinds:
-            report_types.append("mandatory")
-        for snap in ref.collection(settings.FIREBASE_COLLECTION_REPORTS).get():
-            data = snap.to_dict() or {}
-            if data.get("seed_version") == ADMIN_DEMO_SEED_VERSION and data.get("report_type") in report_types:
-                snap.reference.delete()
-                counts["vsr" if data.get("report_type") == "voluntary" else "mor"] += 1
+    async with session_scope() as session:
+        if "survey" in kinds:
+            r = await session.execute(delete(SurveyResponse).where(
+                SurveyResponse.tenant_id == uuid.UUID(tuuid), SurveyResponse.is_demo == True))
+            counts["survey"] = r.rowcount
 
-    if "can" in kinds or "cap" in kinds:
-        seeded_cans = []
-        for snap in ref.collection(_CAN_CAP_COLLECTION).get():
-            data = snap.to_dict() or {}
-            if data.get("seed_version") == ADMIN_DEMO_SEED_VERSION:
-                seeded_cans.append(snap)
-
-        if "cap" in kinds and "can" not in kinds:
-            # Remove only the CAPs, keep the CANs and their hazards.
-            for snap in seeded_cans:
-                caps = list(snap.reference.collection(_CAPS_SUBCOLLECTION).get())
-                for cap in caps:
-                    cap.reference.delete()
-                counts["cap"] += len(caps)
-        elif "can" in kinds:
-            # Full CAN (+CAP) unseed: remove CAPs, then CANs, then the hazards
-            # created for those CANs (tagged admin_seed only).
-            removed_cans = 0
-            removed_caps = 0
-            for snap in seeded_cans:
-                caps = list(snap.reference.collection(_CAPS_SUBCOLLECTION).get())
-                for cap in caps:
-                    cap.reference.delete()
-                removed_caps += len(caps)
-                snap.reference.delete()
-                removed_cans += 1
-            counts["can"] = removed_cans
+        if "can" in kinds or "cap" in kinds:
+            # CAPs are children of CANs. When removing CANs, their CAPs must go
+            # first (FK), so delete CAPs whenever either kind is requested.
+            r = await session.execute(delete(Cap).where(
+                Cap.tenant_id == uuid.UUID(tuuid), Cap.is_demo == True))
             if "cap" in kinds:
-                counts["cap"] = removed_caps
-            for snap in ref.collection(_HAZARDS_COLLECTION).get():
-                data = snap.to_dict() or {}
-                if data.get("admin_seed") and data.get("seed_version") == ADMIN_DEMO_SEED_VERSION:
-                    snap.reference.delete()
+                counts["cap"] = r.rowcount
+            if "can" in kinds:
+                await session.execute(delete(Hazard).where(
+                    Hazard.tenant_id == uuid.UUID(tuuid), Hazard.is_demo == True))
+                r = await session.execute(delete(Can).where(
+                    Can.tenant_id == uuid.UUID(tuuid), Can.is_demo == True))
+                counts["can"] = r.rowcount
+
+        if "vsr" in kinds:
+            r = await session.execute(delete(Report).where(
+                Report.tenant_id == uuid.UUID(tuuid), Report.is_demo == True,
+                Report.report_type == "voluntary"))
+            counts["vsr"] = r.rowcount
+        if "mor" in kinds:
+            r = await session.execute(delete(Report).where(
+                Report.tenant_id == uuid.UUID(tuuid), Report.is_demo == True,
+                Report.report_type == "mandatory"))
+            counts["mor"] = r.rowcount
 
     _audit("DEMO_DATA_UNSEED", actor, tid,
-           f"Removed {', '.join(f'{k}={counts[k]}' for k in kinds)} dummy docs for tenant {tid}")
+           f"Removed {', '.join(f'{k}={counts[k]}' for k in kinds)} dummy rows for tenant {tid}")
     logger.info(f"Demo data unseeded for {tid}: {counts}")
     return {"tenant_id": tid, "removed": counts}
 
