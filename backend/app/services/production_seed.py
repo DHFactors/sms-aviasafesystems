@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
+from app.db.ids import tenant_uuid
 from app.firebase import get_db
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.survey_scoring import (
@@ -269,6 +270,82 @@ def list_tenants_admin() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Failed to list tenants (admin): {e}")
         return []
+
+
+async def _postgres_tenant_counts(slugs: List[str]) -> Dict[str, Dict[str, int]]:
+    """Per-tenant operational counts from PostgreSQL by slug.
+
+    Tenant documents live in Firestore (by slug) while hazards/reports/cans/
+    caps/surveys rows live in Supabase keyed by a deterministic
+    ``uuid5('tenant', slug)``. Returns ``{slug: {surveys, hazards, reports,
+    cans, caps}}``. Falls back to empty counts when DATABASE_URL is unset or
+    the read fails (keep the Firestore-only path working).
+    """
+    slugs = [s for s in (slugs or []) if s]
+    if not slugs:
+        return {}
+    try:
+        from sqlalchemy import text
+        from app.db.session import get_engine
+        engine = get_engine()
+    except Exception as e:
+        logger.warning(f"PostgreSQL unavailable for tenant counts: {e}")
+        return {}
+
+    by_uuid = {tenant_uuid(s): s for s in slugs}
+    counts = {s: {"surveys": 0, "hazards": 0, "reports": 0, "cans": 0, "caps": 0} for s in slugs}
+    try:
+        async with engine.connect() as conn:
+            for label in ("hazards", "reports", "cans", "caps", "surveys"):
+                result = await conn.execute(
+                    text(
+                        f"SELECT tenant_id, count(*) AS c FROM {label} "
+                        "WHERE tenant_id = ANY(:ids) GROUP BY tenant_id"
+                    ),
+                    {"ids": list(by_uuid.keys())},
+                )
+                for row in result:
+                    slug = by_uuid.get(str(row.tenant_id))
+                    if slug:
+                        counts[slug][label] = row.c
+        return counts
+    except Exception as e:
+        logger.warning(f"Failed to read PostgreSQL tenant counts: {e}")
+        return {}
+
+
+async def list_tenants_admin_pg() -> List[Dict[str, Any]]:
+    """List operator tenants enriched for the Super Admin dashboard.
+
+    Merges Firestore tenant metadata (country, regulator_id, status, contract,
+    payment) with PostgreSQL operational counts and resolves regulator name +
+    country from the `regulators` collection. Falls back to Firestore
+    subcollection counts when PostgreSQL is not configured.
+    """
+    rows = list_tenants_admin()
+    pg_counts = await _postgres_tenant_counts([r.get("id") for r in rows])
+
+    regs = {}
+    try:
+        db = get_db()
+        for snap in db.collection(settings.FIREBASE_COLLECTION_REGULATORS).stream():
+            regs[snap.id] = snap.to_dict() or {}
+    except Exception as e:
+        logger.warning(f"Failed to list regulators for tenant enrichment: {e}")
+
+    for r in rows:
+        slug = r.get("id")
+        if slug and slug in pg_counts:
+            r["counts"] = pg_counts[slug]
+        rid = r.get("regulator_id")
+        reg = regs.get(rid) if rid else None
+        r["regulator_name"] = (reg or {}).get("name") if reg else None
+        r["regulator_country"] = (
+            (reg or {}).get("country_name") or (reg or {}).get("country")
+        ) if reg else None
+        r["is_demo"] = bool(r.get("is_demo") or r.get("is_beta_sandbox"))
+    rows.sort(key=lambda r: (r.get("name") or r.get("id") or "").lower())
+    return rows
 
 
 # ============================================================================

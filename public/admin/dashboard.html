@@ -162,6 +162,46 @@ AUTHOR: AviaSAFE Systems
     </div>
 </div>
 
+<div id="manageModal" class="manage-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:560px;width:92%;">
+        <h3 style="margin:0 0 4px;"><i class="fas fa-sliders" style="color:var(--color-brand-600);"></i> Manage Tenant</h3>
+        <p class="sub" id="manageTenantLabel" style="margin:0 0 16px;"></p>
+        <div class="form-row">
+            <div class="form-group"><label>Status</label>
+                <select id="mmStatus" style="width:100%;padding:9px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:.85rem;">
+                    <option value="demo">Demo</option>
+                    <option value="trial">Trial</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Payment Status</label>
+                <select id="mmPayment" style="width:100%;padding:9px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:.85rem;">
+                    <option value="">— (unchanged)</option>
+                    <option value="paid">Paid</option>
+                    <option value="unpaid">Unpaid</option>
+                    <option value="not_applicable">Not Applicable</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Contract Start</label>
+                <input type="date" id="mmStart" style="width:100%;padding:9px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:.85rem;">
+            </div>
+            <div class="form-group"><label>Contract End</label>
+                <input type="date" id="mmEnd" style="width:100%;padding:9px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:.85rem;">
+            </div>
+            <div class="form-group"><label>Trial End (Demo/Trial)</label>
+                <input type="date" id="mmTrialEnd" style="width:100%;padding:9px 10px;border:1px solid var(--color-border);border-radius:8px;font-size:.85rem;">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeManageTenant()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveManageTenant()"><i class="fas fa-check"></i> Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ============================================================================
 // PAGE DATA — grouped by module (same inventory as the standalone test portal)
@@ -428,6 +468,7 @@ function applyFilter(value) {
 // ============================================================================
 
 var GOVERNANCE_TENANTS = [];
+var EXISTING_TENANTS = [];
 
 function renderTenantMgmt(gate) {
     var html = '<div class="view active">';
@@ -876,12 +917,14 @@ async function loadExistingRegulators() {
         var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
         var regs = resp.regulators || [];
         if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
-        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>ID</th><th>Name</th><th>Country</th><th>Operators</th><th>Active</th></tr></thead><tbody>' +
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>Regulator</th><th>Country</th><th>Status</th><th>Operators</th></tr></thead><tbody>' +
             regs.map(function (r) {
-                return '<tr><td><code>' + esc(r.id) + '</code></td><td>' + esc(r.name) + '</td>' +
-                    '<td>' + esc(r.country_name || r.country || '—') + '</td>' +
-                    '<td>' + ((r.operator_tenant_ids || []).length) + '</td>' +
-                    '<td>' + (r.active ? '<span class="badge badge-success">active</span>' : '<span class="badge badge-danger">inactive</span>') + '</td></tr>';
+                var ops = r.operator_tenant_ids || [];
+                return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
+                    '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
+                    '<td>' + regulatorBadge(r.status || (r.active ? 'active' : 'inactive')) + '</td>' +
+                    '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td></tr>';
             }).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
@@ -893,24 +936,108 @@ async function loadExistingTenants() {
     try {
         var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
         var tenants = resp.tenants || [];
+        EXISTING_TENANTS = tenants;
         if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>ID</th><th>Name</th><th>Country</th><th>Regulator</th><th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Status</th></tr></thead><tbody>' +
-            tenants.map(function (t) {
-                var c = t.counts || {};
-                var st = t.status || (t.active === false ? 'Inactive' : 'Active');
-                return '<tr><td><code>' + esc(t.id) + '</code></td><td>' + esc(t.name || t.id) + '</td>' +
-                    '<td>' + esc(t.country || '—') + '</td><td>' + esc(t.regulator_id || '—') + '</td>' +
-                    '<td>' + c.surveys + '</td><td>' + c.hazards + '</td><td>' + c.reports + '</td><td>' + (c.cans || 0) + '</td>' +
-                    '<td>' + statusBadge(st) + '</td></tr>';
-            }).join('') + '</tbody></table></div>';
+            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Status</th><th>Payment</th><th>Contract</th>' +
+            '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Actions</th></tr></thead><tbody>' +
+            tenants.map(buildTenantRow).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
 
+function buildTenantRow(t) {
+    var c = t.counts || {};
+    var reg = t.regulator_name
+        ? esc(t.regulator_name) + (t.regulator_country ? ' <span class="sub">(' + esc(t.regulator_country) + ')</span>' : '')
+        : esc(t.regulator_id || '—');
+    var contract = (t.contract && (t.contract.start_date || t.contract.end_date))
+        ? esc((t.contract.start_date || '?') + ' \u2192 ' + (t.contract.end_date || '?'))
+        : '—';
+    var st = t.status || (t.active === false ? 'INACTIVE' : 'ACTIVE');
+    return '<tr><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
+        '<td>' + reg + '</td>' +
+        '<td>' + esc(t.country || '—') + '</td>' +
+        '<td>' + statusBadge(st) + '</td>' +
+        '<td>' + paymentBadge(t.payment_status) + '</td>' +
+        '<td style="white-space:nowrap;">' + contract + '</td>' +
+        '<td>' + (c.surveys || 0) + '</td><td>' + (c.hazards || 0) + '</td><td>' + (c.reports || 0) + '</td><td>' + (c.cans || 0) + '</td>' +
+        '<td><button class="btn btn-outline btn-sm" onclick="openManageTenant(\'' + esc(t.id) + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
+}
+
 function statusBadge(st) {
-    st = st || 'Active';
-    var cls = st === 'Active' ? 'badge-success' : (st === 'Trial' ? 'badge-info' : 'badge-danger');
-    return '<span class="badge ' + cls + '">' + esc(st) + '</span>';
+    st = (st || '').toUpperCase();
+    if (st === 'DEMO') return '<span class="badge badge-demo">DEMO</span>';
+    if (st === 'TRIAL') return '<span class="badge badge-trial">TRIAL</span>';
+    if (st === 'ACTIVE') return '<span class="badge badge-active">ACTIVE</span>';
+    if (st === 'INACTIVE') return '<span class="badge badge-inactive">INACTIVE</span>';
+    return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
+}
+
+function paymentBadge(p) {
+    p = (p || '').toLowerCase();
+    if (p === 'paid') return '<span class="badge badge-paid">Paid</span>';
+    if (p === 'unpaid') return '<span class="badge badge-unpaid">Unpaid</span>';
+    if (p === 'not_applicable' || p === 'n/a' || p === 'na') return '<span class="badge badge-notapp">N/A</span>';
+    return '<span class="badge badge-info">' + esc(p || '—') + '</span>';
+}
+
+function regulatorBadge(st) {
+    st = (st || '').toLowerCase();
+    if (st === 'active') return '<span class="badge badge-success">active</span>';
+    return '<span class="badge badge-danger">inactive</span>';
+}
+
+// ============================================================================
+// MANAGE TENANT MODAL — lifecycle status / payment / contract
+// ============================================================================
+
+var MANAGE_TENANT_ID = null;
+
+function openManageTenant(id) {
+    MANAGE_TENANT_ID = id;
+    var t = null;
+    EXISTING_TENANTS.forEach(function (r) { if (r.id === id) t = r; });
+    document.getElementById('manageTenantLabel').textContent = t
+        ? (t.name || id) + ' \u00b7 ' + id
+        : id;
+    var contract = (t && t.contract) || {};
+    var st = (t && (t.status || '')) || '';
+    document.getElementById('mmStatus').value = st.toLowerCase() || 'active';
+    var pay = (t && (t.payment_status || '')) || '';
+    document.getElementById('mmPayment').value = pay.toLowerCase();
+    document.getElementById('mmStart').value = (contract.start_date || '').slice(0, 10);
+    document.getElementById('mmEnd').value = (contract.end_date || '').slice(0, 10);
+    document.getElementById('mmTrialEnd').value = (contract.trial_end_date || '').slice(0, 10);
+    document.getElementById('manageModal').style.display = 'flex';
+}
+
+function closeManageTenant() {
+    document.getElementById('manageModal').style.display = 'none';
+    MANAGE_TENANT_ID = null;
+}
+
+async function saveManageTenant() {
+    if (!MANAGE_TENANT_ID) return;
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        status: document.getElementById('mmStatus').value || null,
+        payment_status: document.getElementById('mmPayment').value || null,
+    };
+    var start = document.getElementById('mmStart').value;
+    var end = document.getElementById('mmEnd').value;
+    var trialEnd = document.getElementById('mmTrialEnd').value;
+    if (start) payload.contract_start_date = start;
+    if (end) payload.contract_end_date = end;
+    if (trialEnd) payload.trial_end_date = trialEnd;
+    var tenantId = MANAGE_TENANT_ID;
+    try {
+        await AdminUI.apiPost('/api/v1/admin/tenants/' + encodeURIComponent(tenantId) + '/status', payload);
+        toast('Tenant "' + tenantId + '" updated.', 'success');
+        closeManageTenant();
+        loadExistingTenants();
+    } catch (err) {
+        toast('Error: ' + (err.message || 'failed'), 'error');
+    }
 }
 
 // ============================================================================

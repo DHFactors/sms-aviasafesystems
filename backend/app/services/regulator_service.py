@@ -17,15 +17,27 @@ from loguru import logger
 from app.core.config import settings
 from app.firebase import get_db
 
+REGULATOR_STATUSES = {"active", "inactive"}
+
+
+def _normalize_status(data: Dict[str, Any]) -> str:
+    """Normalize the regulator doc to a display status ('active' | 'inactive')."""
+    raw = str(data.get("status") or "").strip().lower()
+    if raw in REGULATOR_STATUSES:
+        return raw
+    return "active" if data.get("active", True) else "inactive"
+
 
 def _serialize_regulator(doc: Any) -> Dict[str, Any]:
     data = doc.to_dict() or {}
     data["id"] = doc.id
+    data["operator_count"] = len(list(data.get("operator_tenant_ids") or []))
+    data["status"] = _normalize_status(data)
     return data
 
 
 def list_regulators() -> List[Dict[str, Any]]:
-    """All State Regulators in the system."""
+    """All State Regulators in the system, enriched with operator_count/status."""
     try:
         docs = get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
         return [_serialize_regulator(d) for d in docs]

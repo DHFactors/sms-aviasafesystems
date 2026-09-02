@@ -2,8 +2,8 @@
 # FILE: admin_data_service.py
 # PATH: backend/app/services/admin_data_service.py
 # PURPOSE: Super-Admin data-management helpers:
-#            * Tenant lifecycle status (Trial / Active / Inactive) driven by
-#              contract dates + payment status.
+#            * Tenant lifecycle status (Demo / Trial / Active / Inactive) driven
+#              by contract dates + payment status.
 #            * Seed / unseed dummy operational data (VSR, MOR, CAN, CAP) for
 #              one tenant or every tenant.
 #          Every mutation is recorded in the `audit_logs` collection and any
@@ -23,8 +23,8 @@ from app.firebase import get_db
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.production_seed import _audit, _validate_id
 
-TENANT_STATUSES = {"Trial", "Active", "Inactive"}
-PAYMENT_STATUSES = {"Paid", "Unpaid"}
+TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "INACTIVE"}
+PAYMENT_STATUSES = {"paid", "unpaid", "not_applicable"}
 DEMO_KINDS = {"vsr", "mor", "can", "cap"}
 
 ADMIN_DEMO_SEED_VERSION = "admin-demo-1"
@@ -78,21 +78,25 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
 def derive_tenant_status(contract: Optional[Dict[str, Any]],
                          payment_status: Optional[str] = None,
                          explicit: Optional[str] = None) -> str:
-    """Compute the tenant lifecycle status.
+    """Compute the tenant lifecycle status (uppercase).
+
+    Returns one of ``DEMO / TRIAL / ACTIVE / INACTIVE``.
 
     Rules (an explicit `status` wins over everything):
-      * payment_status == 'Unpaid'           -> Inactive
-      * today > contract.end_date            -> Inactive (contract expired)
-      * today < contract.start_date          -> Trial (contract not yet started)
-      * otherwise                            -> Active
+      * payment_status == 'unpaid'             -> INACTIVE
+      * today > contract.end_date              -> INACTIVE (contract expired)
+      * today < contract.start_date            -> TRIAL (contract not yet started)
+      * otherwise                              -> ACTIVE
+    ``DEMO`` is only ever set explicitly (developer/sandbox tenants).
     """
     if explicit:
-        if explicit not in TENANT_STATUSES:
+        norm = str(explicit).strip().upper()
+        if norm not in TENANT_STATUSES:
             raise ValueError(f"invalid status '{explicit}' (allowed: {sorted(TENANT_STATUSES)})")
-        return explicit
+        return norm
 
-    if payment_status == "Unpaid":
-        return "Inactive"
+    if str(payment_status or "").strip().lower() == "unpaid":
+        return "INACTIVE"
 
     today = date.today()
     contract = contract or {}
@@ -102,48 +106,60 @@ def derive_tenant_status(contract: Optional[Dict[str, Any]],
     except ValueError:
         start = end = None
     if end and today > end:
-        return "Inactive"
+        return "INACTIVE"
     if start and today < start:
-        return "Trial"
-    return "Active"
+        return "TRIAL"
+    return "ACTIVE"
 
 
 def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
                          status: Optional[str] = None,
                          contract_start_date: Optional[str] = None,
                          contract_end_date: Optional[str] = None,
-                         payment_status: Optional[str] = None) -> Dict[str, Any]:
+                         payment_status: Optional[str] = None,
+                         trial_end_date: Optional[str] = None) -> Dict[str, Any]:
     """Update a tenant's lifecycle status + contract/payment metadata.
 
-    `status` may be set explicitly (Trial/Active/Inactive) or left None to
-    derive it from the contract dates and payment status. Returns the updated
-    tenant document.
+    Status is normalized to ``DEMO / TRIAL / ACTIVE / INACTIVE`` and payment to
+    ``paid / unpaid / not_applicable``. `status` may be set explicitly or left
+    None to derive it from the contract dates and payment status. Returns the
+    updated tenant document.
     """
     tid = _validate_id(tenant_id, "tenant id")
     doc = _get_tenant(tid)
 
-    if status is not None and status not in TENANT_STATUSES:
-        raise ValueError(f"invalid status '{status}' (allowed: {sorted(TENANT_STATUSES)})")
-    if payment_status is not None and payment_status not in PAYMENT_STATUSES:
-        raise ValueError(f"invalid payment status '{payment_status}' (allowed: {sorted(PAYMENT_STATUSES)})")
+    if status is not None:
+        status = str(status).strip().upper()
+        if status not in TENANT_STATUSES:
+            raise ValueError(f"invalid status '{status}' (allowed: {sorted(TENANT_STATUSES)})")
+    if payment_status is not None:
+        payment_status = str(payment_status).strip().lower()
+        if payment_status in {"not applicable", "n/a", "na"}:
+            payment_status = "not_applicable"
+        if payment_status not in PAYMENT_STATUSES:
+            raise ValueError(f"invalid payment status '{payment_status}' (allowed: {sorted(PAYMENT_STATUSES)})")
 
     if contract_start_date:
         _parse_date(contract_start_date)
     if contract_end_date:
         _parse_date(contract_end_date)
+    if trial_end_date:
+        _parse_date(trial_end_date)
 
     contract = dict(doc.get("contract") or {})
     if contract_start_date:
         contract["start_date"] = contract_start_date.strip()
     if contract_end_date:
         contract["end_date"] = contract_end_date.strip()
+    if trial_end_date:
+        contract["trial_end_date"] = trial_end_date.strip()
 
     resolved = derive_tenant_status(contract, payment_status or doc.get("payment_status"), status)
     now = datetime.now(timezone.utc)
 
     updates = {
         "status": resolved,
-        "active": resolved == "Active",
+        "active": resolved == "ACTIVE",
         "contract": contract,
         "status_updated_at": now,
         "status_updated_by": actor.get("uid"),
@@ -158,7 +174,8 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
     merged.update(updates)
     _audit("TENANT_STATUS_UPDATED", actor, tid,
            f"Status set to {resolved} (contract start={contract.get('start_date') or 'n/a'}, "
-           f"end={contract.get('end_date') or 'n/a'}, payment={updates.get('payment_status') or doc.get('payment_status') or 'n/a'})")
+           f"end={contract.get('end_date') or 'n/a'}, trial_end={contract.get('trial_end_date') or 'n/a'}, "
+           f"payment={updates.get('payment_status') or doc.get('payment_status') or 'n/a'})")
     logger.info(f"Tenant {tid} status -> {resolved} by {actor.get('uid')}")
     return merged
 

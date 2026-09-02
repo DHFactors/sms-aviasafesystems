@@ -438,9 +438,9 @@ async def admin_create_regulator(
 async def admin_list_regulators(
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """List every State Regulator (SUPER_ADMIN)."""
-    from app.services.production_seed import list_regulators_admin
-    return {"success": True, "regulators": list_regulators_admin()}
+    """List every State Regulator (SUPER_ADMIN), enriched with operator_count/status."""
+    from app.services.regulator_service import list_regulators
+    return {"success": True, "regulators": list_regulators()}
 
 
 @router.post("/tenants", status_code=status.HTTP_200_OK)
@@ -519,9 +519,13 @@ async def admin_bulk_create_tenants(
 async def admin_list_tenants(
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """List all operator tenants with per-subcollection counts (SUPER_ADMIN)."""
-    from app.services.production_seed import list_tenants_admin
-    return {"success": True, "tenants": list_tenants_admin()}
+    """List all operator tenants with counts (SUPER_ADMIN).
+
+    Counts come from PostgreSQL when configured (keyed by the deterministic
+    tenant uuid) and fall back to Firestore subcollections otherwise.
+    """
+    from app.services.production_seed import list_tenants_admin_pg
+    return {"success": True, "tenants": await list_tenants_admin_pg()}
 
 
 @router.get("/seed/preview", status_code=status.HTTP_200_OK)
@@ -705,6 +709,7 @@ class TenantStatusRequest(BaseModel):
     contract_start_date: Optional[str] = None
     contract_end_date: Optional[str] = None
     payment_status: Optional[str] = None
+    trial_end_date: Optional[str] = None
 
 
 class DemoDataRequest(BaseModel):
@@ -721,7 +726,7 @@ async def admin_update_tenant_status(
     req: TenantStatusRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Update a tenant's lifecycle status (Trial/Active/Inactive).
+    """Update a tenant's lifecycle status (Demo/Trial/Active/Inactive).
 
     `status` may be set explicitly or derived from the contract dates and
     payment status. Requires a SUPER_ADMIN token + admin setup key.
@@ -736,6 +741,7 @@ async def admin_update_tenant_status(
             contract_start_date=req.contract_start_date,
             contract_end_date=req.contract_end_date,
             payment_status=req.payment_status,
+            trial_end_date=req.trial_end_date,
         )
         return {"success": True, "tenant": doc}
     except ValueError as e:
