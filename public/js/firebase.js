@@ -747,24 +747,53 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
         });
     } catch (err) { /* never let the auth hook break page load */ }
 }
-// ============================================================================
-// AUTO-RECOVERY FROM ACCESS DENIED ROUTING LOOP
-// ============================================================================
-// If an authenticated user lands on a page that does not match their role
-// (e.g. department admin on safety.html), automatically redirect them to
-// their correct destination and clear stale cache flags.
-function autoRecoveryFromAccessDenied(user) {
-    try {
-        if (!user) return;
-        var role = (user.claims && user.claims.role) || (user.role || "");
-        var email = user.email || "";
-        // Department admins (DEPT_ADMIN) must never land on safety.html
-        if (role === "DEPT_ADMIN") {
-            var correctDest = "/dashboard/responsible-manager.html";            if (window.location.pathname !== correctDest) {                // Clear stale auth redirect flags from localStorage                try {                    localStorage.removeItem("aviasafe:beta:copilot_message_count");                    localStorage.removeItem("aviasafe:prod:copilot_message_count");                    // Clear any demo context that might stale-route the user                    localStorage.removeItem("demoContext");                    localStorage.removeItem("aeArchetypeId");                } catch (e) { /* non-fatal */ }                window.location.href = correctDest;            }        }        // Safety management roles (safety@, SUPER_ADMIN, CAAN_SMD)        if (role === "SUPER_ADMIN" || role === "CAAN_SMD") {            try {                localStorage.removeItem("aviasafe:beta:copilot_message_count");                localStorage.removeItem("aviasafe:prod:copilot_message_count");            } catch (e) { /* non-fatal */ }        }        // Department user (DEPT_USER / USER) must land on responsible-manager        if (role === "USER" || role === "DEPT_USER") {            var claims = user.claims || {};            var department = claims.department || "";            if (department) {                var correctDest = "/dashboard/responsible-manager.html";                if (window.location.pathname !== correctDest && window.location.pathname !== "/safety.html") {                    try {                        localStorage.removeItem("aviasafe:beta:copilot_message_count");                        localStorage.removeItem("aviasafe:prod:copilot_message_count");                    } catch (e) { /* non-fatal */ }                    window.location.href = correctDest;                }            }        }    } catch (e) {        // Never block auth flow on recovery error    }}
-// Wire up auto-recovery on every auth state change
-if (typeof firebase !== "undefined" && firebase.auth) {
-    try {        // Override onAuthStateChanged to add auto-recovery        var nativeOnAuthStateChanged = firebase.auth().onAuthStateChanged;        firebase.auth().onAuthStateChanged = function(user) {            // Run auto-recovery immediately after auth state changes            autoRecoveryFromAccessDenied(user);            // Run native handler if it exists            if (nativeOnAuthStateChanged) {                nativeOnAuthStateChanged(user);            }        };    } catch (e) { /* never block auth */ }}
-// End auto-recovery section
+
+// ── Auto-Recovery from Access Denied routing loop ───────────────────────────
+// If an authenticated DEPT_ADMIN lands on safety.html (stale redirect/cache),
+// automatically clear stale flags and redirect to the correct destination.
+// Safe: defers until Firebase app exists, never monkey-patches onAuthStateChanged,
+// never blocks auth on error. Uses getIdTokenResult(false) to avoid forced refresh.
+(function registerAutoRecovery() {
+    function tryRegister() {
+        try {
+            if (typeof firebase === 'undefined' || !firebase.auth || !firebase.apps || firebase.apps.length === 0) {
+                setTimeout(tryRegister, 150);
+                return;
+            }
+            firebase.auth().onAuthStateChanged(function (u) {
+                if (!u) return;
+                // Avoid redirect loops on login page itself - let login.html handle it
+                if (window.location.pathname === '/login.html' || window.location.pathname === '/') return;
+                u.getIdTokenResult(false).then(function (tr) {
+                    var role = tr.claims && tr.claims.role;
+                    if (role !== 'DEPT_ADMIN') return;
+                    var correctDest = '/dashboard/responsible-manager.html';
+                    if (window.location.pathname === correctDest) return;
+                    // DEPT_ADMIN must never stay on safety.html (or any non-responsible-manager page
+                    // that gates as Access Denied). Clear stale flags and redirect once.
+                    try {
+                        localStorage.removeItem('aviasafe:beta:copilot_message_count');
+                        localStorage.removeItem('aviasafe:prod:copilot_message_count');
+                        sessionStorage.removeItem('aviasafe:beta:copilot_message_count');
+                        sessionStorage.removeItem('aviasafe:prod:copilot_message_count');
+                    } catch (e) {}
+                    // Prevent rapid double-redirect: set a one-time session flag
+                    var flagKey = 'aviasafe:prod:auto_recovery_done';
+                    try {
+                        if (sessionStorage.getItem(flagKey)) return;
+                        sessionStorage.setItem(flagKey, '1');
+                    } catch (e2) {}
+                    window.location.href = correctDest;
+                }).catch(function () {});
+            });
+        } catch (e) {}
+    }
+    if (typeof document !== 'undefined' && document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', tryRegister);
+    } else {
+        tryRegister();
+    }
+})();
 
 // ── Quick-Switch Demo Toolbar (?demo=true) ──────────────────────────────────
 // Floating prospect switcher for sales demos. Enabled only when ?demo=true is
