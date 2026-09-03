@@ -8,7 +8,7 @@
 #          actually reads/writes diversion data.
 #
 # Actor mapping: diversions are recorded by the Ops / Safety department
-# manager (ops@*.test / safety@*.test), consistent with the CAN/CAP seeders.
+# manager (ops@*.com / safety@*.com), consistent with the CAN/CAP seeders.
 #
 # Each diversion is created through FlightDiversionService.create_diversion
 # so generated references follow the service format DIV-{YYYY}-{seq:03d}.
@@ -45,9 +45,9 @@ def _uid_for(email: str) -> str:
 
 # Department Manager recorder per tenant (used for created_by).
 RECORDERS: Dict[str, Dict[str, str]] = {
-    "fixedwing": {"email": "ops@fixedwing.test", "name": "Capt. Sanjay Gurung"},
-    "rotarywing": {"email": "ops@rotarywing.test", "name": "Capt. Ram Koirala"},
-    "demoairport": {"email": "ops@demoairport.test", "name": "Mr. Ramesh Adhikari"},
+    "fixedwing": {"email": "ops@fixedwing.com", "name": "Capt. Sanjay Gurung"},
+    "rotarywing": {"email": "ops@rotarywing.com", "name": "Capt. Ram Koirala"},
+    "demoairport": {"email": "ops@demoairport.com", "name": "Mr. Ramesh Adhikari"},
 }
 
 

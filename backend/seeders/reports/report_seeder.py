@@ -71,7 +71,7 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "bearing material. Engine removed for overhaul. Aircraft grounded "
         "pending engine replacement.",
         "created_by": "Mr. Dipak Rai",
-        "created_by_email": "145@fixedwing.test",
+        "created_by_email": "145@fixedwing.com",
         "department": "Part-145",
         "occurrence_type": "Serious Incident",
         "location": "VNKT",
@@ -91,7 +91,7 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "identified the error during records review. Corrective action "
         "implemented.",
         "created_by": "Mr. Suresh Ghale",
-        "created_by_email": "camo@fixedwing.test",
+        "created_by_email": "camo@fixedwing.com",
         "department": "CAMO",
         "occurrence_type": "Incident",
         "location": "VNKT",
@@ -110,7 +110,7 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "scrape. Post-flight inspection confirmed damage to tail skid. "
         "Aircraft removed from service for inspection.",
         "created_by": "Capt. Sanjay Gurung",
-        "created_by_email": "ops@fixedwing.test",
+        "created_by_email": "ops@fixedwing.com",
         "department": "Flight Operations",
         "occurrence_type": "Serious Incident",
         "location": "VNSI",
@@ -129,7 +129,7 @@ FIXED_WING_REPORTS: List[Dict[str, Any]] = [
         "approach speed by 20kts. Crew executed go-around and landed safely on "
         "second attempt. No injuries or damage.",
         "created_by": "F/O Prashant Karki",
-        "created_by_email": "staff@fixedwing.test",
+        "created_by_email": "staff@fixedwing.com",
         "department": "Flight Operations",
         "occurrence_type": "Incident",
         "location": "VNKT",
@@ -156,7 +156,7 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "root. Fleet-wide inspection ordered. Blade replaced and helicopter "
         "returned to service.",
         "created_by": "Mr. Shiva Tamang",
-        "created_by_email": "145@rotarywing.test",
+        "created_by_email": "145@rotarywing.com",
         "department": "Part-145",
         "occurrence_type": "Serious Incident",
         "location": "VNKT",
@@ -175,7 +175,7 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "error was identified during records review. Component removed and "
         "sent for overhaul. Investigation found record-keeping discrepancy.",
         "created_by": "Mr. Kiran Gurung",
-        "created_by_email": "camo@rotarywing.test",
+        "created_by_email": "camo@rotarywing.com",
         "department": "CAMO",
         "occurrence_type": "Incident",
         "location": "VNKT",
@@ -194,7 +194,7 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "yaw due to sudden tailwind shift. Pilot recovered control and landed "
         "safely. Post-flight inspection revealed no damage.",
         "created_by": "Capt. Ram Koirala",
-        "created_by_email": "ops@rotarywing.test",
+        "created_by_email": "ops@rotarywing.com",
         "department": "Flight Operations",
         "occurrence_type": "Serious Incident",
         "location": "High Altitude Helipad",
@@ -213,7 +213,7 @@ ROTARY_WING_REPORTS: List[Dict[str, Any]] = [
         "due to unexpected valley fog. Pilot executed 180° turn and returned "
         "to base. Flight conducted under VFR.",
         "created_by": "F/O Bikram Malla",
-        "created_by_email": "staff@rotarywing.test",
+        "created_by_email": "staff@rotarywing.com",
         "department": "Flight Operations",
         "occurrence_type": "Incident",
         "location": "Mountain Valley",
@@ -240,7 +240,7 @@ AIRPORT_REPORTS: List[Dict[str, Any]] = [
         "was closed for 45 minutes for inspection and cleanup. No aircraft "
         "damage reported.",
         "created_by": "Mr. Ramesh Adhikari",
-        "created_by_email": "ops@demoairport.test",
+        "created_by_email": "ops@demoairport.com",
         "department": "Airport Operations",
         "occurrence_type": "Incident",
         "location": "Runway 25",
@@ -257,7 +257,7 @@ AIRPORT_REPORTS: List[Dict[str, Any]] = [
         "without clearance. ATC alerted the aircraft crew who stopped "
         "immediately. No collision occurred.",
         "created_by": "Mr. Purna Singh",
-        "created_by_email": "staff@demoairport.test",
+        "created_by_email": "staff@demoairport.com",
         "department": "Airport Operations",
         "occurrence_type": "Incident",
         "location": "Apron Area",

@@ -7,7 +7,7 @@
 #
 # Actor mapping:
 #   * CAP submitter -> Department Manager (Part-145 / CAMO / Ops)
-#   * CAP reviewer  -> Safety Manager (safety@*.test)
+#   * CAP reviewer  -> Safety Manager (safety@*.com)
 #
 # Each CAP resolves its CAN via the Can.id uuid so it always links to a real
 # seeded CAN. If the matching CAN is not present (e.g. CAN Seeder not run for
@@ -55,16 +55,16 @@ def _uid_for(email: str) -> str:
 # description column), so the review/assignee mapping is by department.
 SUBMITTERS: Dict[str, Dict[str, Dict[str, str]]] = {
     "fixedwing": {
-        "Part-145": {"email": "145@fixedwing.test", "name": "Mr. Dipak Rai"},
-        "CAMO": {"email": "camo@fixedwing.test", "name": "Mr. Suresh Ghale"},
-        "Flight Operations": {"email": "ops@fixedwing.test", "name": "Capt. Sanjay Gurung"},
+        "Part-145": {"email": "145@fixedwing.com", "name": "Mr. Dipak Rai"},
+        "CAMO": {"email": "camo@fixedwing.com", "name": "Mr. Suresh Ghale"},
+        "Flight Operations": {"email": "ops@fixedwing.com", "name": "Capt. Sanjay Gurung"},
     },
     "rotarywing": {
-        "Part-145": {"email": "145@rotarywing.test", "name": "Mr. Shiva Tamang"},
-        "Flight Operations": {"email": "ops@rotarywing.test", "name": "Capt. Ram Koirala"},
+        "Part-145": {"email": "145@rotarywing.com", "name": "Mr. Shiva Tamang"},
+        "Flight Operations": {"email": "ops@rotarywing.com", "name": "Capt. Ram Koirala"},
     },
     "demoairport": {
-        "Airport Operations": {"email": "ops@demoairport.test", "name": "Mr. Ramesh Adhikari"},
+        "Airport Operations": {"email": "ops@demoairport.com", "name": "Mr. Ramesh Adhikari"},
     },
 }
 

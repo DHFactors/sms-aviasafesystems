@@ -227,7 +227,7 @@ def _patch_secret(monkeypatch, value="test-setup-key"):
 
 
 def _admin_user(role="SUPER_ADMIN"):
-    return {"uid": "super-1", "email": "super-admin@aviasafesystems.test", "role": role, "tenant_id": None}
+    return {"uid": "super-1", "email": "super-admin@aviasafesystems.com", "role": role, "tenant_id": None}
 
 
 # ============================================================================

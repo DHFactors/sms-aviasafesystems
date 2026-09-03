@@ -35,15 +35,15 @@ from app.services.psoe_service import score_assessment, TEMPLATE_VERSION
 # Auditor (CAAN_SMD style) per operator tenant, and the Safety Manager who owns
 # the assessment within the operator.
 AUDITORS: Dict[str, Dict[str, str]] = {
-    "fixedwing": {"email": "smd@demostate.test", "name": "Mr. Prakash Adhikari"},
-    "rotarywing": {"email": "smd@demostate.test", "name": "Mr. Prakash Adhikari"},
-    "demoairport": {"email": "smd@demostate.test", "name": "Ms. Sunita Karki"},
+    "fixedwing": {"email": "smd@demostate.com", "name": "Mr. Prakash Adhikari"},
+    "rotarywing": {"email": "smd@demostate.com", "name": "Mr. Prakash Adhikari"},
+    "demoairport": {"email": "smd@demostate.com", "name": "Ms. Sunita Karki"},
 }
 
 OWNERS: Dict[str, Dict[str, str]] = {
-    "fixedwing": {"email": "safety@fixedwing.test", "name": "Capt. Rajesh Thapa"},
-    "rotarywing": {"email": "safety@rotarywing.test", "name": "Capt. Hari Pandey"},
-    "demoairport": {"email": "safety@demoairport.test", "name": "Mr. Kumar Bhandari"},
+    "fixedwing": {"email": "safety@fixedwing.com", "name": "Capt. Rajesh Thapa"},
+    "rotarywing": {"email": "safety@rotarywing.com", "name": "Capt. Hari Pandey"},
+    "demoairport": {"email": "safety@demoairport.com", "name": "Mr. Kumar Bhandari"},
 }
 
 
@@ -157,7 +157,7 @@ class PsoeSeeder(BaseSeeder):
             tenant_id, {"email": "safety@aviasafe.com", "name": "Safety Manager"}
         )
         auditor = AUDITORS.get(
-            tenant_id, {"email": "smd@demostate.test", "name": "Auditor"}
+            tenant_id, {"email": "smd@demostate.com", "name": "Auditor"}
         )
 
         doc = {

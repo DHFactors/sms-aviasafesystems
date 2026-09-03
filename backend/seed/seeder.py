@@ -238,7 +238,7 @@ def _generic_user_spec(tid: str, shorthand: str, token: str) -> dict:
     meta = _GENERIC_ROLE_META[token]
     return {
         "uid": f"{token}-{tid}-001",
-        "email": f"{token}@{tid}.test",
+        "email": f"{token}@{tid}.com",
         "password": f"{token}_{shorthand}_2026",
         "full_name": meta["full_name"],
         "organization": next(t["name"] for t in GENERIC_TENANT_CONFIG if t["id"] == tid),

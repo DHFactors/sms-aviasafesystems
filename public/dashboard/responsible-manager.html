@@ -53,6 +53,11 @@
         .loading-state i { font-size: 1.5rem; margin-right: 0.5rem; }
         .empty-state { text-align: center; padding: 3rem; color: #64748b; }
         .info-banner { background: #e3f2fd; color: #1565c0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.9rem; display: flex; align-items: center; gap: 0.75rem; }
+        /* Skeleton loaders for cold-start — shown until real stats arrive */
+        .skeleton { background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 37%, #e2e8f0 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; }
+        @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+        .skel-stat { height: 72px; border-radius: 10px; }
+        .skel-row { height: 18px; margin: 6px 0; }
         @media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,7 +95,13 @@
         <span>Showing items assigned to <strong id="assigneeLabel">you</strong> in your department.</span>
     </div>
 
-    <div id="statsRow" class="stats-row"></div>
+    <div id="statsRow" class="stats-row">
+        <!-- Skeleton shown while waiting for Render cold-boot / API response -->
+        <div class="stat-card skel-stat skeleton"></div>
+        <div class="stat-card skel-stat skeleton"></div>
+        <div class="stat-card skel-stat skeleton"></div>
+        <div class="stat-card skel-stat skeleton"></div>
+    </div>
 
     <div class="filter-bar">
         <label>Status:</label>
@@ -207,9 +218,12 @@ async function loadTasks() {
     const loading = document.getElementById('loadingIndicator');
     const empty = document.getElementById('emptyIndicator');
     const statusSel = document.getElementById('filterStatus');
+    const statsRow = document.getElementById('statsRow');
     tbody.innerHTML = '';
     loading.style.display = 'flex';
     empty.style.display = 'none';
+    // Keep skeleton visible until real stats render; never show "No tasks" during loading
+    if (statsRow) statsRow.style.opacity = '0.7';
 
     try {
         const params = new URLSearchParams();
@@ -233,11 +247,15 @@ async function loadTasks() {
         statusSel.value = current;
 
         renderStats(allRows);
+        if (statsRow) statsRow.style.opacity = '1';
         renderTable();
         loading.style.display = 'none';
     } catch (err) {
+        if (statsRow) statsRow.style.opacity = '1';
+        // On error (e.g. Render cold-boot 502/timeout), keep empty hidden and show error row
+        empty.style.display = 'none';
         loading.style.display = 'none';
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message} — backend waking, please wait and retry.</td></tr>`;
     }
 }
 

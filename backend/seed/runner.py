@@ -305,9 +305,9 @@ def run(
         from seed.users import create_user
 
         # AE, Safety Manager, and Pilot/Reporter per tenant
-        ae_email_base = ["ae@buddha.test", "ae@yeti.test", "ae@sita.test"]
-        sm_email_base = ["safety@buddha.test", "safety@yeti.test", "safety@sita.test"]
-        pilot_email_base = ["pilot@buddha.test", "pilot@yeti.test", "pilot@sita.test"]
+        ae_email_base = ["ae@buddha.com", "ae@yeti.com", "ae@sita.com"]
+        sm_email_base = ["safety@buddha.com", "safety@yeti.com", "safety@sita.com"]
+        pilot_email_base = ["pilot@buddha.com", "pilot@yeti.com", "pilot@sita.com"]
 
         for idx, tid in enumerate(step5_tenant_ids):
             profile = next(p for p in OPERATOR_PROFILES if p["id"] == tid)
@@ -448,7 +448,7 @@ def run(
                 department="Safety",
                 scope="Annual SMS surveillance",
                 auditor_name=psoe_t["auditor_name"],
-                assessor_email=f"ae@{tid}.test",
+                assessor_email=f"ae@{tid}.com",
                 assessment_date=psoe_t["assessment_date"],
                 template_version="1.0.0",
                 responses=responses,

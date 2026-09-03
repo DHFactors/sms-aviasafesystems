@@ -75,7 +75,7 @@ def _patch(monkeypatch, db):
 
 
 def _user(role="SUPER_ADMIN"):
-    return {"uid": "super-1", "email": "super-admin@aviasafesystems.test", "role": role, "tenant_id": None}
+    return {"uid": "super-1", "email": "super-admin@aviasafesystems.com", "role": role, "tenant_id": None}
 
 
 def _client(user=None):

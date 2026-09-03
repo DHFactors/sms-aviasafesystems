@@ -96,7 +96,7 @@ def _patch_admin_db(monkeypatch, db):
     monkeypatch.setattr("app.routes.admin.get_db", lambda: db)
 
 
-def _user(role="SUPER_ADMIN", email="super-admin@aviasafesystems.test", tenant_id=None):
+def _user(role="SUPER_ADMIN", email="super-admin@aviasafesystems.com", tenant_id=None):
     return {"uid": "dev-1", "email": email, "role": role, "tenant_id": tenant_id}
 
 

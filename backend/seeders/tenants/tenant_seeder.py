@@ -67,26 +67,26 @@ _USER_ROLE_META: Dict[str, Dict[str, str]] = {
 
 USERS: Dict[str, List[Dict[str, str]]] = {
     "fixedwing": [
-        {"email": "ae@fixedwing.test", "role": "AIRLINE_ADMIN", "department": "Executive"},
-        {"email": "safety@fixedwing.test", "role": "AIRLINE_ADMIN", "department": "Safety"},
-        {"email": "camo@fixedwing.test", "role": "DEPT_ADMIN", "department": "CAMO"},
-        {"email": "145@fixedwing.test", "role": "DEPT_ADMIN", "department": "Part-145"},
-        {"email": "ops@fixedwing.test", "role": "DEPT_ADMIN", "department": "Flight Operations"},
-        {"email": "staff@fixedwing.test", "role": "USER", "department": ""},
+        {"email": "ae@fixedwing.com", "role": "AIRLINE_ADMIN", "department": "Executive"},
+        {"email": "safety@fixedwing.com", "role": "AIRLINE_ADMIN", "department": "Safety"},
+        {"email": "camo@fixedwing.com", "role": "DEPT_ADMIN", "department": "CAMO"},
+        {"email": "145@fixedwing.com", "role": "DEPT_ADMIN", "department": "Part-145"},
+        {"email": "ops@fixedwing.com", "role": "DEPT_ADMIN", "department": "Flight Operations"},
+        {"email": "staff@fixedwing.com", "role": "USER", "department": ""},
     ],
     "rotarywing": [
-        {"email": "ae@rotarywing.test", "role": "AIRLINE_ADMIN", "department": "Executive"},
-        {"email": "safety@rotarywing.test", "role": "AIRLINE_ADMIN", "department": "Safety"},
-        {"email": "camo@rotarywing.test", "role": "DEPT_ADMIN", "department": "CAMO"},
-        {"email": "145@rotarywing.test", "role": "DEPT_ADMIN", "department": "Part-145"},
-        {"email": "ops@rotarywing.test", "role": "DEPT_ADMIN", "department": "Flight Operations"},
-        {"email": "staff@rotarywing.test", "role": "USER", "department": ""},
+        {"email": "ae@rotarywing.com", "role": "AIRLINE_ADMIN", "department": "Executive"},
+        {"email": "safety@rotarywing.com", "role": "AIRLINE_ADMIN", "department": "Safety"},
+        {"email": "camo@rotarywing.com", "role": "DEPT_ADMIN", "department": "CAMO"},
+        {"email": "145@rotarywing.com", "role": "DEPT_ADMIN", "department": "Part-145"},
+        {"email": "ops@rotarywing.com", "role": "DEPT_ADMIN", "department": "Flight Operations"},
+        {"email": "staff@rotarywing.com", "role": "USER", "department": ""},
     ],
     "demoairport": [
-        {"email": "ae@demoairport.test", "role": "AIRLINE_ADMIN", "department": "Executive"},
-        {"email": "safety@demoairport.test", "role": "AIRLINE_ADMIN", "department": "Safety"},
-        {"email": "ops@demoairport.test", "role": "DEPT_ADMIN", "department": "Flight Operations"},
-        {"email": "staff@demoairport.test", "role": "USER", "department": ""},
+        {"email": "ae@demoairport.com", "role": "AIRLINE_ADMIN", "department": "Executive"},
+        {"email": "safety@demoairport.com", "role": "AIRLINE_ADMIN", "department": "Safety"},
+        {"email": "ops@demoairport.com", "role": "DEPT_ADMIN", "department": "Flight Operations"},
+        {"email": "staff@demoairport.com", "role": "USER", "department": ""},
     ],
 }
 

@@ -6,7 +6,7 @@
 #          CanCapService, linking each CAN to an existing seeded hazard.
 #
 # Actor mapping:
-#   * CAN issuer  -> Safety Manager (safety@*.test)
+#   * CAN issuer  -> Safety Manager (safety@*.com)
 #   * CAN assignee-> Part-145 / CAMO / Ops depending on the hazard type
 #
 # Each CAN resolves its hazard via the Hazard.id uuid so it always links to a
@@ -53,9 +53,9 @@ def _uid_for(email: str) -> str:
 
 # Safety Manager issuer per tenant (used for issued_by / issued_by_uid).
 ISSUERS: Dict[str, Dict[str, str]] = {
-    "fixedwing": {"email": "safety@fixedwing.test", "name": "Capt. Rajesh Thapa"},
-    "rotarywing": {"email": "safety@rotarywing.test", "name": "Capt. Hari Pandey"},
-    "demoairport": {"email": "safety@demoairport.test", "name": "Mr. Kumar Bhandari"},
+    "fixedwing": {"email": "safety@fixedwing.com", "name": "Capt. Rajesh Thapa"},
+    "rotarywing": {"email": "safety@rotarywing.com", "name": "Capt. Hari Pandey"},
+    "demoairport": {"email": "safety@demoairport.com", "name": "Mr. Kumar Bhandari"},
 }
 
 # =============================================================================
@@ -79,7 +79,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 3,
             "initial_probability": 2,
             "assigned_to_name": "Mr. Dipak Rai",
-            "assigned_to_email": "145@fixedwing.test",
+            "assigned_to_email": "145@fixedwing.com",
             "department": "Part-145",
             "hazard_keywords": ["engine oil pressure", "oil pressure"],
         },
@@ -99,7 +99,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 3,
             "initial_probability": 2,
             "assigned_to_name": "Mr. Suresh Ghale",
-            "assigned_to_email": "camo@fixedwing.test",
+            "assigned_to_email": "camo@fixedwing.com",
             "department": "CAMO",
             "hazard_keywords": ["cabin pressurization", "pressurization"],
         },
@@ -117,7 +117,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 4,
             "initial_probability": 3,
             "assigned_to_name": "Capt. Sanjay Gurung",
-            "assigned_to_email": "ops@fixedwing.test",
+            "assigned_to_email": "ops@fixedwing.com",
             "department": "Flight Operations",
             "hazard_keywords": ["unstabilized approach", "unstable approach"],
         },
@@ -138,7 +138,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 5,
             "initial_probability": 1,
             "assigned_to_name": "Mr. Shiva Tamang",
-            "assigned_to_email": "145@rotarywing.test",
+            "assigned_to_email": "145@rotarywing.com",
             "department": "Part-145",
             "hazard_keywords": ["tail rotor blade", "tail rotor", "crack"],
         },
@@ -158,7 +158,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 4,
             "initial_probability": 2,
             "assigned_to_name": "Capt. Ram Koirala",
-            "assigned_to_email": "ops@rotarywing.test",
+            "assigned_to_email": "ops@rotarywing.com",
             "department": "Flight Operations",
             "hazard_keywords": ["tail rotor effectiveness", "lte"],
         },
@@ -178,7 +178,7 @@ CAN_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
             "initial_severity": 3,
             "initial_probability": 4,
             "assigned_to_name": "Mr. Ramesh Adhikari",
-            "assigned_to_email": "ops@demoairport.test",
+            "assigned_to_email": "ops@demoairport.com",
             "department": "Airport Operations",
             "hazard_keywords": ["foreign object", "fod", "debris"],
         },

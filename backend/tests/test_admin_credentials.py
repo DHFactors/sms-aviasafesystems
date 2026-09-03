@@ -173,7 +173,7 @@ def _patch_all(monkeypatch, db=None, auth=None, email_provider="none"):
 
 
 def _admin_user(role="SUPER_ADMIN"):
-    return {"uid": "super-1", "email": "super-admin@aviasafesystems.test", "role": role, "tenant_id": None}
+    return {"uid": "super-1", "email": "super-admin@aviasafesystems.com", "role": role, "tenant_id": None}
 
 
 def _client(user=None):
@@ -240,7 +240,7 @@ def test_create_tenant_with_credentials(monkeypatch):
     assert stored["contract"]["reference"] == "AVIA-NEW-2026-001"
     assert stored["users"][0]["email"] == "admin@newair.com"
     assert stored["safety_manager"]["email"] == "admin@newair.com"
-    assert stored["audit"]["created_by"] == "super-admin@aviasafesystems.test"
+    assert stored["audit"]["created_by"] == "super-admin@aviasafesystems.com"
     assert any(l["action"] == "TENANT_CREDENTIALS_CREATED" for l in db._stores["audit_logs"].values())
     # Auth user created with claims
     rec = auth.by_email["admin@newair.com"]

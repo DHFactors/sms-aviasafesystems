@@ -179,10 +179,13 @@ async def get_safety_manager(
 
 
 # Department accounts (email prefix) -> the single department they are scoped to.
-# Used to restrict 145 / CAMO users to only their own department's CANs & CAPs.
+# Used to restrict 145 / CAMO / Ops users to only their own department's CANs & CAPs.
+# Flight Operations users (ops@) must be scoped similarly to Part-145/CAMO;
+# alias normalization in master_register ensures string variants still match.
 DEPARTMENT_SCOPE_PREFIXES = {
     "145": "Part-145",
     "camo": "CAMO",
+    "ops": "Flight Operations",
 }
 
 
