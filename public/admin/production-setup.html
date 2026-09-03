@@ -319,11 +319,18 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
     </div>
 </div>
 
-<!-- CONFIRM MODAL -->
+<!-- CONFIRM MODAL — now captures SETUP_SECRET inline for destructive actions -->
 <div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
-    <div style="background:#fff;padding:26px;border-radius:10px;max-width:460px;width:90%;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:480px;width:90%;">
         <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
         <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div id="confirmSetupKeyWrap" style="display:none;margin-top:14px;">
+            <label for="confirmSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="confirmSetupKey" placeholder="Enter setup key to authorize this destructive action" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <small style="display:block;color:#94a3b8;font-size:.72rem;margin-top:4px;">Stored in this tab only (sessionStorage) — never sent except to verify this action.</small>
+            <div id="confirmSetupKeyError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
         <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
             <button class="btn" onclick="closeConfirm()">Cancel</button>
             <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
@@ -632,7 +639,7 @@ function requestDeleteUser(email, uid) {
     );
 }
 
-async function execDeleteUser(email, uid) {
+async function execDeleteUser(email, uid, setupKeyFromModal) {
     // Resolve tenant_id from cached user list for explicit payload (matches spec)
     var rec = null;
     try {
@@ -643,12 +650,13 @@ async function execDeleteUser(email, uid) {
         }) || null;
     } catch (e) { rec = null; }
     var tenant_id = rec ? (rec.tenant_id || '') : '';
-    // Prompt for SETUP_SECRET exactly like seeding/unseeding (AdminUI.ensureSetupKey)
-    var setup_key;
-    try {
-        setup_key = AdminUI.ensureSetupKey();
-    } catch (e) {
-        toast('Delete cancelled — ' + (e.message || 'setup key required'), 'error');
+    // Use setup key from confirmation modal (prompt inside warning modal), not global header/prompt
+    var setup_key = (setupKeyFromModal || '').trim();
+    if (!setup_key) {
+        try { setup_key = AdminUI.getSetupKey() || ''; } catch (e) { setup_key = ''; }
+    }
+    if (!setup_key) {
+        toast('Delete cancelled — setup key is required', 'error');
         return;
     }
     var body = { setup_key: setup_key };
@@ -757,7 +765,7 @@ function demoData(action) {
     var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
     if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP/Survey).', 'error'); return; }
     var scope = document.querySelector('input[name=demoScope]:checked').value;
-    var body = { setup_key: AdminUI.ensureSetupKey(), action: action, kinds: kinds };
+    var body = { action: action, kinds: kinds };
     if (scope === 'one') {
         var tid = document.getElementById('demoTenantSelect').value;
         if (!tid) { toast('Select a tenant.', 'error'); return; }
@@ -817,15 +825,24 @@ async function execDemo(body) {
 // ============================================================================
 
 async function seedPsoe() {
-    var area = document.getElementById('psoeArea');
-    if (!area) return;
-    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding PSOE baselines...</div>';
     var sel = document.getElementById('psoeTenant');
     var val = sel ? sel.value : '__all__';
     var force = !!(document.getElementById('psoeForce') && document.getElementById('psoeForce').checked);
-    var body = { setup_key: AdminUI.ensureSetupKey(), force: force };
+    var body = { force: force };
     if (val && val !== '__all__') body.tenant_ids = [val];
     else body.all = true;
+    var targetLabel = (val && val !== '__all__') ? 'tenant <code>' + esc(val) + '</code>' : '<strong>all tenants</strong>';
+    openConfirm(
+        'Confirm PSOE Seed',
+        'Seed PSOE baseline assessments (one COMPLETED + one DRAFT) for ' + targetLabel + (force ? ' with <strong>Force re-seed</strong>.' : '.') +
+        ' Existing assessments are skipped unless Force is checked.',
+        { type: 'psoe', body: body }
+    );
+}
+
+async function execPsoe(body) {
+    var area = document.getElementById('psoeArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding PSOE baselines...</div>';
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/psoe', body);
         var results = (resp.results || []).map(function (r) {
@@ -833,11 +850,12 @@ async function seedPsoe() {
             var count = (r.assessments || []).length;
             return '<li>' + esc(r.tenant_id) + ' — ' + count + ' assessment(s)</li>';
         }).join('');
-        area.innerHTML = '<div class="status-box success"><strong>PSOE seeding complete.</strong><ul style="margin:10px 0 0 18px;">' + results + '</ul></div>';
+        if (area) area.innerHTML = '<div class="status-box success"><strong>PSOE seeding complete.</strong><ul style="margin:10px 0 0 18px;">' + results + '</ul></div>';
         toast('PSOE baselines seeded.', 'success');
         loadAuditLog();
     } catch (err) {
-        area.innerHTML = '<div class="status-box error">PSOE seeding failed: ' + esc(err.message) + '</div>';
+        if (area) area.innerHTML = '<div class="status-box error">PSOE seeding failed: ' + esc(err.message) + '</div>';
+        toast('PSOE seeding failed: ' + err.message, 'error');
     }
 }
 
@@ -846,17 +864,25 @@ async function seedPsoe() {
 // ============================================================================
 
 async function seedStateRisk() {
+    openConfirm(
+        'Confirm State Risk Seed',
+        'Write the ICAO top-risk reference categories for the state-level SSP risk register. Global reference data — not tied to any specific tenant.',
+        { type: 'stateRisk', body: {} }
+    );
+}
+
+async function execStateRisk(body) {
     var area = document.getElementById('stateRiskArea');
-    if (!area) return;
-    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding state risk reference...</div>';
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding state risk reference...</div>';
     try {
-        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk', { setup_key: AdminUI.ensureSetupKey() });
-        area.innerHTML = '<div class="status-box success"><strong>State risk reference seeded:</strong> ' +
+        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk', body);
+        if (area) area.innerHTML = '<div class="status-box success"><strong>State risk reference seeded:</strong> ' +
             (resp.categories || resp.result && resp.result.categories || 0) + ' ICAO categories.</div>';
         toast('State risk reference seeded.', 'success');
         loadAuditLog();
     } catch (err) {
-        area.innerHTML = '<div class="status-box error">State risk seeding failed: ' + esc(err.message) + '</div>';
+        if (area) area.innerHTML = '<div class="status-box error">State risk seeding failed: ' + esc(err.message) + '</div>';
+        toast('State risk seeding failed: ' + err.message, 'error');
     }
 }
 
@@ -868,21 +894,61 @@ function openConfirm(title, html, action) {
     pendingConfirm = action;
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmText').innerHTML = html;
+    // Show setup-key field for destructive actions — prompt inside the warning modal
+    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'deleteUser');
+    var wrap = document.getElementById('confirmSetupKeyWrap');
+    var input = document.getElementById('confirmSetupKey');
+    var errEl = document.getElementById('confirmSetupKeyError');
+    if (wrap) wrap.style.display = needsKey ? 'block' : 'none';
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (input) {
+        // Prefill from sessionStorage if already entered this tab
+        try { input.value = AdminUI.getSetupKey() || ''; } catch (e) { input.value = ''; }
+        input.style.borderColor = '#cbd5e1';
+    }
     document.getElementById('confirmModal').style.display = 'flex';
+    if (needsKey && input) setTimeout(function () { input.focus(); input.select(); }, 50);
 }
 
 function closeConfirm() {
     document.getElementById('confirmModal').style.display = 'none';
+    var errEl = document.getElementById('confirmSetupKeyError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
     pendingConfirm = null;
 }
 
 document.getElementById('confirmOkBtn').addEventListener('click', function () {
     var action = pendingConfirm;
+    if (!action) return;
+    // For destructive actions, require setup key from the modal input
+    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'deleteUser';
+    var setupKey = '';
+    if (needsKey) {
+        var input = document.getElementById('confirmSetupKey');
+        var errEl = document.getElementById('confirmSetupKeyError');
+        setupKey = input ? input.value.trim() : '';
+        if (!setupKey) {
+            if (errEl) { errEl.textContent = 'Setup key is required to authorize this destructive action.'; errEl.style.display = 'block'; }
+            if (input) { input.style.borderColor = '#dc2626'; input.focus(); }
+            return; // keep modal open
+        }
+        try { AdminUI.setSetupKey(setupKey); } catch (e) {}
+        // Inject into pending body for demo/psoe/stateRisk/deleteUser
+        if (action.body) action.body.setup_key = setupKey;
+        if (action.type === 'deleteUser') {
+            // deleteUser stores email/uid separately; also inject for exec
+            action.setup_key = setupKey;
+        }
+        if (action.type === 'psoe' || action.type === 'stateRisk') {
+            action.body.setup_key = setupKey;
+        }
+    }
     document.getElementById('confirmModal').style.display = 'none';
     pendingConfirm = null;
-    if (!action) return;
     if (action.type === 'demo') execDemo(action.body);
-    if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid);
+    else if (action.type === 'psoe') execPsoe(action.body);
+    else if (action.type === 'stateRisk') execStateRisk(action.body);
+    else if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid, action.setup_key);
 });
 </script>
 
