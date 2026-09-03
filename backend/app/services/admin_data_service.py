@@ -325,14 +325,16 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
 
     counts_total = {k: 0 for k in kinds}
     base = _now()
+    # Canonical UUID string for this tenant slug (e.g. "fixedwing" -> uuid5)
+    tuuid = _tid(tid)
 
     async with session_scope() as session:
         if "vsr" in kinds:
-            counts_total["vsr"] = await _seed_reports(session, _tid(tid), "voluntary", seed_counts.get("vsr", 0), base)
+            counts_total["vsr"] = await _seed_reports(session, tuuid, "voluntary", seed_counts.get("vsr", 0), base)
         if "mor" in kinds:
-            counts_total["mor"] = await _seed_reports(session, _tid(tid), "mandatory", seed_counts.get("mor", 0), base)
+            counts_total["mor"] = await _seed_reports(session, tuuid, "mandatory", seed_counts.get("mor", 0), base)
         if "survey" in kinds:
-            counts_total["survey"] = await _seed_surveys(session, _tid(tid), seed_counts.get("survey", 0), base)
+            counts_total["survey"] = await _seed_surveys(session, tuuid, seed_counts.get("survey", 0), base)
 
         if "can" in kinds or "cap" in kinds:
             can_ids = []
@@ -341,7 +343,7 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                 cat = random.choice(_ICAO_CATEGORIES)
                 created = base - timedelta(days=i)
                 hazard = Hazard(
-                    tenant_id=uuid.UUID(tid),
+                    tenant_id=uuid.UUID(tuuid),
                     hazard_id=f"{tid}-HZ-DEMO-{i + 1:03d}",
                     title=f"Dummy hazard {i + 1} for demonstration",
                     description="Dummy demonstration hazard created by the Super-Admin seed tool.",
@@ -363,9 +365,9 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                     updated_at=created,
                 )
                 session.add(hazard)
-                session.flush()
+                await session.flush()
                 can = Can(
-                    tenant_id=uuid.UUID(tid),
+                    tenant_id=uuid.UUID(tuuid),
                     hazard_id=hazard.id,
                     can_reference=f"CAN-DEMO-{i + 1:03d}",
                     title=f"Dummy corrective action {i + 1}",
@@ -386,7 +388,7 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                     updated_at=created,
                 )
                 session.add(can)
-                session.flush()
+                await session.flush()
                 can_ids.append((can.id, can.can_reference, created))
             counts_total["can"] = len(can_ids)
 
@@ -395,7 +397,7 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                 for j in range(n_cap):
                     can_id, can_ref, created = can_ids[j]
                     session.add(Cap(
-                        tenant_id=uuid.UUID(tid),
+                        tenant_id=uuid.UUID(tuuid),
                         can_id=can_id,
                         cap_reference=f"{can_ref}-CAP-{j + 1:03d}",
                         action_plan="Dummy corrective/preventive action plan describing the mitigation steps.",
