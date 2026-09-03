@@ -420,7 +420,15 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
 
 
 async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:
-    """Remove only the Super-Admin-seeded dummy rows for one tenant."""
+    """Remove only the Super-Admin-seeded dummy rows for one tenant.
+
+    FK-safe deletion order (child → parent):
+      1. CAPs  (FK cap.can_id → cans.id)
+      2. CANs  (FK cans.hazard_id → hazards.id)
+      3. Reports (VSR/MOR) + Surveys/SurveyResponses (no FK to hazards)
+      4. Hazards (parent, deleted last)
+    Within each step the operation is idempotent — zero rows is not an error.
+    """
     tid = _validate_id(tenant_id, "tenant id")
     _get_tenant(tid)
     kinds = _normalize_kinds(kinds)
@@ -429,25 +437,20 @@ async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[
     tuuid = _tid(tid)
 
     async with session_scope() as session:
-        if "survey" in kinds:
-            r = await session.execute(delete(SurveyResponse).where(
-                SurveyResponse.tenant_id == uuid.UUID(tuuid), SurveyResponse.is_demo == True))
-            counts["survey"] = r.rowcount
-
+        # Step 1: CAPs — child of CANs
         if "can" in kinds or "cap" in kinds:
-            # CAPs are children of CANs. When removing CANs, their CAPs must go
-            # first (FK), so delete CAPs whenever either kind is requested.
             r = await session.execute(delete(Cap).where(
                 Cap.tenant_id == uuid.UUID(tuuid), Cap.is_demo == True))
             if "cap" in kinds:
                 counts["cap"] = r.rowcount
-            if "can" in kinds:
-                await session.execute(delete(Hazard).where(
-                    Hazard.tenant_id == uuid.UUID(tuuid), Hazard.is_demo == True))
-                r = await session.execute(delete(Can).where(
-                    Can.tenant_id == uuid.UUID(tuuid), Can.is_demo == True))
-                counts["can"] = r.rowcount
 
+        # Step 2: CANs — child of Hazards
+        if "can" in kinds:
+            r = await session.execute(delete(Can).where(
+                Can.tenant_id == uuid.UUID(tuuid), Can.is_demo == True))
+            counts["can"] = r.rowcount
+
+        # Step 3: Reports (VSR/MOR) + Surveys
         if "vsr" in kinds:
             r = await session.execute(delete(Report).where(
                 Report.tenant_id == uuid.UUID(tuuid), Report.is_demo == True,
@@ -458,6 +461,22 @@ async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[
                 Report.tenant_id == uuid.UUID(tuuid), Report.is_demo == True,
                 Report.report_type == "mandatory"))
             counts["mor"] = r.rowcount
+        if "survey" in kinds:
+            # SurveyResponse has no FK to Survey in this schema, but delete
+            # child responses before parent surveys for safety / future FKs.
+            r = await session.execute(delete(SurveyResponse).where(
+                SurveyResponse.tenant_id == uuid.UUID(tuuid), SurveyResponse.is_demo == True))
+            # Keep the count on "survey" as the SurveyResponse count for backwards
+            # compat (existing callers expect counts["survey"]), but also remove
+            # parent Survey rows so no orphan survey headers remain.
+            counts["survey"] = r.rowcount
+            await session.execute(delete(Survey).where(
+                Survey.tenant_id == uuid.UUID(tuuid), Survey.is_demo == True))
+
+        # Step 4: Hazards — parent of CANs, deleted last
+        if "can" in kinds:
+            await session.execute(delete(Hazard).where(
+                Hazard.tenant_id == uuid.UUID(tuuid), Hazard.is_demo == True))
 
     _audit("DEMO_DATA_UNSEED", actor, tid,
            f"Removed {', '.join(f'{k}={counts[k]}' for k in kinds)} dummy rows for tenant {tid}")
