@@ -338,6 +338,40 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
     </div>
 </div>
 
+<!-- LIFECYCLE MANAGE MODAL — commercial status + date range for tenants/regulators -->
+<div id="lifecycleModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:12px;max-width:520px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);">
+        <h3 style="margin:0 0 4px;color:#0f172a;"><i class="fas fa-sliders" style="color:var(--color-brand-600);"></i> Manage <span id="lifecycleEntityType">Tenant</span></h3>
+        <p id="lifecycleEntityLabel" style="margin:0 0 14px;color:#64748b;font-size:.85rem;"></p>
+        <div class="form-group">
+            <label for="lifecycleStatus">Lifecycle Status *</label>
+            <select id="lifecycleStatus" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
+                <option value="demo">Demo</option>
+                <option value="trial">Trial</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="retired">Retired</option>
+                <option value="cancelled">Cancelled</option>
+            </select>
+            <small style="color:#94a3b8;">Demo/Trial are non-billable; Suspended blocks auth; Retired/Cancelled are terminal.</small>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label for="lifecycleFrom">From Date</label><input type="date" id="lifecycleFrom" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;"></div>
+            <div class="form-group"><label for="lifecycleTo">To Date</label><input type="date" id="lifecycleTo" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;"></div>
+        </div>
+        <div style="margin-top:14px;">
+            <label for="lifecycleSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="lifecycleSetupKey" placeholder="Enter setup key to authorize this change" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <div id="lifecycleSetupKeyError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+            <button class="btn" onclick="closeLifecycleModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveLifecycleModal()"><i class="fas fa-check"></i> Save</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ============================================================================
 // AUTH — SUPER_ADMIN only
@@ -473,13 +507,19 @@ async function loadExistingRegulators() {
         var regs = resp.regulators || [];
         if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>Regulator</th><th>Country</th><th>Status</th><th>Operators</th></tr></thead><tbody>' +
+            '<th>Regulator</th><th>Country</th><th>Status</th><th>Operators</th><th>Dates</th><th>Manage</th></tr></thead><tbody>' +
             regs.map(function (r) {
                 var ops = r.operator_tenant_ids || [];
+                var fromD = r.from_date || (r.contract && (r.contract.from_date || r.contract.start_date)) || '';
+                var toD = r.to_date || (r.contract && (r.contract.to_date || r.contract.end_date)) || '';
+                var dates = (fromD || toD) ? esc((fromD || '?') + ' → ' + (toD || '?')) : '—';
+                var statusVal = (r.status || (r.active ? 'active' : 'inactive'));
                 return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
                     '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
-                    '<td>' + regulatorBadge(r.status || (r.active ? 'active' : 'inactive')) + '</td>' +
-                    '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td></tr>';
+                    '<td>' + regulatorBadge(statusVal) + '</td>' +
+                    '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td>' +
+                    '<td style="white-space:nowrap;font-size:.78rem;">' + dates + '</td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'regulator\', \'' + esc(r.id).replace(/'/g, "\\'") + '\', \'' + esc(statusVal).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
             }).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
@@ -496,7 +536,7 @@ async function loadExistingTenants() {
         if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
             '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Status</th><th>Payment</th><th>Contract</th>' +
-            '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th></tr></thead><tbody>' +
+            '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Manage</th></tr></thead><tbody>' +
             tenants.map(buildTenantRow).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
@@ -523,15 +563,18 @@ function buildTenantRow(t) {
         : esc(t.regulator_id || '—');
     var contract = (t.contract && (t.contract.start_date || t.contract.end_date))
         ? esc((t.contract.start_date || '?') + ' \u2192 ' + (t.contract.end_date || '?'))
-        : '—';
+        : (t.from_date || t.to_date ? esc((t.from_date || '?') + ' → ' + (t.to_date || '?')) : '—');
     var st = t.status || (t.active === false ? 'INACTIVE' : 'ACTIVE');
+    var fromD = t.from_date || (t.contract && (t.contract.from_date || t.contract.start_date)) || '';
+    var toD = t.to_date || (t.contract && (t.contract.to_date || t.contract.end_date)) || '';
     return '<tr><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
         '<td>' + reg + '</td>' +
         '<td>' + esc(t.country || '—') + '</td>' +
         '<td>' + statusBadge(st) + '</td>' +
         '<td>' + paymentBadge(t.payment_status) + '</td>' +
         '<td style="white-space:nowrap;">' + contract + '</td>' +
-        '<td>' + (c.surveys || 0) + '</td><td>' + (c.hazards || 0) + '</td><td>' + (c.reports || 0) + '</td><td>' + (c.cans || 0) + '</td></tr>';
+        '<td>' + (c.surveys || 0) + '</td><td>' + (c.hazards || 0) + '</td><td>' + (c.reports || 0) + '</td><td>' + (c.cans || 0) + '</td>' +
+        '<td><button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'tenant\', \'' + esc(t.id).replace(/'/g, "\\'") + '\', \'' + esc(st).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
 }
 
 function statusBadge(st) {
@@ -539,6 +582,9 @@ function statusBadge(st) {
     if (st === 'DEMO') return '<span class="badge badge-demo">DEMO</span>';
     if (st === 'TRIAL') return '<span class="badge badge-trial">TRIAL</span>';
     if (st === 'ACTIVE') return '<span class="badge badge-active">ACTIVE</span>';
+    if (st === 'SUSPENDED') return '<span class="badge badge-danger">SUSPENDED</span>';
+    if (st === 'RETIRED') return '<span class="badge" style="background:#fee2e2;color:#7f1d1d;">RETIRED</span>';
+    if (st === 'CANCELLED' || st === 'CANCELED') return '<span class="badge" style="background:#f1f5f9;color:#475569;">CANCELLED</span>';
     if (st === 'INACTIVE') return '<span class="badge badge-inactive">INACTIVE</span>';
     return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
 }
@@ -553,8 +599,14 @@ function paymentBadge(p) {
 
 function regulatorBadge(st) {
     st = (st || '').toLowerCase();
+    if (st === 'demo') return '<span class="badge badge-demo">DEMO</span>';
+    if (st === 'trial') return '<span class="badge badge-trial">TRIAL</span>';
     if (st === 'active') return '<span class="badge badge-success">active</span>';
-    return '<span class="badge badge-danger">inactive</span>';
+    if (st === 'suspended') return '<span class="badge badge-danger">suspended</span>';
+    if (st === 'retired') return '<span class="badge" style="background:#fee2e2;color:#7f1d1d;">retired</span>';
+    if (st === 'cancelled' || st === 'canceled') return '<span class="badge" style="background:#f1f5f9;color:#475569;">cancelled</span>';
+    if (st === 'inactive') return '<span class="badge badge-inactive">inactive</span>';
+    return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
 }
 
 // ============================================================================
@@ -943,6 +995,84 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     else if (action.type === 'psoe') execPsoe(action.body);
     else if (action.type === 'stateRisk') execStateRisk(action.body);
     else if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid, action.setup_key);
+});
+
+// ============================================================================
+// LIFECYCLE MANAGE MODAL — tenants & regulators
+// ============================================================================
+
+var pendingLifecycle = null;
+
+function openLifecycleModal(type, id, status, fromDate, toDate) {
+    pendingLifecycle = { type: type, id: id };
+    document.getElementById('lifecycleEntityType').textContent = type === 'regulator' ? 'Regulator' : 'Tenant';
+    document.getElementById('lifecycleEntityLabel').innerHTML = 'ID: <code>' + esc(id) + '</code> — current: ' + esc(status || '—');
+    var sel = document.getElementById('lifecycleStatus');
+    if (sel) sel.value = (status || 'active').toLowerCase();
+    var fromEl = document.getElementById('lifecycleFrom');
+    var toEl = document.getElementById('lifecycleTo');
+    if (fromEl) fromEl.value = fromDate || '';
+    if (toEl) toEl.value = toDate || '';
+    var keyInput = document.getElementById('lifecycleSetupKey');
+    var errEl = document.getElementById('lifecycleSetupKeyError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (keyInput) {
+        try { keyInput.value = AdminUI.getSetupKey() || ''; } catch (e) { keyInput.value = ''; }
+        keyInput.style.borderColor = '#cbd5e1';
+    }
+    document.getElementById('lifecycleModal').style.display = 'flex';
+    if (keyInput) setTimeout(function () { keyInput.focus(); keyInput.select(); }, 50);
+}
+
+function closeLifecycleModal() {
+    document.getElementById('lifecycleModal').style.display = 'none';
+    var errEl = document.getElementById('lifecycleSetupKeyError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    pendingLifecycle = null;
+}
+
+async function saveLifecycleModal() {
+    if (!pendingLifecycle) return;
+    var status = (document.getElementById('lifecycleStatus') || {}).value || '';
+    var fromDate = (document.getElementById('lifecycleFrom') || {}).value || '';
+    var toDate = (document.getElementById('lifecycleTo') || {}).value || '';
+    var keyInput = document.getElementById('lifecycleSetupKey');
+    var errEl = document.getElementById('lifecycleSetupKeyError');
+    var setupKey = keyInput ? keyInput.value.trim() : '';
+    if (!setupKey) {
+        if (errEl) { errEl.textContent = 'Setup key is required.'; errEl.style.display = 'block'; }
+        if (keyInput) { keyInput.style.borderColor = '#dc2626'; keyInput.focus(); }
+        return;
+    }
+    if (fromDate && toDate && fromDate > toDate) {
+        if (errEl) { errEl.textContent = 'From date must be before To date.'; errEl.style.display = 'block'; }
+        toast('From date must be before To date', 'error');
+        return;
+    }
+    try { AdminUI.setSetupKey(setupKey); } catch (e) {}
+    var isReg = pendingLifecycle.type === 'regulator';
+    var id = pendingLifecycle.id;
+    var path = isReg
+        ? '/api/v1/admin/regulators/' + encodeURIComponent(id) + '/status'
+        : '/api/v1/admin/tenants/' + encodeURIComponent(id) + '/status';
+    var body = { setup_key: setupKey, status: status };
+    if (fromDate) { body.from_date = fromDate; body.contract_start_date = fromDate; }
+    if (toDate) { body.to_date = toDate; body.contract_end_date = toDate; }
+    try {
+        var resp = await AdminUI.apiPost(path, body);
+        toast((isReg ? 'Regulator ' : 'Tenant ') + id + ' → ' + (resp.regulator ? resp.regulator.status : resp.tenant ? resp.tenant.status : status), 'success');
+        closeLifecycleModal();
+        if (isReg) loadExistingRegulators(); else loadExistingTenants();
+        loadAuditLog();
+    } catch (err) {
+        if (errEl) { errEl.textContent = err.message || String(err); errEl.style.display = 'block'; }
+        toast('Save failed: ' + (err.message || String(err)), 'error');
+    }
+}
+
+// Close lifecycle modal on backdrop click
+document.getElementById('lifecycleModal').addEventListener('click', function (e) {
+    if (e.target === this) closeLifecycleModal();
 });
 </script>
 

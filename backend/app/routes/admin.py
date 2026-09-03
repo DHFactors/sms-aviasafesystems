@@ -660,6 +660,8 @@ class TenantStatusRequest(BaseModel):
     contract_end_date: Optional[str] = None
     payment_status: Optional[str] = None
     trial_end_date: Optional[str] = None
+    from_date: Optional[str] = Field(None, description="Commercial lifecycle start (YYYY-MM-DD), alias for contract_start_date")
+    to_date: Optional[str] = Field(None, description="Commercial lifecycle end (YYYY-MM-DD), alias for contract_end_date")
 
 
 class DemoDataRequest(BaseModel):
@@ -688,10 +690,12 @@ async def admin_update_tenant_status(
     req: TenantStatusRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Update a tenant's lifecycle status (Demo/Trial/Active/Inactive).
+    """Update a tenant's commercial lifecycle status + date range.
 
-    `status` may be set explicitly or derived from the contract dates and
-    payment status. Requires a SUPER_ADMIN token + admin setup key.
+    Supports demo, trial, active, suspended, retired, cancelled (and legacy
+    inactive). from_date/to_date are commercial aliases for contract
+    start/end and are stored at top-level plus inside contract. Requires
+    SUPER_ADMIN + setup key and is audit-logged.
     """
     _verify_admin_setup(req.setup_key)
     from app.services.admin_data_service import update_tenant_status
@@ -704,6 +708,8 @@ async def admin_update_tenant_status(
             contract_end_date=req.contract_end_date,
             payment_status=req.payment_status,
             trial_end_date=req.trial_end_date,
+            from_date=req.from_date,
+            to_date=req.to_date,
         )
         return {"success": True, "tenant": doc}
     except ValueError as e:
@@ -715,6 +721,71 @@ async def admin_update_tenant_status(
     except Exception as e:
         logger.error(f"Update tenant status failed ({tenant_id}): {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class RegulatorStatusRequest(BaseModel):
+    setup_key: str = Field(..., description="Admin setup key (SETUP_SECRET)")
+    status: Optional[str] = Field(None, description="Lifecycle status: demo, trial, active, suspended, retired, cancelled, inactive")
+    from_date: Optional[str] = Field(None, description="Commercial start (YYYY-MM-DD)")
+    to_date: Optional[str] = Field(None, description="Commercial end (YYYY-MM-DD)")
+    contract_start_date: Optional[str] = Field(None, description="Alias for from_date")
+    contract_end_date: Optional[str] = Field(None, description="Alias for to_date")
+
+
+@router.post("/regulators/{regulator_id}/status", status_code=status.HTTP_200_OK)
+async def admin_update_regulator_status(
+    regulator_id: str,
+    req: RegulatorStatusRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Update a regulator's commercial lifecycle status + date range.
+
+    Supports demo, trial, active, suspended, retired, cancelled. from_date/to_date
+    are stored at top-level and inside contract. Requires SUPER_ADMIN + setup key,
+    audit-logged as REGULATOR_STATUS_UPDATED.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.regulator_service import update_regulator_status
+
+    # Normalize aliases
+    from_d = req.from_date or req.contract_start_date
+    to_d = req.to_date or req.contract_end_date
+    try:
+        doc = update_regulator_status(
+            regulator_id,
+            user,
+            status=req.status,
+            from_date=from_d,
+            to_date=to_d,
+            contract_start_date=req.contract_start_date,
+            contract_end_date=req.contract_end_date,
+        )
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(status_code=404 if "not found" in msg.lower() else 400, detail=msg)
+    except Exception as e:
+        logger.error(f"Update regulator status failed ({regulator_id}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="REGULATOR_STATUS_UPDATED",
+        user=user.get("email"),
+        tenant_id=regulator_id,
+        target_type="regulator",
+        target_id=regulator_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={
+            "status": doc.get("status"),
+            "from_date": from_d,
+            "to_date": to_d,
+            "by_uid": user.get("uid"),
+        },
+    )
+    logger.info(f"Regulator {regulator_id} status -> {doc.get('status')} by {user.get('email')}")
+    return {"success": True, "regulator": doc}
 
 
 @router.post("/demo-data", status_code=status.HTTP_200_OK)

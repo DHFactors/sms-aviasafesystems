@@ -28,7 +28,9 @@ from app.db.db_models import Can, Cap, Hazard, Report, Survey, SurveyResponse
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.production_seed import _audit, _validate_id
 
-TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "INACTIVE"}
+TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "SUSPENDED", "RETIRED", "CANCELLED", "INACTIVE"}
+# Back-compat alias: retired/cancelled written as single string maps to RETIRED
+TENANT_STATUS_ALIASES = {"RETIRED/CANCELLED": "RETIRED", "RETIRED_CANCELLED": "RETIRED", "CANCELED": "CANCELLED"}
 PAYMENT_STATUSES = {"paid", "unpaid", "not_applicable"}
 DEMO_KINDS = {"vsr", "mor", "can", "cap", "survey"}
 
@@ -81,7 +83,7 @@ def derive_tenant_status(contract: Optional[Dict[str, Any]],
                          explicit: Optional[str] = None) -> str:
     """Compute the tenant lifecycle status (uppercase).
 
-    Returns one of ``DEMO / TRIAL / ACTIVE / INACTIVE``.
+    Returns one of ``DEMO / TRIAL / ACTIVE / SUSPENDED / RETIRED / CANCELLED / INACTIVE``.
 
     Rules (an explicit `status` wins over everything):
       * payment_status == 'unpaid'             -> INACTIVE
@@ -89,9 +91,14 @@ def derive_tenant_status(contract: Optional[Dict[str, Any]],
       * today < contract.start_date            -> TRIAL (contract not yet started)
       * otherwise                              -> ACTIVE
     ``DEMO`` is only ever set explicitly (developer/sandbox tenants).
+    ``RETIRED`` and ``CANCELLED`` are terminal commercial states.
     """
     if explicit:
-        norm = str(explicit).strip().upper()
+        norm = str(explicit).strip().upper().replace("/", "_").replace("-", "_")
+        # Handle retired/cancelled alias
+        if norm in ("RETIRED_CANCELLED", "RETIRED/CANCELLED"):
+            norm = "RETIRED"
+        norm = TENANT_STATUS_ALIASES.get(norm, norm)
         if norm not in TENANT_STATUSES:
             raise ValueError(f"invalid status '{explicit}' (allowed: {sorted(TENANT_STATUSES)})")
         return norm
@@ -118,21 +125,34 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
                          contract_start_date: Optional[str] = None,
                          contract_end_date: Optional[str] = None,
                          payment_status: Optional[str] = None,
-                         trial_end_date: Optional[str] = None) -> Dict[str, Any]:
+                         trial_end_date: Optional[str] = None,
+                         from_date: Optional[str] = None,
+                         to_date: Optional[str] = None) -> Dict[str, Any]:
     """Update a tenant's lifecycle status + contract/payment metadata.
 
-    Status is normalized to ``DEMO / TRIAL / ACTIVE / INACTIVE`` and payment to
+    Status is normalized to ``DEMO / TRIAL / ACTIVE / SUSPENDED / RETIRED / CANCELLED / INACTIVE`` and payment to
     ``paid / unpaid / not_applicable``. `status` may be set explicitly or left
-    None to derive it from the contract dates and payment status. Returns the
-    updated tenant document.
+    None to derive it from the contract dates and payment status. `from_date`/`to_date`
+    are aliases for `contract_start_date`/`contract_end_date` for commercial UI.
+    Returns the updated tenant document.
     """
     tid = _validate_id(tenant_id, "tenant id")
     doc = _get_tenant(tid)
 
+    # from_date/to_date are commercial aliases for contract dates
+    if from_date and not contract_start_date:
+        contract_start_date = from_date
+    if to_date and not contract_end_date:
+        contract_end_date = to_date
+
     if status is not None:
-        status = str(status).strip().upper()
-        if status not in TENANT_STATUSES:
+        norm = str(status).strip().upper().replace("/", "_").replace("-", "_")
+        if norm in ("RETIRED_CANCELLED", "RETIRED/CANCELLED"):
+            norm = "RETIRED"
+        norm = TENANT_STATUS_ALIASES.get(norm, norm)
+        if norm not in TENANT_STATUSES:
             raise ValueError(f"invalid status '{status}' (allowed: {sorted(TENANT_STATUSES)})")
+        status = norm
     if payment_status is not None:
         payment_status = str(payment_status).strip().lower()
         if payment_status in {"not applicable", "n/a", "na"}:
@@ -146,12 +166,22 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
         _parse_date(contract_end_date)
     if trial_end_date:
         _parse_date(trial_end_date)
+    if from_date:
+        _parse_date(from_date)
+    if to_date:
+        _parse_date(to_date)
 
     contract = dict(doc.get("contract") or {})
     if contract_start_date:
         contract["start_date"] = contract_start_date.strip()
     if contract_end_date:
         contract["end_date"] = contract_end_date.strip()
+    if from_date:
+        contract["start_date"] = from_date.strip()
+        contract["from_date"] = from_date.strip()
+    if to_date:
+        contract["end_date"] = to_date.strip()
+        contract["to_date"] = to_date.strip()
     if trial_end_date:
         contract["trial_end_date"] = trial_end_date.strip()
 
@@ -160,7 +190,7 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
 
     updates = {
         "status": resolved,
-        "active": resolved == "ACTIVE",
+        "active": resolved in ("ACTIVE", "TRIAL", "DEMO"),
         "contract": contract,
         "status_updated_at": now,
         "status_updated_by": actor.get("uid"),
@@ -168,6 +198,17 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
     }
     if payment_status:
         updates["payment_status"] = payment_status
+    # Store commercial date range at top-level for direct queries and UI display
+    if from_date:
+        updates["from_date"] = from_date.strip()
+        updates["contract_from_date"] = from_date.strip()
+    elif contract_start_date:
+        updates["from_date"] = contract_start_date.strip()
+    if to_date:
+        updates["to_date"] = to_date.strip()
+        updates["contract_to_date"] = to_date.strip()
+    elif contract_end_date:
+        updates["to_date"] = contract_end_date.strip()
 
     _tenant_ref(tid).set(updates, merge=True)
 
