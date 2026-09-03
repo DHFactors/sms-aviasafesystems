@@ -633,30 +633,52 @@ function requestDeleteUser(email, uid) {
 }
 
 async function execDeleteUser(email, uid) {
-    var body = { setup_key: AdminUI.ensureSetupKey() };
+    // Resolve tenant_id from cached user list for explicit payload (matches spec)
+    var rec = null;
+    try {
+        rec = (CACHED_USERS || []).find(function (u) {
+            if (email && u.email && u.email.toLowerCase() === email.toLowerCase()) return true;
+            if (uid && u.uid === uid) return true;
+            return false;
+        }) || null;
+    } catch (e) { rec = null; }
+    var tenant_id = rec ? (rec.tenant_id || '') : '';
+    // Prompt for SETUP_SECRET exactly like seeding/unseeding (AdminUI.ensureSetupKey)
+    var setup_key;
+    try {
+        setup_key = AdminUI.ensureSetupKey();
+    } catch (e) {
+        toast('Delete cancelled — ' + (e.message || 'setup key required'), 'error');
+        return;
+    }
+    var body = { setup_key: setup_key };
     if (email) body.email = email;
     if (uid) body.uid = uid;
+    if (tenant_id) body.tenant_id = tenant_id;
     try {
         var token = await firebase.auth().currentUser.getIdToken();
         // Use POST to /users/delete — DELETE with JSON body is dropped by some proxies;
-        // POST is reliable and mirrors the backend alias.
+        // POST is reliable and mirrors the backend alias. Explicitly send all 4 fields.
         var resp = await fetch('/api/v1/admin/users/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify(body)
         });
         var data = await resp.json().catch(function () { return {}; });
-        // Explicit contract: success only on 2xx AND data.success === true AND data.deleted
+        // Surface backend validation errors explicitly (403 Invalid setup key, 404 not found, 422 missing)
         if (!resp.ok) {
             var msg = data.detail || data.message || resp.statusText || 'Delete failed';
-            // FastAPI 422 validation errors return array in detail
             if (Array.isArray(msg)) msg = msg.map(function (e) { return e.msg || JSON.stringify(e); }).join('; ');
             throw new Error(msg);
         }
+        // Explicit contract: backend must return {success:true, deleted:true, uid, email}
+        // Guard against soft 200 with missing flags
         if (!data.success || !data.deleted) {
             throw new Error((data.detail || data.message || 'Delete failed — no confirmation from server'));
         }
-        toast('Deleted ' + esc((data.deleted && data.deleted.email) || email || uid), 'success');
+        // Prefer backend-returned email/uid, fall back to request values
+        var deletedEmail = (data.email || (data.deleted_user && data.deleted_user.email) || (data.deleted && data.deleted.email) || email || uid);
+        toast('Deleted ' + esc(deletedEmail), 'success');
         await loadUsers();
         loadAuditLog();
     } catch (err) {
@@ -667,6 +689,7 @@ async function execDeleteUser(email, uid) {
         }
         var msg = err && err.message ? err.message : String(err);
         if (Array.isArray(msg)) msg = msg.join('; ');
+        // Surface exact backend reason (e.g., 403 Invalid setup key) in toast
         toast('Delete failed: ' + msg, 'error');
     }
 }
