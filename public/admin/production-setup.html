@@ -666,12 +666,19 @@ async function execDeleteUser(email, uid, setupKeyFromModal) {
     try {
         // Use AdminUI.apiPost so request goes to Render backend (API_BASE_URL),
         // not Firebase Hosting relative /api/* (which would 404). Handles token + tenant headers.
-        var data = await AdminUI.apiPost('/api/v1/admin/users/delete', body);
-        // Explicit contract: backend must return {success:true, deleted:true, uid, email}
-        if (!data.success || !data.deleted) {
-            throw new Error((data.detail || data.message || 'Delete failed — no confirmation from server'));
+        var raw = await AdminUI.apiPost('/api/v1/admin/users/delete', body);
+        // ApiClient unwraps json.data if present; handle both flat and nested shapes
+        var data = raw && raw.data ? raw.data : raw;
+        // Robust contract: backend returns {success:true, deleted:true, uid, email} flat
+        // but also handle {deleted:{uid,email}} object or nested data.data
+        var success = data && (data.success === true || data.success === 'true');
+        var deletedFlag = data && (data.deleted === true || data.deleted === 'true' || (data.deleted && typeof data.deleted === 'object' && (data.deleted.uid || data.deleted.email)) || data.deleted_user || data.uid);
+        if (!success || !deletedFlag) {
+            var detail = (data && (data.detail || data.message)) || 'Delete failed — no confirmation from server';
+            if (Array.isArray(detail)) detail = detail.map(function (e) { return e.msg || JSON.stringify(e); }).join('; ');
+            throw new Error(detail);
         }
-        var deletedEmail = data.email || (data.deleted_user && data.deleted_user.email) || (data.deleted && data.deleted.email) || email || uid;
+        var deletedEmail = (data.email || (data.deleted_user && data.deleted_user.email) || (data.deleted && typeof data.deleted === 'object' && data.deleted.email) || email || uid);
         toast('Deleted ' + esc(deletedEmail), 'success');
         await loadUsers();
         loadAuditLog();
