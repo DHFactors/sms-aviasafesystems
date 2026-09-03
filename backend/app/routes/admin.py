@@ -1217,7 +1217,17 @@ async def admin_delete_user(
         },
     )
     logger.info(f"USER_DELETED audit: {target_email} ({target_uid}) by {user.get('email')}")
-    return {"success": True, "deleted": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant}}
+    # Explicit confirmation flags expected by frontend: success:true + deleted:true + uid/email
+    return {
+        "success": True,
+        "deleted": True,
+        "uid": target_uid,
+        "email": target_email,
+        "tenant_id": target_tenant,
+        "deleted_user": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant},
+        # Back-compat: keep deleted as object for older clients that expect it
+        "deleted_obj": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant},
+    }
 
 
 @router.post("/users/delete", status_code=status.HTTP_200_OK)
@@ -1301,4 +1311,12 @@ async def admin_delete_user_post(
         metadata={"target_email": target_email, "target_uid": target_uid, "target_tenant_id": target_tenant, "by_uid": user.get("uid"), "by_role": user.get("role")},
     )
     logger.info(f"USER_DELETED audit: {target_email} ({target_uid}) by {user.get('email')}")
-    return {"success": True, "deleted": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant}}
+    return {
+        "success": True,
+        "deleted": True,
+        "uid": target_uid,
+        "email": target_email,
+        "tenant_id": target_tenant,
+        "deleted_user": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant},
+        "deleted_obj": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant},
+    }
