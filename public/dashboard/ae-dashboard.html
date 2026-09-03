@@ -3,377 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accountable Executive Dashboard - AviaSAFE</title>
+    <title>Accountable Executive — AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
-        .page { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-        .nav { background: #0b2a42; color: #fff; padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-        .nav h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
-        .nav h1 i { margin-right: 0.5rem; color: #d4af37; }
-        .nav-actions { display: flex; align-items: center; gap: 1rem; }
-        .nav-actions span { font-size: 0.8rem; opacity: 0.8; }
-        .btn-logout { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
-        .btn-logout:hover { background: rgba(255,255,255,0.1); }
-        .dash-hero { background: linear-gradient(135deg, #0b2a42 0%, #123a5c 100%); color: #fff; padding: 1.5rem 2rem; }
-        .dash-hero h1 { margin: 0; font-size: 1.4rem; }
-        .dash-hero .sub { font-size: 0.8rem; opacity: 0.75; margin-top: 0.3rem; }
-        .fleet-badge { display: inline-block; background: rgba(212,175,55,0.15); border: 1px solid #d4af37; color: #ecd27a; border-radius: 999px; padding: 0.3rem 0.85rem; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.3px; }
-        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem; }
-        .panel { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem 1.4rem; border-top: 4px solid #1a6b8a; }
-        .panel.gold { border-top-color: #d4af37; }
-        .panel.red { border-top-color: #dc3545; }
-        .panel.intel { border-top-color: #5e35b1; }
-        .panel h2 { font-size: 0.95rem; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; color: #0b2a42; }
-        .panel h2 .tag { margin-left: auto; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: #64748b; }
-        .big-score { font-size: 2.8rem; font-weight: 800; line-height: 1; }
-        .level-badge { display: inline-block; padding: 0.35rem 0.9rem; border-radius: 999px; color: #fff; font-size: 0.8rem; font-weight: 700; margin-top: 0.5rem; }
-        .pillar-row { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.55rem; font-size: 0.78rem; }
-        .pillar-row .pname { width: 150px; color: #475569; }
-        .pillar-row .pbar { flex: 1; height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
-        .pillar-row .pbar i { display: block; height: 100%; background: #1a6b8a; border-radius: 999px; }
-        .pillar-row .pval { width: 46px; text-align: right; font-weight: 700; }
-        .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.75rem; }
-        .kpi { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 0.75rem; text-align: center; }
-        .kpi .num { font-size: 1.45rem; font-weight: 800; }
-        .kpi .lbl { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; margin-top: 0.2rem; }
-        .kpi.alert .num { color: #dc3545; }
-        .kpi.warn .num { color: #d97706; }
-        .kpi.good .num { color: #1e7e34; }
-        table.gov { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        table.gov th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; padding: 0.45rem 0.5rem; border-bottom: 2px solid #e2e8f0; }
-        table.gov td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
-        .btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.4rem 0.8rem; border: none; border-radius: 6px; font-size: 0.76rem; font-weight: 600; cursor: pointer; text-decoration: none; }
-        .btn-approve { background: #2e7d32; color: #fff; }
-        .btn-risk { background: #b45309; color: #fff; }
-        .btn-outline { background: #fff; color: #1a6b8a; border: 1px solid #cbd5e1; }
-        .btn-outline:hover { border-color: #1a6b8a; }
-        .badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
-        .badge-red { background: #fde8e8; color: #b91c1c; }
-        .badge-amber { background: #fef3c7; color: #b45309; }
-        .badge-green { background: #e6f4ea; color: #1e7e34; }
-        .badge-grey { background: #f1f5f9; color: #64748b; }
-        .heatmap { display: grid; grid-template-columns: repeat(6, minmax(34px, 1fr)); gap: 3px; font-size: 0.62rem; }
-        .heatmap .hm-cell { aspect-ratio: 1.25; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; background: #f1f5f9; color: #94a3b8; }
-        .hm-axis { display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 600; background: transparent !important; }
-        .feed-item { display: flex; gap: 0.6rem; padding: 0.55rem 0; border-bottom: 1px dashed #eef2f7; font-size: 0.82rem; }
-        .feed-item i { color: #5e35b1; margin-top: 0.15rem; }
-        .roster-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0; border-bottom: 1px dashed #eef2f7; font-size: 0.84rem; }
-        .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-        .dot.green { background: #34a853; } .dot.grey { background: #cbd5e1; }
-        .compliant-badge { display: inline-flex; align-items: center; gap: 0.45rem; background: #e6f4ea; color: #1e7e34; border: 1px solid #34a853; padding: 0.45rem 0.9rem; border-radius: 999px; font-size: 0.78rem; font-weight: 700; }
-        .compliant-badge.pending { background: #fef3c7; color: #b45309; border-color: #d97706; }
-        .empty { color: #94a3b8; font-size: 0.82rem; padding: 0.75rem 0; }
-        .loading-state { display: flex; align-items: center; justify-content: center; padding: 4rem; color: #64748b; }
-        .loading-state i { font-size: 1.6rem; margin-right: 0.6rem; }
-
-        /* ── Executive situational awareness banner ── */
-        .situ-banner { background: #081f33; color: #fff; display: flex; flex-wrap: wrap; }
-        .sit-seg { flex: 1 1 200px; padding: 0.7rem 1rem; border-right: 1px solid rgba(255,255,255,0.12); display: flex; flex-direction: column; gap: 0.25rem; min-width: 180px; }
-        .sit-seg:last-child { border-right: none; }
-        .sit-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.6px; color: #8fa8bd; font-weight: 700; }
-        .sit-value { font-size: 0.92rem; font-weight: 700; display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
-        .sit-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.14rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 800; }
-        .sit-green { background: #14532d; color: #4ade80; }
-        .sit-amber { background: #78350f; color: #fbbf24; }
-        .sit-red { background: #7f1d1d; color: #fca5a5; }
-        .sit-blue { background: #172e52; color: #93c5fd; }
-
-        /* ── Reporting culture & trends ── */
-        .culture-card { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 0.85rem; margin-top: 0.9rem; }
-        .culture-card .cc-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #475569; margin-bottom: 0.5rem; }
-        .chip-row { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem; }
-
-        /* ── AE risk acceptance modal ── */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(8,31,51,0.65); display: flex; align-items: center; justify-content: center; z-index: 500; }
-        .ae-modal { background: #fff; border-radius: 12px; max-width: 620px; width: calc(100% - 2rem); padding: 1.5rem 1.6rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        .ae-modal h3 { margin: 0 0 0.75rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; color: #0b2a42; }
-        .ae-declaration { background: #fdf6ec; border: 1px solid #f0dbb3; border-left: 4px solid #b45309; border-radius: 8px; padding: 0.9rem 1rem; font-size: 0.88rem; line-height: 1.55; color: #7c4a03; margin: 0.75rem 0; }
-        .ae-field label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; margin: 0.7rem 0 0.25rem; }
-        .ae-field input, .ae-field select { width: 100%; padding: 0.55rem 0.7rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.88rem; box-sizing: border-box; }
-
-        /* ── Banner popover ── */
-        .sit-pop-wrap { position: relative; }
-        .sit-pop {
-            display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 300;
-            background: #0e2c47; border: 1px solid rgba(255,255,255,0.25); color: #dbe9f5;
-            border-radius: 8px; padding: 0.6rem 0.8rem; font-size: 0.72rem; font-weight: 500;
-            min-width: 260px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); line-height: 1.6;
-        }
-        .sit-pop-wrap:hover .sit-pop { display: block; }
-        .sit-pop strong { color: #fff; }
-
-        /* ── Departmental health matrix ── */
-        .dept-matrix { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 0.85rem; }
-        .dept-card { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 0.85rem 0.95rem; }
-        .dept-card .dc-head { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.55rem; }
-        .dept-card .dc-name { font-weight: 700; font-size: 0.84rem; }
-        .dept-card .dc-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem 0.6rem; font-size: 0.74rem; color: #475569; }
-        .dept-card .dc-metrics b { color: #0b2a42; }
-        .bar-track { height: 6px; background: #eef2f7; border-radius: 999px; overflow: hidden; margin-top: 3px; }
-        .bar-track i { display: block; height: 100%; background: #1e7e34; border-radius: 999px; }
-
-        /* ── What-if simulator ── */
-        .sim-widget { background: #f6f3ee; border: 1px solid #eadfce; border-radius: 10px; padding: 0.9rem 1rem; margin-top: 0.9rem; }
-        .sim-row { display: flex; align-items: center; gap: 0.7rem; font-size: 0.78rem; margin-top: 0.55rem; }
-        .sim-row label { flex: 0 0 250px; color: #475569; }
-        .sim-row input[type=range] { flex: 1; accent-color: #b45309; }
-        .sim-row .sim-val { width: 34px; text-align: right; font-weight: 700; }
-        .sim-out { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.75rem; }
-        .sim-out .so { background: #fff; border: 1px solid #eadfce; border-radius: 8px; padding: 0.6rem; text-align: center; }
-        .sim-out .so .num { font-size: 1.3rem; font-weight: 800; }
-        .sim-out .so .lbl { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; }
-
-        /* ── AE decision ledger ── */
-        .ledger-actions { display: flex; gap: 0.5rem; margin: 0.5rem 0 0.75rem; flex-wrap: wrap; }
-        @media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+        body { background:#f8fafc; font-family:'Inter',system-ui,-apple-system,sans-serif; color:#0f172a; margin:0; }
+        .nav { background:#0b2a42; color:#fff; padding:0.9rem 1.5rem; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; }
+        .nav h1 { font-size:1rem; font-weight:700; margin:0; letter-spacing:0.2px; }
+        .nav h1 i { color:#d4af37; margin-right:0.5rem; }
+        .hero { background:linear-gradient(135deg,#0b2a42 0%,#123a5c 100%); color:#fff; padding:2rem; text-align:center; }
+        .hero h1 { margin:0; font-size:1.6rem; font-weight:800; }
+        .hero .sub { font-size:0.85rem; opacity:0.7; margin-top:0.4rem; }
+        .hero .welcome { color:#d4af37; font-weight:600; margin-top:0.5rem; }
+        .banner { background:#081f33; color:#fff; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1px; background:#1e3a5a; }
+        .banner .seg { background:#081f33; padding:0.9rem 1.2rem; text-align:center; }
+        .banner .label { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px; color:#8fa8bd; font-weight:700; }
+        .banner .value { font-size:0.95rem; font-weight:800; margin-top:0.3rem; }
+        .chip { display:inline-block; padding:0.25rem 0.7rem; border-radius:999px; font-size:0.75rem; font-weight:700; }
+        .chip-blue { background:#172e52; color:#93c5fd; } .chip-green { background:#14532d; color:#4ade80; } .chip-amber { background:#78350f; color:#fbbf24; } .chip-red { background:#7f1d1d; color:#fca5a5; }
+        .page { max-width:1100px; margin:0 auto; padding:1.5rem; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1.25rem; }
+        .card { background:#fff; border-radius:14px; padding:1.4rem; box-shadow:0 1px 6px rgba(0,0,0,0.06); border:1px solid #f1f5f9; }
+        .card h2 { font-size:0.95rem; margin:0 0 1rem; display:flex; align-items:center; gap:0.5rem; color:#0b2a42; }
+        .card h2 .tag { margin-left:auto; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.4px; color:#64748b; background:#f8fafc; padding:0.2rem 0.5rem; border-radius:999px; }
+        .big-score { font-size:2.6rem; font-weight:800; line-height:1; }
+        .kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:0.6rem; margin:1rem 0; }
+        .kpi { background:#f8fafc; border-radius:10px; padding:0.7rem; text-align:center; border:1px solid #eef2f7; }
+        .kpi .num { font-size:1.3rem; font-weight:800; }
+        .kpi .lbl { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.3px; color:#64748b; }
+        .heatmap { display:grid; grid-template-columns:repeat(6,1fr); gap:3px; font-size:0.6rem; }
+        .hm-cell { aspect-ratio:1.2; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:700; background:#f1f5f9; color:#94a3b8; }
+        .btn { display:inline-flex; align-items:center; gap:0.3rem; padding:0.45rem 0.9rem; border-radius:8px; font-size:0.78rem; font-weight:600; cursor:pointer; border:none; text-decoration:none; }
+        .btn-approve { background:#1e7e34; color:#fff; } .btn-risk { background:#b45309; color:#fff; } .btn-outline { background:#fff; border:1px solid #cbd5e1; color:#1a6b8a; }
+        .empty { color:#94a3b8; font-size:0.85rem; padding:1rem 0; text-align:center; }
+        .loading { display:flex; align-items:center; justify-content:center; padding:3rem; color:#64748b; }
+        .footer { text-align:center; padding:2rem 1rem; color:#94a3b8; font-size:0.75rem; }
+        @media (max-width:700px) { .kpi-strip { grid-template-columns:repeat(2,1fr); } }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
-
 <nav class="nav">
-    <h1><i class="fas fa-user-tie"></i> Accountable Executive Governance</h1>
-    <div class="nav-actions">
-        <span id="userDisplay"></span>
-        <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    <h1><i class="fas fa-user-tie"></i> Accountable Executive</h1>
+    <div style="display:flex;align-items:center;gap:1rem;">
+        <span id="userDisplay" style="font-size:0.8rem;opacity:0.8;"></span>
+        <button onclick="logout()" style="background:transparent;border:1px solid rgba(255,255,255,0.3);color:#fff;padding:0.4rem 1rem;border-radius:999px;cursor:pointer;font-size:0.8rem;">Logout</button>
     </div>
 </nav>
-
-<section class="dash-hero">
-    <h1 id="heroTitle">Accountable Executive Dashboard</h1>
-    <div id="welcomeMsg" style="font-size:0.85rem;margin-top:0.35rem;color:#d4af37;font-weight:600;"></div>
-    <div class="sub">Top-level SMS oversight per ICAO Annex 19 (3rd Ed.) · Doc 9859 · Doc 10159 Safety Intelligence — <span id="heroTenant"></span></div>
-    <div><span id="fleetBadge" style="display:none;margin-top:0.5rem;"></span></div>
+<section class="hero">
+    <h1 id="heroTitle">Executive Oversight</h1>
+    <div id="welcomeMsg" class="welcome"></div>
+    <div class="sub">ICAO Annex 19 · Doc 9859 · Doc 10159 — High-level safety intelligence for executive decision</div>
+    <div><span id="fleetBadge" style="display:none;margin-top:0.7rem;background:rgba(212,175,55,0.15);border:1px solid #d4af37;color:#ecd27a;border-radius:999px;padding:0.3rem 0.8rem;font-size:0.75rem;"></span></div>
 </section>
-
-<!-- Executive Situational Awareness Banner (persistent) -->
-<div class="situ-banner" id="situationalBanner">
-    <div class="sit-seg">
-        <span class="sit-label">SMS Health Status</span>
-        <span class="sit-value"><span class="sit-chip sit-blue" id="sitHealth">Loading…</span></span>
-    </div>
-    <div class="sit-seg">
-        <span class="sit-label">Intolerable / High Exposure</span>
-        <span class="sit-value"><span class="sit-chip sit-blue" id="sitExposure">—</span></span>
-    </div>
-    <div class="sit-seg">
-        <span class="sit-label">Executive Action Queue</span>
-        <span class="sit-value"><span class="sit-chip sit-blue" id="sitQueue">—</span></span>
-    </div>
-    <div class="sit-seg">
-        <span class="sit-label">SPI Trajectory</span>
-        <span class="sit-value"><span class="sit-chip sit-blue" id="sitSpi">—</span></span>
-    </div>
-    <div class="sit-seg">
-        <span class="sit-label">Operational Context</span>
-        <span class="sit-value" id="sitOpsContext" style="font-size:0.78rem;font-weight:600;">—</span>
-    </div>
-    <div class="sit-seg" style="flex:1.5 1 300px;">
-        <span class="sit-label">Predictive Precursor Intelligence <i class="fas fa-circle-info" style="cursor:help;" title="Confidence = weighted composite of barrier degradation (40%), overdue CAPs (40%) and open high risks (20%)."></i></span>
-        <span class="sit-value sit-pop-wrap">
-            <span class="sit-chip sit-blue" id="sitPrecursor">Doc 10159 Intelligence: assessing…</span>
-            <span class="sit-pop" id="precursorPopover">Computing composite…</span>
-        </span>
-    </div>
-    <div class="sit-seg">
-        <span class="sit-label">Data Quality &amp; Integrity Score <i class="fas fa-circle-info" style="cursor:help;" title="% completed SRAs on active hazards plus on-time CAP reviews."></i></span>
-        <span class="sit-value"><span class="sit-chip sit-blue" id="sitDataQuality">—</span></span>
-    </div>
+<div class="banner" id="situationalBanner">
+    <div class="seg"><div class="label">SMS Health</div><div class="value"><span class="chip chip-blue" id="sitHealth">Loading…</span></div></div>
+    <div class="seg"><div class="label">High Exposure</div><div class="value"><span class="chip chip-blue" id="sitExposure">—</span></div></div>
+    <div class="seg"><div class="label">Action Queue</div><div class="value"><span class="chip chip-blue" id="sitQueue">—</span></div></div>
+    <div class="seg"><div class="label">Decision Required</div><div class="value"><span class="chip chip-blue" id="sitPrecursor">Assessing…</span></div></div>
 </div>
-
 <div class="page">
-    <div id="loadingIndicator" class="loading-state"><i class="fas fa-spinner fa-spin"></i> Assembling executive view...</div>
+    <div id="loadingIndicator" class="loading"><i class="fas fa-spinner fa-spin" style="margin-right:0.5rem;"></i> Loading executive summary...</div>
     <div id="dashContent" style="display:none;">
-
-        <!-- Row 1 -->
-        <div class="grid-3">
-
-            <!-- Panel 1: SMS Maturity (PSOE) -->
-            <div class="panel gold">
-                <h2><i class="fas fa-heart-pulse"></i> SMS Maturity &amp; Regulatory Readiness <span class="tag">PSOE · Appendix 10</span></h2>
-                <div style="display:flex;align-items:center;gap:1.25rem;">
+        <div class="grid">
+            <div class="card">
+                <h2><i class="fas fa-heart-pulse" style="color:#d4af37;"></i> SMS Maturity <span class="tag">PSOE</span></h2>
+                <div style="display:flex;align-items:center;gap:1.2rem;">
                     <div>
                         <div class="big-score" id="psoeScore">—</div>
-                        <div style="font-size:0.72rem;color:#64748b;">Overall weighted score</div>
-                        <span class="level-badge" id="psoeLevel" style="background:#64748b;">No completed audit</span>
+                        <div style="font-size:0.7rem;color:#64748b;">Overall score</div>
+                        <div id="psoeLevel" style="margin-top:0.5rem;background:#64748b;color:#fff;display:inline-block;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.7rem;font-weight:700;">No audit</div>
                     </div>
-                    <div style="flex:1;" id="psoeRadarWrap"><canvas id="psoeRadar" height="180"></canvas></div>
+                    <div style="flex:1;"><canvas id="psoeRadar" height="160"></canvas></div>
                 </div>
-                <div id="pillarBars" style="margin-top:0.9rem;"></div>
-                <div style="margin-top:0.9rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-                    <a id="psoeExportBtn" class="btn btn-outline" style="display:none;" href="#"><i class="fas fa-file-pdf"></i> Export CAAN Appendix 10 Compliance PDF</a>
-                    <span id="psoeMeta" style="font-size:0.72rem;color:#64748b;align-self:center;"></span>
-                </div>
+                <div id="pillarBars" style="margin-top:1rem;"></div>
+                <div id="psoeMeta" style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;"></div>
             </div>
-
-            <!-- Panel 2: Systemic Risk & Barrier Tolerability -->
-            <div class="panel red">
-                <h2><i class="fas fa-triangle-exclamation"></i> Systemic Risk &amp; Barrier Tolerability <span class="tag">Residual Exposure</span></h2>
-                <div class="kpi-strip" style="margin-bottom:0.9rem;">
-                    <div class="kpi alert"><div class="num" id="kpiIntolerable">—</div><div class="lbl">Intolerable (&gt;15)</div></div>
-                    <div class="kpi warn"><div class="num" id="kpiHigh">—</div><div class="lbl">High (12–15)</div></div>
-                    <div class="kpi warn"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue CAN/CAP</div></div>
-                    <div class="kpi good"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC (days)</div></div>
+            <div class="card" style="border-top:4px solid #dc3545;">
+                <h2><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure <span class="tag">Risk</span></h2>
+                <div class="kpi-strip">
+                    <div class="kpi" style="border-left:3px solid #dc3545;"><div class="num" style="color:#dc3545;" id="kpiIntolerable">—</div><div class="lbl">Intolerable</div></div>
+                    <div class="kpi" style="border-left:3px solid #d97706;"><div class="num" style="color:#d97706;" id="kpiHigh">—</div><div class="lbl">High</div></div>
+                    <div class="kpi"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue</div></div>
+                    <div class="kpi"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC days</div></div>
                 </div>
-                <div style="font-size:0.72rem;color:#64748b;margin-bottom:0.35rem;">Aggregate active hazards — 5×5 residual risk heatmap (severity × probability)</div>
-                <div class="heatmap" id="heatmap"></div>
-                <div style="display:flex;justify-content:space-between;font-size:0.66rem;color:#94a3b8;margin-top:0.3rem;">
-                    <span>Probability → 1 (low) … 5 (high)</span><span>Severity ↑ 1 … 5</span>
-                </div>
+                <div class="heatmap" id="heatmap" style="margin-top:0.8rem;"></div>
+                <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.4rem;text-align:center;">5×5 Residual Risk Heatmap</div>
             </div>
-
-            <!-- Panel 3: Executive Escalation & Decision Queue -->
-            <div class="panel">
-                <h2><i class="fas fa-gavel"></i> Executive Escalation &amp; Decision Queue <span class="tag">Actionable Governance</span></h2>
+            <div class="card" style="border-top:4px solid #1a6b8a;">
+                <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
                 <div id="escalationQueue"></div>
-                <div style="margin-top:1rem;">
-                    <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#64748b;margin-bottom:0.4rem;">Governance Sign-Offs</div>
-                    <div id="signoffList"></div>
-
-                    <!-- AE Formal Decision Log & Audit Trail -->
-                    <div style="margin-top:1.1rem;">
-                        <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#64748b;margin-bottom:0.4rem;">
-                            <i class="fas fa-clipboard-list"></i> Executive Risk Acceptance Ledger
-                        </div>
-                        <div class="ledger-actions">
-                            <button type="button" class="btn btn-outline" onclick="exportDecisionLog('csv')"><i class="fas fa-file-csv"></i> Export AE Decision Log (CSV)</button>
-                            <button type="button" class="btn btn-outline" onclick="exportDecisionLog('pdf')"><i class="fas fa-file-pdf"></i> Export (PDF / Print)</button>
-                        </div>
-                        <div id="decisionLedger"></div>
-                        <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.4rem;">
-                            Signing executive: <span id="ledgerSigner">—</span>
-                        </div>
+                <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
+                    <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
+                    <div id="decisionLedger" style="margin-top:0.5rem;"></div>
+                    <div style="display:flex;gap:0.5rem;margin-top:0.7rem;">
+                        <button class="btn btn-outline" onclick="exportDecisionLog('csv')" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Export CSV</button>
+                        <button class="btn btn-outline" onclick="exportDecisionLog('pdf')" style="font-size:0.7rem;"><i class="fas fa-file-pdf"></i> PDF</button>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Departmental Safety Health Matrix -->
-        <div class="panel" style="margin-bottom:1.25rem;">
-            <h2><i class="fas fa-table-cells-large"></i> Departmental Safety Health Matrix <span class="tag">Comparative Postholder View</span></h2>
-            <div id="deptCtxLine" style="font-size:0.72rem;color:#64748b;margin:-0.5rem 0 0.6rem;"></div>
-            <div class="dept-matrix" id="deptMatrix"></div>
-            <div style="font-size:0.68rem;color:#94a3b8;margin-top:0.6rem;">
-                Status: <span class="badge badge-green">Stable</span> ·
-                <span class="badge badge-amber">Attention</span> ·
-                <span class="badge badge-red">Critical barrier degradation / overdue concentration</span>
-                — Barrier Health reflects Effective share of rated barriers on submitted Bow-Tie analyses.
-            </div>
-        </div>
-
-        <!-- Row 2: Safety Intelligence -->
-        <div class="panel intel">
-            <h2><i class="fas fa-satellite-dish"></i> Safety Intelligence &amp; Predictive Indicators <span class="tag">Doc 10159 · Leading vs Lagging</span></h2>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem;">
-                <div>
-                    <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#1e7e34;margin-bottom:0.5rem;"><i class="fas fa-arrow-trend-up"></i> Leading Indicators</div>
-                    <div class="kpi-strip">
-                        <div class="kpi good"><div class="num" id="spiVsr">—</div><div class="lbl">VSRs (90d)</div></div>
-                        <div class="kpi"><div class="num" id="spiMor">—</div><div class="lbl">MORs (90d)</div></div>
-                        <div class="kpi good"><div class="num" id="spiHazardRate">—</div><div class="lbl">Hazards / month</div></div>
-                        <div class="kpi" id="barrierKpi"><div class="num" id="spiBarrier">—</div><div class="lbl">Barrier Health Ratio</div></div>
-                    </div>
-                    <div style="margin-top:0.9rem;"><canvas id="velocityChart" height="150"></canvas></div>
-                    <div style="font-size:0.68rem;color:#94a3b8;text-align:center;">Reporting velocity — voluntary vs mandatory reports (6 months)</div>
-
-                    <div class="culture-card">
-                        <div class="cc-title"><i class="fas fa-comments"></i> Reporting Culture &amp; Vitality Index</div>
-                        <div class="kpi-strip">
-                            <div class="kpi" id="ratioKpi"><div class="num" id="spiVsrMorRatio">—</div><div class="lbl">VSR : MOR (target &gt; 3:1)</div></div>
-                            <div class="kpi"><div class="num" id="spiTurnaround">—</div><div class="lbl">Report → SRA latency (days)</div></div>
-                        </div>
-                        <div class="chip-row">
-                            <span class="badge badge-grey" id="benchmarkChip">Benchmark: computing…</span>
-                            <span class="badge badge-grey" id="justCultureChip">Just Culture: computing…</span>
-                        </div>
-                    </div>
-
-                    <div style="margin-top:0.9rem;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
-                        12-Month SPI Trajectory <span style="font-weight:400;text-transform:none;color:#94a3b8;">— Annex 19 §3.3.6 alert limits</span>
-                    </div>
-                    <canvas id="trendChart" height="170"></canvas>
-
-                    <!-- What-If Mitigation Scenario Simulator -->
-                    <div class="sim-widget">
-                        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#7c4a03;">
-                            <i class="fas fa-sliders"></i> What-If Mitigation Scenario Simulator (90-day projection)
-                        </div>
-                        <div class="sim-row">
-                            <label>Simulate resolving overdue CAPs</label>
-                            <input type="range" min="0" max="10" step="1" value="0" id="simOverdue">
-                            <span class="sim-val" id="simOverdueVal">0</span>
-                        </div>
-                        <div class="sim-row">
-                            <label>Restore degraded barriers to Effective</label>
-                            <input type="range" min="0" max="20" step="1" value="0" id="simBarriers">
-                            <span class="sim-val" id="simBarriersVal">0</span>
-                        </div>
-                        <div class="sim-out">
-                            <div class="so"><div class="num" id="simPrecursor">—</div><div class="lbl">Projected Precursor Risk %</div></div>
-                            <div class="so"><div class="num" id="simMaturity">—</div><div class="lbl">Projected PSOE Maturity (90d)</div></div>
-                        </div>
-                        <div style="font-size:0.66rem;color:#94a3b8;margin-top:0.5rem;">Projection model: each resolved overdue CAP reduces schedule-pressure weight; each restored barrier lowers the degradation component of the precursor composite and contributes maturity credit.</div>
-                    </div>
-                </div>
-                <div>
-                    <div style="font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#b91c1c;margin-bottom:0.5rem;"><i class="fas fa-arrow-trend-down"></i> Lagging Indicators</div>
-                    <div class="kpi-strip">
-                        <div class="kpi alert"><div class="num" id="spiOccurrences">—</div><div class="lbl">Occurrences (total)</div></div>
-                        <div class="kpi warn"><div class="num" id="spiOpenAge">—</div><div class="lbl">Avg open finding age (d)</div></div>
-                        <div class="kpi warn"><div class="num" id="spiDegraded">—</div><div class="lbl">Degraded / failed barriers</div></div>
-                        <div class="kpi"><div class="num" id="spiOpenCan">—</div><div class="lbl">Open findings</div></div>
-                    </div>
-                    <div style="margin-top:0.9rem;font-size:0.74rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#5e35b1;">Safety Intelligence Feed</div>
-                    <div id="intelFeed"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 3: Governance & Line of Accountability -->
-        <div class="panel" style="margin-top:1.25rem;">
-            <h2><i class="fas fa-sitemap"></i> Governance &amp; Line-of-Accountability Summary
-                <span style="margin-left:auto;" id="car19Badge"><span class="compliant-badge pending"><i class="fas fa-hourglass-half"></i> Oversight readiness pending data</span></span>
-            </h2>
-            <div id="roster"></div>
+        <div class="card" style="margin-top:1.25rem;text-align:center;padding:2rem;">
+            <div style="font-size:0.8rem;color:#64748b;">Detailed operational analysis, departmental health matrix, and predictive simulations are available in the dedicated Safety Workspace.</div>
+            <a href="/safety.html" class="btn btn-outline" style="margin-top:0.8rem;"><i class="fas fa-chart-line"></i> Open Safety Workspace for Granular Data</a>
         </div>
     </div>
 </div>
+<div class="footer">AviaSAFE Executive Governance — ICAO Annex 19 Compliant &nbsp;|&nbsp; <a href="/safety.html" style="color:#64748b;">Safety Workspace</a></div>
 
-<!-- AE formal risk-acceptance modal -->
-<div class="modal-overlay" id="riskAcceptModal" style="display:none;">
-    <div class="ae-modal" role="dialog" aria-modal="true">
-        <h3><i class="fas fa-scale-balanced" style="color:#b45309;"></i> Executive Risk Acceptance — <span id="raCapRef"></span></h3>
-        <div style="font-size:0.8rem;color:#475569;">
-            Department: <strong id="raDept">—</strong> &nbsp;·&nbsp; Residual Risk:
-            <strong id="raResidual">—</strong> <span id="raResidualBadge" class="badge badge-amber"></span>
-        </div>
-        <div class="ae-declaration" id="raDeclaration"></div>
-        <div class="ae-field">
-            <label>Review Interval (mandatory re-review date)</label>
-            <select id="raInterval">
-                <option value="30">30 days</option>
-                <option value="60" selected>60 days</option>
-                <option value="90">90 days</option>
-            </select>
-        </div>
-        <div class="ae-field">
-            <label>Executive Signature (type full name — required)</label>
-            <input type="text" id="raSignature" placeholder="Type your full name as signature">
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:0.6rem;margin-top:1.1rem;">
-            <button type="button" class="btn btn-outline" onclick="closeRiskModal()">Cancel</button>
-            <button type="button" class="btn btn-risk" onclick="submitRiskAcceptance()"><i class="fas fa-signature"></i> Sign &amp; Accept Risk</button>
-        </div>
-    </div>
-</div>
-
+<!-- Reuse original AE logic but with minimalist DOM -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/demo-prospects.js"></script>
@@ -382,1228 +122,133 @@
 <script src="/js/api/client.js"></script>
 <script src="/js/chart-theme.js"></script>
 <script>
-let myEmail = null;
-let myDomain = null;
-let charts = {};
-// Shared dataset for cross-panel computations (banner, trends, modal).
-let gPsoeList = [], gCans = [], gCaps = [], gHazards = [], gReports = [];
-let gSpiAlerts = 0;
-let gPendingCap = null;
-// Session overlay store (Chunk 7): demo decisions never touch master data —
-// they are persisted via /api/v1/demo/session/decision and merged locally.
-let gOverlays = {};
-
-function isDemoSession() {
-    return !!(window.DEMO_CONTEXT && window.DEMO_CONTEXT.archetypeId);
-}
-
-firebase.auth().onAuthStateChanged(async function(user) {
-    if (!user) { window.location.href = '/login.html'; return; }
-    document.getElementById('userDisplay').textContent = user.email;
-    try {
-        const tr = await user.getIdTokenResult();
-        const role = (tr.claims && tr.claims.role) || 'USER';
-        const tenant = (tr.claims && tr.claims.tenant_id) || '';
-        const allowed = ['SUPER_ADMIN', 'AIRLINE_ADMIN', 'CAAN_SMD'];
-        if (allowed.indexOf(role) === -1) { window.location.href = '/safety.html'; return; }
-        myEmail = user.email || '';
-        myDomain = myEmail.indexOf('@') >= 0 ? myEmail.split('@')[1] : '';
-        applyPersonalization();
-
-        // Demo session analytics (registered prospect AEs only — safe fallback).
-        if (window.DemoAnalytics) {
-            window.DemoAnalytics.init({ email: myEmail });
-            user.getIdToken().then(function (t) { window.__demoIdToken = t; }).catch(function () {});
+// Minimalist AE — reuses ae-dashboard.html logic but hides non-executive panels
+let myEmail=null, myDomain=null, charts={}, gPsoeList=[], gCans=[], gCaps=[], gHazards=[], gReports=[], gOverlays={};
+function isDemoSession(){ return !!(window.DEMO_CONTEXT && window.DEMO_CONTEXT.archetypeId); }
+firebase.auth().onAuthStateChanged(async function(user){
+    if(!user){ window.location.href='/login.html'; return; }
+    document.getElementById('userDisplay').textContent=user.email;
+    try{
+        const tr=await user.getIdTokenResult();
+        const role=(tr.claims&&tr.claims.role)||'USER';
+        if(['SUPER_ADMIN','AIRLINE_ADMIN','CAAN_SMD'].indexOf(role)===-1){ window.location.href='/safety.html'; return; }
+        myEmail=user.email||''; myDomain=myEmail.split('@')[1]||'';
+        if(window.DemoAnalytics) window.DemoAnalytics.init({email:myEmail});
+        const tenant=(tr.claims&&tr.claims.tenant_id)||'';
+        if(tenant){ document.getElementById('heroTitle').textContent=tenant.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' — Executive'; }
+        var ctx=(typeof getStoredDemoContext==='function')?getStoredDemoContext():null;
+        if(ctx&&String(ctx.email||'').toLowerCase()===myEmail.toLowerCase()&&ctx.companyName){
+            document.getElementById('heroTitle').textContent=ctx.companyName+' — Executive';
+            document.getElementById('welcomeMsg').textContent='Welcome, '+ctx.aeName;
+            const fb=document.getElementById('fleetBadge'); if(fb){ fb.textContent='Fleet: '+(ctx.fleetType||'—')+' | Base: '+(ctx.baseLocation||'—'); fb.style.display='inline-block'; }
         }
-        if (tenant) {
-            document.getElementById('heroTitle').textContent =
-                tenant.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + ' — Executive Oversight';
-            document.getElementById('heroTenant').textContent = tenant;
-        }
-        // Virtual Tenant Mirroring: prospect branding overrides the raw id.
-        var demoCtx = (typeof getStoredDemoContext === 'function') ? getStoredDemoContext() : null;
-        if (demoCtx && String(demoCtx.email || '').toLowerCase() === myEmail.toLowerCase() && demoCtx.companyName) {
-            document.getElementById('heroTitle').textContent =
-                demoCtx.companyName + '\u2014 Executive Oversight';
-            document.getElementById('heroTenant').textContent = demoCtx.archetypeId;
-            if (typeof window.formatReference === 'function') window.formatReference('');
-        }
-    } catch (e) { /* fall through with defaults */ }
+    }catch(e){}
     loadDashboard();
 });
-
-function logout() {
-    firebase.auth().signOut().then(function() { window.location.href = '/'; })
-        .catch(function(e) { console.error(e); });
+function logout(){ firebase.auth().signOut().then(()=>window.location.href='/'); }
+function fmtDate(iso){ if(!iso) return '-'; try{ return new Date(iso).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});}catch(e){ return String(iso);} }
+function psoeStage(pct){
+    if(pct==null) return {label:'Not assessed', color:'#64748b'};
+    if(pct>=90) return {label:'Level 3 — Effective', color:'#1a7f37'};
+    if(pct>=70) return {label:'Level 2 — Suitable & Operating', color:'#1a6b8a'};
+    if(pct>=40) return {label:'Level 1 — Present', color:'#d97706'};
+    return {label:'Level 0 — Non-Compliant', color:'#dc3545'};
 }
-
-function fmtDate(iso) {
-    if (!iso) return '-';
-    try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
-    catch (e) { return String(iso); }
-}
-
-function daysBetween(a, b) {
-    return Math.round((new Date(b) - new Date(a)) / 86400000);
-}
-
-function psoeStage(pct) {
-    if (pct == null) return { level: '—', label: 'Not assessed', color: '#64748b' };
-    if (pct >= 90) return { level: 3, label: 'Level 3 — Effective', color: '#1a7f37' };
-    if (pct >= 70) return { level: 2, label: 'Level 2 — Suitable & Operating', color: '#1a6b8a' };
-    if (pct >= 40) return { level: 1, label: 'Level 1 — Present', color: '#d97706' };
-    return { level: 0, label: 'Level 0 — Non-Compliant', color: '#dc3545' };
-}
-
-async function loadDashboard() {
-    try {
-        const [psoeList, cans, caps, hazards, reports] = await Promise.all([
-            ApiClient.get('/api/v1/psoe/assessments?status=completed').catch(function() { return []; }),
-            ApiClient.get('/api/v1/cans/').catch(function() { return []; }),
-            ApiClient.get('/api/v1/cans/caps').catch(function() { return []; }),
-            ApiClient.get('/api/v1/hazards/').catch(function() { return []; }),
-            ApiClient.get('/api/v1/reports/').catch(function() { return []; })
+async function loadDashboard(){
+    try{
+        const [psoeList,cans,caps,hazards,reports]=await Promise.all([
+            ApiClient.get('/api/v1/psoe/assessments?status=completed').catch(()=>[]),
+            ApiClient.get('/api/v1/cans/').catch(()=>[]),
+            ApiClient.get('/api/v1/cans/caps').catch(()=>[]),
+            ApiClient.get('/api/v1/hazards/').catch(()=>[]),
+            ApiClient.get('/api/v1/reports/').catch(()=>[])
         ]);
-
-        gPsoeList = psoeList || [];
-        gCans = cans || [];
-        gCaps = caps || [];
-        gHazards = hazards || [];
-        gReports = reports || [];
-
-        // Re-apply session overlays so in-session decisions survive refetches.
-        gCaps.forEach(function (c) {
-            const ov = gOverlays[c.id];
-            if (ov) Object.assign(c, ov);
-        });
-
-        renderPsoe(gPsoeList);
-        renderRisk(gCans, gCaps, gHazards);
-        renderEscalations(gCaps);
-        renderIntelligence(gHazards, gReports, gCaps, gCans);
-        renderReportingCulture(gHazards, gReports, gCans);
-        renderTrends(gHazards, gCaps);
-        renderGovernance(gCans);
-        renderCar19Badge(gPsoeList, gCans);
+        gPsoeList=psoeList||[]; gCans=cans||[]; gCaps=caps||[]; gHazards=hazards||[]; gReports=reports||[];
+        gCaps.forEach(c=>{ const ov=gOverlays[c.id]; if(ov) Object.assign(c,ov); });
+        renderPsoe(gPsoeList); renderRisk(gCans,gCaps,gHazards); renderEscalations(gCaps);
         renderSituationalBanner();
-        renderDataQualityChip();
-        renderDeptMatrix();
-        renderDecisionLog();
-        initSimulator();
-
-        // Personalization pass + body-wide reference formatting on the
-        // freshly rendered DOM (covers panels, ledger, matrix, banner).
-        applyPersonalization();
-        formatAllReferences(document.body);
-
-        document.getElementById('loadingIndicator').style.display = 'none';
-        document.getElementById('dashContent').style.display = 'block';
-    } catch (err) {
-        document.getElementById('loadingIndicator').innerHTML =
-            '<i class="fas fa-exclamation-circle" style="color:#dc3545;"></i> Failed to load executive data: ' + err.message;
+        document.getElementById('loadingIndicator').style.display='none';
+        document.getElementById('dashContent').style.display='block';
+    }catch(err){
+        document.getElementById('loadingIndicator').innerHTML='<span style="color:#dc3545;">Failed to load: '+err.message+'</span>';
     }
 }
-
-// Quick-Switch toolbar hook: live re-fetch + re-format without a page reload.
-window.__aeRefresh = loadDashboard;
-
-/* ── UI personalization (Virtual Tenant Mirroring) ────────────────────── */
-function applyPersonalization() {
-    var ctx = (typeof getStoredDemoContext === 'function') ? getStoredDemoContext() : null;
-    if (!ctx || !ctx.companyName) return null;
-
-    // window.DEMO_CONTEXT mirror for any script that reads it directly.
-    window.DEMO_CONTEXT = ctx;
-
-    document.title = ctx.companyName + ' \u2014 Accountable Executive Dashboard | AviaSAFE';
-
-    var hero = document.getElementById('heroTitle');
-    if (hero) hero.textContent = ctx.companyName;
-
-    var nav = document.querySelector('.nav h1');
-    if (nav) nav.innerHTML = '<i class="fas fa-user-tie"></i> ' + esc(ctx.companyName) + ' · AE Governance';
-
-    var welcome = document.getElementById('welcomeMsg');
-    if (welcome) welcome.textContent = 'Welcome, ' + ctx.aeName;
-
-    var fleet = document.getElementById('fleetBadge');
-    if (fleet) {
-        fleet.textContent = 'Fleet: ' + (ctx.fleetType || '—') + '  |  Operating Base: ' + (ctx.baseLocation || '—');
-        fleet.style.display = 'inline-block';
-    }
-
-    var tenant = document.getElementById('heroTenant');
-    if (tenant) tenant.textContent = ctx.archetypeId;
-
-    // Signature placeholders across governance surfaces.
-    var sig = document.getElementById('raSignature');
-    if (sig && !sig.value) sig.placeholder = ctx.aeName;
-    var signer = document.getElementById('ledgerSigner');
-    if (signer) signer.textContent = ctx.aeName;
-
-    return ctx;
-}
-
-/* ── Reference formatting DOM scanner ─────────────────────────────────── */
-// Replaces the neutral master prefixes (FW- / RW-) with the prospect's IATA
-// code across every text node in `container`. Safe for dynamic content:
-// call after each render pass.
-function formatAllReferences(container, iataCode) {
-    if (!container || !document.createTreeWalker) return 0;
-    var code = String(iataCode ||
-        (window.DEMO_CONTEXT && window.DEMO_CONTEXT.iataCode) ||
-        ((typeof getStoredDemoContext === 'function') && (getStoredDemoContext() || {}).iataCode) || ''
-    ).trim().toUpperCase();
-    if (!code) return 0;
-
-    var count = 0;
-    var regex = /\b(FW|RW)-(HZ|CAN|CAP|SRA)-/g;
-    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-    var nodes = [];
-    while (walker.nextNode()) {
-        if (walker.currentNode) nodes.push(walker.currentNode);
-    }
-    nodes.forEach(function (node) {
-        var value = node.nodeValue;
-        if (value && regex.test(value)) {
-            node.nodeValue = value.replace(regex, code + '-$2-');
-            count++;
-        }
-    });
-    return count;
-}
-
-/* ── Panel 1: PSOE maturity ───────────────────────────────────────────── */
-const PILLARS = [
-    { id: 'component_1', name: 'Safety Policy & Objectives', weight: '10%' },
-    { id: 'component_2', name: 'Safety Risk Management', weight: '40%' },
-    { id: 'component_3', name: 'Safety Assurance', weight: '30%' },
-    { id: 'component_4', name: 'Safety Promotion', weight: '20%' },
-];
-
-async function renderPsoe(list) {
-    const latest = (list || []).length ? list[0] : null;
-    const scoreEl = document.getElementById('psoeScore');
-    const levelEl = document.getElementById('psoeLevel');
-    const metaEl = document.getElementById('psoeMeta');
-    const exportBtn = document.getElementById('psoeExportBtn');
-
-    if (!latest) {
-        scoreEl.textContent = '—';
-        levelEl.textContent = 'No completed PSOE audit';
-        metaEl.textContent = 'Schedule a CAAN Appendix 10 surveillance audit.';
-        return;
-    }
-
-    let detail = null;
-    try { detail = await ApiClient.get('/api/v1/psoe/assessments/' + latest.id); } catch (e) { /* list data only */ }
-
-    const pct = latest.overall_score_pct != null ? latest.overall_score_pct : (detail && detail.overall_score_pct);
-    const stage = psoeStage(pct);
-    scoreEl.textContent = pct != null ? pct + '%' : '—';
-    scoreEl.style.color = stage.color;
-    levelEl.textContent = stage.label;
-    levelEl.style.background = stage.color;
-    metaEl.textContent = (latest.title || 'PSOE assessment') + ' · ' + fmtDate(latest.assessment_date || latest.updated_at);
-
-    if (latest.id) {
-        exportBtn.href = '/api/v1/psoe/assessments/' + latest.id + '/export?format=pdf';
-        exportBtn.style.display = 'inline-flex';
-        exportBtn.addEventListener('click', function () {
-            if (window.DemoAnalytics) DemoAnalytics.exportTriggered('pdf', 'PSOE Appendix 10');
-        });
-    }
-
-    // Four-pillar split (weights: Policy 10% | SRM 40% | Assurance 30% | Promotion 20%)
-    const comps = (detail && detail.component_scores) || {};
-    const barsEl = document.getElementById('pillarBars');
-    barsEl.innerHTML = PILLARS.map(function(p) {
-        const c = comps[p.id] || {};
-        const v = c.score_pct != null ? c.score_pct : (c.pct != null ? c.pct : 0);
-        return '<div class="pillar-row">' +
-            '<span class="pname">' + p.name + ' <span style="color:#94a3b8;">(' + p.weight + ')</span></span>' +
-            '<span class="pbar"><i style="width:' + Math.max(0, Math.min(100, v)) + '%;"></i></span>' +
-            '<span class="pval">' + (v ? v.toFixed(1) : '0') + '%</span></div>';
+window.__aeRefresh=loadDashboard;
+// Simplified renderers — reuse original logic but minimalist DOM
+const PILLARS=[{id:'component_1',name:'Safety Policy & Objectives'},{id:'component_2',name:'Safety Risk Management'},{id:'component_3',name:'Safety Assurance'},{id:'component_4',name:'Safety Promotion'}];
+async function renderPsoe(list){
+    const latest=(list||[])[0]||null;
+    const scoreEl=document.getElementById('psoeScore'), levelEl=document.getElementById('psoeLevel'), metaEl=document.getElementById('psoeMeta');
+    if(!latest){ scoreEl.textContent='—'; levelEl.textContent='No completed audit'; levelEl.style.background='#64748b'; return; }
+    let detail=null; try{ detail=await ApiClient.get('/api/v1/psoe/assessments/'+latest.id);}catch(e){}
+    const pct=latest.overall_score_pct!=null?latest.overall_score_pct:(detail&&detail.overall_score_pct);
+    const stage=psoeStage(pct);
+    scoreEl.textContent=pct!=null?pct+'%':'—'; scoreEl.style.color=stage.color;
+    levelEl.textContent=stage.label; levelEl.style.background=stage.color;
+    metaEl.textContent=(latest.title||'PSOE')+' · '+fmtDate(latest.assessment_date||latest.updated_at);
+    const comps=(detail&&detail.component_scores)||{};
+    document.getElementById('pillarBars').innerHTML=PILLARS.map(p=>{
+        const c=comps[p.id]||{}; const v=c.score_pct!=null?c.score_pct:(c.pct!=null?c.pct:0);
+        return '<div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.75rem;"><span style="width:160px;color:#475569;">'+p.name+'</span><span style="flex:1;height:6px;background:#eef2f7;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;background:#1a6b8a;width:'+Math.max(0,Math.min(100,v))+'%;"></i></span><span style="width:40px;text-align:right;font-weight:700;">'+(v?v.toFixed(0):0)+'%</span></div>';
     }).join('');
-
-    // Radar — destroy before create (tenant switch without reload = canvas already in use)
-    const ctx = document.getElementById('psoeRadar');
-    if (ctx && window.Chart) {
-        if (charts.radar) { try { charts.radar.destroy(); } catch (_) {} }
-        if (typeof Chart.getChart === 'function') {
-            const orphan = Chart.getChart(ctx);
-            if (orphan) { try { orphan.destroy(); } catch (_) {} }
-        }
-        charts.radar = new Chart(ctx, {
-            type: 'radar',
-            data: {
-                labels: PILLARS.map(function(p) { return p.name.split(' ')[0] + ' (' + p.weight + ')'; }),
-                datasets: [{
-                    label: 'Component %',
-                    data: PILLARS.map(function(p) {
-                        const c = comps[p.id] || {};
-                        return c.score_pct != null ? c.score_pct : (c.pct != null ? c.pct : 0);
-                    }),
-                    backgroundColor: 'rgba(26,107,138,0.18)', borderColor: '#1a6b8a', pointBackgroundColor: '#1a6b8a'
-                }]
-            },
-            options: { plugins: { legend: { display: false } }, scales: { r: { min: 0, max: 100, ticks: { display: false } } } }
-        });
+    const ctx=document.getElementById('psoeRadar');
+    if(ctx&&window.Chart){
+        if(charts.radar) try{charts.radar.destroy();}catch(_){}
+        charts.radar=new Chart(ctx,{type:'radar',data:{labels:PILLARS.map(p=>p.name.split(' ')[0]),datasets:[{label:'Component %',data:PILLARS.map(p=>{const c=comps[p.id]||{};return c.score_pct!=null?c.score_pct:(c.pct!=null?c.pct:0);}),backgroundColor:'rgba(26,107,138,0.15)',borderColor:'#1a6b8a',pointBackgroundColor:'#1a6b8a'}]},options:{plugins:{legend:{display:false}},scales:{r:{min:0,max:100,ticks:{display:false}}}}});
     }
 }
-
-/* ── Panel 2: Systemic risk & tolerability ────────────────────────────── */
-function renderRisk(cans, caps, hazards) {
-    const now = new Date();
-    const isOpen = function(s) { const v = String(s || '').toLowerCase(); return v !== 'closed' && v !== 'completed'; };
-
-    let intolerable = 0, high = 0;
-    (cans || []).forEach(function(c) {
-        if (!isOpen(c.status)) return;
-        const sra = c.initial_sra || {};
-        const idx = sra.risk_index != null ? sra.risk_index
-            : (sra.severity && sra.probability ? sra.severity * sra.probability : null);
-        if (idx == null) return;
-        if (idx > 15) intolerable++;
-        else if (idx >= 12) high++;
-    });
-
-    let overdueCans = 0, overdueCaps = 0;
-    (cans || []).forEach(function(c) {
-        if (!isOpen(c.status) || !c.target_completion_date) return;
-        if (new Date(c.target_completion_date) < now) overdueCans++;
-    });
-    (caps || []).forEach(function(c) {
-        if (!isOpen(c.status) || !c.target_completion_date) return;
-        if (new Date(c.target_completion_date) < now) overdueCaps++;
-    });
-
-    // Mean Time to Close — completed CAPs only.
-    const closedDurations = (caps || []).filter(function(c) { return c.closed_at && c.submitted_at; })
-        .map(function(c) { return daysBetween(c.submitted_at, c.closed_at); })
-        .filter(function(d) { return d >= 0; });
-    const mttc = closedDurations.length
-        ? Math.round(closedDurations.reduce(function(a, b) { return a + b; }, 0) / closedDurations.length)
-        : null;
-
-    document.getElementById('kpiIntolerable').textContent = intolerable;
-    document.getElementById('kpiHigh').textContent = high;
-    document.getElementById('kpiOverdue').textContent = overdueCans + overdueCaps;
-    document.getElementById('kpiMttc').textContent = mttc != null ? mttc : '—';
-
-    renderHeatmap(hazards || []);
+function renderRisk(cans,caps,hazards){
+    const isOpen=s=>{const v=String(s||'').toLowerCase();return v!=='closed'&&v!=='completed';};
+    let intolerable=0,high=0; (cans||[]).forEach(c=>{ if(!isOpen(c.status))return; const sra=c.initial_sra||{}; const idx=sra.risk_index!=null?sra.risk_index:(sra.severity&&sra.probability?sra.severity*sra.probability:null); if(idx==null)return; if(idx>15) intolerable++; else if(idx>=12) high++;});
+    let overdue=0; (cans||[]).forEach(c=>{ if(!isOpen(c.status)||!c.target_completion_date)return; if(new Date(c.target_completion_date)<new Date()) overdue++;}); (caps||[]).forEach(c=>{ if(!isOpen(c.status)||!c.target_completion_date)return; if(new Date(c.target_completion_date)<new Date()) overdue++;});
+    const closed=caps.filter(c=>c.closed_at&&c.submitted_at).map(c=>Math.round((new Date(c.closed_at)-new Date(c.submitted_at))/86400000)).filter(d=>d>=0);
+    const mttc=closed.length?Math.round(closed.reduce((a,b)=>a+b,0)/closed.length):null;
+    document.getElementById('kpiIntolerable').textContent=intolerable; document.getElementById('kpiHigh').textContent=high;
+    document.getElementById('kpiOverdue').textContent=overdue; document.getElementById('kpiMttc').textContent=mttc!=null?mttc:'—';
+    // heatmap
+    const el=document.getElementById('heatmap'); const active=(hazards||[]).filter(h=>String(h.status||'').toLowerCase()!=='closed'); const grid={};
+    active.forEach(h=>{ const s=h.severity||null; const p=h.probability||null; if(!s||!p||s<1||s>5||p<1||p>5) return; const k=s+'-'+p; grid[k]=(grid[k]||0)+1; });
+    const cellColor=(s,p,n)=>{ if(!n) return ''; const idx=s*p; if(idx>15) return '#b91c1c'; if(idx>=12) return '#ea580c'; if(idx>=8) return '#d97706'; if(idx>=4) return '#ca8a04'; return '#1e7e34'; };
+    let html='<div class="hm-cell"></div>'; for(let p=1;p<=5;p++) html+='<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">P'+p+'</div>';
+    for(let s=5;s>=1;s--){ html+='<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">S'+s+'</div>'; for(let p=1;p<=5;p++){ const n=grid[s+'-'+p]||0; html+='<div class="hm-cell" '+(n?'style="background:'+cellColor(s,p,n)+';color:#fff;"':'')+'>'+(n||'')+'</div>'; } }
+    el.innerHTML=html;
 }
-
-function renderHeatmap(hazards) {
-    const el = document.getElementById('heatmap');
-    const active = (hazards || []).filter(function(h) { return String(h.status || '').toLowerCase() !== 'closed'; });
-    const grid = {};
-    active.forEach(function(h) {
-        const s = h.severity || (h.risk_index ? Math.ceil((h.risk_index || 1) / (h.probability || 1)) : null);
-        const p = h.probability || (h.risk_index && s ? Math.round((h.risk_index || 1) / s) : null);
-        if (!s || !p || s < 1 || s > 5 || p < 1 || p > 5) return;
-        const key = s + '-' + p;
-        grid[key] = (grid[key] || 0) + 1;
-    });
-    const cellColor = function(sev, prob, n) {
-        if (!n) return '';
-        const idx = sev * prob;
-        if (idx > 15) return '#b91c1c';
-        if (idx >= 12) return '#ea580c';
-        if (idx >= 8) return '#d97706';
-        if (idx >= 4) return '#ca8a04';
-        return '#1e7e34';
-    };
-    let html = '<div class="hm-cell"></div>';
-    for (let p = 1; p <= 5; p++) html += '<div class="hm-cell hm-axis">P' + p + '</div>';
-    for (let s = 5; s >= 1; s--) {
-        html += '<div class="hm-cell hm-axis">S' + s + '</div>';
-        for (let p = 1; p <= 5; p++) {
-            const n = grid[s + '-' + p] || 0;
-            html += '<div class="hm-cell" title="Severity ' + s + ' × Probability ' + p + ': ' + n + ' active hazards"' +
-                (n ? ' style="background:' + cellColor(s, p, n) + ';"' : '') + '>' + (n || '') + '</div>';
-        }
+function renderEscalations(caps){
+    const queue=(caps||[]).filter(c=>c.escalated_to_ae).sort((a,b)=>new Date(b.escalated_at||0)-new Date(a.escalated_at||0));
+    const el=document.getElementById('escalationQueue');
+    if(!queue.length){ el.innerHTML='<div class="empty">No escalated CAPs — all clear.</div>'; } else {
+        el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;">'+(c.cap_reference||c.id)+' <span style="color:#64748b;font-weight:400;">· '+ (c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+c.id+'\',\'authorize\')">Authorize</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+c.id+'\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
     }
-    el.innerHTML = html;
+    // decision ledger (simplified)
+    const ledger=document.getElementById('decisionLedger');
+    const decided=(caps||[]).filter(c=>c.ae_signature).slice(0,3);
+    ledger.innerHTML=decided.length?decided.map(c=>'<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>'+c.cap_reference+'</strong> — '+ (c.ae_signature||'')+' on '+fmtDate(c.ae_signed_at)+'</div>').join(''):'<div class="empty">No executive decisions yet.</div>';
 }
-
-/* ── Panel 3: Executive escalation & decision queue ───────────────────── */
-function renderEscalations(caps) {
-    const queue = (caps || []).filter(function(c) { return c.escalated_to_ae; })
-        .sort(function(a, b) { return new Date(b.escalated_at || 0) - new Date(a.escalated_at || 0); });
-    const el = document.getElementById('escalationQueue');
-
-    if (!queue.length) {
-        el.innerHTML = '<div class="empty"><i class="fas fa-circle-check" style="color:#1e7e34;"></i> No escalated CAPs awaiting executive decision.</div>';
+function decideEscalation(capId, decision){
+    if(decision==='accept_risk'){ alert('Risk acceptance requires signature — use full AE view for detailed modal.'); return; }
+    const note=prompt('AE authorization note:','Resources authorized.');
+    if(note==null||!note.trim()) return;
+    const cap=gCaps.find(c=>c.id===capId);
+    if(!cap) return;
+    // demo vs real
+    if(window.DEMO_CONTEXT){
+        fetch('/api/v1/demo/session/decision',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(window.__demoIdToken||'')},body:JSON.stringify({email:myEmail,cap_id:capId,decision:'authorize',note:note.trim()})}).then(()=>{ cap.escalated_to_ae=false; renderEscalations(gCaps); alert('Authorized (demo session).'); }).catch(e=>alert(e.message));
     } else {
-        el.innerHTML = '<table class="gov"><thead><tr><th>CAP</th><th>Dept</th><th>Escalated</th><th>Blockage / Reason</th><th>Decision</th></tr></thead><tbody>' +
-            queue.map(function(c) {
-                return '<tr>' +
-                    '<td><strong>' + esc(c.cap_reference) + '</strong><br><span style="color:#64748b;font-size:0.72rem;">Residual ' + (c.residual_risk_index != null ? c.residual_risk_index : '—') + '</span></td>' +
-                    '<td>' + esc(c.department || '—') + '</td>' +
-                    '<td>' + fmtDate(c.escalated_at) + '</td>' +
-                    '<td style="max-width:220px;">' + esc(c.escalation_reason || '—') + '</td>' +
-                    '<td><div style="display:flex;flex-direction:column;gap:0.3rem;">' +
-                        '<button type="button" class="btn btn-approve" onclick="decideEscalation(\'' + esc(c.id) + '\', \'authorize\')"><i class="fas fa-check"></i> Authorize Resources</button>' +
-                        '<button type="button" class="btn btn-risk" onclick="decideEscalation(\'' + esc(c.id) + '\', \'accept_risk\')"><i class="fas fa-scale-balanced"></i> Accept Risk</button>' +
-                    '</div></td></tr>';
-            }).join('') + '</tbody></table>';
-    }
-
-    // Governance sign-offs — derived from live records.
-    const underReview = (caps || []).filter(function(c) { return c.status === 'Under Review'; }).length;
-    const signoffs = [
-        { icon: 'fa-file-signature', label: 'Safety Policy affirmation', note: 'Affirmed at SMS Manual rev 6 sign-off (Accountable Executive)', done: true },
-        { icon: 'fa-magnifying-glass-chart', label: 'Latest CAAN Appendix 10 surveillance', note: document.getElementById('psoeMeta').textContent || '—', done: !!document.getElementById('psoeExportBtn').href },
-        { icon: 'fa-users-gear', label: 'CAP reviews awaiting Safety Manager decision', note: underReview + ' CAP(s) under review', done: underReview === 0 },
-    ];
-    document.getElementById('signoffList').innerHTML = signoffs.map(function(s) {
-        return '<div class="roster-row"><span class="dot ' + (s.done ? 'green' : 'grey') + '"></span>' +
-            '<span><i class="fas ' + s.icon + '" style="color:#1a6b8a;margin-right:0.4rem;"></i><strong>' + esc(s.label) + '</strong>' +
-            '<br><span style="color:#64748b;font-size:0.76rem;">' + esc(s.note) + '</span></span></div>';
-    }).join('');
-}
-
-function decideEscalation(capId, decision) {
-    if (decision === 'accept_risk') {
-        openRiskModal(capId);
-        return;
-    }
-    // Demo session: route through the isolated session endpoint (masters are
-    // never modified during prospect demonstrations).
-    if (isDemoSession()) {
-        const note = prompt('AE authorization note (resources approved):', 'Resources authorized for CAP implementation.');
-        if (note == null) return;
-        if (!note.trim()) { alert('A documented note is required.'); return; }
-        submitDemoDecision(capId, 'authorize', { note: note.trim() });
-        return;
-    }
-    // Authorize Resources — lighter confirmation flow.
-    const note = prompt('AE authorization note (resources approved):', 'Resources authorized for CAP implementation.');
-    if (note == null) return;
-    if (!note.trim()) { alert('A documented note is required.'); return; }
-    submitEscalationDecision(capId, {
-        status: 'In Progress',
-        comments: '[AE RESOURCES AUTHORIZED] ' + note.trim(),
-        escalated_to_ae: false,
-        manager_approval: 'Approved',
-    });
-}
-
-/* ── Demo session decision (isolated overlay write) ───────────────────── */
-async function submitDemoDecision(capId, decision, extra) {
-    extra = extra || {};
-    try {
-        const res = await ApiClient.post('/api/v1/demo/session/decision', Object.assign({
-            email: myEmail,
-            cap_id: capId,
-            decision: decision,
-        }, extra));
-        const ov = res.overlay || {};
-        gOverlays[capId] = ov;
-        const cap = gCaps.find(c => c.id === capId);
-        if (cap) Object.assign(cap, ov);
-        if (window.DemoAnalytics) DemoAnalytics.decisionMade(decision, (cap && cap.cap_reference) || capId);
-        renderEscalations(gCaps);
-        formatAllReferences(document.getElementById('dashContent'));
-        showMessage('Decision recorded in your demo session.', 'success');
-    } catch (err) {
-        showMessage('Demo decision failed: ' + err.message, 'error');
+        ApiClient.post('/api/v1/cans/caps/'+capId+'/review',{status:'In Progress',comments:'[AE] '+note.trim(),escalated_to_ae:false}).then(()=>{ cap.escalated_to_ae=false; renderEscalations(gCaps); }).catch(e=>alert(e.message));
     }
 }
-
-/* ── Formal AE risk-acceptance modal ──────────────────────────────────── */
-function openRiskModal(capId) {
-    const cap = (gCaps || []).find(function(c) { return c.id === capId; });
-    if (!cap) return;
-    gPendingCap = cap;
-
-    const sra = cap.residual_sra || {};
-    const sev = cap.residual_severity || sra.severity || null;
-    const prob = cap.residual_probability || sra.probability || null;
-    const idx = cap.residual_risk_index != null ? cap.residual_risk_index
-        : (sra.risk_index != null ? sra.risk_index : (sev && prob ? sev * prob : null));
-    const spText = sev && prob ? ('S' + sev + ' × P' + prob) : 'the documented';
-
-    document.getElementById('raCapRef').textContent = cap.cap_reference || capId;
-    document.getElementById('raDept').textContent = cap.department || '—';
-    document.getElementById('raResidual').textContent = idx != null ? ('Risk Index ' + idx) : 'Not indexed';
-    const badge = document.getElementById('raResidualBadge');
-    if (idx != null && idx > 15) { badge.className = 'badge badge-red'; badge.textContent = 'Intolerable'; }
-    else if (idx != null && idx >= 12) { badge.className = 'badge badge-amber'; badge.textContent = 'High'; }
-    else { badge.className = 'badge badge-green'; badge.textContent = 'Mitigated'; }
-
-    // Formal executive declaration (interpolated with the documented risk).
-    document.getElementById('raDeclaration').innerHTML =
-        '"I hereby acknowledge the documented residual risk of <strong>' + esc(spText) +
-        '</strong>' + (idx != null ? ' <strong>(Risk Index ' + esc(String(idx)) + ')</strong>' : '') +
-        ' and authorize continued operations subject to the implementation timeline and review date."';
-
-    var sigInput = document.getElementById('raSignature');
-    sigInput.value = '';
-    // Personalize: suggest the Accountable Executive's name from context.
-    var dctx = (typeof getStoredDemoContext === 'function') ? getStoredDemoContext() : null;
-    if (dctx && dctx.aeName) sigInput.placeholder = dctx.aeName;
-    document.getElementById('riskAcceptModal').style.display = 'flex';
-}
-
-function closeRiskModal() {
-    document.getElementById('riskAcceptModal').style.display = 'none';
-    gPendingCap = null;
-}
-
-async function submitRiskAcceptance() {
-    if (!gPendingCap) return;
-    const signature = document.getElementById('raSignature').value.trim();
-    if (!signature) { alert('An executive signature is required to accept this risk.'); return; }
-    const interval = parseInt(document.getElementById('raInterval').value, 10);
-    const sev = gPendingCap.residual_severity || (gPendingCap.residual_sra || {}).severity;
-    const prob = gPendingCap.residual_probability || (gPendingCap.residual_sra || {}).probability;
-
-    // Demo session: isolated overlay write — masters stay immutable.
-    if (isDemoSession()) {
-        try {
-            const res = await ApiClient.post('/api/v1/demo/session/decision', {
-                email: myEmail,
-                cap_id: gPendingCap.id,
-                decision: 'accept_risk',
-                signature: signature,
-                interval_days: interval,
-                note: 'Residual risk S' + (sev || '?') + ' x P' + (prob || '?') + ' accepted by the Accountable Executive.',
-            });
-            const ov = res.overlay || {};
-            gOverlays[gPendingCap.id] = ov;
-            const cap = gCaps.find(c => c.id === gPendingCap.id);
-            if (cap) Object.assign(cap, ov);
-            if (window.DemoAnalytics) DemoAnalytics.decisionMade('accept_risk', gPendingCap.cap_reference);
-            closeRiskModal();
-            renderEscalations(gCaps);
-            formatAllReferences(document.getElementById('dashContent'));
-            showMessage('Risk acceptance recorded in your demo session.', 'success');
-        } catch (err) {
-            showMessage('Demo decision failed: ' + err.message, 'error');
-        }
-        return;
-    }
-
-    await submitEscalationDecision(gPendingCap.id, {
-        status: 'In Progress',
-        comments: '[AE RISK ACCEPTED] Residual risk S' + (sev || '?') + ' x P' + (prob || '?') +
-            ' formally accepted by the Accountable Executive (' + signature + '). Mandatory review in ' + interval + ' days.',
-        escalated_to_ae: false,
-        manager_approval: 'Accepted Risk',
-        ae_signature: signature,
-        ae_signed_at: new Date().toISOString(),
-        ae_review_interval_days: interval,
-    });
-}
-
-async function submitEscalationDecision(capId, payload) {
-    try {
-        await ApiClient._request('PATCH', '/api/v1/cans/caps/' + capId + '/review', payload);
-        closeRiskModal();
-        loadDashboard();
-    } catch (err) {
-        alert('Decision failed: ' + err.message);
-    }
-}
-
-/* ── Panel 4: Safety intelligence (Doc 10159) ─────────────────────────── */
-function monthKey(iso) { return iso ? String(iso).slice(0, 7) : null; }
-
-function renderIntelligence(hazards, reports, caps, cans) {
-    const now = new Date();
-    const cutoff90 = new Date(now - 90 * 86400000).toISOString();
-
-    // Reporting velocity (leading): VSR vs MOR per month, last 6 months.
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push(d.toISOString().slice(0, 7));
-    }
-    const vsrByMonth = {}, morByMonth = {};
-    let vsr90 = 0, mor90 = 0;
-    (reports || []).forEach(function(r) {
-        const mk = monthKey(r.created_at || r.submitted_at);
-        if (!mk) return;
-        const voluntary = String(r.report_type || '').toLowerCase() === 'voluntary';
-        if (voluntary) vsrByMonth[mk] = (vsrByMonth[mk] || 0) + 1; else morByMonth[mk] = (morByMonth[mk] || 0) + 1;
-        if ((r.created_at || '') >= cutoff90) { voluntary ? vsr90++ : mor90++; }
-    });
-    document.getElementById('spiVsr').textContent = vsr90;
-    document.getElementById('spiMor').textContent = mor90;
-
-    const vCtx = document.getElementById('velocityChart');
-    if (vCtx && window.Chart) {
-        if (charts.velocity) { try { charts.velocity.destroy(); } catch (_) {} }
-        if (typeof Chart.getChart === 'function') {
-            const orphan = Chart.getChart(vCtx);
-            if (orphan) { try { orphan.destroy(); } catch (_) {} }
-        }
-        charts.velocity = new Chart(vCtx, {
-            type: 'bar',
-            data: {
-                labels: months,
-                datasets: [
-                    { label: 'VSR', data: months.map(function(m) { return vsrByMonth[m] || 0; }), backgroundColor: '#1a6b8a' },
-                    { label: 'MOR', data: months.map(function(m) { return morByMonth[m] || 0; }), backgroundColor: '#dc3545' },
-                ]
-            },
-            options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { x: { stacked: true }, y: { stacked: true, ticks: { precision: 0 } } } }
-        });
-    }
-
-    // Hazard identification rate (leading): avg hazards/month over last 6 months.
-    const hazByMonth = {};
-    (hazards || []).forEach(function(h) {
-        const mk = monthKey(h.created_at);
-        if (mk) hazByMonth[mk] = (hazByMonth[mk] || 0) + 1;
-    });
-    const hazRecent = months.slice(-6).reduce(function(acc, m) { return acc + (hazByMonth[m] || 0); }, 0);
-    document.getElementById('spiHazardRate').textContent = (hazRecent / 6).toFixed(1);
-
-    // Barrier health ratio (leading) from persisted Bow-Tie blocks.
-    const bh = { effective: 0, degraded: 0, failed: 0 };
-    (caps || []).forEach(function(c) {
-        const s = c.barrier_health || {};
-        bh.effective += s.effective || 0; bh.degraded += s.degraded || 0; bh.failed += s.failed || 0;
-    });
-    const totalBarriers = bh.effective + bh.degraded + bh.failed;
-    const ratio = totalBarriers ? Math.round(bh.effective / totalBarriers * 100) : null;
-    document.getElementById('spiBarrier').textContent = ratio != null ? ratio + '%' : '—';
-    document.getElementById('spiDegraded').textContent = bh.degraded + bh.failed;
-
-    // Lagging: occurrences + open finding age.
-    document.getElementById('spiOccurrences').textContent = (reports || []).length;
-    const openCans = (cans || []).filter(function(c) {
-        const s = String(c.status || '').toLowerCase();
-        return s !== 'closed' && s !== 'completed';
-    });
-    const ages = openCans.map(function(c) { return c.issued_at ? daysBetween(c.issued_at, now.toISOString()) : null; }).filter(function(a) { return a != null && a >= 0; });
-    document.getElementById('spiOpenAge').textContent = ages.length ? Math.round(ages.reduce(function(a, b) { return a + b; }, 0) / ages.length) : '—';
-    document.getElementById('spiOpenCan').textContent = openCans.length;
-
-    // Intelligence feed — rule-based systemic precursor insights.
-    const feed = [];
-    const deptCount = {};
-    openCans.forEach(function(c) { const d = c.department || 'Unassigned'; deptCount[d] = (deptCount[d] || 0) + 1; });
-    const topDept = Object.keys(deptCount).sort(function(a, b) { return deptCount[b] - deptCount[a]; })[0];
-    if (topDept && deptCount[topDept] > 1) {
-        feed.push(['fa-sitemap', 'Findings concentrate in ' + topDept + ' (' + deptCount[topDept] + ' open) — review resourcing and supervision in this department.']);
-    }
-    const taxCount = {};
-    (hazards || []).forEach(function(h) { if (String(h.status || '').toLowerCase() !== 'closed' && h.taxonomy) taxCount[h.taxonomy] = (taxCount[h.taxonomy] || 0) + 1; });
-    const topTax = Object.keys(taxCount).sort(function(a, b) { return taxCount[b] - taxCount[a]; })[0];
-    if (topTax) {
-        feed.push(['fa-triangle-exclamation', 'Dominant hazard taxonomy: "' + topTax + '" (' + taxCount[topTax] + ' active) — check for cross-fleet precursor correlation.']);
-    }
-    if (bh.degraded + bh.failed > 0) {
-        feed.push(['fa-shield-halved', bh.degraded + bh.failed + ' barrier(s) rated Degraded or Missing/Failed across submitted Bow-Tie analyses — prioritize restoration actions.']);
-    }
-    if (mor90 > 0 && vsr90 / Math.max(1, mor90) < 2) {
-        feed.push(['fa-bullhorn', 'Voluntary reporting velocity is low relative to mandatory occurrences (' + vsr90 + ' VSR vs ' + mor90 + ' MOR in 90 days) — reinforce just-culture reporting promotion.']);
-    }
-    if (!feed.length) feed.push(['fa-circle-check', 'No systemic precursor patterns detected in the current dataset.']);
-    document.getElementById('intelFeed').innerHTML = feed.map(function(f) {
-        return '<div class="feed-item"><i class="fas ' + f[0] + '"></i><span>' + esc(f[1]) + '</span></div>';
-    }).join('');
-}
-
-/* ── Panel 5: Governance & line of accountability ─────────────────────── */
-function renderGovernance(cans) {
-    const domain = myDomain || 'example.com';
-    const openByAssignee = {};
-    (cans || []).forEach(function(c) {
-        const s = String(c.status || '').toLowerCase();
-        if (s === 'closed') return;
-        const a = String(c.assigned_to || '').toLowerCase();
-        openByAssignee[a] = (openByAssignee[a] || 0) + 1;
-    });
-    const roles = [
-        { title: 'Safety Manager', email: 'safety@' + domain, icon: 'fa-user-shield' },
-        { title: 'Quality Manager', email: 'safety@' + domain, icon: 'fa-clipboard-check' },
-        { title: 'CAMO Postholder', email: 'camo@' + domain, icon: 'fa-plane-up' },
-        { title: 'Part-145 Postholder', email: '145@' + domain, icon: 'fa-screwdriver-wrench' },
-        { title: 'Chief Pilot / Head of Flight Ops', email: 'ops@' + domain, icon: 'fa-jet-fighter-up' },
-    ];
-    document.getElementById('roster').innerHTML = roles.map(function(r) {
-        const open = openByAssignee[r.email.toLowerCase()] || 0;
-        return '<div class="roster-row">' +
-            '<span class="dot green"></span>' +
-            '<i class="fas ' + r.icon + '" style="color:#1a6b8a;width:1.1rem;"></i>' +
-            '<strong style="min-width:230px;">' + esc(r.title) + '</strong>' +
-            '<span style="color:#475569;">' + esc(r.email) + '</span>' +
-            '<span style="margin-left:auto;' + (open ? 'color:#b45309;' : 'color:#94a3b8;') + 'font-size:0.76rem;">' +
-            (open ? open + ' open item(s)' : 'no open items') + '</span></div>';
-    }).join('');
-}
-
-function renderCar19Badge(psoeList, cans) {
-    const wrap = document.getElementById('car19Badge');
-    const latest = (psoeList || [])[0];
-    const pct = latest && latest.overall_score_pct != null ? latest.overall_score_pct : null;
-    let intolerable = 0;
-    (cans || []).forEach(function(c) {
-        const sra = c.initial_sra || {};
-        const idx = sra.risk_index != null ? sra.risk_index : null;
-        if (idx != null && idx > 15 && String(c.status || '').toLowerCase() !== 'closed') intolerable++;
-    });
-    if (pct != null && pct >= 70 && intolerable === 0) {
-        wrap.innerHTML = '<span class="compliant-badge"><i class="fas fa-circle-check"></i> State Oversight Ready (CAR-19 Compliant)</span>';
-    } else {
-        const why = [];
-        if (pct == null || pct < 70) why.push('SMS maturity below Level 2');
-        if (intolerable > 0) why.push(intolerable + ' intolerable risk(s) open');
-        wrap.innerHTML = '<span class="compliant-badge pending"><i class="fas fa-triangle-exclamation"></i> CAR-19 readiness gaps: ' + esc(why.join(' · ')) + '</span>';
-    }
-}
-
-/* ── Executive situational awareness banner ───────────────────────────── */
-const HAZ_TARGET_MONTHLY = 10;   // SPI target: hazard identifications / month
-const DEGRADED_AMBER_PCT = 30;   // CAR-19 SRAM barrier-health amber limit
-const DEGRADED_RED_PCT = 50;     // CAR-19 SRAM barrier-health red limit
-
-function renderSituationalBanner() {
-    const latest = gPsoeList.length ? gPsoeList[0] : null;
-    const pct = latest && latest.overall_score_pct != null ? latest.overall_score_pct : null;
-
-    // 1. SMS health status
-    const healthEl = document.getElementById('sitHealth');
-    let health = 'BLUE';
-    if (pct == null) health = 'GREY';
-    else if (pct >= 70) health = 'GREEN';
-    else if (pct >= 40) health = 'AMBER';
-    else health = 'RED';
-    const healthCls = { GREEN: 'sit-green', AMBER: 'sit-amber', RED: 'sit-red', BLUE: 'sit-blue', GREY: 'sit-blue' };
-    const healthNote = {
-        GREEN: 'Suitable & Operating', AMBER: 'Present — improvement required',
-        RED: 'Non-compliant', BLUE: 'No audit data', GREY: 'No audit data'
-    }[health];
-    healthEl.className = 'sit-chip ' + healthCls[health];
-    healthEl.innerHTML = '<i class="fas fa-circle" style="font-size:0.5rem;"></i> ' + health +
-        (pct != null ? ' · Maturity: ' + pct + '%' : '');
-
-    // 2. Intolerable / high exposure
-    let intolerable = 0, high = 0;
-    gCans.forEach(function(c) {
-        if (String(c.status || '').toLowerCase() === 'closed') return;
-        const sra = c.initial_sra || {};
-        const idx = sra.risk_index != null ? sra.risk_index
-            : (sra.severity && sra.probability ? sra.severity * sra.probability : null);
-        if (idx == null) return;
-        if (idx > 15) intolerable++; else if (idx >= 12) high++;
-    });
-    const expEl = document.getElementById('sitExposure');
-    const expN = intolerable + high;
-    expEl.className = 'sit-chip ' + (intolerable > 0 ? 'sit-red' : expN > 0 ? 'sit-amber' : 'sit-green');
-    expEl.textContent = intolerable + ' intolerable · ' + high + ' high — active';
-
-    // Precursor intelligence composite (Doc 10159) — used by the banner chip
-    // and popover below.
-    const pc = computePrecursorComponents();
-
-    // 3. Executive action queue
-    const pending = gCaps.filter(function(c) { return c.escalated_to_ae; }).length;
-    const qEl = document.getElementById('sitQueue');
-    qEl.className = 'sit-chip ' + (pending > 0 ? 'sit-amber' : 'sit-green');
-    qEl.innerHTML = pending + ' Escalation(s) Pending AE Decision' +
-        (pending ? ' <i class="fas fa-arrow-down" style="cursor:pointer;" title="Go to queue" onclick="document.getElementById(\'escalationQueue\').scrollIntoView({behavior:\'smooth\'});"></i>' : '');
-
-    // 4. SPI trajectory alerts (computed by renderTrends)
-    const spiEl = document.getElementById('sitSpi');
-    spiEl.className = 'sit-chip ' + (gSpiAlerts >= 2 ? 'sit-amber' : gSpiAlerts > 0 ? 'sit-blue' : 'sit-green');
-    spiEl.textContent = gSpiAlerts + ' Indicator(s) Approaching Alert Level';
-
-    const pcCls = pc.level === 'HIGH' ? 'sit-red' : pc.level === 'MODERATE' ? 'sit-amber' : 'sit-green';
-    const preEl = document.getElementById('sitPrecursor');
-    preEl.className = 'sit-chip ' + pcCls;
-    preEl.innerHTML = '<i class="fas fa-satellite-dish"></i> Doc 10159 Precursor Risk: ' + pc.level +
-        ' (' + pc.confidence + '% Confidence) | Projected Impact: ' + pc.impact45 + '% 45-day occurrence probability';
-    document.getElementById('precursorPopover').innerHTML =
-        '<strong>Composite confidence — weighted components:</strong><br>' +
-        '· Barrier degradation (40%): <strong>' + pc.barrierDegPct + '%</strong> of rated barriers degraded/failed<br>' +
-        '· Overdue CAPs (40%): <strong>' + pc.overdueCapPct + '%</strong> of active CAPs past target (' + pc.overdueCaps + ')<br>' +
-        '· Open high risks (20%): <strong>' + pc.highRiskRatioPct + '%</strong> of active CANs at High/Intolerable<br>' +
-        '<strong>Composite score: ' + pc.confidence + '%</strong>';
-
-    // Operational context from the mirroring profile (fleet / base).
-    var ops = document.getElementById('sitOpsContext');
-    if (ops) {
-        var dctx = (typeof getStoredDemoContext === 'function') ? getStoredDemoContext() : (window.DEMO_CONTEXT || null);
-        if (dctx && (dctx.fleetType || dctx.baseLocation)) {
-            ops.textContent = 'Fleet: ' + (dctx.fleetType || '—') + '  ·  Base: ' + (dctx.baseLocation || '—');
-        } else {
-            ops.textContent = '—';
-        }
-    }
-}
-
-/* ── Precursor composite model (Doc 10159) ────────────────────────────── */
-// Confidence = barrier degradation (40%) + overdue CAPs (40%) + open high
-// risks (20%), each normalized to a 0-100 component score.
-function computePrecursorComponents(overrides) {
-    overrides = overrides || {};
-    const now = new Date();
-    const isOpen = function(s) { const v = String(s || '').toLowerCase(); return v !== 'closed' && v !== 'completed'; };
-
-    // Component 1 — barrier degradation (40%).
-    let eff = 0, bad = 0;
-    gCaps.forEach(function(c) {
-        const s = c.barrier_health || {};
-        eff += s.effective || 0; bad += (s.degraded || 0) + (s.failed || 0);
-    });
-    if (overrides.restoreBarriers) bad = Math.max(0, bad - overrides.restoreBarriers);
-    const totalBarriers = eff + bad;
-    const barrierDegScore = totalBarriers ? Math.round(bad / totalBarriers * 100) : 0;
-
-    // Component 2 — overdue CAPs (40%), ratio of active CAPs past target.
-    let overdueCaps = 0, activeCaps = 0;
-    gCaps.forEach(function(c) {
-        if (!isOpen(c.status)) return;
-        activeCaps++;
-        if (c.target_completion_date && new Date(c.target_completion_date) < now) overdueCaps++;
-    });
-    if (overrides.resolveOverdue) overdueCaps = Math.max(0, overdueCaps - overrides.resolveOverdue);
-    const overdueCapScore = activeCaps ? Math.min(100, Math.round(overdueCaps / activeCaps * 200)) : 0;
-
-    // Component 3 — open high risks (20%), share of active CANs.
-    let highRisk = 0, activeCans = 0;
-    gCans.forEach(function(c) {
-        if (!isOpen(c.status)) return;
-        activeCans++;
-        const sra = c.initial_sra || {};
-        const idx = sra.risk_index != null ? sra.risk_index
-            : (sra.severity && sra.probability ? sra.severity * sra.probability : null);
-        if (idx != null && idx >= 12) highRisk++;
-    });
-    const highRiskScore = activeCans ? Math.min(100, Math.round(highRisk / activeCans * 300)) : 0;
-
-    const score01 = (
-        0.40 * barrierDegScore +
-        0.40 * overdueCapScore +
-        0.20 * highRiskScore
-    ) / 100;
-
-    const level = score01 >= 0.60 ? 'HIGH' : score01 >= 0.30 ? 'MODERATE' : 'LOW';
-    // Projected 45-day occurrence probability — monotone mapping of the composite.
-    const impact45 = Math.min(95, Math.round(Math.pow(score01, 0.75) * 78));
-
-    return {
-        level: level,
-        confidence: Math.round(score01 * 100),
-        impact45: impact45,
-        barrierDegPct: barrierDegScore,
-        overdueCapPct: activeCaps ? Math.round(overdueCaps / activeCaps * 100) : 0,
-        highRiskRatioPct: activeCans ? Math.round(highRisk / activeCans * 100) : 0,
-        overdueCaps: overdueCaps,
-        degradedBarriers: bad,
-        totalBarriers: totalBarriers,
-    };
-}
-
-/* ── Reporting Culture & Vitality Index ───────────────────────────────── */
-function renderReportingCulture(hazards, reports, cans) {
-    const now = new Date();
-    const cut90 = new Date(now - 90 * 86400000).toISOString();
-    const cut180 = new Date(now - 180 * 86400000).toISOString();
-
-    let vsr90 = 0, mor90 = 0, vsrPrev = 0, morPrev = 0;
-    (reports || []).forEach(function(r) {
-        const ts = r.created_at || r.submitted_at;
-        if (!ts) return;
-        const voluntary = String(r.report_type || '').toLowerCase() === 'voluntary';
-        if (ts >= cut90) { voluntary ? vsr90++ : mor90++; }
-        else if (ts >= cut180) { voluntary ? vsrPrev++ : morPrev++; }
-    });
-
-    // VSR:MOR ratio vs target (> 3:1).
-    const ratioEl = document.getElementById('spiVsrMorRatio');
-    const ratioKpi = document.getElementById('ratioKpi');
-    if (mor90 === 0 && vsr90 === 0) {
-        ratioEl.textContent = '—';
-        ratioKpi.className = 'kpi';
-    } else {
-        const ratio = mor90 > 0 ? vsr90 / mor90 : vsr90;
-        ratioEl.textContent = mor90 > 0 ? ratio.toFixed(1) + ':1' : String(ratio);
-        ratioKpi.className = 'kpi ' + (ratio >= 3 ? 'good' : 'warn');
-    }
-
-    // Report → Initial SRA latency: hazard report date → CAN issuance date.
-    const hazardCreated = {};
-    (hazards || []).forEach(function(h) {
-        if (h.created_at) hazardCreated[h.hazard_id || h.id] = h.created_at;
-    });
-    const latencies = (cans || []).map(function(c) {
-        const created = c.hazard_id ? hazardCreated[c.hazard_id] : null;
-        if (!created || !c.issued_at) return null;
-        const d = daysBetween(created, c.issued_at);
-        return d >= 0 && d < 365 ? d : null;
-    }).filter(function(d) { return d != null; });
-    document.getElementById('spiTurnaround').textContent =
-        latencies.length ? Math.round(latencies.reduce(function(a, b) { return a + b; }, 0) / latencies.length) : '—';
-
-    // Benchmark chip: current vs prior 90-day reporting volume (+ YoY-style delta).
-    const cur = vsr90 + mor90, prev = vsrPrev + morPrev;
-    const benchChip = document.getElementById('benchmarkChip');
-    let benchText, benchCls;
-    if (!cur) { benchText = 'Benchmark: no reports in last 90 days'; benchCls = 'badge-grey'; }
-    else if (!prev) { benchText = 'Reporting Health: Establishing baseline (' + cur + ' reports/90d)'; benchCls = 'badge-grey'; }
-    else {
-        const delta = Math.round((cur - prev) / prev * 100);
-        if (delta >= 10) { benchText = 'Reporting Health: Robust (+' + delta + '% vs prior period)'; benchCls = 'badge-green'; }
-        else if (delta >= -10) { benchText = 'Reporting Health: Stable (' + (delta >= 0 ? '+' : '') + delta + '% vs prior period)'; benchCls = 'badge-amber'; }
-        else { benchText = 'Reporting Health: Declining (' + delta + '% vs prior period)'; benchCls = 'badge-red'; }
-    }
-    benchChip.className = 'badge ' + benchCls;
-    benchChip.textContent = benchText;
-
-    // Just Culture chip from the vitality ratio.
-    const jcChip = document.getElementById('justCultureChip');
-    const ratioNow = mor90 > 0 ? vsr90 / mor90 : (vsr90 > 0 ? 99 : 0);
-    if (ratioNow >= 3) { jcChip.className = 'badge badge-green'; jcChip.textContent = 'Just Culture: Healthy — voluntary reporting dominates'; }
-    else if (ratioNow >= 1) { jcChip.className = 'badge badge-amber'; jcChip.textContent = 'Just Culture: Watch — mandatory reports outweigh voluntary'; }
-    else { jcChip.className = 'badge badge-grey'; jcChip.textContent = 'Just Culture: insufficient data'; }
-}
-
-/* ── 12-month SPI trajectory trendlines ───────────────────────────────── */
-function renderTrends(hazards, caps) {
-    const now = new Date();
-    const months = [];
-    for (let i = 11; i >= 0; i--) {
-        months.push(new Date(now.getFullYear(), now.getMonth() - i, 1).toISOString().slice(0, 7));
-    }
-
-    const hazByMonth = {};
-    (hazards || []).forEach(function(h) {
-        const mk = monthKey(h.created_at);
-        if (mk) hazByMonth[mk] = (hazByMonth[mk] || 0) + 1;
-    });
-    const hazRate = months.map(function(m) { return hazByMonth[m] || 0; });
-
-    // Degraded barrier % per month — each CAP's barrier snapshot at submission.
-    const degByMonth = {};
-    (caps || []).forEach(function(c) {
-        const mk = monthKey(c.submitted_at);
-        const s = c.barrier_health || {};
-        const total = (s.effective || 0) + (s.degraded || 0) + (s.failed || 0);
-        if (!mk || !total) return;
-        const pctVal = ((s.degraded || 0) + (s.failed || 0)) / total * 100;
-        degByMonth[mk] = degByMonth[mk] || [];
-        degByMonth[mk].push(pctVal);
-    });
-    const degPct = months.map(function(m) {
-        const arr = degByMonth[m];
-        if (!arr || !arr.length) return null;
-        return Math.round(arr.reduce(function(a, b) { return a + b; }, 0) / arr.length);
-    });
-
-    // SPI alert count for the banner: latest-month breaches against limits.
-    let alerts = 0;
-    const lastHaz = hazRate[hazRate.length - 1] || 0;
-    const lastDeg = (() => { for (let i = degPct.length - 1; i >= 0; i--) { if (degPct[i] != null) return degPct[i]; } return null; })();
-    if (lastHaz < HAZ_TARGET_MONTHLY * 0.4) alerts++;          // under-reporting hazards
-    if (lastDeg != null && lastDeg >= DEGRADED_AMBER_PCT) alerts++;
-    const ctx = document.getElementById('trendChart');
-    if (ctx && window.Chart) {
-        if (charts.trend) { try { charts.trend.destroy(); } catch (_) {} }
-        if (typeof Chart.getChart === 'function') {
-            const orphan = Chart.getChart(ctx);
-            if (orphan) { try { orphan.destroy(); } catch (_) {} }
-        }
-        charts.trend = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: months,
-                datasets: [
-                    { label: 'Hazard ID rate / month', data: hazRate, borderColor: '#1a6b8a', backgroundColor: 'rgba(26,107,138,0.08)', tension: 0.35, pointRadius: 2 },
-                    { label: 'Target (' + HAZ_TARGET_MONTHLY + '/mo)', data: months.map(function() { return HAZ_TARGET_MONTHLY; }), borderColor: '#1e7e34', borderDash: [6, 4], pointRadius: 0 },
-                    { label: 'Degraded barrier %', data: degPct, borderColor: '#b45309', backgroundColor: 'rgba(180,83,9,0.06)', tension: 0.35, pointRadius: 2, yAxisID: 'y2' },
-                    { label: 'Amber limit (' + DEGRADED_AMBER_PCT + '%)', data: months.map(function() { return DEGRADED_AMBER_PCT; }), borderColor: '#d97706', borderDash: [6, 4], pointRadius: 0, yAxisID: 'y2' },
-                    { label: 'Red limit (' + DEGRADED_RED_PCT + '%)', data: months.map(function() { return DEGRADED_RED_PCT; }), borderColor: '#dc3545', borderDash: [3, 5], pointRadius: 0, yAxisID: 'y2' },
-                ]
-            },
-            options: {
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } } },
-                scales: {
-                    x: { ticks: { font: { size: 9 } } },
-                    y: { min: 0, position: 'left', title: { display: true, text: 'Hazards / month', font: { size: 9 } }, ticks: { precision: 0 } },
-                    y2: { min: 0, max: 100, position: 'right', title: { display: true, text: 'Degraded %', font: { size: 9 } }, grid: { drawOnChartArea: false }, ticks: { callback: function(v) { return v + '%'; } } },
-                }
-            }
-        });
-    }
-    gSpiAlerts = alerts;
-}
-
-/* ── Data Quality & Integrity chip ────────────────────────────────────── */
-const REVIEW_SLA_DAYS = 14;
-
-function renderDataQualityChip() {
-    const now = new Date();
-    // Completed SRAs on active hazards.
-    const activeHazards = gHazards.filter(function(h) { return String(h.status || '').toLowerCase() !== 'closed'; });
-    const assessed = activeHazards.filter(function(h) {
-        return h.risk_index != null || (h.severity != null && h.probability != null);
-    }).length;
-    const sraPct = activeHazards.length ? Math.round(assessed / activeHazards.length * 100) : 100;
-    const unassessed = activeHazards.length - assessed;
-
-    // On-time CAP reviews (SLA 14 days): reviewed in time, or pending within SLA.
-    let onTime = 0, overdueReviews = 0, considered = 0;
-    gCaps.forEach(function(c) {
-        if (!c.submitted_at) return;
-        considered++;
-        const ageDays = daysBetween(c.submitted_at, now.toISOString());
-        if (c.reviewed_at) {
-            if (daysBetween(c.submitted_at, c.reviewed_at) <= REVIEW_SLA_DAYS) onTime++;
-            else overdueReviews++;
-        } else if (String(c.status || '').toLowerCase() === 'under review') {
-            if (ageDays <= REVIEW_SLA_DAYS) onTime++; else { overdueReviews++; }
-        } else {
-            onTime++; // not awaiting review — no SLA breach
-        }
-    });
-    const reviewPct = considered ? Math.round(onTime / considered * 100) : 100;
-    const dqScore = Math.round(sraPct * 0.5 + reviewPct * 0.5);
-
-    const el = document.getElementById('sitDataQuality');
-    el.className = 'sit-chip ' + (dqScore >= 85 ? 'sit-green' : dqScore >= 65 ? 'sit-amber' : 'sit-red');
-    el.innerHTML = '<i class="fas fa-database"></i> ' + dqScore + '% — ' + unassessed + ' unassessed hazard(s), ' +
-        overdueReviews + ' overdue review(s)';
-}
-
-/* ── Departmental Safety Health Matrix ────────────────────────────────── */
-function normDept(v) {
-    const raw = String(v || '').trim().toLowerCase();
-    if (!raw) return '';
-    const map = {
-        'part-145': 'Part-145', 'part 145': 'Part-145', '145': 'Part-145',
-        'maintenance': 'Part-145', 'engineering': 'Part-145', 'amo': 'Part-145',
-        'engineering & maintenance': 'Part-145', 'maintenance & engineering': 'Part-145',
-        'camo': 'CAMO', 'camo / engineering': 'CAMO', 'continuing airworthiness': 'CAMO',
-        'flight operations': 'Flight Operations', 'flight ops': 'Flight Operations',
-        'ops': 'Flight Operations', 'line crew': 'Flight Operations',
-        'ground operations': 'Ground Operations', 'ground handling': 'Ground Operations',
-        'cabin services': 'Cabin Services', 'cabin crew': 'Cabin Services', 'cabin safety': 'Cabin Services',
-        'safety': 'Safety', 'safety & quality': 'Safety', 'qa': 'Safety',
-    };
-    return map[raw] || String(v || '').trim();
-}
-
-const DEPT_MATRIX_ROWS = [
-    { name: 'Flight Operations', match: 'Flight Operations' },
-    { name: 'Part-145 Maintenance', match: 'Part-145' },
-    { name: 'CAMO', match: 'CAMO' },
-    { name: 'Cabin Safety', match: 'Cabin Services' },
-    { name: 'Ground Handling', match: 'Ground Operations' },
-];
-
-function renderDeptMatrix() {
-    const now = new Date();
-    // Operational context line from the mirroring profile.
-    var ctxLine = document.getElementById('deptCtxLine');
-    if (ctxLine) {
-        var dctx = (typeof getStoredDemoContext === 'function') ? getStoredDemoContext() : (window.DEMO_CONTEXT || null);
-        if (dctx && (dctx.fleetType || dctx.baseLocation)) {
-            ctxLine.textContent = 'Fleet: ' + (dctx.fleetType || '—') + '  ·  Base: ' + (dctx.baseLocation || '—');
-        }
-    }
-    const isOpen = function(s) { const v = String(s || '').toLowerCase(); return v !== 'closed' && v !== 'completed'; };
-
-    document.getElementById('deptMatrix').innerHTML = DEPT_MATRIX_ROWS.map(function(row) {
-        const dept = row.match;
-        const inDept = function(d) { return normDept(d) === dept; };
-
-        const activeHazards = gHazards.filter(function(h) {
-            return isOpen(h.status) && inDept(h.department);
-        }).length;
-
-        let bhEff = 0, bhBad = 0;
-        let openCans = 0, openCaps = 0, overdue = 0;
-        gCans.forEach(function(c) {
-            if (!inDept(c.department)) return;
-            if (isOpen(c.status)) {
-                openCans++;
-                if (c.target_completion_date && new Date(c.target_completion_date) < now) overdue++;
-            }
-        });
-        gCaps.forEach(function(c) {
-            if (!inDept(c.department)) return;
-            const s = c.barrier_health || {};
-            bhEff += s.effective || 0; bhBad += (s.degraded || 0) + (s.failed || 0);
-            if (isOpen(c.status)) {
-                openCaps++;
-                if (c.target_completion_date && new Date(c.target_completion_date) < now) overdue++;
-            }
-        });
-        const bhTotal = bhEff + bhBad;
-        const effPct = bhTotal ? Math.round(bhEff / bhTotal * 100) : null;
-
-        // Status: red on critical degradation or overdue concentration,
-        // amber on attention items, green when stable, grey with no data.
-        let chip = '<span class="badge badge-grey">No Data</span>';
-        if (bhTotal || openCans || openCaps) {
-            if ((bhTotal && effPct < 50) || overdue >= 3) chip = '<span class="badge badge-red">Critical</span>';
-            else if (overdue > 0 || (bhTotal && effPct < 70)) chip = '<span class="badge badge-amber">Attention</span>';
-            else chip = '<span class="badge badge-green">Stable</span>';
-        }
-
-        return '<div class="dept-card">' +
-            '<div class="dc-head"><span class="dc-name">' + esc(row.name) + '</span>' + chip + '</div>' +
-            '<div class="dc-metrics">' +
-                '<span>Active hazards</span><b>' + activeHazards + '</b>' +
-                '<span>Open CANs / CAPs</span><b>' + openCans + ' / ' + openCaps + '</b>' +
-                '<span>Overdue</span><b' + (overdue ? ' style="color:#dc3545;"' : '') + '>' + overdue + '</b>' +
-                '<span>Barrier health</span><b>' + (effPct != null ? effPct + '% effective' : '—') + '</b>' +
-            '</div>' +
-            (bhTotal ? '<div class="bar-track"><i style="width:' + effPct + '%;background:' +
-                (effPct >= 70 ? '#1e7e34' : effPct >= 50 ? '#d97706' : '#dc3545') + ';"></i></div>' : '') +
-            '</div>';
-    }).join('');
-}
-
-/* ── Executive Risk Acceptance Ledger ─────────────────────────────────── */
-let gLedgerRows = [];
-
-function renderDecisionLog() {
-    const signed = gCaps.filter(function(c) { return c.ae_signature; });
-    const container = document.getElementById('decisionLedger');
-
-    if (!signed.length) {
-        gLedgerRows = [];
-        container.innerHTML = '<div class="empty">No AE risk-acceptance decisions recorded yet.</div>';
-        return;
-    }
-
-    // Fetch full records for the typed signature text (list payloads carry a flag only).
-    Promise.all(signed.map(function(c) {
-        return ApiClient.get('/api/v1/cans/caps/' + c.id).catch(function() { return c; });
-    })).then(function(details) {
-        const now = new Date();
-        gLedgerRows = details.map(function(d) {
-            const sra = d.residual_sra || {};
-            const sev = d.residual_severity || sra.severity;
-            const prob = d.residual_probability || sra.probability;
-            const reviewDate = d.ae_review_date;
-            const expired = reviewDate && new Date(reviewDate) < now;
-            const statusText = expired ? 'Expired' : 'Active';
-            const statusCls = expired ? 'badge-red' : 'badge-green';
-            return {
-                ref: d.cap_reference || d.id,
-                dept: d.department || '—',
-                sp: sev && prob ? ('S' + sev + ' × P' + prob + ' (' + (d.residual_risk_index != null ? d.residual_risk_index : sev * prob) + ')') : '—',
-                signature: d.ae_signature || '(signed)',
-                signedAt: fmtDate(d.ae_signed_at),
-                reviewDate: fmtDate(reviewDate),
-                statusText: statusText,
-                statusCls: statusCls,
-            };
-        });
-        container.innerHTML = '<table class="gov"><thead><tr>' +
-            '<th>Reference</th><th>Department</th><th>Residual Accepted</th><th>Typed Signature</th>' +
-            '<th>Sign-off Date</th><th>Mandatory Review</th><th>Status</th></tr></thead><tbody>' +
-            gLedgerRows.map(function(r) {
-                return '<tr><td><strong>' + esc(r.ref) + '</strong></td><td>' + esc(r.dept) + '</td><td>' + esc(r.sp) +
-                    '</td><td>' + esc(r.signature) + '</td><td>' + esc(r.signedAt) + '</td><td>' + esc(r.reviewDate) +
-                    '</td><td><span class="badge ' + r.statusCls + '">' + r.statusText + '</span></td></tr>';
-            }).join('') + '</tbody></table>';
-    });
-}
-
-function exportDecisionLog(fmt) {
-    if (window.DemoAnalytics) DemoAnalytics.exportTriggered(fmt, 'AE Decision Log');
-    if (!gLedgerRows.length) { alert('No AE decision records to export yet.'); return; }
-    if (fmt === 'csv') {
-        const header = 'Reference,Department,Residual Risk Accepted,Typed Signature,Sign-off Date,Mandatory Review Date,Status\n';
-        const body = gLedgerRows.map(function(r) {
-            return [r.ref, r.dept, '"' + r.sp + '"', '"' + r.signature + '"', r.signedAt, r.reviewDate, r.statusText]
-                .map(function(v) { return String(v).replace(/"/g, '""'); }).join(',');
-        }).join('\n');
-        const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'ae_decision_log_' + new Date().toISOString().slice(0, 10) + '.csv';
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } else {
-        const rowsHtml = gLedgerRows.map(function(r) {
-            return '<tr><td>' + esc(r.ref) + '</td><td>' + esc(r.dept) + '</td><td>' + esc(r.sp) + '</td><td>' +
-                esc(r.signature) + '</td><td>' + esc(r.signedAt) + '</td><td>' + esc(r.reviewDate) + '</td><td>' + r.statusText + '</td></tr>';
-        }).join('');
-        const w = window.open('', '_blank');
-        w.document.write('<html><head><title>AE Decision Log</title><style>body{font-family:Inter,Arial,sans-serif;padding:1.5rem;}h1{font-size:1.1rem;color:#0b2a42;}table{width:100%;border-collapse:collapse;font-size:0.8rem;}th,td{border:1px solid #cbd5e1;padding:0.45rem;text-align:left;}th{background:#f1f5f9;}</style></head><body>' +
-            '<h1>AviaSAFE — Executive Risk Acceptance Ledger</h1><p>Generated ' + new Date().toLocaleString() + '</p>' +
-            '<table><thead><tr><th>Reference</th><th>Department</th><th>Residual Accepted</th><th>Typed Signature</th><th>Sign-off Date</th><th>Mandatory Review</th><th>Status</th></tr></thead><tbody>' +
-            rowsHtml + '</tbody></table></body></html>');
-        w.document.close();
-        w.focus();
-        setTimeout(function() { w.print(); }, 350);
-    }
-}
-
-/* ── What-If Mitigation Scenario Simulator ────────────────────────────── */
-function initSimulator() {
-    const overdueMax = computePrecursorComponents().overdueCaps;
-    let badBarriers = 0;
-    gCaps.forEach(function(c) {
-        const s = c.barrier_health || {};
-        badBarriers += (s.degraded || 0) + (s.failed || 0);
-    });
-    const overSlider = document.getElementById('simOverdue');
-    const barSlider = document.getElementById('simBarriers');
-    overSlider.max = Math.max(1, overdueMax);
-    overSlider.value = 0;
-    barSlider.max = Math.max(1, badBarriers);
-    barSlider.value = 0;
-    document.getElementById('simOverdueVal').textContent = '0';
-    document.getElementById('simBarriersVal').textContent = '0';
-
-    overSlider.oninput = updateSimulator;
-    barSlider.oninput = updateSimulator;
-    updateSimulator();
-}
-
-function updateSimulator() {
-    const x = parseInt(document.getElementById('simOverdue').value, 10) || 0;
-    const y = parseInt(document.getElementById('simBarriers').value, 10) || 0;
-    document.getElementById('simOverdueVal').textContent = x;
-    document.getElementById('simBarriersVal').textContent = y;
-
-    const pc = computePrecursorComponents({ resolveOverdue: x, restoreBarriers: y });
-
-    const pEl = document.getElementById('simPrecursor');
-    pEl.textContent = pc.confidence + '% (' + pc.level + ')';
-    pEl.style.color = pc.level === 'HIGH' ? '#dc3545' : pc.level === 'MODERATE' ? '#d97706' : '#1e7e34';
-
-    // Maturity projection: modest credit per resolved CAP / restored barrier,
-    // capped at +12 points over the current score.
-    const latest = gPsoeList.length ? gPsoeList[0] : null;
-    const base = latest && latest.overall_score_pct != null ? latest.overall_score_pct : null;
-    const mEl = document.getElementById('simMaturity');
-    if (base == null) {
-        mEl.textContent = '—';
-    } else {
-        const delta = Math.min(12, Math.round(x * 1.2 + y * 0.6));
-        mEl.textContent = Math.min(100, base + delta) + '% (+' + delta + ')';
-        mEl.style.color = delta > 0 ? '#1e7e34' : '#0b2a42';
-    }
-    if ((x || y) && window.DemoAnalytics) DemoAnalytics.simulatorUse({ overdue_resolved: x, barriers_restored: y });
-}
-
-function esc(v) {
-    if (v === null || v === undefined) return '';
-    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function renderSituationalBanner(){
+    // simplified contextual chips
+    const health=(gPsoeList[0]&&gPsoeList[0].overall_score_pct>=70)?'Healthy':'Attention';
+    document.getElementById('sitHealth').textContent=health; document.getElementById('sitHealth').className='chip '+(health==='Healthy'?'chip-green':'chip-amber');
+    const exp=(gCans.filter(c=>{const s=c.initial_sra||{}; const idx=s.risk_index||0; return idx>15;}).length);
+    document.getElementById('sitExposure').textContent=exp?exp+' high':'None';
+    document.getElementById('sitExposure').className='chip '+(exp?'chip-red':'chip-green');
+    const q=gCaps.filter(c=>c.escalated_to_ae).length;
+    document.getElementById('sitQueue').textContent=q?q+' pending':'Clear';
+    document.getElementById('sitQueue').className='chip '+(q?'chip-amber':'chip-green');
+    document.getElementById('sitPrecursor').textContent='Assessed';
 }
 </script>
-<footer class="app-footer" style="text-align: center; padding: 1rem; border-top: 1px solid #e2e8f0; margin-top: 1.5rem;">
-    <p style="margin: 0; font-size: 0.875rem;">
-        <a href="/privacy.html" style="color: var(--color-text-muted, #64748b); text-decoration: none;">Privacy Policy</a>
-        <span style="margin: 0 0.5rem; color: #94a3b8;">|</span>
-        <a href="/terms.html" style="color: var(--color-text-muted, #64748b); text-decoration: none;">Terms of Service</a>
-    </p>
-    <p style="margin: 0.25rem 0 0; font-size: 0.875rem;">Made with love <span style="color: #ef4444;">&hearts;</span> from Nepal</p>
-    <p style="margin: 0.25rem 0 0; font-size: 0.75rem; opacity: 0.7;">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
-</footer>
-
 </body>
 </html>

@@ -15,6 +15,13 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/admin/dashboard.html",
+          "destination": "/admin/production-setup.html",
+          "type": 301
+        }
+      ],
       "rewrites": [
         {
           "source": "/aviasdcps",
