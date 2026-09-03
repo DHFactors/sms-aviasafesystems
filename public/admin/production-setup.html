@@ -664,28 +664,14 @@ async function execDeleteUser(email, uid, setupKeyFromModal) {
     if (uid) body.uid = uid;
     if (tenant_id) body.tenant_id = tenant_id;
     try {
-        var token = await firebase.auth().currentUser.getIdToken();
-        // Use POST to /users/delete — DELETE with JSON body is dropped by some proxies;
-        // POST is reliable and mirrors the backend alias. Explicitly send all 4 fields.
-        var resp = await fetch('/api/v1/admin/users/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify(body)
-        });
-        var data = await resp.json().catch(function () { return {}; });
-        // Surface backend validation errors explicitly (403 Invalid setup key, 404 not found, 422 missing)
-        if (!resp.ok) {
-            var msg = data.detail || data.message || resp.statusText || 'Delete failed';
-            if (Array.isArray(msg)) msg = msg.map(function (e) { return e.msg || JSON.stringify(e); }).join('; ');
-            throw new Error(msg);
-        }
+        // Use AdminUI.apiPost so request goes to Render backend (API_BASE_URL),
+        // not Firebase Hosting relative /api/* (which would 404). Handles token + tenant headers.
+        var data = await AdminUI.apiPost('/api/v1/admin/users/delete', body);
         // Explicit contract: backend must return {success:true, deleted:true, uid, email}
-        // Guard against soft 200 with missing flags
         if (!data.success || !data.deleted) {
             throw new Error((data.detail || data.message || 'Delete failed — no confirmation from server'));
         }
-        // Prefer backend-returned email/uid, fall back to request values
-        var deletedEmail = (data.email || (data.deleted_user && data.deleted_user.email) || (data.deleted && data.deleted.email) || email || uid);
+        var deletedEmail = data.email || (data.deleted_user && data.deleted_user.email) || (data.deleted && data.deleted.email) || email || uid;
         toast('Deleted ' + esc(deletedEmail), 'success');
         await loadUsers();
         loadAuditLog();
@@ -697,7 +683,8 @@ async function execDeleteUser(email, uid, setupKeyFromModal) {
         }
         var msg = err && err.message ? err.message : String(err);
         if (Array.isArray(msg)) msg = msg.join('; ');
-        // Surface exact backend reason (e.g., 403 Invalid setup key) in toast
+        // Surface exact backend reason (e.g., 403 Invalid setup key) in toast;
+        // ApiClient already wraps network errors as "Network error. Please check..."
         toast('Delete failed: ' + msg, 'error');
     }
 }
