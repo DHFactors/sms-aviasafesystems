@@ -638,18 +638,36 @@ async function execDeleteUser(email, uid) {
     if (uid) body.uid = uid;
     try {
         var token = await firebase.auth().currentUser.getIdToken();
-        var resp = await fetch('/api/v1/admin/users', {
-            method: 'DELETE',
+        // Use POST to /users/delete — DELETE with JSON body is dropped by some proxies;
+        // POST is reliable and mirrors the backend alias.
+        var resp = await fetch('/api/v1/admin/users/delete', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify(body)
         });
         var data = await resp.json().catch(function () { return {}; });
-        if (!resp.ok) throw new Error((data.detail || data.message || resp.statusText || 'Delete failed'));
+        // Explicit contract: success only on 2xx AND data.success === true AND data.deleted
+        if (!resp.ok) {
+            var msg = data.detail || data.message || resp.statusText || 'Delete failed';
+            // FastAPI 422 validation errors return array in detail
+            if (Array.isArray(msg)) msg = msg.map(function (e) { return e.msg || JSON.stringify(e); }).join('; ');
+            throw new Error(msg);
+        }
+        if (!data.success || !data.deleted) {
+            throw new Error((data.detail || data.message || 'Delete failed — no confirmation from server'));
+        }
         toast('Deleted ' + esc((data.deleted && data.deleted.email) || email || uid), 'success');
         await loadUsers();
         loadAuditLog();
     } catch (err) {
-        toast('Delete failed: ' + err.message, 'error');
+        // Handle setup_key cancel (prompt closed) without noisy toast
+        if (err && err.message && err.message.indexOf('Setup key required') !== -1) {
+            toast('Delete cancelled — setup key required', 'error');
+            return;
+        }
+        var msg = err && err.message ? err.message : String(err);
+        if (Array.isArray(msg)) msg = msg.join('; ');
+        toast('Delete failed: ' + msg, 'error');
     }
 }
 
