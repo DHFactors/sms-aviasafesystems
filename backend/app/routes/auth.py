@@ -52,7 +52,7 @@ class LoginRequest(BaseModel):
 
 
 class LoginCredentials(BaseModel):
-    email: EmailStr
+    email: str = Field(..., description="Email address (validated on the client and via corporate email service)")
     password: str
 
 
@@ -113,7 +113,7 @@ async def login_endpoint(
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., description="Email address (validated on the client and via corporate email service)")
     password: str
     full_name: str
     organization: str
@@ -224,7 +224,7 @@ class RegisterTenantRequest(BaseModel):
     classification: OperationalScope
     admin_full_name: str = Field(..., min_length=1)
     admin_title: str = Field(..., min_length=1)
-    email: EmailStr
+    email: str = Field(..., description="Email address (validated on the client and via corporate email service)")
     password: str
     confirm_password: str
     beta_access_key: Optional[str] = None
@@ -316,7 +316,7 @@ class JoinTeamRequest(BaseModel):
     invite_code: Optional[str] = None
     tenant_id: Optional[str] = None
     full_name: str = Field(..., min_length=1)
-    email: EmailStr
+    email: str = Field(..., description="Email address (validated on the client and via corporate email service)")
     password: str
     confirm_password: str
     department: str = Field(..., min_length=1)

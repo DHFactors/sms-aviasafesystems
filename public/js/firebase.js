@@ -636,6 +636,10 @@ function getRoleDestination(user) {
             return '/dashboard/ae-dashboard.html';
         }
     }
+    // Department admins (DEPT_ADMIN for CAMO, Part-145, Operations) must be
+    // routed directly to the responsible-manager dashboard instead of safety.html
+    // to prevent the Access Denied routing loop.
+    if (role === 'DEPT_ADMIN') return '/dashboard/responsible-manager.html';
     if (role === 'USER') {
         var claims = (user && (user.claims || {})) || {};
         var department = claims.department || (user && user.department) || '';
