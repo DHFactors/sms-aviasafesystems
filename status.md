@@ -1,58 +1,44 @@
 # Project Status
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Objective
 - **AviaSAFE SMS** production platform at `sms.aviasafesystems.com` (Firebase `aerosafety-sms-prod` + Render `aviasafe-unified-platform`) — single consolidated `sms-db` Firestore + Supabase Postgres.
-- Super-admin landing = `admin/production-setup.html` (Steps 1–7 data-driven), all operator / regulator / safety workflows verified via live UAT.
+- Super-admin landing = `admin/production-setup.html` (Steps 1–7 data-driven), executive = `dashboard/ae-dashboard.html` (minimalist), safety = `safety.html` (data-rich), all verified via live UAT. Platform cleanup consolidated.
 
 ## Key decisions (latest)
-- SUPER_ADMIN → `/admin/production-setup.html`, CAAN_SMD → `/caan.html`, DEPT_ADMIN (camo/145/ops) → `/dashboard/responsible-manager.html` (fixes Access Denied loop), AE (`ae@`) → `/dashboard/ae-dashboard.html`.
-- `EmailStr` → `str` in `backend/app/routes/auth.py` (LoginCredentials + 3 models) — strict Pydantic validator blocked `ezondiza.dhf@gmail.com` etc.; validation now client-side + corporate service.
-- `public/js/firebase.js` auto-recovery: deferred `registerAutoRecovery` (polls `firebase.apps.length`) — removed broken `onAuthStateChanged` monkey-patch that crashed `Firebase: No Firebase App [DEFAULT]`.
-- Cache-busting `?v=4.0.1` on 41 HTML `firebase.js` includes; `firebase.json` JS/CSS `max-age=3600`.
-- `is_demo` scoping: seeders write `is_demo` via `demo_scope()` (ENVIRONMENT), `master_register` filters same flag — mismatched ENVIRONMENT produced zeros; verified counts `fixedwing 10H/3CAN/3CAP` etc. exist with `is_demo=true`.
-- Admin unseed FK order fixed to `CAPs → CANs → Reports/Surveys → Hazards`; `admin_data_service` UUID casting `uuid.UUID(_tid)` + `await session.flush()` for hazard→can FK.
-- User deletion: `DELETE/POST /api/v1/admin/users` + `POST /users/delete` alias, SUPER_ADMIN+SETUP_SECRET, protected emails, audit `USER_DELETED`, frontend `POST /users/delete` via `AdminUI.apiPost` (avoids Firebase Hosting `/api` rewrite 404).
-- Setup key UX: moved from header input to **confirm modal** (`#confirmModal` `#confirmSetupKeyWrap` + `#lifecycleModal`) — destructive actions (seed/unseed, PSOE, state-risk, user delete, lifecycle Manage) prompt inside warning modal, stored `sessionStorage`.
-- Commercial lifecycle: `TENANT_STATUSES`/`REGULATOR_STATUSES` expanded to `demo,trial,active,suspended,retired,cancelled (+inactive)` with `from_date`/`to_date` top-level + `contract` aliases, `Manage` column + `lifecycleModal` on both Existing Tenants/Regulators tables.
+- **Platform cleanup 2026-09-04:** `dashboard.html` deprecated — `firebase.json` 301 `→ /admin/production-setup.html`, meta refresh + banner, `Full Admin` nav now `Production Setup — Active Admin`; governance toggle (`ACTIVE/SUSPENDED`) absorbed into `production-setup.html` lifecycle `Manage`.
+- **AE redesign:** `ae-dashboard.html` rebuilt minimalist — hero + 4-chip situ banner + 3-card grid (PSOE big-score, Residual Exposure heatmap, Executive Decisions queue) + link to Safety Workspace; removed departmental matrix, velocity/trend charts, culture card, What-If simulator, detailed roster for uncluttered CEO view (410 lines vs 1600).
+- **Safety verified:** `safety.html` untouched, remains dedicated robust workspace (master-register, risk-distribution, monthly-trends, hazard-frequency, actions-summary, recent reports) with department scoping — no executive overlap.
+- **Routing:** SUPER_ADMIN → `/admin/production-setup.html`, CAAN_SMD → `/caan.html`, DEPT_ADMIN (camo/145/ops) → `/dashboard/responsible-manager.html`, AE (`ae@`) → `/dashboard/ae-dashboard.html`; `dashboard.html` no longer in active nav.
+- `EmailStr` → `str` in `auth.py`, `firebase.js` deferred `registerAutoRecovery`, `?v=4.0.1` cache-bust, `is_demo` scoping fixed, unseed FK `CAPs→CANs→Reports/Surveys→Hazards`, UUID `uuid.UUID(_tid)` + `await flush`, user deletion `deleted:true` flat contract via `AdminUI.apiPost`.
 
 ## Complete
-- **`public/admin/production-setup.html`** — Steps 1–7, Existing Regulators/Tenants with `Manage` (status + from/to + setup key), User Management — Cleanup (tenant filter, search, Delete), Audit Log, Dummy Data (per-kind counts), PSOE, State Risk, confirm + lifecycle modals with inline setup-key.
-- **`public/js/firebase.js`** — `getRoleDestination` DEPT_ADMIN fix, safe auto-recovery defer, `DEMO` context, `isSafetyManagementRole`.
-- **`backend/app/routes/auth.py`** — `EmailStr`→`str` (LoginCredentials, RegisterRequest, RegisterTenantRequest, JoinTeamRequest).
-- **`backend/app/middleware/auth.py`** — `DEPARTMENT_SCOPE_PREFIXES` now `145→Part-145, camo→CAMO, ops→Flight Operations`.
-- **`backend/app/services/admin_data_service.py`** — expanded tenant statuses, `from_date/to_date` handling, `update_tenant_status` commercial aliases, fixed seed UUID + flush, fixed unseed FK order (CAP→CAN→Reports/Surveys→Hazards) + Survey parent delete, per-kind counts.
-- **`backend/app/services/regulator_service.py`** — expanded statuses, `_normalize_status`, `update_regulator_status` with from/to + contract sync.
-- **`backend/app/routes/admin.py`** — `TenantStatusRequest` from/to, `POST /tenants/{id}/status` + new `POST /regulators/{id}/status` (SUPER_ADMIN+setup_key, audit `REGULATOR_STATUS_UPDATED`/`TENANT_STATUS_UPDATED`), `GET /users` + `DELETE /users` (robust body/query) + `POST /users/delete` with flat `{success:true, deleted:true, uid, email}` contract.
-- **Seeders** — hazard/can/cap `register_tenant` UUID handling, `.test→.com` email migration.
-- **Responsible Manager** `public/dashboard/responsible-manager.html` — skeleton shimmer during Render cold-boot, empty hidden until load, stats for Flight Ops.
-- **Deployed** — `aerosafety-sms-prod` (`firebase deploy --only hosting`, 175 files) + Render `aviasafe-unified-platform` auto-deploy from `main`.
+- **`public/admin/production-setup.html`** — Steps 1–7 + Existing Regulators/Tenants with `Manage` (demo/trial/active/suspended/retired/cancelled + from/to + setup-key modal + Dates column), User Management — Cleanup (filter, Delete via `POST /users/delete`), Audit Log, Dummy Data per-kind counts, PSOE, State Risk, confirm + lifecycle modals.
+- **`public/admin/dashboard.html`** — deprecated: 301 redirect, banner, meta refresh, `Test Portal` retained as dev reference only.
+- **`public/dashboard/ae-dashboard.html`** — minimalist executive (hero, banner, 3 cards, decision ledger, link to `safety.html`), retains `riskAcceptModal` + situational awareness.
+- **`public/safety.html`** — verified data-rich, unchanged.
+- **`public/js/firebase.js`** — `getRoleDestination` DEPT_ADMIN, safe auto-recovery.
+- **`backend/app/routes/auth.py`** — `str` emails; **`middleware/auth.py`** — `ops→Flight Operations`; **`admin_data_service.py`** — expanded statuses + from/to + UUID/flush fixes; **`regulator_service.py`** — lifecycle + `update_regulator_status`; **`routes/admin.py`** — tenants/regulators status + users delete/list + psoe/state-risk.
+- **Deployed** — `aerosafety-sms-prod` (firebase deploy, 175 files) + Render auto-deploy; `ea002dc` live.
 
 ## Verification
-- `python -m py_compile backend/app/routes/admin.py backend/app/services/admin_data_service.py` — OK; `node --check public/js/firebase.js` — OK.
-- Live `POST /api/v1/admin/users/delete` 403→`Invalid setup key` explicit, 200→`{success:true, deleted:true, uid, email}` flat — frontend guard `!data.success || !data.deleted` passes, no “no confirmation” throw.
-- Live `GET /api/v1/admin/users` SUPER_ADMIN 200 (openapi), `sms.aviasafesystems.com/js/firebase.js?v=4.0.1` live with `registerAutoRecovery` and DEPT_ADMIN routing.
-- `Phase 3 UAT` live `26/27 PASS` (1 expected 403 CAAN), `GET /dashboard/master-register` with `ops@fixedwing.com` correctly scoped to `Flight Operations` via `user_department`.
-- Seeded verification `python verify_demo_true.py` — `fixedwing is_demo=True: 10H/3CAN/3CAP` present; after `seed_tenant_demo_data` `vsr:15 mor:7 can:5 cap:3 survey:12` → `unseed` FK-safe.
-- `pytest backend/tests/test_admin*` — green; `AdminUI.apiPost` correctly routes to Render `https://aviasafe-unified-platform.onrender.com`.
+- `python -m py_compile` + `node --check public/js/firebase.js` — OK.
+- `firebase.json` redirect `301 /admin/dashboard.html → /admin/production-setup.html` live; `production-setup.html` no longer links to deprecated dashboard.
+- `ae-dashboard.html` minimalist renders 3 cards, no dept-matrix/simulator, passes `ae@fixedwing.com` auth gate.
+- `safety.html` still serves master-register + risk charts, correctly scoped.
+- `Phase 3 UAT` 26/27 PASS (1 expected 403), `POST /users/delete` → `{success:true, deleted:true}` flat.
 
 ## Active / Next
-- Monitor Render cold-boot (15min idle → 30–60s wake) with skeleton + 60s login timeout.
-- Re-seed demo tenants via Step 5 after unseed wipe (currently all demo tables 0).
-- Rotate `SETUP_SECRET` if leaked; keep `sessionStorage` per-tab isolation.
+- Monitor executive feedback on minimalist AE — iterate if CEO needs additional KPIs.
+- Keep `dashboard.html` file for 1 release then delete; no active links remain.
+- Re-seed demo tenants via Step 5 after unseed wipe if needed.
 
 ## Relevant files
-- `public/admin/production-setup.html` — super-admin Steps 1–7 + Manage lifecycle + User Management + confirm/lifecycle modals (setup-key inline).
-- `public/js/firebase.js` — init, `getRoleDestination`, `registerAutoRecovery`, `demo` mirroring.
-- `public/js/api/client.js` — `ApiClient` with `API_BASE_URL` + tenant/department headers.
-- `public/dashboard/responsible-manager.html` — department-scoped tasks, skeleton, `master-register` + `ApiClient`.
-- `backend/app/routes/admin.py` — tenants/regulators lifecycle, demo-data seed/unseed, users list/delete, psoe/state-risk, audit.
-- `backend/app/services/admin_data_service.py` — tenant lifecycle, demo data writer, FK-safe unseed, UUID handling.
-- `backend/app/services/regulator_service.py` — regulator lifecycle, `update_regulator_status`.
-- `backend/app/middleware/auth.py` — `get_department_scope` + `DEPARTMENT_SCOPE_PREFIXES`.
-- `backend/app/services/master_register.py` — `_DEPARTMENT_ALIASES`, `normalize_department`, department/assignee filtering.
-- `backend/app/routes/auth.py` — `str` email fields, login rate-limit.
-- `backend/app/db/ids.py` — `tenant_uuid`/`register_tenant` deterministic UUID5.
-- `firebase.json` — hosting `public`, rewrites, `Cache-Control: max-age=3600` for JS/CSS.
-- `render.yaml` — Render backend service.
+- `public/admin/production-setup.html` — active super-admin (lifecycle Manage + User Management).
+- `public/admin/dashboard.html` — deprecated, 301 to production-setup.
+- `public/dashboard/ae-dashboard.html` — minimalist executive (new).
+- `public/safety.html` — dedicated safety workspace (unchanged).
+- `public/js/firebase.js` + `public/js/api/client.js` + `firebase.json` (redirect + cache 3600).
+- `backend/app/routes/admin.py` + `services/admin_data_service.py` + `services/regulator_service.py` + `middleware/auth.py`.
+- `render.yaml` + `status.md` (this file).
