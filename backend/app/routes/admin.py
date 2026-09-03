@@ -1019,3 +1019,194 @@ async def admin_update_tenant_governance_status(
             "status": new_status,
         },
     }
+
+
+# ============================================================================
+# User management — SUPER_ADMIN user deletion / purge
+# ============================================================================
+
+class UserDeleteRequest(BaseModel):
+    setup_key: str = Field(..., description="Admin setup key (SETUP_SECRET)")
+    email: Optional[str] = Field(None, description="User email to delete")
+    uid: Optional[str] = Field(None, description="User UID to delete")
+    tenant_id: Optional[str] = Field(None, description="Optional tenant scope hint")
+
+
+SUPER_ADMIN_PROTECTED_EMAILS = {"ezondiza.dhf@gmail.com", "ghanshyamacharya@outlook.com"}
+
+
+@router.get("/users", status_code=status.HTTP_200_OK)
+async def admin_list_users(
+    tenant_id: Optional[str] = Query(None, description="Filter by tenant_id slug"),
+    limit: int = Query(100, ge=1, le=1000, description="Max users to return (paginated, 1-1000)"),
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """List Firebase Auth users for Super Admin cleanup (SUPER_ADMIN).
+
+    Returns email, uid, display_name, role, tenant_id, department, disabled
+    state. Supports optional tenant_id filter and limit. SUPER_ADMIN-only.
+    """
+    auth = get_auth()
+    db = get_db()
+    users: List[Dict[str, Any]] = []
+    try:
+        # Iterate with pagination — list_users uses page token internally.
+        page = auth.list_users(max_results=min(limit, 1000))
+        count = 0
+        while page and count < limit:
+            for rec in page.users:
+                if count >= limit:
+                    break
+                email = getattr(rec, "email", "") or ""
+                uid = getattr(rec, "uid", "") or ""
+                claims = getattr(rec, "custom_claims", None) or {}
+                # Firebase Admin may store claims as dict or None
+                if not isinstance(claims, dict):
+                    try:
+                        claims = dict(claims)
+                    except Exception:
+                        claims = {}
+                role = claims.get("role") or ""
+                t = claims.get("tenant_id") or ""
+                dept = claims.get("department") or ""
+                if tenant_id and str(t).lower() != str(tenant_id).lower():
+                    continue
+                users.append({
+                    "uid": uid,
+                    "email": email,
+                    "display_name": getattr(rec, "display_name", "") or "",
+                    "role": role,
+                    "tenant_id": t,
+                    "department": dept,
+                    "disabled": bool(getattr(rec, "disabled", False)),
+                    "email_verified": bool(getattr(rec, "email_verified", False)),
+                })
+                count += 1
+            page = page.get_next_page() if hasattr(page, "get_next_page") else None
+            if page is None:
+                break
+        # Sort by tenant then email for stable UI
+        users.sort(key=lambda u: ((u.get("tenant_id") or "").lower(), (u.get("email") or "").lower()))
+    except Exception as e:
+        logger.error(f"Failed to list users for {user.get('email')}: {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not list users at this time.")
+    return {"users": users, "count": len(users)}
+
+
+@router.delete("/users", status_code=status.HTTP_200_OK)
+async def admin_delete_user(
+    req: UserDeleteRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Delete a Firebase Auth user completely (SUPER_ADMIN + setup key).
+
+    Accepts email or uid (email preferred). Verifies SUPER_ADMIN role and
+    SETUP_SECRET, blocks deletion of protected super-admin accounts, removes
+    the Auth record and any Firestore `users/{uid}` doc, and writes an audit
+    log entry with actor/target/timestamp for compliance.
+    """
+    _verify_admin_setup(req.setup_key)
+
+    email = (req.email or "").strip()
+    uid = (req.uid or "").strip()
+    if not email and not uid:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide email or uid of user to delete")
+
+    auth = get_auth()
+    db = get_db()
+
+    # Resolve UID + email + tenant for audit and protection checks
+    target_email = email
+    target_uid = uid
+    target_tenant = req.tenant_id or ""
+    try:
+        if target_uid and not target_email:
+            rec = auth.get_user(target_uid)
+            target_email = getattr(rec, "email", "") or target_email
+            claims = getattr(rec, "custom_claims", {}) or {}
+            if isinstance(claims, dict):
+                target_tenant = target_tenant or claims.get("tenant_id") or ""
+        elif target_email:
+            rec = auth.get_user_by_email(target_email)
+            target_uid = getattr(rec, "uid", "") or target_uid
+            target_email = getattr(rec, "email", "") or target_email
+            claims = getattr(rec, "custom_claims", {}) or {}
+            if isinstance(claims, dict):
+                target_tenant = target_tenant or claims.get("tenant_id") or ""
+            # If uid was also supplied but mismatched, prefer the email-resolved uid
+            if uid and uid != target_uid:
+                logger.warning(f"UID mismatch for {target_email}: supplied {uid} vs resolved {target_uid}")
+    except Exception as e:
+        # Firebase throws UserNotFoundError / ValueError when not found
+        msg = str(e).lower()
+        if "not found" in msg or "no user" in msg or "does not exist" in msg:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found: {email or uid}")
+        logger.error(f"Failed to resolve user {email or uid}: {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not resolve user at this time.")
+
+    # Protect super-admin / developer accounts from accidental purge
+    if (target_email or "").strip().lower() in {e.lower() for e in SUPER_ADMIN_PROTECTED_EMAILS}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Protected account cannot be deleted: {target_email}")
+
+    # Prevent self-deletion
+    if (target_email and target_email.lower() == (user.get("email") or "").lower()) or (target_uid and target_uid == user.get("uid")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Self-deletion is not allowed")
+
+    try:
+        auth.delete_user(target_uid)
+        logger.info(f"Auth user deleted: {target_email} ({target_uid}) by {user.get('email')}")
+    except Exception as e:
+        msg = str(e).lower()
+        if "not found" in msg or "does not exist" in msg:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found: {target_email or target_uid}")
+        logger.error(f"Failed to delete Auth user {target_email} ({target_uid}): {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not delete user at this time.")
+
+    # Best-effort Firestore cleanup: users/{uid}
+    try:
+        db.collection(settings.FIREBASE_COLLECTION_USERS).document(target_uid).delete()
+    except Exception as e:
+        logger.warning(f"Firestore user doc delete failed for {target_uid}: {e}")
+
+    # Also try legacy lookup doc keyed by email if present (no-op if missing)
+    if target_email:
+        try:
+            # Some deployments mirror by email as doc id — attempt without failing
+            for doc in db.collection(settings.FIREBASE_COLLECTION_USERS).where("email", "==", target_email).limit(1).stream():
+                try:
+                    doc.reference.delete()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="USER_DELETED",
+        user=user.get("email"),
+        tenant_id=target_tenant or None,
+        target_type="user",
+        target_id=target_uid,
+        ip=ip,
+        request_id=request_id,
+        metadata={
+            "target_email": target_email,
+            "target_uid": target_uid,
+            "target_tenant_id": target_tenant,
+            "by_uid": user.get("uid"),
+            "by_role": user.get("role"),
+        },
+    )
+    logger.info(f"USER_DELETED audit: {target_email} ({target_uid}) by {user.get('email')}")
+    return {"success": True, "deleted": {"uid": target_uid, "email": target_email, "tenant_id": target_tenant}}
+
+
+@router.post("/users/delete", status_code=status.HTTP_200_OK)
+async def admin_delete_user_post(
+    req: UserDeleteRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """POST alias for DELETE /api/v1/admin/users — supports setups where DELETE with body is blocked."""
+    return await admin_delete_user(req, request, user)

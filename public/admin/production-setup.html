@@ -263,6 +263,18 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             <div id="tenantList"><div class="empty-state">Not loaded.</div></div>
         </div>
 
+        <!-- ============ USER MANAGEMENT — CLEANUP ============ -->
+        <div class="section-title"><i class="fas fa-users-gear"></i> User Management — Cleanup</div>
+        <div class="admin-card">
+            <p class="card-sub">List tenant users and purge test accounts. Requires SUPER_ADMIN + setup key. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every deletion is audit-logged.</p>
+            <div class="btn-row" style="margin-bottom:12px;">
+                <select id="userTenantFilter" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;min-width:160px;" onchange="renderUserTable()"><option value="">All tenants</option></select>
+                <input type="text" id="userSearch" placeholder="Filter by email…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
+                <button class="btn btn-outline btn-sm" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
+            </div>
+            <div id="userList"><div class="empty-state">Not loaded. Click Refresh to load users.</div></div>
+        </div>
+
         <!-- ============ STEP 4 — AUDIT LOG ============ -->
         <div class="section-title"><i class="fas fa-clipboard-list"></i> Step 4 — Audit Log</div>
         <div class="admin-card">
@@ -473,6 +485,7 @@ async function loadExistingTenants() {
         var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
         var tenants = resp.tenants || [];
         EXISTING_TENANTS = tenants;
+        try { populateUserTenantFilter(); } catch (e) {}
         if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
             '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Status</th><th>Payment</th><th>Contract</th>' +
@@ -535,6 +548,109 @@ function regulatorBadge(st) {
     st = (st || '').toLowerCase();
     if (st === 'active') return '<span class="badge badge-success">active</span>';
     return '<span class="badge badge-danger">inactive</span>';
+}
+
+// ============================================================================
+// USER MANAGEMENT — CLEANUP
+// ============================================================================
+
+var CACHED_USERS = [];
+
+function populateUserTenantFilter() {
+    var sel = document.getElementById('userTenantFilter');
+    if (!sel) return;
+    var tenants = EXISTING_TENANTS || [];
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">All tenants</option>' +
+        tenants.map(function (t) {
+            return '<option value="' + esc(t.id) + '">' + esc(t.name || t.id) + ' (' + esc(t.id) + ')</option>';
+        }).join('');
+    if (prev && Array.from(sel.options).some(function (o) { return o.value === prev; })) sel.value = prev;
+}
+
+async function loadUsers() {
+    var el = document.getElementById('userList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading users...</div>';
+    try {
+        var filterVal = (document.getElementById('userTenantFilter') || {}).value || '';
+        var qs = filterVal ? '?tenant_id=' + encodeURIComponent(filterVal) : '';
+        var resp = await AdminUI.apiGet('/api/v1/admin/users' + qs);
+        CACHED_USERS = resp.users || [];
+        renderUserTable();
+    } catch (err) {
+        el.innerHTML = '<div class="status-box error">Failed to load users: ' + esc(err.message) + '</div>';
+    }
+}
+
+function renderUserTable() {
+    var el = document.getElementById('userList');
+    if (!el) return;
+    var q = ((document.getElementById('userSearch') || {}).value || '').trim().toLowerCase();
+    var filtered = CACHED_USERS.filter(function (u) {
+        if (!q) return true;
+        return (u.email || '').toLowerCase().indexOf(q) !== -1 ||
+               (u.uid || '').toLowerCase().indexOf(q) !== -1 ||
+               (u.role || '').toLowerCase().indexOf(q) !== -1;
+    });
+    if (!filtered.length) {
+        el.innerHTML = '<div class="empty-state">' + (CACHED_USERS.length ? 'No users match filter.' : 'No users found.') + '</div>';
+        return;
+    }
+    var html = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+        '<th>Email</th><th>Role</th><th>Tenant</th><th>Department</th><th>UID</th><th>Action</th></tr></thead><tbody>';
+    filtered.forEach(function (u) {
+        var emailEsc = esc(u.email || '—');
+        var uidEsc = esc(u.uid || '—');
+        html += '<tr><td><strong>' + emailEsc + '</strong></td>' +
+            '<td><code>' + esc(u.role || '—') + '</code></td>' +
+            '<td><code>' + esc(u.tenant_id || '—') + '</code></td>' +
+            '<td>' + esc(u.department || '—') + '</td>' +
+            '<td style="font-size:.72rem;color:#64748b;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + uidEsc + '">' + uidEsc + '</td>' +
+            '<td><button class="btn btn-danger btn-sm" onclick="requestDeleteUser(\'' + esc(u.email).replace(/'/g, "\\'") + '\', \'' + esc(u.uid).replace(/'/g, "\\'") + '\')"><i class="fas fa-trash"></i> Delete</button></td></tr>';
+    });
+    html += '</tbody></table></div><div style="margin-top:8px;color:#94a3b8;font-size:.75rem;">' + filtered.length + ' of ' + CACHED_USERS.length + ' users shown.</div>';
+    el.innerHTML = html;
+}
+
+function filterUserTable(q) {
+    renderUserTable();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var sel = document.getElementById('userTenantFilter');
+    if (sel) sel.addEventListener('change', renderUserTable);
+});
+
+function requestDeleteUser(email, uid) {
+    var label = email || uid || 'this user';
+    openConfirm(
+        'Delete User',
+        'Permanently delete <strong>' + esc(label) + '</strong> from Firebase Authentication?<br><br>' +
+        '<span style="color:#b91c1c;">This cannot be undone.</span> The Firestore <code>users/{uid}</code> doc will also be removed and an audit log entry <code>USER_DELETED</code> will be written.',
+        { type: 'deleteUser', email: email, uid: uid }
+    );
+}
+
+async function execDeleteUser(email, uid) {
+    var body = { setup_key: AdminUI.ensureSetupKey() };
+    if (email) body.email = email;
+    if (uid) body.uid = uid;
+    try {
+        var token = await firebase.auth().currentUser.getIdToken();
+        var resp = await fetch('/api/v1/admin/users', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(body)
+        });
+        var data = await resp.json().catch(function () { return {}; });
+        if (!resp.ok) throw new Error((data.detail || data.message || resp.statusText || 'Delete failed'));
+        toast('Deleted ' + esc((data.deleted && data.deleted.email) || email || uid), 'success');
+        await loadUsers();
+        loadAuditLog();
+    } catch (err) {
+        toast('Delete failed: ' + err.message, 'error');
+    }
 }
 
 // ============================================================================
@@ -725,6 +841,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     pendingConfirm = null;
     if (!action) return;
     if (action.type === 'demo') execDemo(action.body);
+    if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid);
 });
 </script>
 
