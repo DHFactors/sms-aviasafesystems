@@ -30,7 +30,7 @@ surfaces:
   * **N-HRC** (`/api/v1/nhrc/*`) — National High-Risk Category KPI aggregates
     for the 7 ICAO categories (CFIT, LOC-I, MAC, RE, RI, ARC, WS).
   * Operator dashboards `/dashboard/spi-dashboard.html` and
-    `/dashboard/nhrc-dashboard.html`, wired into the shell navigation across all
+    `/dashboard/nhrc-kpis.html`, wired into the shell navigation across all
     operator-facing pages.
 * **Data source of truth for diversions is Firestore** (`tenants/{tid}/flight_diversions`),
   matching the app's operational `flight_diversion_service`; the Postgres
@@ -104,7 +104,7 @@ Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
 ```
 Westin-prefix role routing (live accounts, email ⇒ role ⇒ surface)
     safety@…  → Safety Manager (AIRLINE_ADMIN)      → /safety.html
-    ops@…     → Flight Operations (USER)            → /dashboard/responsible-manager.html
+    ops@…     → Flight Operations (USER)            → /dashboard/my-tasks.html
     smd@…     → CAAN SMD (CROSS_TENANT, scoped)     → CAAN aggregate
     super-admin → platform console                  → /administration.html
 
@@ -172,7 +172,7 @@ status, previous-month and monthly trend series all read one consistent view:
   `-m <module>` for a single seeder, `-u` to unseed. Human bypass:
   `seed_manager.bat`.
 * **New dashboards**: `/dashboard/spi-dashboard.html` (SPI/SPT) and
-  `/dashboard/nhrc-dashboard.html` (N-HRC KPIs) follow the standard
+  `/dashboard/nhrc-kpis.html` (N-HRC KPIs) follow the standard
   `SHELL_CONFIG` + auth-gate + `ApiClient` pattern and are reachable from the
   sidebar on every operator page.
 * **Diversion data**: authored and read exclusively in

@@ -10,7 +10,7 @@ const RBAC_PERMISSIONS = {
 const MENU_CONFIG = {
     'module1': { label: 'Maturity Assessment', icon: 'fa-chart-simple', href: '/module1/maturity.html' },
     'module2': { label: 'Safety Reports', icon: 'fa-triangle-exclamation', href: '/safety.html' },
-    'module3': { label: 'Safety Dashboard', icon: 'fa-gauge-high', href: '/dashboard/index.html' },
+    'module3': { label: 'Safety Dashboard', icon: 'fa-gauge-high', href: '/dashboard/sms-maturity.html' },
     'module5': { label: 'Regulator Dashboard', icon: 'fa-landmark', href: '/module5/regulator-dashboard.html' },
     'settings': { label: 'Settings', icon: 'fa-gear', href: '/settings/team.html' },
 };

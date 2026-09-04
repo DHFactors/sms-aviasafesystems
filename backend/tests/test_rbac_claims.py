@@ -107,7 +107,7 @@ def _route(user):
     if role == "USER":
         department = user.get("department") or ""
         if department:
-            return "/dashboard/responsible-manager.html"
+            return "/dashboard/my-tasks.html"
         return "/safety.html"
     return "/safety.html"
 
@@ -129,7 +129,7 @@ def test_department_roles_route_to_responsible_manager(token, op_id, expected_em
     assert r["app_role"] == "USER"
     assert r.get("department")
     assert _route({"role": "USER", "department": r["department"]}) \
-        == "/dashboard/responsible-manager.html"
+        == "/dashboard/my-tasks.html"
     assert simplified_email(token, op_id) == expected_email
 
 

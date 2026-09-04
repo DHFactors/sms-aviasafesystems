@@ -10,7 +10,7 @@ Last updated: 2026-09-04
 - **Platform cleanup 2026-09-04:** `dashboard.html` deprecated — `firebase.json` 301 `→ /admin/production-setup.html`, meta refresh + banner, `Full Admin` nav now `Production Setup — Active Admin`; governance toggle (`ACTIVE/SUSPENDED`) absorbed into `production-setup.html` lifecycle `Manage`.
 - **AE redesign:** `ae-dashboard.html` rebuilt minimalist — hero + 4-chip situ banner + 3-card grid (PSOE big-score, Residual Exposure heatmap, Executive Decisions queue) + link to Safety Workspace; removed departmental matrix, velocity/trend charts, culture card, What-If simulator, detailed roster for uncluttered CEO view (410 lines vs 1600).
 - **Safety verified:** `safety.html` untouched, remains dedicated robust workspace (master-register, risk-distribution, monthly-trends, hazard-frequency, actions-summary, recent reports) with department scoping — no executive overlap.
-- **Routing:** SUPER_ADMIN → `/admin/production-setup.html`, CAAN_SMD → `/caan.html`, DEPT_ADMIN (camo/145/ops) → `/dashboard/responsible-manager.html`, AE (`ae@`) → `/dashboard/ae-dashboard.html`; `dashboard.html` no longer in active nav.
+- **Routing:** SUPER_ADMIN → `/admin/production-setup.html`, CAAN_SMD → `/caan.html`, DEPT_ADMIN (camo/145/ops) → `/dashboard/my-tasks.html`, AE (`ae@`) → `/dashboard/ae-dashboard.html`; `dashboard.html` no longer in active nav.
 - `EmailStr` → `str` in `auth.py`, `firebase.js` deferred `registerAutoRecovery`, `?v=4.0.1` cache-bust, `is_demo` scoping fixed, unseed FK `CAPs→CANs→Reports/Surveys→Hazards`, UUID `uuid.UUID(_tid)` + `await flush`, user deletion `deleted:true` flat contract via `AdminUI.apiPost`.
 
 ## Complete

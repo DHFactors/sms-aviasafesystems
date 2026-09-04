@@ -49,7 +49,7 @@ for (const [email, dest, archetype, company, iata] of MATRIX) {
 // Standard tenants unaffected.
 const std = [
     [{ role: 'AIRLINE_ADMIN', email: 'safety@buddha-air.com' }, '/safety.html'],
-    [{ role: 'USER', email: '145@fishtailair.com', claims: { department: 'Part-145' } }, '/dashboard/responsible-manager.html'],
+    [{ role: 'USER', email: '145@fishtailair.com', claims: { department: 'Part-145' } }, '/dashboard/my-tasks.html'],
     [{ role: 'CAAN_SMD', email: 'smd@caanepal.gov.np' }, '/caan.html'],
 ];
 for (const [u, expected] of std) {

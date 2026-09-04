@@ -639,11 +639,11 @@ function getRoleDestination(user) {
     // Department admins (DEPT_ADMIN for CAMO, Part-145, Operations) must be
     // routed directly to the responsible-manager dashboard instead of safety.html
     // to prevent the Access Denied routing loop.
-    if (role === 'DEPT_ADMIN') return '/dashboard/responsible-manager.html';
+    if (role === 'DEPT_ADMIN') return '/dashboard/my-tasks.html';
     if (role === 'USER') {
         var claims = (user && (user.claims || {})) || {};
         var department = claims.department || (user && user.department) || '';
-        if (department) return '/dashboard/responsible-manager.html';
+        if (department) return '/dashboard/my-tasks.html';
         return '/safety.html';
     }
     return '/safety.html';
@@ -767,7 +767,7 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
                 u.getIdTokenResult(false).then(function (tr) {
                     var role = tr.claims && tr.claims.role;
                     if (role !== 'DEPT_ADMIN') return;
-                    var correctDest = '/dashboard/responsible-manager.html';
+                    var correctDest = '/dashboard/my-tasks.html';
                     if (window.location.pathname === correctDest) return;
                     // DEPT_ADMIN must never stay on safety.html (or any non-responsible-manager page
                     // that gates as Access Denied). Clear stale flags and redirect once.
