@@ -1,31 +1,23 @@
 const functions = require("firebase-functions");
-const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// ============================================================
-// Email transporter — configured via:
-//   firebase functions:config:set email.user="..." email.password="..."
-// For Gmail, use an App Password (not your login password).
-// ============================================================
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: functions.config().email?.user || "support@aviasafesystems.com",
-    pass: functions.config().email?.password || "",
-  },
-});
-
 const RECIPIENT = "support@aviasafesystems.com";
 
-// ============================================================
-// handleRequestDemo — POST form from index.html
-// Receives: contact_person, organization, work_email, anti_bot
-// Sends an email, then redirects to /?demo_requested=success
-// ============================================================
+function getTransporter() {
+  var nodemailer = require("nodemailer");
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: functions.config().email?.user || "support@aviasafesystems.com",
+      pass: functions.config().email?.password || "",
+    },
+  });
+}
+
 exports.handleRequestDemo = functions.https.onRequest(async (req, res) => {
   res.set("Access-Control-Allow-Origin", "*");
 
@@ -41,9 +33,12 @@ exports.handleRequestDemo = functions.https.onRequest(async (req, res) => {
     return;
   }
 
-  const { contact_person, organization, work_email, anti_bot } = req.body;
+  var body = req.body || {};
+  var contact_person = body.contact_person;
+  var organization = body.organization;
+  var work_email = body.work_email;
+  var anti_bot = body.anti_bot;
 
-  // Honeypot check — bots fill hidden fields
   if (anti_bot) {
     res.redirect(302, "/?demo_requested=success");
     return;
@@ -55,34 +50,28 @@ exports.handleRequestDemo = functions.https.onRequest(async (req, res) => {
   }
 
   try {
+    var transporter = getTransporter();
     await transporter.sendMail({
-      from: `"AviaSafe Demo" <${functions.config().email?.user || "support@aviasafesystems.com"}>`,
+      from: '"AviaSafe Demo" <' + (functions.config().email?.user || "support@aviasafesystems.com") + ">",
       to: RECIPIENT,
       replyTo: work_email,
-      subject: `Demo Request: ${organization || "Unknown"} — ${contact_person}`,
-      html: `
-        <h2>New Demo Request</h2>
-        <hr>
-        <p><strong>Contact:</strong> ${contact_person}</p>
-        <p><strong>Organization:</strong> ${organization || "Not provided"}</p>
-        <p><strong>Email:</strong> ${work_email}</p>
-        <hr>
-        <p><strong>Date:</strong> ${new Date().toISOString()}</p>
-        <p><strong>IP:</strong> ${req.ip || "Unknown"}</p>
-        <p><strong>User Agent:</strong> ${req.headers["user-agent"] || "Unknown"}</p>
-      `,
+      subject: "Demo Request: " + (organization || "Unknown") + " - " + contact_person,
+      html: "<h2>New Demo Request</h2><hr>" +
+        "<p><strong>Contact:</strong> " + contact_person + "</p>" +
+        "<p><strong>Organization:</strong> " + (organization || "Not provided") + "</p>" +
+        "<p><strong>Email:</strong> " + work_email + "</p>" +
+        "<hr><p><strong>Date:</strong> " + new Date().toISOString() + "</p>" +
+        "<p><strong>User Agent:</strong> " + (req.headers["user-agent"] || "Unknown") + "</p>",
     });
 
-    // Log to Firestore (optional, non-blocking)
     admin.firestore().collection("demo_requests").add({
-      contact_person,
-      organization,
-      work_email,
+      contact_person: contact_person,
+      organization: organization,
+      work_email: work_email,
       date: new Date(),
       ip: req.ip,
-    }).catch(() => {});
+    }).catch(function () {});
 
-    // Redirect to success page
     res.redirect(302, "/?demo_requested=success");
   } catch (error) {
     console.error("Demo request error:", error);
@@ -90,11 +79,6 @@ exports.handleRequestDemo = functions.https.onRequest(async (req, res) => {
   }
 });
 
-// ============================================================
-// handleSendFeedback — POST JSON from feedback.js widget
-// Receives: email, tenant, rating, subject, message, page, date
-// Sends an email to support + logs to Firestore
-// ============================================================
 exports.handleSendFeedback = functions.https.onRequest(async (req, res) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -110,48 +94,52 @@ exports.handleSendFeedback = functions.https.onRequest(async (req, res) => {
     return;
   }
 
-  const { email, tenant, rating, subject, message, page, date } = req.body;
+  var body = req.body || {};
+  var email = body.email;
+  var tenant = body.tenant;
+  var rating = body.rating;
+  var subject = body.subject;
+  var message = body.message;
+  var page = body.page;
+  var date = body.date;
 
   if (!message) {
     res.status(400).json({ error: "Message is required" });
     return;
   }
 
-  const stars = rating && rating > 0 ? "⭐".repeat(Math.min(rating, 5)) : "Not rated";
+  var stars = rating && rating > 0 ? "\u2B50".repeat(Math.min(rating, 5)) : "Not rated";
 
   try {
+    var transporter = getTransporter();
     await transporter.sendMail({
-      from: `"AviaSafe Feedback" <${functions.config().email?.user || "support@aviasafesystems.com"}>`,
+      from: '"AviaSafe Feedback" <' + (functions.config().email?.user || "support@aviasafesystems.com") + ">",
       to: RECIPIENT,
       replyTo: email && email !== "Anonymous" ? email : undefined,
-      subject: `Feedback: ${subject || "No subject"}`,
-      html: `
-        <h2>New Feedback from AviaSafe</h2>
-        <hr>
-        <p><strong>From:</strong> ${email || "Anonymous"}</p>
-        <p><strong>Tenant:</strong> ${tenant || "Unknown"}</p>
-        <p><strong>Rating:</strong> ${stars}</p>
-        <p><strong>Subject:</strong> ${subject || "No subject"}</p>
-        <p><strong>Message:</strong></p>
-        <div style="background:#f5f7fa;padding:12px;border-radius:4px;">${message}</div>
-        <hr>
-        <p><strong>Page:</strong> ${page || "Unknown"}</p>
-        <p><strong>Date:</strong> ${date || new Date().toISOString()}</p>
-        <p><strong>User Agent:</strong> ${req.headers["user-agent"] || "Unknown"}</p>
-      `,
+      subject: "Feedback: " + (subject || "No subject"),
+      html: "<h2>New Feedback from AviaSafe</h2><hr>" +
+        "<p><strong>From:</strong> " + (email || "Anonymous") + "</p>" +
+        "<p><strong>Tenant:</strong> " + (tenant || "Unknown") + "</p>" +
+        "<p><strong>Rating:</strong> " + stars + "</p>" +
+        "<p><strong>Subject:</strong> " + (subject || "No subject") + "</p>" +
+        "<p><strong>Message:</strong></p>" +
+        '<div style="background:#f5f7fa;padding:12px;border-radius:4px;">' + message + "</div>" +
+        "<hr>" +
+        "<p><strong>Page:</strong> " + (page || "Unknown") + "</p>" +
+        "<p><strong>Date:</strong> " + (date || new Date().toISOString()) + "</p>" +
+        "<p><strong>User Agent:</strong> " + (req.headers["user-agent"] || "Unknown") + "</p>",
     });
 
-    // Log to Firestore
     admin.firestore().collection("feedback").add({
-      email,
-      tenant,
+      email: email,
+      tenant: tenant,
       rating: rating || null,
-      subject,
-      message,
-      page,
+      subject: subject,
+      message: message,
+      page: page,
       date: new Date(),
       userAgent: req.headers["user-agent"],
-    }).catch(() => {});
+    }).catch(function () {});
 
     res.status(200).json({ success: true, message: "Feedback sent successfully!" });
   } catch (error) {
