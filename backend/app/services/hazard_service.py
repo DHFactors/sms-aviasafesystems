@@ -414,7 +414,11 @@ class HazardService:
         return run(self._get_hazard_stats_async(user))
 
     async def _get_hazard_stats_async(self, user: dict) -> dict:
-        stmt = select(Hazard).where(Hazard.is_demo == demo_scope())
+        # For demo tenants (is_demo=True in Firestore), show demo data even in production
+        # where demo_scope() is False. Query both is_demo states for the tenant and filter in Python,
+        # or just not filter by is_demo for dashboard stats (show all for tenant).
+        # To keep demo data visible in production, we do not filter by is_demo here.
+        stmt = select(Hazard)
         if user.get("role") not in settings.CROSS_TENANT_ROLES:
             stmt = stmt.where(Hazard.tenant_id == register_tenant(self.tenant_id))
 

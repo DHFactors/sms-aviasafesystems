@@ -383,6 +383,8 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                 sev, prob, idx, lvl = _risk(random.randint(2, 4), random.randint(2, 4))
                 cat = random.choice(_ICAO_CATEGORIES)
                 created = base - timedelta(days=i)
+                # Use ICAO category as occurrence_type/adrep for realistic hazard frequency chart
+                occ_type = cat  # e.g., CFIT, RE, BIRD, etc. — matches seeded adrep for frequency grouping
                 hazard = Hazard(
                     tenant_id=uuid.UUID(tuuid),
                     hazard_id=f"{tid}-HZ-DEMO-{i + 1:03d}",
@@ -390,7 +392,8 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                     description="Dummy demonstration hazard created by the Super-Admin seed tool.",
                     source="Internal Audit",
                     source_id="",
-                    occurrence_type="Hazard",
+                    occurrence_type=occ_type,
+                    adrep_category=cat,
                     taxonomy=_ICAO_TO_TAXONOMY.get(cat, "Other"),
                     severity=sev,
                     probability=prob,
