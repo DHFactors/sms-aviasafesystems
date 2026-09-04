@@ -66,20 +66,13 @@
         return cfg;
     }
 
-    // ---- Header navigation: [Home] + direct links + Administration dropdown ----
+    // ---- Header navigation: [Home] + direct links (no dropdowns) ----
     const NAV_ITEMS = [
         { label: 'SMS Maturity', href: '/dashboard/sms-maturity.html' },
         { label: 'Risk & Trends', href: '/risk-trends.html' },
         { label: 'Top Hazards', href: '/top-hazards.html' },
         { label: 'SPI/SPT', href: '/dashboard/spi-dashboard.html' },
-        {
-            label: 'Administration',
-            dropdown: [
-                { href: '/administration.html', label: 'System Settings' },
-                { href: '/settings/team.html', label: 'Team Management' },
-                { href: '/admin/super-admin.html', label: 'Super Admin' }
-            ]
-        }
+        { label: 'Administration', href: '/administration.html' }
     ];
 
     // Persistent user session surface so static pages can share tenant/user info.
@@ -189,35 +182,11 @@
         }
 
         NAV_ITEMS.forEach(function (item) {
-            if (item.dropdown) {
-                const dd = document.createElement('div');
-                dd.className = 'nav-dropdown';
-                const link = document.createElement('a');
-                link.href = '#';
-                link.className = 'nav-link';
-                link.textContent = item.label + ' ';
-                const caret = document.createElement('span');
-                caret.className = 'caret';
-                caret.textContent = '\u25BC';
-                link.appendChild(caret);
-                const content = document.createElement('div');
-                content.className = 'dropdown-content';
-                item.dropdown.forEach(function (d) {
-                    const da = document.createElement('a');
-                    da.href = d.href;
-                    da.textContent = d.label;
-                    content.appendChild(da);
-                });
-                dd.appendChild(link);
-                dd.appendChild(content);
-                nav.appendChild(dd);
-            } else {
-                const a = document.createElement('a');
-                a.href = item.href;
-                a.className = 'nav-link';
-                a.textContent = item.label;
-                nav.appendChild(a);
-            }
+            const a = document.createElement('a');
+            a.href = item.href;
+            a.className = 'nav-link';
+            a.textContent = item.label;
+            nav.appendChild(a);
         });
         header.appendChild(nav);
 
@@ -308,33 +277,6 @@
         shell.appendChild(main);
 
         setActiveNav();
-
-        // Mobile dropdown: click-to-toggle (hover is unreliable on touch). On
-        // narrow screens every .nav-dropdown .nav-link becomes a toggle; on
-        // desktop the CSS :hover handles it (we keep open-class in sync so the
-        // panel stays open if the window is resized down while hovered).
-        function bindDropdownToggles() {
-            document.querySelectorAll('.nav-dropdown').forEach(function (dd) {
-                const link = dd.querySelector('.nav-link');
-                if (!link) return;
-                link.onclick = function (e) {
-                    if (link.getAttribute('href') === '#') e.preventDefault();
-                    const content = dd.querySelector('.dropdown-content');
-                    if (!content) return;
-                    if (window.innerWidth < 768) {
-                        const willOpen = !content.classList.contains('open');
-                        document.querySelectorAll('.dropdown-content.open').forEach(function (o) {
-                            if (o !== content) o.classList.remove('open');
-                        });
-                        content.classList.toggle('open', willOpen);
-                    } else {
-                        content.classList.remove('open');
-                    }
-                };
-            });
-        }
-        bindDropdownToggles();
-        window.addEventListener('resize', bindDropdownToggles);
 
         // Populate the header user email once auth is ready.
         if (typeof firebase !== 'undefined' && firebase.auth) {
