@@ -1,11 +1,4 @@
 {
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "runtime": "nodejs20"
-    }
-  ],
   "firestore": [
     {
       "database": "sms-db",
@@ -30,14 +23,6 @@
         }
       ],
       "rewrites": [
-        {
-          "source": "/api/request-demo",
-          "function": "handleRequestDemo"
-        },
-        {
-          "source": "/api/send-feedback",
-          "function": "handleSendFeedback"
-        },
         {
           "source": "/aviasdcps",
           "destination": "/aviasdcps.html"
