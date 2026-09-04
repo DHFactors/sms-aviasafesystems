@@ -297,13 +297,91 @@ def build_master_register(
 
     rows: List[dict] = []
 
-    # --- Hazards: Firestore-level filtering ---
+    # --- Hazards: Firestore-level filtering with Postgres fallback ---
     t_haz = time.perf_counter()
     try:
         # Use DB filtering for department/status + limit; assignee/search remain Python
         hazard_query = _build_filtered_query(_hazard_base(), norm_dept, status, cursor_dt, order_field="created_at")
         hazard_docs = _safe_get(hazard_query, lambda: _hazard_base())
         logger.info(f"[PERF] hazards query={len(hazard_docs)} docs {(time.perf_counter()-t_haz)*1000:.1f}ms dept={norm_dept} status={status}")
+        # Postgres fallback: seeder writes to Postgres (is_demo=True) while this repo reads Firestore
+        if len(hazard_docs) == 0:
+            try:
+                from app.db.ids import register_tenant as _reg_tenant
+                from app.db.session import session_scope as _session_scope
+                from app.db.db_models import Hazard as _PgHazard
+                from sqlalchemy import select as _select
+                import uuid as _uuid
+                # Resolve tenant slug -> UUID for Postgres
+                _haz_tenant_uuid = None
+                if tenant_id and not cross_tenant:
+                    try:
+                        _haz_tenant_uuid = _reg_tenant(tenant_id)
+                    except Exception:
+                        _haz_tenant_uuid = None
+                # Determine is_demo for demo tenants (fixedwing/rotarywing/demoairport)
+                _is_demo_tenant = False
+                try:
+                    from app.firebase import get_db as _get_db
+                    _tdoc = _get_db().collection("tenants").document(tenant_id).get() if tenant_id else None
+                    if _tdoc and _tdoc.exists:
+                        _is_demo_tenant = bool((_tdoc.to_dict() or {}).get("is_demo"))
+                except Exception:
+                    pass
+                def _run_pg_hazards():
+                    from app.db.runner import run as _run
+                    async def _q():
+                        async with _session_scope() as _session:
+                            stmt = _select(_PgHazard)
+                            if _haz_tenant_uuid:
+                                try:
+                                    stmt = stmt.where(_PgHazard.tenant_id == _uuid.UUID(_haz_tenant_uuid))
+                                except Exception:
+                                    pass
+                                if _is_demo_tenant:
+                                    stmt = stmt.where(_PgHazard.is_demo == True)
+                            if norm_dept:
+                                stmt = stmt.where(_PgHazard.department == norm_dept)
+                            if status:
+                                stmt = stmt.where(_PgHazard.status == status)
+                            if cutoff_from is not None:
+                                stmt = stmt.where(_PgHazard.created_at >= cutoff_from)
+                            if cutoff_to is not None:
+                                stmt = stmt.where(_PgHazard.created_at <= cutoff_to)
+                            stmt = stmt.order_by(_PgHazard.created_at.desc()).limit(per_type_limit)
+                            if cursor_dt is not None:
+                                stmt = stmt.where(_PgHazard.created_at < cursor_dt)
+                            rows_pg = (await _session.execute(stmt)).scalars().all()
+                            out = []
+                            for r in rows_pg:
+                                # Convert to Firestore-like doc stub
+                                class _Doc:
+                                    def __init__(self, row):
+                                        self.id = str(row.id)
+                                        self._row = row
+                                    def to_dict(self):
+                                        return {
+                                            "hazard_id": self._row.hazard_id,
+                                            "title": self._row.title,
+                                            "description": self._row.description,
+                                            "status": self._row.status,
+                                            "risk_level": self._row.risk_level,
+                                            "priority": self._row.priority,
+                                            "assigned_to": self._row.assigned_to,
+                                            "assigned_to_uid": self._row.assigned_to_uid,
+                                            "department": self._row.department,
+                                            "created_at": self._row.created_at,
+                                            "follow_up_date": getattr(self._row, "follow_up_date", None),
+                                        }
+                                out.append(_Doc(r))
+                            return out
+                    return _run(_q())
+                _pg_docs = _run_pg_hazards()
+                if _pg_docs:
+                    logger.info(f"Postgres fallback: Firestore hazards 0 but Postgres has {len(_pg_docs)} for tenant {tenant_id} (is_demo={_is_demo_tenant})")
+                    hazard_docs = _pg_docs
+            except Exception as _pg_e:
+                logger.debug(f"Postgres fallback for hazards failed (non-fatal): {_pg_e}")
         # If query already filtered at DB, we still apply Python checks for safety (search, alias edge)
         for doc in hazard_docs:
             data = doc.to_dict() or {}
@@ -389,6 +467,81 @@ def build_master_register(
 
         can_docs_cache = _safe_get(can_query, lambda: _can_base())
         logger.info(f"[PERF] can_cap query={len(can_docs_cache)} docs {(time.perf_counter()-t_can)*1000:.1f}ms")
+        # Postgres fallback for CANs (same is_demo handling as hazards)
+        if len(can_docs_cache) == 0:
+            try:
+                from app.db.ids import register_tenant as _reg_tenant2
+                from app.db.session import session_scope as _session_scope2
+                from app.db.db_models import Can as _PgCan
+                from sqlalchemy import select as _select2
+                import uuid as _uuid2
+                _can_tenant_uuid = None
+                if tenant_id and not cross_tenant:
+                    try:
+                        _can_tenant_uuid = _reg_tenant2(tenant_id)
+                    except Exception:
+                        pass
+                _is_demo_tenant2 = False
+                try:
+                    from app.firebase import get_db as _get_db2
+                    _tdoc2 = _get_db2().collection("tenants").document(tenant_id).get() if tenant_id else None
+                    if _tdoc2 and _tdoc2.exists:
+                        _is_demo_tenant2 = bool((_tdoc2.to_dict() or {}).get("is_demo"))
+                except Exception:
+                    pass
+                def _run_pg_cans():
+                    from app.db.runner import run as _run2
+                    async def _q2():
+                        async with _session_scope2() as _session:
+                            stmt = _select2(_PgCan)
+                            if _can_tenant_uuid:
+                                try:
+                                    stmt = stmt.where(_PgCan.tenant_id == _uuid2.UUID(_can_tenant_uuid))
+                                except Exception:
+                                    pass
+                                if _is_demo_tenant2:
+                                    stmt = stmt.where(_PgCan.is_demo == True)
+                            if norm_dept:
+                                stmt = stmt.where(_PgCan.department == norm_dept)
+                            if status:
+                                stmt = stmt.where(_PgCan.status == status)
+                            if cutoff_from is not None:
+                                stmt = stmt.where(_PgCan.created_at >= cutoff_from)
+                            if cutoff_to is not None:
+                                stmt = stmt.where(_PgCan.created_at <= cutoff_to)
+                            stmt = stmt.order_by(_PgCan.created_at.desc()).limit(per_type_limit)
+                            if cursor_dt is not None:
+                                stmt = stmt.where(_PgCan.created_at < cursor_dt)
+                            rows_pg = (await _session.execute(stmt)).scalars().all()
+                            out2 = []
+                            for r in rows_pg:
+                                class _Doc2:
+                                    def __init__(self, row):
+                                        self.id = str(row.id)
+                                        self._row = row
+                                    def to_dict(self):
+                                        return {
+                                            "can_reference": self._row.can_reference,
+                                            "title": self._row.title,
+                                            "description": self._row.description,
+                                            "status": self._row.status,
+                                            "priority": self._row.priority,
+                                            "assigned_to": self._row.assigned_to,
+                                            "assigned_to_uid": self._row.assigned_to_uid,
+                                            "department": self._row.department,
+                                            "created_at": self._row.created_at,
+                                            "issued_at": getattr(self._row, "issued_at", None),
+                                            "target_completion_date": getattr(self._row, "target_completion_date", None),
+                                        }
+                                out2.append(_Doc2(r))
+                            return out2
+                    return _run2(_q2())
+                _pg_cans = _run_pg_cans()
+                if _pg_cans:
+                    logger.info(f"Postgres fallback: Firestore CANs 0 but Postgres has {len(_pg_cans)} for tenant {tenant_id}")
+                    can_docs_cache = _pg_cans
+            except Exception as _pg_e2:
+                logger.debug(f"Postgres fallback for CANs failed (non-fatal): {_pg_e2}")
         for can_doc in can_docs_cache:
             can_data = can_doc.to_dict() or {}
             if not _match_department(can_data):
