@@ -1,0 +1,190 @@
+/* ============================================================================
+   FILE: dashboard-responsive.css
+   PATH: public/css/dashboard-responsive.css
+   VERSION: 1.0.0
+   PURPOSE: Central responsive overrides for all dashboard pages.
+            - Sidebar auto-collapses to 60px on screens < 768px
+            - Hover-to-expand sidebar on small screens
+            - Footer shows only the "Made with love" line on small screens
+   AUTHOR: AviaSAFE Systems
+   ============================================================================ */
+
+/* ── SIDEBAR AUTO-COLLAPSE (< 768px) ─────────────────────────────────────── */
+@media (max-width: 768px) {
+
+    /* Override shell.css horizontal-top-nav behavior — keep sidebar vertical
+       but shrink to icon-only strip. */
+    .app-shell {
+        flex-direction: row !important;
+    }
+
+    .shell-sidebar {
+        width: 60px !important;
+        position: fixed !important;
+        flex-direction: column !important;
+        overflow: visible !important;
+        transition: width 0.25s ease;
+    }
+
+    /* Hide text labels, role badge, sidebar footer, brand text */
+    .shell-sidebar .sidebar-brand span,
+    .shell-sidebar .sidebar-role,
+    .shell-sidebar .sidebar-footer {
+        display: none !important;
+    }
+
+    .shell-sidebar .sidebar-brand {
+        justify-content: center;
+        padding: 0.9rem 0 !important;
+        border-bottom: none !important;
+    }
+
+    /* Nav links: icon-only, centered */
+    .shell-sidebar .sidebar-nav {
+        padding: 0.5rem 0 !important;
+    }
+
+    .shell-sidebar .sidebar-nav ul {
+        flex-direction: column !important;
+    }
+
+    .shell-sidebar .sidebar-nav li a {
+        justify-content: center;
+        padding: 0.7rem 0 !important;
+        border-left: none !important;
+        border-bottom: none !important;
+        font-size: 0 !important;
+        gap: 0 !important;
+    }
+
+    .shell-sidebar .sidebar-nav li a i {
+        width: auto;
+        font-size: 1.1rem;
+    }
+
+    .shell-sidebar .sidebar-nav li a.active {
+        border-left: none !important;
+        border-bottom: none !important;
+        border-right: 3px solid var(--shell-gold, #d4af37) !important;
+    }
+
+    /* Main content shifts to account for collapsed sidebar */
+    .app-shell .shell-main {
+        margin-left: 60px !important;
+    }
+
+    .shell-header {
+        padding: 0.6rem 1rem !important;
+    }
+}
+
+/* ── SIDEBAR HOVER-TO-EXPAND (< 768px) ───────────────────────────────────── */
+@media (max-width: 768px) {
+    .shell-sidebar:hover {
+        width: 250px !important;
+        z-index: 999;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .shell-sidebar:hover .sidebar-brand span,
+    .shell-sidebar:hover .sidebar-role,
+    .shell-sidebar:hover .sidebar-footer {
+        display: block !important;
+    }
+
+    .shell-sidebar:hover .sidebar-brand {
+        justify-content: flex-start;
+        padding: 1.1rem 1.2rem !important;
+    }
+
+    .shell-sidebar:hover .sidebar-nav li a {
+        justify-content: flex-start;
+        padding: 0.7rem 1.2rem !important;
+        font-size: 0.875rem !important;
+        gap: 0.75rem !important;
+        border-left: 3px solid transparent !important;
+        border-right: none !important;
+    }
+
+    .shell-sidebar:hover .sidebar-nav li a.active {
+        border-right: none !important;
+        border-left-color: var(--shell-gold, #d4af37) !important;
+    }
+
+    .shell-sidebar:hover .sidebar-nav li a:not(.active) {
+        border-left-color: transparent !important;
+    }
+
+    /* Expand main content when sidebar is hovered open */
+    .app-shell:hover .shell-main {
+        margin-left: 250px !important;
+    }
+
+    .app-shell .shell-main {
+        transition: margin-left 0.25s ease;
+    }
+}
+
+/* ── FOOTER: HIDE LINES 1 & 3 ON SMALL SCREENS ───────────────────────────── */
+@media (max-width: 768px) {
+
+    /* Shell-generated .dashboard-footer (sms-maturity, nhrc-kpis, spi-dashboard)
+       Structure: div.footer-links (line 1: Privacy|Terms)
+                  p (line 2: "A Project by ...")
+                  p (line 3: copyright) */
+    .dashboard-footer > div:first-child,
+    .dashboard-footer > p:last-child {
+        display: none !important;
+    }
+
+    .dashboard-footer > p {
+        margin-top: 0 !important;
+    }
+
+    /* Static .dashboard-footer (my-tasks, master-register)
+       Structure: p (line 1: Privacy|Terms)
+                  p (line 2: "Made with love ...")
+                  p (line 3: copyright) */
+    .dashboard-footer > p:first-child,
+    .dashboard-footer > p:last-child {
+        display: none !important;
+    }
+
+    .dashboard-footer > p:nth-child(2) {
+        margin-top: 0 !important;
+    }
+
+    /* .app-footer (caan-sms-maturity)
+       Structure: p (line 1: Privacy|Terms)
+                  p (line 2: "Made with love ...")
+                  p (line 3: copyright) */
+    .app-footer > p:first-child,
+    .app-footer > p:last-child {
+        display: none !important;
+    }
+
+    .app-footer > p:nth-child(2) {
+        margin-top: 0 !important;
+    }
+
+    /* .footer div (ae-dashboard — single line, no changes needed) */
+}
+
+/* ── SMALL SCREENS < 480px ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .shell-sidebar:hover {
+        width: 200px !important;
+    }
+
+    .app-shell:hover .shell-main {
+        margin-left: 200px !important;
+    }
+
+    .shell-header .shell-brand {
+        font-size: 0.9rem !important;
+    }
+
+    .shell-header .shell-user {
+        display: none;
+    }
+}

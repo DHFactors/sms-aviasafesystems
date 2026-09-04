@@ -43,6 +43,7 @@
         @media (max-width:700px) { .kpi-strip { grid-template-columns:repeat(2,1fr); } }
     </style>
     <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
 </head>
 <body>
 <nav class="nav">
@@ -111,7 +112,15 @@
         </div>
     </div>
 </div>
-<div class="footer">AviaSAFE Executive Governance — ICAO Annex 19 Compliant &nbsp;|&nbsp; <a href="/safety.html" style="color:#64748b;">Safety Workspace</a></div>
+<footer class="dashboard-footer text-center py-3">
+  <p class="mb-0 text-muted" style="font-size: 0.875rem;">
+    <a href="/privacy.html" style="color: var(--color-text-muted); text-decoration: none;">Privacy Policy</a>
+    <span style="margin: 0 0.5rem; color: var(--color-gray-400);">|</span>
+    <a href="/terms.html" style="color: var(--color-text-muted); text-decoration: none;">Terms of Service</a>
+  </p>
+  <p class="mb-0 text-muted" style="font-size: 0.875rem; margin-top: 0.25rem;">Made with love <span class="text-red-500">&hearts;</span> from Nepal</p>
+  <p class="mb-0 text-muted" style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">&copy; 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 &amp; Doc 10159 Compliance.</p>
+</footer>
 
 <!-- Reuse original AE logic but with minimalist DOM -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
