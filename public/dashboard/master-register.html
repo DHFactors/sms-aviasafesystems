@@ -346,36 +346,50 @@ function sortRows(rows) {
     });
 }
 
-function renderTable() {
-    const tbody = document.getElementById('registerBody');
-    const empty = document.getElementById('emptyIndicator');
-    const rows = sortRows(getFilteredRows());
-    tbody.innerHTML = '';
-    if (rows.length === 0) {
-        empty.style.display = 'block';
-        return;
+function getDetailUrl(item) {
+        const id = item.id || item.hazard_id || item.can_id || item.cap_id;
+        if (!id) return '#';
+        if (item.type === 'Hazard') {
+            return `/hazards/detail.html?id=${encodeURIComponent(id)}`;
+        } else if (item.type === 'CAN') {
+            return `/can_cap/can_detail.html?id=${encodeURIComponent(id)}`;
+        } else if (item.type === 'CAP') {
+            return `/can_cap/cap_review.html?id=${encodeURIComponent(id)}`;
+        }
+        return '#';
     }
-    empty.style.display = 'none';
-    rows.forEach(function(r) {
-        const tr = document.createElement('tr');
-        tr.style.cursor = 'pointer';
-        tr.addEventListener('click', function() {
-            window.location.href = r.detail_url;
+
+    function renderTable() {
+        const tbody = document.getElementById('registerBody');
+        const empty = document.getElementById('emptyIndicator');
+        const rows = sortRows(getFilteredRows());
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+        rows.forEach(function(r) {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            const detailUrl = getDetailUrl(r);
+            tr.addEventListener('click', function() {
+                window.location.href = detailUrl;
+            });
+            tr.innerHTML = `
+                <td><strong>${r.reference}</strong></td>
+                <td>${r.title}</td>
+                <td><span class="badge ${typeBadgeClass(r.type)}">${r.type}</span></td>
+                <td><span class="badge ${statusBadgeClass(r.status)}">${r.status}</span></td>
+                <td><span class="badge ${riskBadgeClass(r.risk_level)}">${r.risk_level || '-'}</span></td>
+                <td>${r.assigned_to || '-'}</td>
+                <td>${r.department || '-'}</td>
+                <td>${formatDate(r.date)}</td>
+                <td>${formatDate(r.target_date)}</td>
+            `;
+            tbody.appendChild(tr);
         });
-        tr.innerHTML = `
-            <td><strong>${r.reference}</strong></td>
-            <td>${r.title}</td>
-            <td><span class="badge ${typeBadgeClass(r.type)}">${r.type}</span></td>
-            <td><span class="badge ${statusBadgeClass(r.status)}">${r.status}</span></td>
-            <td><span class="badge ${riskBadgeClass(r.risk_level)}">${r.risk_level || '-'}</span></td>
-            <td>${r.assigned_to || '-'}</td>
-            <td>${r.department || '-'}</td>
-            <td>${formatDate(r.date)}</td>
-            <td>${formatDate(r.target_date)}</td>
-        `;
-        tbody.appendChild(tr);
-    });
-}
+    }
 
 document.querySelectorAll('th[data-sort]').forEach(function(th) {
     th.addEventListener('click', function() {
