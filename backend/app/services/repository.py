@@ -202,6 +202,86 @@ class ReportRepository:
                 except Exception as fe:
                     logger.warning(f"Fallback unfiltered fetch failed: {fe}")
 
+            # Postgres fallback: seeder writes to Postgres (is_demo=True) while
+            # this repository reads Firestore. If Firestore returned 0, try Postgres.
+            if len(results) == 0:
+                try:
+                    from app.db.ids import register_tenant
+                    from app.db.session import session_scope
+                    from app.db.db_models import Report as PgReport
+                    from sqlalchemy import select
+                    import uuid as _uuid
+                    pg_results = []
+                    # Determine tenant UUID for Postgres lookup
+                    tenant_uuid = None
+                    if filter.tenant_id and not filter.cross_tenant:
+                        try:
+                            tenant_uuid = register_tenant(filter.tenant_id)
+                        except Exception:
+                            tenant_uuid = None
+                    # Only fallback for demo tenants or when Firestore is empty
+                    # Query Postgres reports table directly
+                    def _run_pg():
+                        import asyncio
+                        from app.db.runner import run
+                        async def _query():
+                            async with session_scope() as session:
+                                stmt = select(PgReport)
+                                if tenant_uuid and not filter.cross_tenant:
+                                    try:
+                                        stmt = stmt.where(PgReport.tenant_id == _uuid.UUID(tenant_uuid))
+                                    except Exception:
+                                        pass
+                                    # Include demo data: seeder uses is_demo=True, match both
+                                    # Prefer is_demo=True for demo tenants to avoid mixing prod
+                                    try:
+                                        # Check if tenant is_demo (Firestore tenant doc)
+                                        from app.firebase import get_db as _get_db
+                                        tdoc = _get_db().collection("tenants").document(filter.tenant_id).get() if filter.tenant_id else None
+                                        is_demo_tenant = False
+                                        if tdoc and tdoc.exists:
+                                            is_demo_tenant = bool((tdoc.to_dict() or {}).get("is_demo"))
+                                        if is_demo_tenant:
+                                            stmt = stmt.where(PgReport.is_demo == True)
+                                    except Exception:
+                                        pass
+                                if filter.report_type:
+                                    stmt = stmt.where(PgReport.report_type == filter.report_type)
+                                if filter.status:
+                                    stmt = stmt.where(PgReport.status == filter.status)
+                                stmt = stmt.order_by(PgReport.created_at.desc()).limit(limit)
+                                rows = (await session.execute(stmt)).scalars().all()
+                                out = []
+                                for r in rows:
+                                    d = {
+                                        "id": str(r.id),
+                                        "tenant_id": str(r.tenant_id),
+                                        "report_type": r.report_type,
+                                        "status": r.status,
+                                        "narrative": r.narrative,
+                                        "location": r.location,
+                                        "occurrence_date": r.occurrence_date.isoformat() if hasattr(r.occurrence_date, "isoformat") else str(r.occurrence_date),
+                                        "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
+                                        "risk_level": r.risk_level,
+                                        "risk_index": r.risk_index,
+                                        "is_demo": r.is_demo,
+                                    }
+                                    # Apply date range in-memory for Postgres fallback
+                                    if filter.date_from or filter.date_to:
+                                        from app.services.repository import coerce_utc_datetime as _coerce
+                                        dt = _coerce(d.get("created_at")) or _coerce(d.get("occurrence_date"))
+                                        if not self._doc_in_date_range(dt, filter.date_from, filter.date_to):
+                                            continue
+                                    out.append(d)
+                                return out
+                        return run(_query())
+                    pg_results = _run_pg()
+                    if pg_results:
+                        logger.info(f"Postgres fallback: Firestore returned 0 but Postgres has {len(pg_results)} reports for tenant {filter.tenant_id} (is_demo handling). Using Postgres results.")
+                        results = pg_results
+                except Exception as pg_e:
+                    logger.debug(f"Postgres fallback for reports failed (non-fatal): {pg_e}")
+
             self._cache[cache_key] = (now, results)
             if len(results) == 0:
                 logger.warning(f"Firestore query returned 0 results for tenant_id={filter.tenant_id}, cross_tenant={filter.cross_tenant}, date_from={filter.date_from}, date_to={filter.date_to}")
