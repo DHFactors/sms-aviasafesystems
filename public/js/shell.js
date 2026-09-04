@@ -1,12 +1,11 @@
 /* ============================================================================
    FILE: shell.js
    PATH: public/js/shell.js
-   VERSION: 1.0.0
-   PURPOSE: Shared dashboard shell. Renders the fixed left sidebar navigation,
-            the top header (brand + tenant info + user + logout), a hero showing
-            the tenant title + department subtitle, a clean single-line footer,
-            and scroll-spy active states. Used by all tenant dashboards and the
-            CAAN dashboard.
+   VERSION: 2.0.0
+   PURPOSE: Shared dashboard shell. Renders the fixed top header (brand + nav
+            with WordPress-style dropdowns + user + logout), a clean page hero
+            (airline name + department subtitle), and a single-line footer.
+            No sidebar, no hamburger, no overlay — content is full width.
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
@@ -55,64 +54,40 @@
     // Shell configuration is supplied by each page BEFORE this script loads:
     //   window.SHELL_CONFIG = {
     //     brand: 'AviaSAFE',
-    //     roleLabel: 'Airline Safety Manager',     // shown under brand in sidebar
-    //     tenantTitle: 'SITA AIR',                 // optional (tenant scope)
-    //     tenantMeta: 'ICAO: STA · Nepal',         // optional additional info
-    //     heroSubtitle: 'Corporate Safety Dept',   // optional hero subtitle override
-    //                                                (defaults to department label)
-    //     nav: [ { id: 'overview', label: 'Overview', icon: 'fa-gauge-high' }, ... ],
-    //     links: [ { href, label }, ... ]          // optional footer links
+    //     roleLabel: 'Operator Safety Dashboard',   // shown under the page title
+    //     tenantTitle: 'SITA AIR',                  // optional (tenant scope)
+    //     heroTitle: 'Custom Page Title',           // optional page title override
+    //     heroSubtitle: 'Custom subtitle',          // optional subtitle override
     //   }
-    //
-    // Pages may set SHELL_CONFIG either before or after this script runs (in a
-    // script that executes before DOMContentLoaded). We re-read it at init time
-    // so the sidebar/header always reflect the latest config.
-    let cfg = global.SHELL_CONFIG || { nav: [] };
+    let cfg = global.SHELL_CONFIG || {};
 
     function refreshCfg() {
         if (global.SHELL_CONFIG) cfg = global.SHELL_CONFIG;
         return cfg;
     }
 
-    // Hide/show sidebar items that declare a restricted set of roles.
-    // A nav item may specify `roles: ['AIRLINE_ADMIN', ...]` to be shown
-    // only to users whose role is in that list.
-    function applyNavVisibility(role) {
-        document.querySelectorAll('.sidebar-nav li[data-roles]').forEach(function (li) {
-            const allowed = (li.dataset.roles || '').split(',').filter(function (r) { return r; });
-            li.style.display = allowed.indexOf(role) !== -1 ? '' : 'none';
-        });
-    }
-
-    // ---- Shared navigation config for the fixed header tabs (Phase 5) ----
-    const HEADER_LINKS = [
-        { href: '/dashboard/sms-maturity.html', label: 'SMS Maturity', match: 'sms-maturity' },
-        { href: '/risk-trends.html',           label: 'Risk & Trends', match: 'risk-trends' },
-        { href: '/top-hazards.html',           label: 'Top Hazards',  match: 'top-hazards' },
-        { href: '/dashboard/spi-dashboard.html', label: 'SPI/SPT',    match: 'spi-dashboard' },
-        { href: '/administration.html',        label: 'Administration', match: 'administration' }
+    // ---- Header navigation: simple links + WordPress-style dropdowns ----
+    const NAV_ITEMS = [
+        {
+            label: 'SMS Maturity',
+            dropdown: [
+                { href: '/dashboard/sms-maturity.html', label: 'Dashboard' },
+                { href: '/survey/index.html', label: 'Survey Management' },
+                { href: '/dashboard/sms-maturity.html#history', label: 'Assessment History' }
+            ]
+        },
+        { label: 'Risk & Trends', href: '/risk-trends.html' },
+        { label: 'Top Hazards', href: '/top-hazards.html' },
+        { label: 'SPI/SPT', href: '/dashboard/spi-dashboard.html' },
+        {
+            label: 'Administration',
+            dropdown: [
+                { href: '/administration.html', label: 'System Settings' },
+                { href: '/settings/team.html', label: 'Team Management' },
+                { href: '/admin/super-admin.html', label: 'Super Admin' }
+            ]
+        }
     ];
-
-    // ---- Sidebar secondary links (Phase 5) ----
-    const SIDEBAR_LINKS = [
-        { icon: 'fa-users',    href: '/settings/team.html', label: 'Team' },
-        { icon: 'fa-question-circle', href: '/help.html',   label: 'Help' },
-        { icon: 'fa-comment-dots',    href: '/feedback.html', label: 'Feedback' }
-    ];
-
-    const VERSION_LINE = 'AviaSAFE SMS v1.0 · © 2026 AviaSafe Systems';
-
-    // Set the active header tab based on the current page path.
-    function setActiveHeaderLink() {
-        const path = window.location.pathname || '';
-        document.querySelectorAll('.app-header .nav-tabs a').forEach(function (a) {
-            const href = a.getAttribute('href') || '';
-            const matchItem = HEADER_LINKS.find(function (item) { return href.indexOf(item.href) !== -1; }) || {};
-            const match = matchItem.match || '';
-            const active = match && path.indexOf(match) !== -1;
-            a.classList.toggle('active', active);
-        });
-    }
 
     // Persistent user session surface so static pages can share tenant/user info.
     const currentUserState = { email: null, tenant: null, dept: null };
@@ -139,194 +114,122 @@
         }
     };
 
-    global.closeSidebar = function () {
-        const sb = document.getElementById('shellSidebar');
-        const ov = document.getElementById('sidebarOverlay');
-        if (sb) sb.classList.remove('open');
-        if (ov) ov.classList.remove('active');
-    };
-
-    global.toggleSidebar = function () {
-        const sb = document.getElementById('shellSidebar');
-        const ov = document.getElementById('sidebarOverlay');
-        if (!sb) return;
-        const open = sb.classList.toggle('open');
-        if (ov) ov.classList.toggle('active', open);
-    };
-
-    function bindShellInteractions() {
-        // Hamburger toggles sidebar
-        const hamb = document.getElementById('shellHamburger');
-        if (hamb) hamb.addEventListener('click', function () { global.toggleSidebar(); });
-
-        // Overlay click closes sidebar
-        const ov = document.getElementById('sidebarOverlay');
-        if (ov) ov.addEventListener('click', function () { global.closeSidebar(); });
-
-        // Escape closes sidebar
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') global.closeSidebar();
+    // Set the active nav link based on the current page path.
+    function setActiveNav() {
+        const path = window.location.pathname || '';
+        const base = path.split('/').pop() || '';
+        document.querySelectorAll('.app-header .header-nav a.nav-link[href]').forEach(function (a) {
+            const href = a.getAttribute('href') || '';
+            const hrefBase = href.split('/').pop().split('#')[0] || '';
+            a.classList.toggle('active', hrefBase === base && href !== '#');
         });
-
-        // Resize >= 769px auto-closes mobile sidebar
-        window.addEventListener('resize', function () {
-            if (window.innerWidth >= 769) global.closeSidebar();
-        });
-    }
-
-    function buildSidebar() {
-        const aside = document.createElement('aside');
-        aside.className = 'shell-sidebar';
-        aside.id = 'shellSidebar';
-
-        // Brand/logo
-        const brand = document.createElement('a');
-        brand.className = 'sidebar-brand';
-        brand.href = '/safety.html';
-        brand.innerHTML = '<i class="fas fa-shield-alt"></i><span>' +
-            (cfg.brand || 'AviaSAFE') + '</span>';
-        aside.appendChild(brand);
-
-        // Tenant info block (name + department). The airline name is derived
-        // from the signed-in user's email domain (e.g. safety@fixedwing.com ->
-        // 'Fixedwing'), falling back to the configured tenantTitle or brand.
-        const userEmail = getUserEmail() || 'safety@fixedwing.com';
-        const airlineName = airlineNameFromEmail(userEmail);
-        const displayName = cfg.tenantTitle || airlineName;
-        const deptLabel = cfg.roleLabel || 'Safety Department';
-
-        const tenant = document.createElement('div');
-        tenant.className = 'sidebar-tenant';
-        tenant.innerHTML =
-            '<div class="tenant-name">' + displayName + '</div>' +
-            '<div class="tenant-dept">' + deptLabel + '</div>';
-        aside.appendChild(tenant);
-
-        // User email + logout (secondary)
-        const user = document.createElement('div');
-        user.className = 'sidebar-user';
-        user.id = 'sidebarUser';
-        user.innerHTML = '<span class="sidebar-email">—</span>';
-        aside.appendChild(user);
-
-        // Secondary links (Team, Help, Feedback)
-        const navWrap = document.createElement('nav');
-        navWrap.className = 'sidebar-nav';
-        const ul = document.createElement('ul');
-        SIDEBAR_LINKS.forEach(function (item) {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = item.href;
-            a.innerHTML = '<i class="fas ' + item.icon + '"></i><span>' + item.label + '</span>';
-            li.appendChild(a);
-            ul.appendChild(li);
-        });
-        navWrap.appendChild(ul);
-        aside.appendChild(navWrap);
-
-        // Version footer
-        const foot = document.createElement('div');
-        foot.className = 'sidebar-footer';
-        foot.textContent = VERSION_LINE;
-        aside.appendChild(foot);
-
-        return aside;
     }
 
     function buildHeader() {
+        const email = getUserEmail() || 'Unknown';
+
         const header = document.createElement('header');
         header.className = 'app-header';
         header.id = 'shellHeader';
 
-        // Left: hamburger (mobile) + brand/logo → /safety.html
+        // Left: brand/logo
         const left = document.createElement('div');
-        left.className = 'shell-hamburger-area';
-        const hamb = document.createElement('button');
-        hamb.type = 'button';
-        hamb.id = 'shellHamburger';
-        hamb.className = 'hamburger-btn';
-        hamb.setAttribute('aria-label', 'Toggle navigation');
-        hamb.innerHTML = '<i class="fas fa-bars"></i>';
-        left.appendChild(hamb);
+        left.className = 'header-left';
         const brand = document.createElement('a');
-        brand.className = 'brand-link';
+        brand.className = 'header-brand';
         brand.href = '/safety.html';
-        brand.innerHTML = '<i class="fas fa-shield-alt"></i><span>Avia' +
-            '<span style="color:#0d9488;">SAFE</span></span>';
+        brand.innerHTML = '<span class="logo-icon">✈️</span> AviaSAFE';
         left.appendChild(brand);
         header.appendChild(left);
 
-        // Center: navigation tabs (primary modules)
+        // Center: navigation (simple links + dropdowns)
         const nav = document.createElement('nav');
-        nav.className = 'nav-tabs';
-        HEADER_LINKS.forEach(function (item) {
-            const a = document.createElement('a');
-            a.href = item.href;
-            a.textContent = item.label;
-            nav.appendChild(a);
+        nav.className = 'header-nav';
+
+        NAV_ITEMS.forEach(function (item) {
+            if (item.dropdown) {
+                const dd = document.createElement('div');
+                dd.className = 'nav-dropdown';
+                const link = document.createElement('a');
+                link.href = '#';
+                link.className = 'nav-link';
+                link.textContent = item.label + ' ';
+                const caret = document.createElement('span');
+                caret.className = 'caret';
+                caret.textContent = '▼';
+                link.appendChild(caret);
+                const content = document.createElement('div');
+                content.className = 'dropdown-content';
+                item.dropdown.forEach(function (d) {
+                    const da = document.createElement('a');
+                    da.href = d.href;
+                    da.textContent = d.label;
+                    content.appendChild(da);
+                });
+                dd.appendChild(link);
+                dd.appendChild(content);
+                nav.appendChild(dd);
+            } else {
+                const a = document.createElement('a');
+                a.href = item.href;
+                a.className = 'nav-link';
+                a.textContent = item.label;
+                nav.appendChild(a);
+            }
         });
         header.appendChild(nav);
 
-        // Right: user email (desktop) + logout
-        const actions = document.createElement('div');
-        actions.className = 'header-actions';
+        // Right: user email + logout
+        const right = document.createElement('div');
+        right.className = 'header-right';
         const user = document.createElement('span');
-        user.className = 'header-user';
+        user.className = 'user-email';
         user.id = 'shellUser';
-        user.textContent = '—';
-        actions.appendChild(user);
+        user.textContent = email;
+        right.appendChild(user);
         const logout = document.createElement('button');
         logout.type = 'button';
-        logout.className = 'btn-logout';
+        logout.className = 'logout-btn';
         logout.id = 'shellLogoutBtn';
-        logout.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
-        logout.addEventListener('click', function () { global.handleLogout(); });
-        actions.appendChild(logout);
-        header.appendChild(actions);
+        logout.textContent = 'Logout';
+        logout.addEventListener('click', function () {
+            try { localStorage.removeItem('mockEmail'); } catch (e) {}
+            global.handleLogout();
+        });
+        right.appendChild(logout);
+        header.appendChild(right);
 
         return header;
     }
 
-    // Compact page title block: airline name (from user email) + subtitle.
-    // Uses the .page-header / h1#pageTitle / p.subtitle#pageSubtitle structure so
-    // pages get a small, consistent title without duplicating the header chrome.
+    // Clean page hero: airline name (from email) + department subtitle.
     function buildHero() {
-        const header = document.createElement('div');
-        header.className = 'page-header';
+        const email = getUserEmail() || 'Unknown';
+        const airlineName = cfg.heroTitle || cfg.tenantTitle || airlineNameFromEmail(email);
+
+        const hero = document.createElement('div');
+        hero.className = 'page-hero';
 
         const title = document.createElement('h1');
         title.id = 'pageTitle';
-        title.textContent = cfg.heroTitle || cfg.pageTitle || (airlineNameFromEmail(getUserEmail()) + ' SMS Dashboard');
+        title.textContent = airlineName;
 
         const subtitle = document.createElement('p');
         subtitle.className = 'subtitle';
         subtitle.id = 'pageSubtitle';
-        subtitle.textContent = cfg.heroSubtitle || cfg.roleLabel || (airlineNameFromEmail(getUserEmail()) + ' - Safety Department');
+        subtitle.textContent = cfg.heroSubtitle || cfg.roleLabel || (airlineNameFromEmail(email) + ' - Safety Department');
 
-        header.appendChild(title);
-        header.appendChild(subtitle);
-        return header;
+        hero.appendChild(title);
+        hero.appendChild(subtitle);
+        return hero;
     }
 
-    // Footer: three lines on desktop, single line ("Made with ❤️ from Nepal")
-    // on mobile (handled by CSS media queries).
+    // Single-line footer (heart stays clear only in CSS).
     function buildFooter() {
         const footer = document.createElement('footer');
         footer.className = 'app-footer';
         footer.id = 'shellFooter';
-
-        const l1 = document.createElement('div');
-        l1.className = 'footer-line1';
-        l1.textContent = 'AviaSAFE SMS v1.0';
-        const l2 = document.createElement('div');
-        l2.className = 'footer-line2';
-        l2.innerHTML = 'Made with <span class="heart">&hearts;</span> from Nepal';
-        const l3 = document.createElement('div');
-        l3.className = 'footer-line3';
-        l3.textContent = '© 2026 AviaSafe Systems';
-        footer.appendChild(l1);
-        footer.appendChild(l2);
-        footer.appendChild(l3);
+        footer.innerHTML = 'Made with <span class="heart">&hearts;</span> from Nepal';
         return footer;
     }
 
@@ -341,46 +244,6 @@
         });
     }
 
-    function attachScrollSpy() {
-        const links = document.querySelectorAll('.sidebar-nav li a');
-        const navWrap = document.querySelector('.sidebar-nav');
-        const targets = (cfg.nav || [])
-            .map(function (n) { return document.getElementById(n.id); })
-            .filter(Boolean);
-
-        function onScroll() {
-            const pos = window.scrollY + 120;
-            let current = null;
-            targets.forEach(function (el) {
-                if (el.offsetParent === null) return;
-                if (el.offsetTop <= pos) current = el.id;
-            });
-            if (!current && targets.length) current = targets[0].id;
-            if (navWrap) {
-                // Dim every section except the one currently in view.
-                if (current) navWrap.classList.add('has-active');
-                else navWrap.classList.remove('has-active');
-            }
-            links.forEach(function (a) {
-                if (a.dataset.target === current) a.classList.add('active');
-                else a.classList.remove('active');
-            });
-        }
-
-        links.forEach(function (a) {
-            a.addEventListener('click', function (e) {
-                const el = document.getElementById(a.dataset.target);
-                if (el) {
-                    e.preventDefault();
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            });
-        });
-
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
-    }
-
     function loadInterFont() {
         if (document.querySelector('link[href*="Inter"]')) return;
         const link = document.createElement('link');
@@ -390,86 +253,77 @@
     }
 
     function initShell() {
-        if (document.getElementById('shellSidebar')) return;
+        if (document.getElementById('shellHeader')) return;
         loadInterFont();
         const shell = document.querySelector('.app-shell');
         if (!shell) return;
 
-        // Demo: hide N-HRC dashboard link until full Supabase migration is complete
-        // This keeps the sidebar clean for the demo; revisit after migration.
-        try {
-            const style = document.createElement('style');
-            style.textContent = 'a[href*="nhrc-dashboard.html"]{display:none !important;} a[href*="/dashboard/nhrc"]{display:none !important;}';
-            document.head.appendChild(style);
-        } catch (e) {}
-
         // Re-read SHELL_CONFIG in case it was assigned after this script loaded.
         refreshCfg();
 
-        const sidebar = buildSidebar();
-        const main = document.createElement('div');
-        main.className = 'shell-main';
+        const main = document.createElement('main');
+        main.className = 'main-content';
 
-        // Wrap existing children into .shell-content
+        // Wrap existing children into the main content area.
         const content = document.createElement('div');
         content.className = 'shell-content';
         while (shell.firstChild) content.appendChild(shell.firstChild);
-        const header = buildHeader();
-        header.classList.add('is-fixed');
-        main.appendChild(header);
+
+        main.appendChild(buildHeader());
         main.appendChild(buildHero());
         main.appendChild(content);
-        // Pages that ship their own complete static footer (the single-line
-        // .app-footer with "Made with love") must not also receive the shell
-        // footer — that stacked two footers.
         if (!document.querySelector('footer.app-footer')) {
             main.appendChild(buildFooter());
         }
-        shell.appendChild(sidebar);
+
         shell.appendChild(main);
 
-        // Overlay backdrop (mobile sidebar)
-        const overlay = document.createElement('div');
-        overlay.id = 'sidebarOverlay';
-        overlay.className = 'sidebar-overlay';
-        shell.appendChild(overlay);
+        setActiveNav();
 
-        // Wire hamburger / overlay / escape / resize interactions.
-        bindShellInteractions();
+        // Mobile dropdown: click-to-toggle (hover is unreliable on touch). On
+        // narrow screens every .nav-dropdown .nav-link becomes a toggle; on
+        // desktop the CSS :hover handles it (we keep open-class in sync so the
+        // panel stays open if the window is resized down while hovered).
+        function bindDropdownToggles() {
+            document.querySelectorAll('.nav-dropdown').forEach(function (dd) {
+                const link = dd.querySelector('.nav-link');
+                if (!link) return;
+                link.onclick = function (e) {
+                    if (link.getAttribute('href') === '#') e.preventDefault();
+                    const content = dd.querySelector('.dropdown-content');
+                    if (!content) return;
+                    if (window.innerWidth < 768) {
+                        const willOpen = !content.classList.contains('open');
+                        document.querySelectorAll('.dropdown-content.open').forEach(function (o) {
+                            if (o !== content) o.classList.remove('open');
+                        });
+                        content.classList.toggle('open', willOpen);
+                    } else {
+                        content.classList.remove('open');
+                    }
+                };
+            });
+        }
+        bindDropdownToggles();
+        window.addEventListener('resize', bindDropdownToggles);
 
-        setActiveHeaderLink();
-        attachScrollSpy();
-
-        // Populate user email (header + sidebar) + department (hero subtitle)
-        // once auth is ready.
+        // Populate the header user email once auth is ready.
         if (typeof firebase !== 'undefined' && firebase.auth) {
             firebase.auth().onAuthStateChanged(function (user) {
-                const email = user ? user.email : '—';
+                const email = user ? user.email : (getUserEmail() || 'Unknown');
                 currentUserState.email = user ? user.email : null;
                 const el = document.getElementById('shellUser');
                 if (el) el.textContent = email;
-                const sidebarUser = document.getElementById('sidebarUser');
-                if (sidebarUser) {
-                    sidebarUser.innerHTML = user
-                        ? '<i class="fas fa-user-cog"></i><span class="sidebar-email">' + email + '</span>'
-                        : '<span class="sidebar-email">—</span>';
-                }
                 const pageSubtitle = document.getElementById('pageSubtitle');
-                if (pageSubtitle) pageSubtitle.textContent = '—';
                 if (user && user.getIdTokenResult) {
                     user.getIdTokenResult(true).then(function (tokenResult) {
                         const claims = (tokenResult && tokenResult.claims) || {};
-                        applyNavVisibility(claims.role || 'USER');
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                         currentUserState.tenant = claims.tenant_id || null;
                         if (pageSubtitle && typeof getDepartmentLabel === 'function') {
                             pageSubtitle.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }
-                    }).catch(function () {
-                        if (pageSubtitle) pageSubtitle.textContent = '—';
-                    });
-                } else {
-                    applyNavVisibility('USER');
+                    }).catch(function () {});
                 }
             });
         } else {
@@ -477,31 +331,22 @@
         }
     }
 
-    // Local development: populate the header/sidebar email + tenant from the
-    // mock user (so pages render without Firebase auth on localhost).
+    // Local development: populate the header user email from the mock user
+    // (so pages render without Firebase auth on localhost).
     function applyLocalUserToShell() {
         const local = getLocalUser();
         if (!local) return;
         currentUserState.email = local.email;
         const el = document.getElementById('shellUser');
         if (el) el.textContent = local.email;
-        const sidebarUser = document.getElementById('sidebarUser');
-        if (sidebarUser) {
-            sidebarUser.innerHTML = '<i class="fas fa-user-cog"></i><span class="sidebar-email">' + local.email + '</span>';
-        }
     }
 
-    // Allow pages to update the sidebar tenant info + hero title after auth resolves.
+    // Allow pages to update the page hero title after auth resolves.
     global.updateShellTenant = function (title, meta) {
         cfg.tenantTitle = title || cfg.tenantTitle;
         cfg.tenantMeta = meta || cfg.tenantMeta;
-        const tenantEl = document.querySelector('.sidebar-tenant');
-        if (tenantEl) {
-            const nameEl = tenantEl.querySelector('.tenant-name');
-            if (nameEl) nameEl.textContent = title || '';
-        }
         const pageTitle = document.getElementById('pageTitle');
-        if (pageTitle) pageTitle.textContent = cfg.tenantTitle || cfg.roleLabel || pageTitle.textContent;
+        if (pageTitle) pageTitle.textContent = cfg.tenantTitle || pageTitle.textContent;
     };
 
     if (document.readyState === 'loading') {
