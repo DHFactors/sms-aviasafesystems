@@ -66,16 +66,9 @@
         return cfg;
     }
 
-    // ---- Header navigation: simple links + WordPress-style dropdowns ----
+    // ---- Header navigation: [Home] + direct links + Administration dropdown ----
     const NAV_ITEMS = [
-        {
-            label: 'SMS Maturity',
-            dropdown: [
-                { href: '/dashboard/sms-maturity.html', label: 'Dashboard' },
-                { href: '/survey/index.html', label: 'Survey Management' },
-                { href: '/dashboard/sms-maturity.html#history', label: 'Assessment History' }
-            ]
-        },
+        { label: 'SMS Maturity', href: '/dashboard/sms-maturity.html' },
         { label: 'Risk & Trends', href: '/risk-trends.html' },
         { label: 'Top Hazards', href: '/top-hazards.html' },
         { label: 'SPI/SPT', href: '/dashboard/spi-dashboard.html' },

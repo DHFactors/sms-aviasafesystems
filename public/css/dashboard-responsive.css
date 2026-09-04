@@ -130,8 +130,9 @@
 }
 
 .header-nav .nav-link.active {
-    background: rgba(255,255,255,0.12);
-    color: #ffffff;
+    background: rgba(255, 215, 0, 0.2);
+    color: #ffd700 !important;
+    border-bottom: 2px solid #ffd700;
 }
 
 /* Home link - gold/yellow to stand out */
