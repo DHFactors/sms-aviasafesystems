@@ -300,6 +300,28 @@
 }
 
 /* ============================================================================
+   COMPACT PAGE HEADER (page title + subtitle)
+   ============================================================================ */
+.page-header {
+    padding: 8px 0 12px 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e8eaed;
+}
+
+.page-header h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    color: #1a237e;
+}
+
+.page-header .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin: 2px 0 0 0;
+}
+
+/* ============================================================================
    FOOTER - 3 lines desktop / 1 line mobile
    ============================================================================ */
 .app-footer {

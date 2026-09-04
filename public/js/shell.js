@@ -13,6 +13,45 @@
 (function (global) {
     'use strict';
 
+    // Returns a mock user for local development (localhost / 127.0.0.1) so the
+    // shell can render tenant info, user email and role without Firebase auth.
+    // Set localStorage 'mockEmail' to override the default email.
+    function getLocalUser() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return {
+                email: localStorage.getItem('mockEmail') || 'safety@fixedwing.com',
+                role: 'safety_manager',
+                tenant: 'fixedwing'
+            };
+        }
+        return null;
+    }
+    global.getLocalUser = getLocalUser;
+
+    // Returns the current user email: from an authenticated session if present,
+    // otherwise the local mock user (localhost), otherwise a safe default.
+    function getUserEmail() {
+        try {
+            if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+                return firebase.auth().currentUser.email;
+            }
+        } catch (e) {}
+        const local = getLocalUser();
+        if (local) return local.email;
+        return null;
+    }
+    global.getUserEmail = getUserEmail;
+
+    // Derive a human-friendly airline/company name from an email domain.
+    // 'safety@fixedwing.com' -> 'Fixedwing'
+    function airlineNameFromEmail(email) {
+        if (!email) return 'Unknown';
+        const domain = String(email).split('@')[1] || '';
+        const seg = domain.split('.')[0] || 'Unknown';
+        return seg.charAt(0).toUpperCase() + seg.slice(1);
+    }
+    global.airlineNameFromEmail = airlineNameFromEmail;
+
     // Shell configuration is supplied by each page BEFORE this script loads:
     //   window.SHELL_CONFIG = {
     //     brand: 'AviaSAFE',
@@ -148,20 +187,20 @@
             (cfg.brand || 'AviaSAFE') + '</span>';
         aside.appendChild(brand);
 
-        // Tenant info block (name + department)
-        if (cfg.tenantTitle || cfg.roleLabel) {
-            const tenant = document.createElement('div');
-            tenant.className = 'sidebar-tenant';
-            tenant.innerHTML =
-                (cfg.tenantTitle ? '<div class="tenant-name">' + cfg.tenantTitle + '</div>' : '') +
-                (cfg.roleLabel ? '<div class="tenant-dept">' + cfg.roleLabel + '</div>' : '');
-            aside.appendChild(tenant);
-        } else if (cfg.tenantTitle) {
-            const tenant = document.createElement('div');
-            tenant.className = 'sidebar-tenant';
-            tenant.innerHTML = '<div class="tenant-name">' + cfg.tenantTitle + '</div>';
-            aside.appendChild(tenant);
-        }
+        // Tenant info block (name + department). The airline name is derived
+        // from the signed-in user's email domain (e.g. safety@fixedwing.com ->
+        // 'Fixedwing'), falling back to the configured tenantTitle or brand.
+        const userEmail = getUserEmail() || 'safety@fixedwing.com';
+        const airlineName = airlineNameFromEmail(userEmail);
+        const displayName = cfg.tenantTitle || airlineName;
+        const deptLabel = cfg.roleLabel || 'Safety Department';
+
+        const tenant = document.createElement('div');
+        tenant.className = 'sidebar-tenant';
+        tenant.innerHTML =
+            '<div class="tenant-name">' + displayName + '</div>' +
+            '<div class="tenant-dept">' + deptLabel + '</div>';
+        aside.appendChild(tenant);
 
         // User email + logout (secondary)
         const user = document.createElement('div');
@@ -248,23 +287,25 @@
         return header;
     }
 
-    // Uniform page title block: centered tenant/page title + department label
-    // (mapped from the signed-in user's role / custom claims).
+    // Compact page title block: airline name (from user email) + subtitle.
+    // Uses the .page-header / h1#pageTitle / p.subtitle#pageSubtitle structure so
+    // pages get a small, consistent title without duplicating the header chrome.
     function buildHero() {
-        const hero = document.createElement('section');
-        hero.className = 'shell-hero';
-        hero.id = 'shellHero';
+        const header = document.createElement('div');
+        header.className = 'page-header';
+
         const title = document.createElement('h1');
-        title.className = 'shell-hero-title';
-        title.id = 'shellHeroTitle';
-        title.textContent = cfg.heroTitle || cfg.tenantTitle || cfg.roleLabel || (cfg.brand || 'AviaSAFE');
-        const user = document.createElement('div');
-        user.className = 'shell-hero-user';
-        user.id = 'shellHeroUser';
-        user.textContent = cfg.heroSubtitle || '—';
-        hero.appendChild(title);
-        hero.appendChild(user);
-        return hero;
+        title.id = 'pageTitle';
+        title.textContent = cfg.heroTitle || cfg.pageTitle || (airlineNameFromEmail(getUserEmail()) + ' SMS Dashboard');
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'subtitle';
+        subtitle.id = 'pageSubtitle';
+        subtitle.textContent = cfg.heroSubtitle || cfg.roleLabel || (airlineNameFromEmail(getUserEmail()) + ' - Safety Department');
+
+        header.appendChild(title);
+        header.appendChild(subtitle);
+        return header;
     }
 
     // Footer: three lines on desktop, single line ("Made with ❤️ from Nepal")
@@ -413,24 +454,40 @@
                         ? '<i class="fas fa-user-cog"></i><span class="sidebar-email">' + email + '</span>'
                         : '<span class="sidebar-email">—</span>';
                 }
-                const heroUser = document.getElementById('shellHeroUser');
-                if (heroUser) heroUser.textContent = '—';
+                const pageSubtitle = document.getElementById('pageSubtitle');
+                if (pageSubtitle) pageSubtitle.textContent = '—';
                 if (user && user.getIdTokenResult) {
                     user.getIdTokenResult(true).then(function (tokenResult) {
                         const claims = (tokenResult && tokenResult.claims) || {};
                         applyNavVisibility(claims.role || 'USER');
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                         currentUserState.tenant = claims.tenant_id || null;
-                        if (heroUser && typeof getDepartmentLabel === 'function') {
-                            heroUser.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
+                        if (pageSubtitle && typeof getDepartmentLabel === 'function') {
+                            pageSubtitle.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }
                     }).catch(function () {
-                        if (heroUser) heroUser.textContent = '—';
+                        if (pageSubtitle) pageSubtitle.textContent = '—';
                     });
                 } else {
                     applyNavVisibility('USER');
                 }
             });
+        } else {
+            applyLocalUserToShell();
+        }
+    }
+
+    // Local development: populate the header/sidebar email + tenant from the
+    // mock user (so pages render without Firebase auth on localhost).
+    function applyLocalUserToShell() {
+        const local = getLocalUser();
+        if (!local) return;
+        currentUserState.email = local.email;
+        const el = document.getElementById('shellUser');
+        if (el) el.textContent = local.email;
+        const sidebarUser = document.getElementById('sidebarUser');
+        if (sidebarUser) {
+            sidebarUser.innerHTML = '<i class="fas fa-user-cog"></i><span class="sidebar-email">' + local.email + '</span>';
         }
     }
 
@@ -443,8 +500,8 @@
             const nameEl = tenantEl.querySelector('.tenant-name');
             if (nameEl) nameEl.textContent = title || '';
         }
-        const heroTitle = document.getElementById('shellHeroTitle');
-        if (heroTitle) heroTitle.textContent = cfg.tenantTitle || cfg.roleLabel || '';
+        const pageTitle = document.getElementById('pageTitle');
+        if (pageTitle) pageTitle.textContent = cfg.tenantTitle || cfg.roleLabel || pageTitle.textContent;
     };
 
     if (document.readyState === 'loading') {
