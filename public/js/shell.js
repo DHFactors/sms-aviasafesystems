@@ -175,6 +175,26 @@
         const nav = document.createElement('nav');
         nav.className = 'header-nav';
 
+        // Conditional Home link - show on all pages except landing (safety.html)
+        const path = window.location.pathname || '';
+        const isLandingPage = path === '/safety.html' || path === '/' || path === '/index.html' || path.endsWith('/safety.html');
+        if (!isLandingPage) {
+            const homeLink = document.createElement('a');
+            homeLink.href = '/safety.html';
+            homeLink.className = 'nav-link nav-home';
+            const homeIcon = document.createElement('span');
+            homeIcon.className = 'home-icon';
+            homeIcon.textContent = '\uD83C\uDFE0'; // 🏠
+            homeIcon.setAttribute('aria-hidden', 'true');
+            const homeText = document.createElement('span');
+            homeText.className = 'home-text';
+            homeText.textContent = 'Home';
+            homeLink.appendChild(homeIcon);
+            homeLink.appendChild(document.createTextNode(' '));
+            homeLink.appendChild(homeText);
+            nav.appendChild(homeLink);
+        }
+
         NAV_ITEMS.forEach(function (item) {
             if (item.dropdown) {
                 const dd = document.createElement('div');
