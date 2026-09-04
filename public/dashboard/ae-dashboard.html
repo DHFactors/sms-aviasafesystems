@@ -46,6 +46,8 @@
     <link rel="stylesheet" href="/css/dashboard-responsive.css">
 </head>
 <body>
+<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
+<div class="sidebar-overlay" onclick="closeSidebar()"></div>
 <nav class="nav">
     <h1><i class="fas fa-user-tie"></i> Accountable Executive</h1>
     <div style="display:flex;align-items:center;gap:1rem;">
@@ -258,6 +260,35 @@ function renderSituationalBanner(){
     document.getElementById('sitQueue').className='chip '+(q?'chip-amber':'chip-green');
     document.getElementById('sitPrecursor').textContent='Assessed';
 }
+</script>
+<script>
+    function toggleSidebar() {
+        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar) sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
+
+    function closeSidebar() {
+        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        if (sidebar) sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+    }
+
+    // Auto-close sidebar on window resize to desktop
+    window.addEventListener('resize', function() {
+        if (window.innerWidth >= 769) {
+            closeSidebar();
+        }
+    });
+
+    // Close sidebar when Escape key is pressed
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeSidebar();
+        }
+    });
 </script>
 </body>
 </html>

@@ -1,135 +1,181 @@
 /* ============================================================================
    FILE: dashboard-responsive.css
    PATH: public/css/dashboard-responsive.css
-   VERSION: 1.0.0
-   PURPOSE: Central responsive overrides for all dashboard pages.
-            - Sidebar auto-collapses to 60px on screens < 768px
-            - Hover-to-expand sidebar on small screens
-            - Footer shows only the "Made with love" line on small screens
+   VERSION: 2.0.0
+   PURPOSE: Hamburger overlay menu + responsive footer for all dashboards.
+            Works with both shell.js sidebars (.shell-sidebar) and
+            static sidebars (.sidebar).
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
-/* ── SIDEBAR AUTO-COLLAPSE (< 768px) ─────────────────────────────────────── */
-@media (max-width: 768px) {
-
-    /* Override shell.css horizontal-top-nav behavior — keep sidebar vertical
-       but shrink to icon-only strip. */
-    .app-shell {
-        flex-direction: row !important;
-    }
-
-    .shell-sidebar {
-        width: 60px !important;
-        position: fixed !important;
-        flex-direction: column !important;
-        overflow: visible !important;
-        transition: width 0.25s ease;
-    }
-
-    /* Hide text labels, role badge, sidebar footer, brand text */
-    .shell-sidebar .sidebar-brand span,
-    .shell-sidebar .sidebar-role,
-    .shell-sidebar .sidebar-footer {
-        display: none !important;
-    }
-
-    .shell-sidebar .sidebar-brand {
-        justify-content: center;
-        padding: 0.9rem 0 !important;
-        border-bottom: none !important;
-    }
-
-    /* Nav links: icon-only, centered */
-    .shell-sidebar .sidebar-nav {
-        padding: 0.5rem 0 !important;
-    }
-
-    .shell-sidebar .sidebar-nav ul {
-        flex-direction: column !important;
-    }
-
-    .shell-sidebar .sidebar-nav li a {
-        justify-content: center;
-        padding: 0.7rem 0 !important;
-        border-left: none !important;
-        border-bottom: none !important;
-        font-size: 0 !important;
-        gap: 0 !important;
-    }
-
-    .shell-sidebar .sidebar-nav li a i {
-        width: auto;
-        font-size: 1.1rem;
-    }
-
-    .shell-sidebar .sidebar-nav li a.active {
-        border-left: none !important;
-        border-bottom: none !important;
-        border-right: 3px solid var(--shell-gold, #d4af37) !important;
-    }
-
-    /* Main content shifts to account for collapsed sidebar */
-    .app-shell .shell-main {
-        margin-left: 60px !important;
-    }
-
-    .shell-header {
-        padding: 0.6rem 1rem !important;
-    }
+/* ===== HAMBURGER MENU BUTTON ===== */
+.hamburger-btn {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1001;
+    background: #1a237e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
 }
 
-/* ── SIDEBAR HOVER-TO-EXPAND (< 768px) ───────────────────────────────────── */
-@media (max-width: 768px) {
-    .shell-sidebar:hover {
-        width: 250px !important;
-        z-index: 999;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
-    }
+.hamburger-btn:hover {
+    background: #0d1b5e;
+}
 
-    .shell-sidebar:hover .sidebar-brand span,
-    .shell-sidebar:hover .sidebar-role,
-    .shell-sidebar:hover .sidebar-footer {
+.hamburger-btn:focus {
+    outline: 2px solid #64b5f6;
+}
+
+/* ===== SIDEBAR - Desktop (both .shell-sidebar and .sidebar) ===== */
+.shell-sidebar,
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    background: #1a237e;
+    color: white;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+}
+
+.shell-sidebar .nav-text,
+.sidebar .nav-text {
+    display: inline;
+}
+
+.shell-sidebar .nav-icon,
+.sidebar .nav-icon {
+    margin-right: 10px;
+    min-width: 20px;
+}
+
+/* ===== SIDEBAR - Mobile ===== */
+@media (max-width: 768px) {
+    .hamburger-btn {
         display: block !important;
     }
 
-    .shell-sidebar:hover .sidebar-brand {
+    .shell-sidebar,
+    .sidebar {
+        width: 280px !important;
+        transform: translateX(-100%);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+        height: 100vh;
+        overflow-y: auto;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.3);
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .shell-sidebar.open,
+    .sidebar.open {
+        transform: translateX(0) !important;
+    }
+
+    .shell-sidebar .nav-text,
+    .sidebar .nav-text {
+        display: inline !important;
+    }
+
+    .shell-sidebar .nav-icon,
+    .sidebar .nav-icon {
+        margin-right: 10px !important;
+    }
+
+    /* Show sidebar text labels when open */
+    .shell-sidebar.open .sidebar-brand span,
+    .shell-sidebar.open .sidebar-role,
+    .shell-sidebar.open .sidebar-footer,
+    .sidebar.open .sidebar-brand span,
+    .sidebar.open .sidebar-role,
+    .sidebar.open .sidebar-footer {
+        display: block !important;
+    }
+
+    .shell-sidebar.open .sidebar-brand,
+    .sidebar.open .sidebar-brand {
         justify-content: flex-start;
         padding: 1.1rem 1.2rem !important;
     }
 
-    .shell-sidebar:hover .sidebar-nav li a {
+    .shell-sidebar.open .sidebar-nav li a,
+    .sidebar.open .sidebar-nav li a {
         justify-content: flex-start;
         padding: 0.7rem 1.2rem !important;
         font-size: 0.875rem !important;
         gap: 0.75rem !important;
-        border-left: 3px solid transparent !important;
-        border-right: none !important;
     }
 
-    .shell-sidebar:hover .sidebar-nav li a.active {
-        border-right: none !important;
-        border-left-color: var(--shell-gold, #d4af37) !important;
+    /* Overlay background when sidebar is open */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
 
-    .shell-sidebar:hover .sidebar-nav li a:not(.active) {
-        border-left-color: transparent !important;
+    .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
     }
 
-    /* Expand main content when sidebar is hovered open */
-    .app-shell:hover .shell-main {
-        margin-left: 250px !important;
-    }
-
+    /* Main content - no left margin on mobile */
     .app-shell .shell-main {
-        transition: margin-left 0.25s ease;
+        margin-left: 0 !important;
+        padding-top: 60px !important;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+        padding: 70px 15px 20px !important;
+        width: 100% !important;
     }
 }
 
-/* ── FOOTER: HIDE LINES 1 & 3 ON SMALL SCREENS ───────────────────────────── */
+@media (min-width: 769px) {
+    .hamburger-btn {
+        display: none !important;
+    }
+
+    .sidebar-overlay {
+        display: none !important;
+    }
+
+    .app-shell .shell-main {
+        margin-left: 250px !important;
+    }
+
+    .main-content {
+        margin-left: 250px !important;
+        padding: 20px !important;
+    }
+}
+
+/* ===== FOOTER - Mobile: hide lines 1 & 3, show only line 2 ===== */
 @media (max-width: 768px) {
 
-    /* Shell-generated .dashboard-footer (sms-maturity, nhrc-kpis, spi-dashboard)
-       Structure: div.footer-links (line 1: Privacy|Terms)
+    /* Shell-generated .dashboard-footer
+       Structure: div.footer-links (line 1)
                   p (line 2: "A Project by ...")
                   p (line 3: copyright) */
     .dashboard-footer > div:first-child,
@@ -141,7 +187,7 @@
         margin-top: 0 !important;
     }
 
-    /* Static .dashboard-footer (my-tasks, master-register)
+    /* Static .dashboard-footer (my-tasks, master-register, ae-dashboard)
        Structure: p (line 1: Privacy|Terms)
                   p (line 2: "Made with love ...")
                   p (line 3: copyright) */
@@ -167,17 +213,29 @@
         margin-top: 0 !important;
     }
 
-    /* .footer div (ae-dashboard — single line, no changes needed) */
+    .app-footer {
+        padding: 8px 10px !important;
+        min-height: 40px !important;
+    }
 }
 
-/* ── SMALL SCREENS < 480px ────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-    .shell-sidebar:hover {
-        width: 200px !important;
+@media (min-width: 769px) {
+    .dashboard-footer > div:first-child,
+    .dashboard-footer > p:first-child,
+    .dashboard-footer > p:last-child,
+    .dashboard-footer > p:nth-child(2),
+    .app-footer > p:first-child,
+    .app-footer > p:last-child,
+    .app-footer > p:nth-child(2) {
+        display: block !important;
     }
+}
 
-    .app-shell:hover .shell-main {
-        margin-left: 200px !important;
+/* ===== SMALL SCREENS < 480px ===== */
+@media (max-width: 480px) {
+    .shell-sidebar,
+    .sidebar {
+        width: 260px !important;
     }
 
     .shell-header .shell-brand {
@@ -186,5 +244,12 @@
 
     .shell-header .shell-user {
         display: none;
+    }
+
+    .hamburger-btn {
+        top: 8px;
+        left: 8px;
+        padding: 6px 10px;
+        font-size: 20px;
     }
 }
