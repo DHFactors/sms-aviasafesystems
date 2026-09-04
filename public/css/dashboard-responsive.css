@@ -171,63 +171,58 @@
     }
 }
 
-/* ===== FOOTER - Mobile: hide lines 1 & 3, show only line 2 ===== */
-@media (max-width: 768px) {
-
-    /* Shell-generated .dashboard-footer
-       Structure: div.footer-links (line 1)
-                  p (line 2: "A Project by ...")
-                  p (line 3: copyright) */
-    .dashboard-footer > div:first-child,
-    .dashboard-footer > p:last-child {
-        display: none !important;
-    }
-
-    .dashboard-footer > p {
-        margin-top: 0 !important;
-    }
-
-    /* Static .dashboard-footer (my-tasks, master-register, ae-dashboard)
-       Structure: p (line 1: Privacy|Terms)
-                  p (line 2: "Made with love ...")
-                  p (line 3: copyright) */
-    .dashboard-footer > p:first-child,
-    .dashboard-footer > p:last-child {
-        display: none !important;
-    }
-
-    .dashboard-footer > p:nth-child(2) {
-        margin-top: 0 !important;
-    }
-
-    /* .app-footer (caan-sms-maturity)
-       Structure: p (line 1: Privacy|Terms)
-                  p (line 2: "Made with love ...")
-                  p (line 3: copyright) */
-    .app-footer > p:first-child,
-    .app-footer > p:last-child {
-        display: none !important;
-    }
-
-    .app-footer > p:nth-child(2) {
-        margin-top: 0 !important;
-    }
-
-    .app-footer {
-        padding: 8px 10px !important;
-        min-height: 40px !important;
-    }
+/* ===== FOOTER - Single Line ===== */
+.app-footer {
+    background: #f5f5f5;
+    padding: 12px 20px;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-@media (min-width: 769px) {
-    .dashboard-footer > div:first-child,
-    .dashboard-footer > p:first-child,
-    .dashboard-footer > p:last-child,
-    .dashboard-footer > p:nth-child(2),
-    .app-footer > p:first-child,
-    .app-footer > p:last-child,
-    .app-footer > p:nth-child(2) {
-        display: block !important;
+.app-footer .footer-line {
+    margin: 0;
+}
+
+.app-footer .heart {
+    color: #e53935;
+    display: inline-block;
+}
+
+/* .dashboard-footer (my-tasks, ae-dashboard, master-register + shell) */
+.dashboard-footer {
+    background: #f5f5f5;
+    padding: 12px 20px;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+    justify-content: center;
+}
+
+.dashboard-footer .footer-line {
+    margin: 0;
+}
+
+.dashboard-footer .heart {
+    color: #e53935;
+    display: inline-block;
+}
+
+/* Mobile - same single line, just smaller */
+@media (max-width: 768px) {
+    .app-footer {
+        font-size: 12px;
+        padding: 10px 15px;
+        min-height: 40px;
+    }
+    .dashboard-footer {
+        font-size: 12px;
+        padding: 10px 15px;
+        min-height: 40px;
     }
 }
 

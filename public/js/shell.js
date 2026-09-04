@@ -178,33 +178,13 @@
     // feedback.js and stays untouched.
     function buildFooter() {
         const footer = document.createElement('footer');
-        footer.className = 'dashboard-footer text-center';
+        footer.className = 'app-footer';
         footer.id = 'shellFooter';
 
-        const links = document.createElement('div');
-        links.style.fontSize = '0.875rem';
-        links.style.marginBottom = '0.25rem';
-        links.innerHTML =
-            '<a href="/privacy.html" style="color: var(--color-text-muted); text-decoration: none;">Privacy Policy</a>' +
-            '<span style="margin: 0 0.5rem; color: var(--color-gray-400);">|</span>' +
-            '<a href="/terms.html" style="color: var(--color-text-muted); text-decoration: none;">Terms of Service</a>';
-        footer.appendChild(links);
-
-        const p = document.createElement('p');
-        p.className = 'mb-0 text-muted';
-        p.style.fontSize = '0.875rem';
-        p.style.fontWeight = '500';
-        p.style.marginTop = '0.25rem';
-        p.innerHTML = 'A Project by <strong>Ghanshyam Acharya</strong>';
-        footer.appendChild(p);
-
-        const cr = document.createElement('p');
-        cr.className = 'mb-0 text-muted';
-        cr.style.fontSize = '0.75rem';
-        cr.style.opacity = '0.7';
-        cr.style.marginTop = '0.25rem';
-        cr.textContent = '\u00A9 2026 AviaSAFE Systems. Engineered for ICAO Annex 19 (3rd Ed.), Doc 9859 & Doc 10159 Compliance.';
-        footer.appendChild(cr);
+        const line = document.createElement('div');
+        line.className = 'footer-line';
+        line.innerHTML = 'Made with <span class="heart">&hearts;</span> from Nepal';
+        footer.appendChild(line);
         return footer;
     }
 
@@ -295,9 +275,9 @@
         main.appendChild(buildHeader());
         main.appendChild(buildHero());
         main.appendChild(content);
-        // Pages that ship their own complete static footer (the premium
-        // dashboards' 3-line .app-footer with the "Made with love" line)
-        // must not also receive the shell footer — that stacked two footers.
+        // Pages that ship their own complete static footer (the single-line
+        // .app-footer with "Made with love") must not also receive the shell
+        // footer — that stacked two footers.
         if (!document.querySelector('footer.app-footer')) {
             main.appendChild(buildFooter());
         }
