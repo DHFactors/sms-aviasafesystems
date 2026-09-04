@@ -5,6 +5,7 @@
    PURPOSE: Clean, full-width dashboard layout for the AviaSAFE SMS UI.
             - Fixed full-width header with brand, nav (WordPress-style dropdowns)
               and user/logout — NO sidebar, NO hamburger, NO overlay
+            - Two-row header: Top (brand + user) / Yellow divider / Bottom (nav)
             - Page hero (airline name + department subtitle)
             - Main content full width
             - Single-line footer
@@ -12,118 +13,136 @@
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
-/* ============================================================================
-   HEADER - Full Width (56px fixed)
-   ============================================================================ */
+/* ===== HEADER - Two Rows ===== */
 .app-header {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    height: 56px;
     background: #1a237e;
     color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
     z-index: 1000;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* Left: brand/logo */
+/* Top Row */
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 20px;
+    height: 50px;
+}
+
 .header-left {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
+
 .header-brand {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
+    font-size: 18px;
     font-weight: 700;
-    font-size: 1.05rem;
     color: #ffffff;
     text-decoration: none;
     white-space: nowrap;
 }
+
 .header-brand .logo-icon {
     font-size: 1.15rem;
 }
 
-/* Center: navigation (simple links + dropdowns) */
-.header-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-    justify-content: center;
-    min-width: 0;
-}
-.header-nav .nav-link {
-    color: rgba(255, 255, 255, 0.8);
-    padding: 8px 14px;
-    border-radius: 4px;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    white-space: nowrap;
-}
-.header-nav .nav-link:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-}
-.header-nav .nav-link.active {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
-}
-
-/* Right: user email + logout */
 .header-right {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 12px;
 }
-.user-email {
-    font-size: 0.8rem;
+
+.header-right .user-email {
+    font-size: 13px;
+    opacity: 0.8;
     color: rgba(255, 255, 255, 0.85);
     max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.logout-btn {
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.4);
+
+.header-right .logout-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
     color: #ffffff;
-    padding: 0.4rem 1rem;
-    border-radius: 6px;
+    padding: 4px 12px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 12px;
     font-weight: 500;
     transition: all 0.2s;
 }
-.logout-btn:hover {
+
+.header-right .logout-btn:hover {
     background: #cc1111;
     border-color: #cc1111;
     color: #ffffff;
 }
 
-/* ============================================================================
-   DROPDOWN MENU (WordPress-style, hover on desktop)
-   ============================================================================ */
+/* Yellow Separator Line */
+.header-divider {
+    height: 3px;
+    background: #ffd700;
+    width: 100%;
+}
+
+/* Bottom Row - Navigation */
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 20px;
+    height: 44px;
+    background: #1a237e;
+    overflow-x: auto;
+    justify-content: center;
+}
+
+/* Navigation links */
+.header-nav .nav-link {
+    color: rgba(255,255,255,0.8);
+    padding: 6px 14px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-nav .nav-link:hover {
+    background: rgba(255,255,255,0.12);
+    color: #ffffff;
+}
+
+.header-nav .nav-link.active {
+    background: rgba(255,255,255,0.12);
+    color: #ffffff;
+}
+
+/* Dropdown styles (unchanged) */
 .nav-dropdown {
     position: relative;
     display: inline-block;
 }
+
 .nav-dropdown .nav-link {
     color: rgba(255, 255, 255, 0.8);
-    padding: 8px 14px;
+    padding: 6px 14px;
     border-radius: 4px;
     text-decoration: none;
     font-size: 14px;
@@ -134,6 +153,7 @@
     align-items: center;
     gap: 4px;
 }
+
 .nav-dropdown .nav-link:hover {
     background: rgba(255, 255, 255, 0.12);
     color: #ffffff;
@@ -142,19 +162,17 @@
 .dropdown-content {
     display: none;
     position: absolute;
-    top: 100%;
+    top: calc(100% + 4px);
     left: 0;
+    min-width: 220px;
     background: #ffffff;
-    min-width: 200px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     border-radius: 8px;
-    padding: 8px 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    padding: 6px 0;
     z-index: 1001;
-    margin-top: 4px;
     border: 1px solid #e8eaed;
 }
 
-/* Hover to open (desktop) */
 .nav-dropdown:hover .dropdown-content {
     display: block;
     animation: fadeIn 0.2s ease;
@@ -185,17 +203,17 @@
     font-size: 14px;
     transition: all 0.15s ease;
 }
+
 .dropdown-content a:hover {
     background: #f5f7fa;
     color: #1a237e;
 }
+
 .dropdown-content a:not(:last-child) {
     border-bottom: 1px solid #f0f0f0;
 }
 
-/* ============================================================================
-   MAIN CONTENT - Full Width
-   ============================================================================ */
+/* ===== MAIN CONTENT (adjust for two rows) ===== */
 .main-content,
 .app-shell .shell-main {
     display: flex;
@@ -203,16 +221,15 @@
     width: 100%;
     min-height: 0;
 }
+
 .main-content {
-    margin-top: 56px;
+    margin-top: 94px; /* 50px top row + 3px divider + 44px nav = 97px, but use 94px for safety */
     padding: 20px 30px 20px;
-    min-height: calc(100vh - 56px - 50px);
+    min-height: calc(100vh - 94px - 50px);
     background: #f5f7fa;
 }
 
-/* ============================================================================
-   PAGE HERO (airline name + subtitle)
-   ============================================================================ */
+/* ===== PAGE HERO (airline name + subtitle) ===== */
 .page-hero {
     padding: 16px 0 20px;
     margin-bottom: 20px;
@@ -248,9 +265,7 @@
     margin: 2px 0 0 0;
 }
 
-/* ============================================================================
-   FOOTER - Single Line
-   ============================================================================ */
+/* ===== FOOTER ===== */
 .app-footer {
     background: #ffffff;
     padding: 12px 20px;
@@ -273,35 +288,37 @@
     display: inline-block;
 }
 
-/* ============================================================================
-   MOBILE < 768px
-   ============================================================================ */
+/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
-    .app-header {
-        padding: 0 12px;
-        height: 50px;
+    .header-top {
+        padding: 6px 12px;
+        height: 44px;
     }
 
-    .header-nav {
-        gap: 4px;
-        overflow-x: auto;
-        justify-content: flex-start;
-        flex: 0 1 auto;
-    }
-
-    .header-nav .nav-link {
-        font-size: 11px;
-        padding: 4px 10px;
-        white-space: nowrap;
+    .header-brand {
+        font-size: 15px;
     }
 
     .header-right .user-email {
         display: none;
     }
 
+    .header-nav {
+        padding: 4px 12px;
+        height: 40px;
+        gap: 4px;
+        justify-content: flex-start;
+        overflow-x: auto;
+    }
+
+    .header-nav .nav-link {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+
     .main-content {
-        margin-top: 50px;
-        padding: 14px 12px;
+        margin-top: 84px; /* adjust for mobile */
+        padding: 12px 12px;
     }
 
     .page-hero h1 {

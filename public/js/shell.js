@@ -132,17 +132,46 @@
         header.className = 'app-header';
         header.id = 'shellHeader';
 
-        // Left: brand/logo
+        // ---- Top Row: Brand + User ----
+        const top = document.createElement('div');
+        top.className = 'header-top';
+
         const left = document.createElement('div');
         left.className = 'header-left';
         const brand = document.createElement('a');
         brand.className = 'header-brand';
         brand.href = '/safety.html';
-        brand.innerHTML = '<span class="logo-icon">✈️</span> AviaSAFE';
+        brand.innerHTML = '<span class="logo-icon">\u2708\uFE0F</span> AviaSAFE';
         left.appendChild(brand);
-        header.appendChild(left);
+        top.appendChild(left);
 
-        // Center: navigation (simple links + dropdowns)
+        const right = document.createElement('div');
+        right.className = 'header-right';
+        const user = document.createElement('span');
+        user.className = 'user-email';
+        user.id = 'shellUser';
+        user.textContent = email;
+        right.appendChild(user);
+        const logout = document.createElement('button');
+        logout.type = 'button';
+        logout.className = 'logout-btn';
+        logout.id = 'shellLogoutBtn';
+        logout.textContent = 'Logout';
+        logout.addEventListener('click', function () {
+            try { localStorage.removeItem('mockEmail'); } catch (e) {}
+            global.handleLogout();
+        });
+        right.appendChild(logout);
+        top.appendChild(right);
+
+        header.appendChild(top);
+
+        // ---- Yellow Separator Line ----
+        const divider = document.createElement('div');
+        divider.className = 'header-divider';
+        header.appendChild(divider);
+
+        // ---- Bottom Row: Navigation ----
         const nav = document.createElement('nav');
         nav.className = 'header-nav';
 
@@ -156,7 +185,7 @@
                 link.textContent = item.label + ' ';
                 const caret = document.createElement('span');
                 caret.className = 'caret';
-                caret.textContent = '▼';
+                caret.textContent = '\u25BC';
                 link.appendChild(caret);
                 const content = document.createElement('div');
                 content.className = 'dropdown-content';
@@ -178,26 +207,6 @@
             }
         });
         header.appendChild(nav);
-
-        // Right: user email + logout
-        const right = document.createElement('div');
-        right.className = 'header-right';
-        const user = document.createElement('span');
-        user.className = 'user-email';
-        user.id = 'shellUser';
-        user.textContent = email;
-        right.appendChild(user);
-        const logout = document.createElement('button');
-        logout.type = 'button';
-        logout.className = 'logout-btn';
-        logout.id = 'shellLogoutBtn';
-        logout.textContent = 'Logout';
-        logout.addEventListener('click', function () {
-            try { localStorage.removeItem('mockEmail'); } catch (e) {}
-            global.handleLogout();
-        });
-        right.appendChild(logout);
-        header.appendChild(right);
 
         return header;
     }
