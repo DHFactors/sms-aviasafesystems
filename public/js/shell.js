@@ -227,8 +227,196 @@
         heart.textContent = '❤️';
         content.appendChild(heart);
         content.appendChild(document.createTextNode(' from Nepal'));
+
+        const feedbackBtn = document.createElement('button');
+        feedbackBtn.type = 'button';
+        feedbackBtn.className = 'feedback-btn';
+        feedbackBtn.textContent = '\uD83D\uDCAC Send Feedback';
+        feedbackBtn.setAttribute('aria-label', 'Send feedback');
+        feedbackBtn.addEventListener('click', function () {
+            global.openFeedbackModal();
+        });
+        content.appendChild(feedbackBtn);
+
         footer.appendChild(content);
         return footer;
+    }
+
+    function buildFeedbackModal() {
+        const modal = document.createElement('div');
+        modal.className = 'feedback-modal';
+        modal.id = 'feedbackModal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'feedbackModalTitle');
+
+        modal.innerHTML = `
+            <div class="feedback-modal-content">
+                <button class="feedback-close" aria-label="Close feedback modal">&times;</button>
+                <h2 id="feedbackModalTitle">Send Feedback</h2>
+                <form id="feedbackForm">
+                    <div class="feedback-rating">
+                        <label>Rating</label>
+                        <div class="stars" role="radiogroup" aria-label="Rating">
+                            <button type="button" class="star" data-rating="1" aria-label="1 star">\u2605</button>
+                            <button type="button" class="star" data-rating="2" aria-label="2 stars">\u2605</button>
+                            <button type="button" class="star" data-rating="3" aria-label="3 stars">\u2605</button>
+                            <button type="button" class="star" data-rating="4" aria-label="4 stars">\u2605</button>
+                            <button type="button" class="star" data-rating="5" aria-label="5 stars">\u2605</button>
+                        </div>
+                        <input type="hidden" name="rating" id="feedbackRating" value="0">
+                    </div>
+                    <div class="feedback-field">
+                        <label for="feedbackSubject">Subject</label>
+                        <input type="text" id="feedbackSubject" name="subject" placeholder="What is this about?" required maxlength="120">
+                    </div>
+                    <div class="feedback-field">
+                        <label for="feedbackMessage">Message</label>
+                        <textarea id="feedbackMessage" name="message" placeholder="Your feedback..." required maxlength="2000" rows="5"></textarea>
+                    </div>
+                    <div class="feedback-actions">
+                        <button type="button" class="feedback-btn-cancel">Cancel</button>
+                        <button type="submit" class="feedback-btn-submit">Send</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        return modal;
+    }
+
+    let feedbackRating = 0;
+
+    global.openFeedbackModal = function () {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) {
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            const firstInput = modal.querySelector('input, textarea');
+            if (firstInput) firstInput.focus();
+        }
+    };
+
+    global.closeFeedbackModal = function () {
+        const modal = document.getElementById('feedbackModal');
+        if (modal) {
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+            resetFeedbackForm();
+        }
+    };
+
+    global.setRating = function (rating) {
+        feedbackRating = rating;
+        const ratingInput = document.getElementById('feedbackRating');
+        if (ratingInput) ratingInput.value = rating;
+        document.querySelectorAll('.feedback-modal .star').forEach(function (star, idx) {
+            star.classList.toggle('filled', idx < rating);
+            star.setAttribute('aria-pressed', idx < rating);
+        });
+    };
+
+    function resetFeedbackForm() {
+        feedbackRating = 0;
+        const form = document.getElementById('feedbackForm');
+        if (form) form.reset();
+        document.querySelectorAll('.feedback-modal .star').forEach(function (star) {
+            star.classList.remove('filled');
+            star.setAttribute('aria-pressed', 'false');
+        });
+        const ratingInput = document.getElementById('feedbackRating');
+        if (ratingInput) ratingInput.value = '0';
+    }
+
+    global.submitFeedback = function (e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const data = {
+            rating: parseInt(formData.get('rating')) || 0,
+            subject: formData.get('subject') || '',
+            message: formData.get('message') || '',
+            email: getUserEmail() || 'Unknown',
+            page: window.location.pathname,
+            timestamp: new Date().toISOString()
+        };
+
+        if (data.rating === 0) {
+            alert('Please select a rating');
+            return;
+        }
+
+        const submitBtn = form.querySelector('.feedback-btn-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+        }
+
+        fetch('/api/send-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (result) {
+                if (result.success) {
+                    alert('Thank you for your feedback!');
+                    global.closeFeedbackModal();
+                } else {
+                    throw new Error(result.error || 'Failed to send feedback');
+                }
+            })
+            .catch(function (err) {
+                console.error('Feedback error:', err);
+                alert('Failed to send feedback. Please try again later.');
+            })
+            .finally(function () {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Send';
+                }
+            });
+    };
+
+    function bindFeedbackModalEvents() {
+        const modal = document.getElementById('feedbackModal');
+        if (!modal) return;
+
+        // Close button
+        const closeBtn = modal.querySelector('.feedback-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', global.closeFeedbackModal);
+        }
+
+        // Click overlay to close
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) global.closeFeedbackModal();
+        });
+
+        // Star rating
+        modal.querySelectorAll('.star').forEach(function (star) {
+            star.addEventListener('click', function () {
+                global.setRating(parseInt(this.dataset.rating, 10));
+            });
+            star.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    global.setRating(parseInt(this.dataset.rating, 10));
+                }
+            });
+        });
+
+        // Form submit
+        const form = modal.querySelector('#feedbackForm');
+        if (form) {
+            form.addEventListener('submit', global.submitFeedback);
+        }
+
+        // Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('open')) {
+                global.closeFeedbackModal();
+            }
+        });
     }
 
     function applyTenantToSurveyLinks(tenantId) {
@@ -275,6 +463,12 @@
         }
 
         shell.appendChild(main);
+
+        // Append feedback modal to body
+        if (!document.getElementById('feedbackModal')) {
+            document.body.appendChild(buildFeedbackModal());
+            bindFeedbackModalEvents();
+        }
 
         setActiveNav();
 
