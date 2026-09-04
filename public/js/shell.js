@@ -273,6 +273,14 @@
         const shell = document.querySelector('.app-shell');
         if (!shell) return;
 
+        // Demo: hide N-HRC dashboard link until full Supabase migration is complete
+        // This keeps the sidebar clean for the demo; revisit after migration.
+        try {
+            const style = document.createElement('style');
+            style.textContent = 'a[href*="nhrc-dashboard.html"]{display:none !important;} a[href*="/dashboard/nhrc"]{display:none !important;}';
+            document.head.appendChild(style);
+        } catch (e) {}
+
         // Re-read SHELL_CONFIG in case it was assigned after this script loaded.
         refreshCfg();
 
