@@ -15,8 +15,6 @@
     <script src="/js/chart-theme.js"></script>
 </head>
 <body>
-<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
-<div class="sidebar-overlay" onclick="closeSidebar()"></div>
     <div class="app-shell">
         <div id="authGate" style="padding:3rem;text-align:center;color:#64748b;">
             <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
@@ -31,7 +29,6 @@
                     <div class="section-sub">National High-Risk Categories — Based on Nepal NASP 2023-2025</div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
                     <button class="btn btn-primary btn-sm" onclick="loadNhrcData()"><i class="fas fa-rotate"></i> Refresh</button>
                 </div>
             </div>
@@ -94,17 +91,6 @@
     window.SHELL_CONFIG = {
         brand: 'AviaSAFE',
         roleLabel: 'Operator N-HRC Dashboard',
-        nav: [
-            { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
-            { href: '/dashboard/sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
-            { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
-            { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
-            { href: '/dashboard/nhrc-kpis.html', label: 'N-HRC KPIs', icon: 'fa-triangle-exclamation' },
-            { href: '/dashboard/spi-dashboard.html', label: 'SPI/SPT', icon: 'fa-gauge-high' },
-            { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
-            { href: '/audits/psoe.html', label: 'PSOE Audit', icon: 'fa-clipboard-check', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'CAAN_SMD', 'SUPER_ADMIN', 'safety'] },
-            { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'safety'] },
-        ],
     };
     </script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -113,34 +99,5 @@
     <script src="/js/api/client.js"></script>
     <script src="/js/shell.js"></script>
     <script src="/js/nhrc-dashboard.js"></script>
-<script>
-    function toggleSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.toggle('open');
-        overlay.classList.toggle('active');
-    }
-
-    function closeSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.remove('open');
-        overlay.classList.remove('active');
-    }
-
-    // Auto-close sidebar on window resize to desktop
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 769) {
-            closeSidebar();
-        }
-    });
-
-    // Close sidebar when Escape key is pressed
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
-    });
-</script>
 </body>
 </html>

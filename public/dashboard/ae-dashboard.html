@@ -46,15 +46,8 @@
     <link rel="stylesheet" href="/css/dashboard-responsive.css">
 </head>
 <body>
-<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
-<div class="sidebar-overlay" onclick="closeSidebar()"></div>
-<nav class="nav">
-    <h1><i class="fas fa-user-tie"></i> Accountable Executive</h1>
-    <div style="display:flex;align-items:center;gap:1rem;">
-        <span id="userDisplay" style="font-size:0.8rem;opacity:0.8;"></span>
-        <button onclick="logout()" style="background:transparent;border:1px solid rgba(255,255,255,0.3);color:#fff;padding:0.4rem 1rem;border-radius:999px;cursor:pointer;font-size:0.8rem;">Logout</button>
-    </div>
-</nav>
+
+<div class="app-shell">
 <section class="hero">
     <h1 id="heroTitle">Executive Oversight</h1>
     <div id="welcomeMsg" class="welcome"></div>
@@ -69,54 +62,59 @@
 </div>
 <div class="page">
     <div id="loadingIndicator" class="loading"><i class="fas fa-spinner fa-spin" style="margin-right:0.5rem;"></i> Loading executive summary...</div>
-    <div id="dashContent" style="display:none;">
-        <div class="grid">
-            <div class="card">
-                <h2><i class="fas fa-heart-pulse" style="color:#d4af37;"></i> SMS Maturity <span class="tag">PSOE</span></h2>
-                <div style="display:flex;align-items:center;gap:1.2rem;">
-                    <div>
-                        <div class="big-score" id="psoeScore">—</div>
-                        <div style="font-size:0.7rem;color:#64748b;">Overall score</div>
-                        <div id="psoeLevel" style="margin-top:0.5rem;background:#64748b;color:#fff;display:inline-block;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.7rem;font-weight:700;">No audit</div>
+<div id="dashContent" style="display:none;">
+            <div class="grid">
+                <div class="card">
+                    <h2><i class="fas fa-heart-pulse" style="color:#d4af37;"></i> SMS Maturity <span class="tag">PSOE</span></h2>
+                    <div style="display:flex;align-items:center;gap:1.2rem;">
+                        <div>
+                            <div class="big-score" id="psoeScore">—</div>
+                            <div style="font-size:0.7rem;color:#64748b;">Overall score</div>
+                            <div id="psoeLevel" style="margin-top:0.5rem;background:#64748b;color:#fff;display:inline-block;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.7rem;font-weight:700;">No audit</div>
+                        </div>
+                        <div style="flex:1;"><canvas id="psoeRadar" height="160"></canvas></div>
                     </div>
-                    <div style="flex:1;"><canvas id="psoeRadar" height="160"></canvas></div>
+                    <div id="pillarBars" style="margin-top:1rem;"></div>
+                    <div id="psoeMeta" style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;"></div>
                 </div>
-                <div id="pillarBars" style="margin-top:1rem;"></div>
-                <div id="psoeMeta" style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;"></div>
-            </div>
-            <div class="card" style="border-top:4px solid #dc3545;">
-                <h2><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure <span class="tag">Risk</span></h2>
-                <div class="kpi-strip">
-                    <div class="kpi" style="border-left:3px solid #dc3545;"><div class="num" style="color:#dc3545;" id="kpiIntolerable">—</div><div class="lbl">Intolerable</div></div>
-                    <div class="kpi" style="border-left:3px solid #d97706;"><div class="num" style="color:#d97706;" id="kpiHigh">—</div><div class="lbl">High</div></div>
-                    <div class="kpi"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue</div></div>
-                    <div class="kpi"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC days</div></div>
+                <div class="card" style="border-top:4px solid #dc3545;">
+                    <h2><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure <span class="tag">Risk</span></h2>
+                    <div class="kpi-strip">
+                        <div class="kpi" style="border-left:3px solid #dc3545;"><div class="num" style="color:#dc3545;" id="kpiIntolerable">—</div><div class="lbl">Intolerable</div></div>
+                        <div class="kpi" style="border-left:3px solid #d97706;"><div class="num" style="color:#d97706;" id="kpiHigh">—</div><div class="lbl">High</div></div>
+                        <div class="kpi"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue</div></div>
+                        <div class="kpi"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC days</div></div>
+                    </div>
+                    <div class="heatmap" id="heatmap" style="margin-top:0.8rem;"></div>
+                    <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.4rem;text-align:center;">5×5 Residual Risk Heatmap</div>
                 </div>
-                <div class="heatmap" id="heatmap" style="margin-top:0.8rem;"></div>
-                <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.4rem;text-align:center;">5×5 Residual Risk Heatmap</div>
-            </div>
-            <div class="card" style="border-top:4px solid #1a6b8a;">
-                <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
-                <div id="escalationQueue"></div>
-                <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
-                    <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
-                    <div id="decisionLedger" style="margin-top:0.5rem;"></div>
-                    <div style="display:flex;gap:0.5rem;margin-top:0.7rem;">
-                        <button class="btn btn-outline" onclick="exportDecisionLog('csv')" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Export CSV</button>
-                        <button class="btn btn-outline" onclick="exportDecisionLog('pdf')" style="font-size:0.7rem;"><i class="fas fa-file-pdf"></i> PDF</button>
+                <div class="card" style="border-top:4px solid #1a6b8a;">
+                    <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
+                    <div id="escalationQueue"></div>
+                    <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
+                        <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
+                        <div id="decisionLedger" style="margin-top:0.5rem;"></div>
+                        <div style="display:flex;gap:0.5rem;margin-top:0.7rem;">
+                            <button class="btn btn-outline" onclick="exportDecisionLog('csv')" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Export CSV</button>
+                            <button class="btn btn-outline" onclick="exportDecisionLog('pdf')" style="font-size:0.7rem;"><i class="fas fa-file-pdf"></i> PDF</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="card" style="margin-top:1.25rem;text-align:center;padding:2rem;">
-            <div style="font-size:0.8rem;color:#64748b;">Detailed operational analysis, departmental health matrix, and predictive simulations are available in the dedicated Safety Workspace.</div>
-            <a href="/safety.html" class="btn btn-outline" style="margin-top:0.8rem;"><i class="fas fa-chart-line"></i> Open Safety Workspace for Granular Data</a>
+            <div class="card" style="margin-top:1.25rem;text-align:center;padding:2rem;">
+                <div style="font-size:0.8rem;color:#64748b;">Detailed operational analysis, departmental health matrix, and predictive simulations are available in the dedicated Safety Workspace.</div>
+                <a href="/safety.html" class="btn btn-outline" style="margin-top:0.8rem;"><i class="fas fa-chart-line"></i> Open Safety Workspace for Granular Data</a>
+            </div>
         </div>
     </div>
 </div>
-<footer class="app-footer">
-    <div class="footer-line">Made with <span class="heart">&#10084;&#65039;</span> from Nepal</div>
-</footer>
+
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Accountable Executive',
+};
+</script>
 
 <!-- Reuse original AE logic but with minimalist DOM -->
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -126,13 +124,13 @@
 <script src="/js/firebase.js?v=4.0.1"></script>
 <script src="/js/api/client.js"></script>
 <script src="/js/chart-theme.js"></script>
+<script src="/js/shell.js"></script>
 <script>
 // Minimalist AE — reuses ae-dashboard.html logic but hides non-executive panels
 let myEmail=null, myDomain=null, charts={}, gPsoeList=[], gCans=[], gCaps=[], gHazards=[], gReports=[], gOverlays={};
 function isDemoSession(){ return !!(window.DEMO_CONTEXT && window.DEMO_CONTEXT.archetypeId); }
 firebase.auth().onAuthStateChanged(async function(user){
     if(!user){ window.location.href='/login.html'; return; }
-    document.getElementById('userDisplay').textContent=user.email;
     try{
         const tr=await user.getIdTokenResult();
         const role=(tr.claims&&tr.claims.role)||'USER';
@@ -140,17 +138,16 @@ firebase.auth().onAuthStateChanged(async function(user){
         myEmail=user.email||''; myDomain=myEmail.split('@')[1]||'';
         if(window.DemoAnalytics) window.DemoAnalytics.init({email:myEmail});
         const tenant=(tr.claims&&tr.claims.tenant_id)||'';
-        if(tenant){ document.getElementById('heroTitle').textContent=tenant.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' — Executive'; }
+        if(tenant && typeof updateShellTenant==='function'){ updateShellTenant(tenant.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+' — Executive'); }
         var ctx=(typeof getStoredDemoContext==='function')?getStoredDemoContext():null;
         if(ctx&&String(ctx.email||'').toLowerCase()===myEmail.toLowerCase()&&ctx.companyName){
-            document.getElementById('heroTitle').textContent=ctx.companyName+' — Executive';
+            if(typeof updateShellTenant==='function'){ updateShellTenant(ctx.companyName+' — Executive'); }
             document.getElementById('welcomeMsg').textContent='Welcome, '+ctx.aeName;
             const fb=document.getElementById('fleetBadge'); if(fb){ fb.textContent='Fleet: '+(ctx.fleetType||'—')+' | Base: '+(ctx.baseLocation||'—'); fb.style.display='inline-block'; }
         }
     }catch(e){}
     loadDashboard();
 });
-function logout(){ firebase.auth().signOut().then(()=>window.location.href='/'); }
 function fmtDate(iso){ if(!iso) return '-'; try{ return new Date(iso).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});}catch(e){ return String(iso);} }
 function psoeStage(pct){
     if(pct==null) return {label:'Not assessed', color:'#64748b'};
@@ -255,34 +252,6 @@ function renderSituationalBanner(){
     document.getElementById('sitPrecursor').textContent='Assessed';
 }
 </script>
-<script>
-    function toggleSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.toggle('open');
-        overlay.classList.toggle('active');
-    }
 
-    function closeSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.remove('open');
-        overlay.classList.remove('active');
-    }
-
-    // Auto-close sidebar on window resize to desktop
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 769) {
-            closeSidebar();
-        }
-    });
-
-    // Close sidebar when Escape key is pressed
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
-    });
-</script>
 </body>
 </html>

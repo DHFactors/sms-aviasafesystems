@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/styles/global.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -56,7 +57,6 @@
 
         <div class="page-header">
             <h2><i class="fas fa-triangle-exclamation"></i> Top Hazards</h2>
-            <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
         </div>
 
         <div class="filter-bar">
@@ -98,16 +98,6 @@
 window.SHELL_CONFIG = {
     brand: 'AviaSAFE',
     roleLabel: 'Operator Safety Dashboard',
-    nav: [
-        { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
-        { href: '/dashboard/sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
-        { href: '/risk-trends.html', label: 'Risk & Trends', icon: 'fa-chart-bar' },
-        { href: '/top-hazards.html', label: 'Top Hazards', icon: 'fa-triangle-exclamation' },
-        { href: '/dashboard/nhrc-kpis.html', label: 'N-HRC KPIs', icon: 'fa-triangle-exclamation' },
-        { href: '/dashboard/spi-dashboard.html', label: 'SPI/SPT', icon: 'fa-gauge-high' },
-        { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN'] },
-        { href: '/administration.html', label: 'Administration', icon: 'fa-user-gear', roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN'] },
-    ],
 };
 </script>
 <script src="/js/api/client.js"></script>

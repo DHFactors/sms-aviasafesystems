@@ -1,246 +1,420 @@
 /* ============================================================================
    FILE: dashboard-responsive.css
    PATH: public/css/dashboard-responsive.css
-   VERSION: 2.0.0
-   PURPOSE: Hamburger overlay menu + responsive footer for all dashboards.
-            Works with both shell.js sidebars (.shell-sidebar) and
-            static sidebars (.sidebar).
+   VERSION: 3.0.0
+   PURPOSE: Global dashboard layout for the AviaSAFE SMS UI restructure.
+            - Fixed 56px header with brand, nav tabs, user info, logout
+            - Compact 200px sidebar (tenant info, user, secondary links, version)
+            - Hamburger button (mobile only), slide-in sidebar with overlay
+            - Responsive footer: 3 lines desktop, 1 line mobile
+            - Breakpoints: 769px and 480px
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
-/* ===== HAMBURGER MENU BUTTON ===== */
+/* ===== THEME VARIABLES ===== */
+:root {
+    --hd-header-h: 56px;
+    --hd-sidebar-w: 200px;
+    --hd-sidebar-w-mobile: 280px;
+    --hd-sidebar-bg: #1a237e;
+    --hd-sidebar-bg-hover: rgba(255,255,255,0.08);
+    --hd-sidebar-text: #e6e9f5;
+    --hd-sidebar-muted: #9aa5c9;
+    --hd-header-bg: #ffffff;
+    --hd-header-border: #e5e7eb;
+    --hd-accent: #d4af37;
+    --hd-text: #334155;
+    --hd-text-muted: #64748b;
+    --hd-hamburger-bg: #1a237e;
+}
+
+/* ============================================================================
+   HEADER (56px fixed top bar)
+   ============================================================================ */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--hd-header-h);
+    z-index: 1090;
+    background: var(--hd-header-bg);
+    color: var(--hd-text);
+    border-bottom: 1px solid var(--hd-header-border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 0 1.25rem;
+}
+
+/* Left: hamburger (mobile) + brand/logo → /safety.html */
+.app-header .shell-hamburger-area {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.app-header .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--hd-text);
+    text-decoration: none;
+}
+.app-header .brand-link i {
+    font-size: 1.25rem;
+    color: var(--hd-accent);
+}
+
+/* Center: navigation tabs (primary modules) */
+.app-header .nav-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+}
+.app-header .nav-tabs a {
+    color: var(--hd-text-muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+.app-header .nav-tabs a:hover {
+    background: rgba(0,0,0,0.05);
+    color: var(--hd-text);
+}
+.app-header .nav-tabs a.active {
+    background: var(--hd-sidebar-bg);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Right: user email (desktop) + logout */
+.app-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.app-header .header-user {
+    font-size: 0.8rem;
+    color: var(--hd-text-muted);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.app-header .btn-logout {
+    background: transparent;
+    border: 1px solid var(--hd-header-border);
+    color: var(--hd-text);
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+.app-header .btn-logout:hover {
+    background: #fee2e2;
+    border-color: #fecaca;
+    color: #b91c1c;
+}
+
+/* ============================================================================
+   HAMBURGER MENU BUTTON (mobile only)
+   ============================================================================ */
 .hamburger-btn {
     display: none;
     position: fixed;
-    top: 12px;
-    left: 12px;
-    z-index: 1001;
-    background: #1a237e;
-    color: white;
+    top: 10px;
+    left: 10px;
+    z-index: 1100;
+    background: var(--hd-hamburger-bg);
+    color: #fff;
     border: none;
     border-radius: 6px;
     padding: 8px 12px;
-    font-size: 24px;
+    font-size: 22px;
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
 }
+.hamburger-btn:hover { background: #0d1b5e; }
+.hamburger-btn:focus { outline: 2px solid #64b5f6; }
 
-.hamburger-btn:hover {
-    background: #0d1b5e;
-}
-
-.hamburger-btn:focus {
-    outline: 2px solid #64b5f6;
-}
-
-/* ===== SIDEBAR - Desktop (both .shell-sidebar and .sidebar) ===== */
+/* ============================================================================
+   SIDEBAR - Desktop (200px compact)
+   ============================================================================ */
 .shell-sidebar,
 .sidebar {
-    width: 250px;
+    width: var(--hd-sidebar-w);
     height: 100vh;
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 1000;
-    background: #1a237e;
-    color: white;
+    z-index: 1080;
+    background: var(--hd-sidebar-bg);
+    color: #fff;
     overflow-y: auto;
     transition: transform 0.3s ease;
     box-shadow: 2px 0 12px rgba(0,0,0,0.15);
 }
 
-.shell-sidebar .nav-text,
-.sidebar .nav-text {
-    display: inline;
+.shell-sidebar .sidebar-brand,
+.sidebar .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 1rem 0.9rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.shell-sidebar .sidebar-brand i,
+.sidebar .sidebar-brand i {
+    font-size: 1.1rem;
+    color: var(--hd-accent);
 }
 
-.shell-sidebar .nav-icon,
-.sidebar .nav-icon {
-    margin-right: 10px;
-    min-width: 20px;
+/* Tenant info block */
+.shell-sidebar .sidebar-tenant,
+.sidebar .sidebar-tenant {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.7rem;
+    color: var(--hd-sidebar-muted);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.shell-sidebar .sidebar-tenant .tenant-name,
+.sidebar .sidebar-tenant .tenant-name {
+    font-weight: 600;
+    color: var(--hd-sidebar-text);
+    font-size: 0.85rem;
+}
+.shell-sidebar .sidebar-tenant .tenant-dept,
+.sidebar .sidebar-tenant .tenant-dept {
+    font-size: 0.7rem;
+    color: var(--hd-sidebar-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
 }
 
-/* ===== SIDEBAR - Mobile ===== */
+/* User email + logout (sidebar, secondary) */
+.shell-sidebar .sidebar-user,
+.sidebar .sidebar-user {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.75rem;
+    color: var(--hd-sidebar-text);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Secondary nav */
+.shell-sidebar .sidebar-nav,
+.sidebar .sidebar-nav {
+    flex: 1;
+    padding: 0.5rem;
+}
+.shell-sidebar .sidebar-nav ul,
+.sidebar .sidebar-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.shell-sidebar .sidebar-nav li a,
+.sidebar .sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    color: var(--hd-sidebar-text);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: background 0.15s;
+    font-size: 0.85rem;
+}
+.shell-sidebar .sidebar-nav li a i,
+.sidebar .sidebar-nav li a i {
+    width: 18px;
+    text-align: center;
+}
+.shell-sidebar .sidebar-nav li a:hover,
+.sidebar .sidebar-nav li a:hover {
+    background: var(--hd-sidebar-bg-hover);
+}
+.shell-sidebar .sidebar-nav li a.active,
+.sidebar .sidebar-nav li a.active {
+    background: var(--hd-sidebar-bg-hover);
+    border-left: 3px solid var(--hd-accent);
+}
+
+/* Version footer */
+.shell-sidebar .sidebar-footer,
+.sidebar .sidebar-footer {
+    padding: 0.6rem 0.9rem;
+    border-top: 1px solid rgba(255,255,255,0.12);
+    font-size: 0.68rem;
+    color: var(--hd-sidebar-muted);
+}
+
+/* ============================================================================
+   OVERLAY BACKDROP
+   ============================================================================ */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1070;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.sidebar-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* ============================================================================
+   MAIN CONTENT
+   ============================================================================ */
+.app-shell .shell-main,
+.main-content {
+    margin-left: var(--hd-sidebar-w);
+    padding-top: var(--hd-header-h);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ============================================================================
+   FOOTER - 3 lines desktop / 1 line mobile
+   ============================================================================ */
+.app-footer {
+    background: var(--hd-header-bg);
+    color: #666;
+    padding: 12px 20px;
+    border-top: 1px solid var(--hd-header-border);
+    text-align: center;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+.app-footer .footer-line1 {
+    font-size: 14px;
+    color: #475569;
+    font-weight: 600;
+}
+.app-footer .footer-line2 {
+    font-size: 14px;
+    color: #666;
+}
+.app-footer .footer-line2 .heart {
+    color: #e53935;
+}
+.app-footer .footer-line3 {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+/* .dashboard-footer (non-shell dashboards) */
+.dashboard-footer {
+    background: var(--hd-header-bg);
+    color: #666;
+    padding: 12px 20px;
+    border-top: 1px solid var(--hd-header-border);
+    text-align: center;
+    min-height: 84px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+/* ============================================================================
+   MOBILE < 769px
+   ============================================================================ */
 @media (max-width: 768px) {
     .hamburger-btn {
-        display: block !important;
+        display: block;
     }
 
+    /* Sidebar becomes off-canvas panel */
     .shell-sidebar,
     .sidebar {
-        width: 280px !important;
+        width: var(--hd-sidebar-w-mobile);
         transform: translateX(-100%);
         position: fixed;
         top: 0;
         left: 0;
-        z-index: 1000;
+        z-index: 1080;
         height: 100vh;
         overflow-y: auto;
         box-shadow: 2px 0 20px rgba(0,0,0,0.3);
         border-right: 1px solid rgba(255,255,255,0.1);
     }
-
     .shell-sidebar.open,
     .sidebar.open {
-        transform: translateX(0) !important;
+        transform: translateX(0);
     }
 
-    .shell-sidebar .nav-text,
-    .sidebar .nav-text {
-        display: inline !important;
+    /* Main content full width on mobile */
+    .app-shell .shell-main,
+    .main-content {
+        margin-left: 0;
+        padding-top: var(--hd-header-h);
     }
 
-    .shell-sidebar .nav-icon,
-    .sidebar .nav-icon {
-        margin-right: 10px !important;
-    }
-
-    /* Show sidebar text labels when open */
-    .shell-sidebar.open .sidebar-brand span,
-    .shell-sidebar.open .sidebar-role,
-    .shell-sidebar.open .sidebar-footer,
-    .sidebar.open .sidebar-brand span,
-    .sidebar.open .sidebar-role,
-    .sidebar.open .sidebar-footer {
-        display: block !important;
-    }
-
-    .shell-sidebar.open .sidebar-brand,
-    .sidebar.open .sidebar-brand {
-        justify-content: flex-start;
-        padding: 1.1rem 1.2rem !important;
-    }
-
-    .shell-sidebar.open .sidebar-nav li a,
-    .sidebar.open .sidebar-nav li a {
-        justify-content: flex-start;
-        padding: 0.7rem 1.2rem !important;
-        font-size: 0.875rem !important;
-        gap: 0.75rem !important;
-    }
-
-    /* Overlay background when sidebar is open */
-    .sidebar-overlay {
+    /* Hide nav tabs on mobile unless header wraps (keep concise) */
+    .app-header .nav-tabs {
         display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-        opacity: 0;
-        transition: opacity 0.3s ease;
     }
 
-    .sidebar-overlay.active {
+    /* Footer: single line (mobile) */
+    .app-footer .footer-line1,
+    .app-footer .footer-line3 {
+        display: none;
+    }
+    .app-footer .footer-line2 {
         display: block;
-        opacity: 1;
+        font-size: 13px;
     }
-
-    /* Main content - no left margin on mobile */
-    .app-shell .shell-main {
-        margin-left: 0 !important;
-        padding-top: 60px !important;
-    }
-
-    .main-content {
-        margin-left: 0 !important;
-        padding: 70px 15px 20px !important;
-        width: 100% !important;
-    }
-}
-
-@media (min-width: 769px) {
-    .hamburger-btn {
-        display: none !important;
-    }
-
-    .sidebar-overlay {
-        display: none !important;
-    }
-
-    .app-shell .shell-main {
-        margin-left: 250px !important;
-    }
-
-    .main-content {
-        margin-left: 250px !important;
-        padding: 20px !important;
-    }
-}
-
-/* ===== FOOTER - Single Line ===== */
-.app-footer {
-    background: #f5f5f5;
-    padding: 12px 20px;
-    border-top: 1px solid #e0e0e0;
-    text-align: center;
-    font-size: 14px;
-    color: #666;
-    min-height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.app-footer .footer-line {
-    margin: 0;
-}
-
-.app-footer .heart {
-    color: #e53935;
-    display: inline-block;
-}
-
-/* .dashboard-footer (my-tasks, ae-dashboard, master-register + shell) */
-.dashboard-footer {
-    background: #f5f5f5;
-    padding: 12px 20px;
-    border-top: 1px solid #e0e0e0;
-    text-align: center;
-    justify-content: center;
-}
-
-.dashboard-footer .footer-line {
-    margin: 0;
-}
-
-.dashboard-footer .heart {
-    color: #e53935;
-    display: inline-block;
-}
-
-/* Mobile - same single line, just smaller */
-@media (max-width: 768px) {
     .app-footer {
-        font-size: 12px;
-        padding: 10px 15px;
         min-height: 40px;
-    }
-    .dashboard-footer {
-        font-size: 12px;
         padding: 10px 15px;
-        min-height: 40px;
     }
 }
 
-/* ===== SMALL SCREENS < 480px ===== */
+/* ============================================================================
+   SMALL SCREENS < 480px
+   ============================================================================ */
 @media (max-width: 480px) {
     .shell-sidebar,
     .sidebar {
-        width: 260px !important;
+        width: 260px;
     }
-
-    .shell-header .shell-brand {
-        font-size: 0.9rem !important;
+    .app-header .brand-link {
+        font-size: 0.9rem;
     }
-
-    .shell-header .shell-user {
-        display: none;
+    .app-header {
+        padding: 0 0.9rem;
     }
-
     .hamburger-btn {
         top: 8px;
         left: 8px;

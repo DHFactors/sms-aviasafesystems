@@ -64,30 +64,12 @@
     <link rel="stylesheet" href="/css/dashboard-responsive.css">
     </head>
 <body>
-<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
-<div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
-<nav class="nav">
-    <h1><i class="fas fa-table"></i> Master Register</h1>
-    <div class="nav-actions">
-        <span id="userDisplay"></span>
-        <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
-    </div>
-</nav>
-
-<!-- Uniform top section: tenant name + department label -->
-<section class="dash-hero">
-    <h1 id="dashHeroTitle">Master Register</h1>
-    <div class="dash-hero-user" id="dashHeroUser">—</div>
-</section>
+<div class="app-shell">
 
 <div class="page">
     <div class="header-bar">
         <h2><i class="fas fa-table-list"></i> Unified Hazard · CAN · CAP Register</h2>
-        <div style="display:flex;gap:0.5rem;">
-            <a href="/dashboard/sms-maturity.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
-            <a href="/dashboard/my-tasks.html" class="btn btn-outline btn-sm operational"><i class="fas fa-user-tie"></i> My Tasks</a>
-        </div>
     </div>
 
     <div class="type-tabs">
@@ -144,12 +126,21 @@
     </div>
 </div>
 
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js?v=4.0.1"></script>
 <script src="/js/tenant_context.js"></script>
 <script src="/js/department_resolver.js"></script>
 <script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+};
+</script>
+<script src="/js/shell.js"></script>
 <script>
 let currentUser = null;
 let allRows = [];
@@ -164,21 +155,15 @@ let currentPageSize = 50;
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     currentUser = user;
-    document.getElementById('userDisplay').textContent = user.email;
     if (typeof applyDepartmentContext === 'function') {
         applyDepartmentContext(user.email);
     }
-    const heroTitle = document.getElementById('dashHeroTitle');
-    const heroUser = document.getElementById('dashHeroUser');
-    if (heroTitle || heroUser) {
-        user.getIdTokenResult(true).then(function(tr) {
-            const t = (tr.claims && tr.claims.tenant_id) || '';
-            if (t && heroTitle) heroTitle.textContent = t.replace(/-/g, ' ').toUpperCase();
-            if (heroUser && typeof getDepartmentLabel === 'function') {
-                heroUser.textContent = getDepartmentLabel(tr.claims) || '—';
-            }
-        }).catch(function() {});
-    }
+    user.getIdTokenResult(true).then(function(tr) {
+        const t = (tr.claims && tr.claims.tenant_id) || '';
+        if (t && typeof updateShellTenant === 'function') {
+            updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
+        }
+    }).catch(function() {});
     loadRegister();
 });
 
@@ -399,46 +384,6 @@ document.querySelectorAll('th[data-sort]').forEach(function(th) {
         renderTable();
     });
 });
-
-async function logout() {
-    try { await firebase.auth().signOut(); window.location.href = '/'; }
-    catch (e) { console.error(e); }
-}
-</script>
-
-<!-- ========== FOOTER ========== -->
-<footer class="app-footer">
-    <div class="footer-line">Made with <span class="heart">&#10084;&#65039;</span> from Nepal</div>
-</footer>
-
-<script>
-    function toggleSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.toggle('open');
-        overlay.classList.toggle('active');
-    }
-
-    function closeSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.remove('open');
-        overlay.classList.remove('active');
-    }
-
-    // Auto-close sidebar on window resize to desktop
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 769) {
-            closeSidebar();
-        }
-    });
-
-    // Close sidebar when Escape key is pressed
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
-    });
 </script>
 
 </body>

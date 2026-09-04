@@ -112,8 +112,6 @@ AUTHOR: AviaSAFE Systems
     <link rel="stylesheet" href="/css/dashboard-responsive.css">
     </head>
 <body>
-<button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle navigation menu">&#9776;</button>
-<div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
 <div class="app-shell">
     <div id="authGate" style="padding:3rem;text-align:center;color:#64748b;">
@@ -129,7 +127,6 @@ AUTHOR: AviaSAFE Systems
                 <div class="section-sub">Aggregated 4-pillar / 12-element ICAO Annex 19 SMS evaluation — State scope</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <a href="/caan.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Back to State Dashboard</a>
                 <button class="btn btn-primary btn-sm" onclick="loadMaturity()"><i class="fas fa-rotate"></i> Refresh</button>
             </div>
         </div>
@@ -195,12 +192,6 @@ window.SHELL_CONFIG = {
     roleLabel: 'CAAN SMD',
     tenantTitle: 'State SMS Maturity Assessment — CAAN SMD',
     heroSubtitle: 'Civil Aviation Authority of Nepal — State-Wide 4-Pillar / 12-Element SMS Evaluation',
-    nav: [
-        { href: '/caan.html', label: 'Back to Dashboard', icon: 'fa-arrow-left' },
-        { id: 'sms-maturity', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
-        { id: 'operators', label: 'Operator Breakdown', icon: 'fa-building' },
-        { id: 'assessment', label: 'Assessment', icon: 'fa-robot' },
-    ],
 };
 </script>
 <script src="/js/api/client.js"></script>
@@ -600,39 +591,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 initFeedbackWidget();
-</script>
-<footer class="app-footer">
-    <div class="footer-line">Made with <span class="heart">&#10084;&#65039;</span> from Nepal</div>
-</footer>
-
-<script>
-    function toggleSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.toggle('open');
-        overlay.classList.toggle('active');
-    }
-
-    function closeSidebar() {
-        const sidebar = document.querySelector('.shell-sidebar') || document.querySelector('.sidebar');
-        const overlay = document.querySelector('.sidebar-overlay');
-        if (sidebar) sidebar.classList.remove('open');
-        overlay.classList.remove('active');
-    }
-
-    // Auto-close sidebar on window resize to desktop
-    window.addEventListener('resize', function() {
-        if (window.innerWidth >= 769) {
-            closeSidebar();
-        }
-    });
-
-    // Close sidebar when Escape key is pressed
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeSidebar();
-        }
-    });
 </script>
 
 </body>
