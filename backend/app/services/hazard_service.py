@@ -49,6 +49,8 @@ from app.services.risk_matrix import (
     risk_outcome,
 )
 from app.services.users import get_user_department
+from app.db.abstract_repository import AbstractRepository
+from app.db.firestore_repository import FirestoreRepository
 
 # ICAO Doc 9859 Standard Risk Tolerability Lookups
 TOLERABILITY_MATRIX = {
@@ -124,11 +126,19 @@ def _lookup_hazard_stmt(tenant_uuid_value: str, value: str):
 class HazardService:
     COLLECTION = "hazards"
 
-    def __init__(self, tenant_id: Optional[str] = None, db: Any = None):
+    def __init__(
+        self,
+        tenant_id: Optional[str] = None,
+        db: Any = None,
+        repository: Optional[AbstractRepository] = None,
+    ):
         self.tenant_id = tenant_id
         # `db` is accepted for backward compatibility with the unmounted
         # hazard_analysis router; all persistence is now PostgreSQL-backed.
         self.db = db
+        # Migration-ready DAL: inject repository (defaults to Firestore for legacy
+        # collections). All queries are tenant-isolated via tenant_id.
+        self.repository: AbstractRepository = repository or FirestoreRepository()
 
     # ==========================================================================
     # create_hazard dispatcher
