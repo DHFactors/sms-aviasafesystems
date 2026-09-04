@@ -233,12 +233,19 @@
         return hero;
     }
 
-    // Single-line footer (heart stays clear only in CSS).
     function buildFooter() {
         const footer = document.createElement('footer');
         footer.className = 'app-footer';
         footer.id = 'shellFooter';
-        footer.innerHTML = 'Made with <span class="heart">&hearts;</span> from Nepal';
+        const content = document.createElement('div');
+        content.className = 'footer-content';
+        content.appendChild(document.createTextNode('Made with '));
+        const heart = document.createElement('span');
+        heart.className = 'heart';
+        heart.textContent = '❤️';
+        content.appendChild(heart);
+        content.appendChild(document.createTextNode(' from Nepal'));
+        footer.appendChild(content);
         return footer;
     }
 
