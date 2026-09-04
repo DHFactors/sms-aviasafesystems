@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Regulator Dashboard - Module 5</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #f8fafc; margin: 0; color: #0f172a; }
+        .header { background: #0f172a; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; font-size: 1.2rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 1rem; font-size: 1rem; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .heat-map { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+        .heat-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-size: 0.85rem; color: white; }
+        .level-1 { background: #dc3545; } .level-2 { background: #fd7e14; } .level-3 { background: #ffc107; color: #000; } .level-4 { background: #198754; } .level-5 { background: #0d6efd; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { text-align: left; padding: 0.5rem; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-weight: 600; }
+        td { padding: 0.5rem; border-bottom: 1px solid #f1f5f9; }
+        .benchmark { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f8fafc; border-radius: 8px; }
+        .benchmark .score { font-size: 2rem; font-weight: 800; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #0f172a; color: white; } .btn-outline { background: white; border: 1px solid #cbd5e1; }
+        .export-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Regulator Dashboard — Industry Oversight</h1>
+        <div>
+            <span id="tenantCount" style="font-size:0.85rem; opacity:0.8;"></span>
+            <button class="btn btn-outline" onclick="window.location.href='/login.html'" style="margin-left:1rem;">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="export-bar">
+            <button class="btn btn-outline" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+            <button class="btn btn-outline" onclick="exportExcel()"><i class="fas fa-file-excel"></i> Export Excel</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Industry SMS Maturity Heat Map</h2>
+                <p style="font-size:0.8rem; color:#64748b;">Operators anonymized — color by maturity level 1-5</p>
+                <div id="heatMap" class="heat-map" style="margin-top:1rem;"></div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem; font-size:0.7rem; justify-content:center;">
+                    <span><span style="display:inline-block; width:12px; height:12px; background:#dc3545; border-radius:2px;"></span> L1 Initial</span>
+                    <span><span style="display:inline-block; width:12px; height:12px; background:#fd7e14; border-radius:2px;"></span> L2 Developing</span>
+                    <span><span style="display:inline-block; width:12px; height:12px; background:#ffc107; border-radius:2px;"></span> L3 Implemented</span>
+                    <span><span style="display:inline-block; width:12px; height:12px; background:#198754; border-radius:2px;"></span> L4 Advanced</span>
+                    <span><span style="display:inline-block; width:12px; height:12px; background:#0d6efd; border-radius:2px;"></span> L5 Optimizing</span>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Top Hazards Across Industry</h2>
+                <canvas id="hazardChart" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>Risk Trend Analysis</h2>
+                <canvas id="riskChart" height="200"></canvas>
+            </div>
+            <div class="card">
+                <h2>Benchmarking — Operator vs Industry</h2>
+                <div id="benchmark" class="benchmark">
+                    <div>
+                        <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase;">Your Score</div>
+                        <div class="score" id="operatorScore">—</div>
+                    </div>
+                    <div style="font-size:1.5rem; color:#64748b;">vs</div>
+                    <div>
+                        <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase;">Industry Avg</div>
+                        <div class="score" id="industryAvg">—</div>
+                    </div>
+                    <div id="benchmarkDiff" style="margin-left:auto; font-weight:700;"></div>
+                </div>
+                <canvas id="benchmarkChart" height="150" style="margin-top:1rem;"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>State-Level Risk Register — Top Risks (Anonymized)</h2>
+            <p style="font-size:0.8rem; color:#64748b;">Aggregated across all operators — no tenant identification</p>
+            <table>
+                <thead>
+                    <tr><th>Operator</th><th>Risk Title</th><th>Category</th><th>Level</th><th>Value</th></tr>
+                </thead>
+                <tbody id="riskRegisterBody">
+                    <tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js"></script>
+    <script src="/js/api/client.js"></script>
+    <script>
+        // Regulator dashboard logic — anonymized, tenant-isolated
+        let industryData = null;
+
+        async function loadDashboard() {
+            try {
+                // In real deployment, tenant_ids would be fetched from /api/v1/tenants
+                // For demo, use mock tenant list
+                const tenantIds = ["fixedwing", "rotarywing", "demoairport"];
+                document.getElementById('tenantCount').textContent = `${tenantIds.length} operators`;
+
+                // Mock data for demo (replace with ApiClient.get calls)
+                // industryData = await ApiClient.get(`/api/v1/regulator/industry-averages?tenants=${tenantIds.join(',')}`);
+                // For now, simulate with mock
+                industryData = {
+                    tenant_count: 3,
+                    average_overall: 68.5,
+                    average_components: {component_1: 72, component_2: 65, component_3: 70, component_4: 66},
+                    level_distribution: {"Level 1":0,"Level 2":1,"Level 3":1,"Level 4":1,"Level 5":0},
+                    anonymized_scores: [
+                        {anonymized_id:"Operator-1", level:2, overall_maturity:55},
+                        {anonymized_id:"Operator-2", level:3, overall_maturity:68},
+                        {anonymized_id:"Operator-3", level:4, overall_maturity:82},
+                    ]
+                };
+
+                renderHeatMap(industryData.anonymized_scores);
+                renderHazardChart([{category:"Runway Incursion",count:12},{category:"Bird Strike",count:8},{category:"Engine Failure",count:6},{category:"Cabin Pressurization",count:5},{category:"Tail Rotor",count:4}]);
+                renderRiskChart({Low:15, Medium:12, High:8, VeryHigh:3});
+                renderRiskRegister([
+                    {anonymized_id:"Operator-2", title:"Engine Oil Fluctuation Risk", category:"2000", risk_level:"Very High", risk_value:20},
+                    {anonymized_id:"Operator-1", title:"Cabin Pressurization Warning", category:"2001", risk_level:"High", risk_value:15},
+                ]);
+                renderBenchmark(68, 68.5);
+
+            } catch (e) {
+                console.error("Dashboard load failed", e);
+            }
+        }
+
+        function renderHeatMap(scores) {
+            const el = document.getElementById('heatMap');
+            if (!scores || scores.length===0) { el.innerHTML='<div style="grid-column:1/-1;text-align:center;color:#94a3b8;">Insufficient data (min 3 tenants)</div>'; return; }
+            el.innerHTML = scores.map(s => `<div class="heat-cell level-${s.level}" title="${s.anonymized_id}: ${s.overall_maturity}%">${s.level}</div>`).join('');
+        }
+
+        function renderHazardChart(data) {
+            const ctx = document.getElementById('hazardChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d=>d.category),
+                    datasets: [{ label: 'Frequency', data: data.map(d=>d.count), backgroundColor: '#0f172a' }]
+                },
+                options: { responsive: true, plugins: { legend: {display:false} } }
+            });
+        }
+
+        function renderRiskChart(byLevel) {
+            const ctx = document.getElementById('riskChart');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(byLevel),
+                    datasets: [{ label: 'Hazards', data: Object.values(byLevel), borderColor: '#dc3545', tension: 0.3 }]
+                },
+                options: { responsive: true }
+            });
+        }
+
+        function renderRiskRegister(risks) {
+            const tbody = document.getElementById('riskRegisterBody');
+            if (!risks || risks.length===0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:2rem; color:#94a3b8;">No high risks — insufficient data</td></tr>';
+                return;
+            }
+            tbody.innerHTML = risks.map(r => `<tr><td>${r.anonymized_id}</td><td>${r.title}</td><td>${r.category}</td><td><span style="background:${r.risk_level==='Very High'?'#dc3545':'#fd7e14'};color:white;padding:2px 6px;border-radius:4px;font-size:0.75rem;">${r.risk_level}</span></td><td>${r.risk_value}</td></tr>`).join('');
+        }
+
+        function renderBenchmark(opScore, avg) {
+            document.getElementById('operatorScore').textContent = opScore ?? '—';
+            document.getElementById('industryAvg').textContent = avg;
+            const diff = opScore != null ? (opScore - avg).toFixed(1) : null;
+            const el = document.getElementById('benchmarkDiff');
+            if (diff != null) {
+                el.textContent = (diff >=0 ? '+' : '') + diff;
+                el.style.color = diff >=0 ? '#198754' : '#dc3545';
+            }
+            const ctx = document.getElementById('benchmarkChart');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Your Score', 'Industry Avg'],
+                    datasets: [{ data: [opScore||0, avg], backgroundColor: ['#0f172a', '#94a3b8'] }]
+                },
+                options: { indexAxis: 'y', responsive: true, plugins:{legend:{display:false}} }
+            });
+        }
+
+        async function exportPDF() {
+            // Calls backend export endpoint
+            try {
+                const blob = await ApiClient.get('/api/v1/regulator/export/pdf');
+                // In mock, just alert
+                alert('PDF export would download: regulator-report.pdf');
+            } catch (e) { alert('PDF export: ' + e.message); }
+        }
+        async function exportExcel() {
+            try {
+                await ApiClient.get('/api/v1/regulator/export/excel');
+                alert('Excel export would download: regulator-data.xlsx');
+            } catch (e) { alert('Excel export: ' + e.message); }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDashboard);
+    </script>
+</body>
+</html>
