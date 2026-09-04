@@ -178,6 +178,7 @@ _GENERIC_ROLE_META = {
     "ops": {"role": "DEPT_ADMIN", "full_name": "Operations Manager", "department": "Flight Operations"},
     "staff": {"role": "USER", "full_name": "Staff Member", "department": ""},
     "smd": {"role": "CAAN_SMD", "full_name": "State Regulator (SMD)", "department": ""},
+    "regulator": {"role": "regulator", "full_name": "Regulator", "department": ""},
 }
 
 # Role tokens provisioned per generic tenant (order matters for readability).
@@ -185,8 +186,14 @@ GENERIC_TENANT_USERS = {
     "fixedwing": ["ae", "safety", "camo", "145", "ops", "staff"],
     "rotarywing": ["ae", "safety", "camo", "145", "ops", "staff"],
     "demoairport": ["ae", "safety", "ops", "staff"],
-    "demostate": ["smd"],
+    "demostate": ["smd", "regulator"],
 }
+
+# Additional regulator demo accounts (Module 5 only, anonymized view)
+REGULATOR_DEMO_USERS = [
+    {"email": "regulator@demo.com", "password": "Demo@123", "role": "regulator", "tenant_id": "demostate", "full_name": "Regulator Demo", "department": ""},
+    {"email": "smd@caan.gov.np", "password": "Demo@123", "role": "CAAN_SMD", "tenant_id": "demostate", "full_name": "CAAN SMD Demo", "department": ""},
+]
 
 
 def _create_generic_tenant(db, cfg: dict) -> str:
@@ -280,6 +287,33 @@ def seed_generic_tenants_and_users(db=None, auth=None, print_counts: bool = True
                 continue
             result = create_user(auth, spec)
             created_users.append(result["uid"])
+
+    # Additional regulator demo accounts (Module 5, RBAC regulator)
+    for spec in REGULATOR_DEMO_USERS:
+        email = spec["email"]
+        uid = spec["email"].split("@")[0].replace(".", "-") + "-" + spec["tenant_id"] + "-reg"
+        # Use deterministic uid pattern for regulator
+        if _user_exists(auth, uid=uid, email=email):
+            skipped_users.append(email)
+            logger.info(f"Regulator demo user already exists, skipping: {email}")
+            continue
+        # Build full spec for create_user
+        full_spec = {
+            "uid": uid,
+            "email": email,
+            "password": spec["password"],
+            "full_name": spec["full_name"],
+            "organization": "Demo State Regulator" if spec["tenant_id"] == "demostate" else "Regulator",
+            "role": spec["role"],
+            "tenant_id": spec["tenant_id"],
+            "department": spec.get("department", ""),
+        }
+        try:
+            result = create_user(auth, full_spec)
+            created_users.append(result["uid"])
+            logger.info(f"Created regulator demo user: {email} ({spec['role']})")
+        except Exception as e:
+            logger.warning(f"Failed to create regulator demo user {email}: {e}")
 
     counts = {
         "tenants": created_tenants,
