@@ -244,14 +244,37 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
                 <div id="stateRiskArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
             </div>
 
-            <!-- ============ STEP 8 — PURGE DEMO DATA ============ -->
+            <!-- ============ STEP 8 — UNIFIED PURGE (SUPABASE + FIRESTORE) ============ -->
             <div class="admin-card" style="border-color:#e2b8b8;">
                 <div class="card-head"><span class="step-badge">Step 8</span></div>
-                <h2><i class="fas fa-trash-can" style="color:#b91c1c;"></i> Purge Demo Data</h2>
-                <p class="card-sub">Delete ALL demo data (<code>is_demo = true</code>) from every table &mdash; hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows &mdash; across all tenants. Real paying-tenant data and the PSOE question bank are preserved.</p>
+                <h2><i class="fas fa-database" style="color:#b91c1c;"></i> Unified Purge Demo Data</h2>
+                <p class="card-sub">Delete <strong>ALL</strong> demo data from <strong>BOTH</strong> Supabase AND Firestore &mdash; Postgres rows (<code>is_demo = true</code>): hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows &mdash; plus the Firestore <code>audit_logs</code>, <code>psoe_assessments</code> baselines and <code>state</code> SSP reference tree &mdash; across all tenants. Tenants, regulators, users and the PSOE question bank are preserved.</p>
                 <p style="margin:0 0 12px;color:#b91c1c;font-weight:600;">⚠️ This is irreversible!</p>
-                <button id="purgeDemoDataBtn" class="btn btn-danger" onclick="purgeDemoData()"><i class="fas fa-trash-can"></i> Purge All Demo Data</button>
-                <div id="purgeResult" style="margin-top: 12px;"></div>
+                <div style="border-top:1px dashed #e5deae;margin:0 0 16px;padding-top:14px;">
+                    <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-file-export"></i> Export Current Data</div>
+                    <p class="card-sub" style="margin-bottom:10px;">Download CSV backups before purging — the purge summary (per-table counts), a full dump of every table, or a single table.</p>
+                    <div class="btn-row" style="margin-bottom:4px;">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="exportPurgeSummary()"><i class="fas fa-file-csv"></i> Export Summary</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="exportAllTables()"><i class="fas fa-file-csv"></i> Export All Tables</button>
+                        <select id="exportTableSelect" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:.82rem;">
+                            <option value="">— table —</option>
+                            <option value="hazards">hazards</option>
+                            <option value="reports">reports</option>
+                            <option value="cans">cans</option>
+                            <option value="caps">caps</option>
+                            <option value="surveys">surveys</option>
+                            <option value="survey_responses">survey_responses</option>
+                            <option value="psoe_assessments">psoe_assessments</option>
+                            <option value="bow_tie_analyses">bow_tie_analyses</option>
+                            <option value="risk_register">risk_register</option>
+                            <option value="barrier_register">barrier_register</option>
+                        </select>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="exportSelectedTable()"><i class="fas fa-file-csv"></i> Export Table</button>
+                    </div>
+                    <div id="exportPurgeStatus"></div>
+                </div>
+                <button id="purgeUnifiedBtn" class="btn btn-danger" onclick="purgeUnifiedDemo()"><i class="fas fa-trash-can"></i> Purge All Demo Data (Unified)</button>
+                <div id="purgeUnifiedResult" style="margin-top: 12px;"></div>
             </div>
         </div>
 
@@ -321,6 +344,25 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             <div class="btn-row">
                 <button class="btn btn-success" onclick="demoData('seed')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>
                 <button class="btn btn-danger" onclick="demoData('unseed')"><i class="fas fa-broom"></i> Unseed Dummy Data</button>
+            </div>
+            <div style="border-top:1px dashed #e2e8f0;margin:16px 0 12px;padding-top:14px;">
+                <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-file-export"></i> Export Dummy Data</div>
+                <p class="card-sub" style="margin-bottom:10px;">Download the seeded demo rows (<code>is_demo = true</code>) as CSV, scoped to all tenants or a single tenant.</p>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Tenant (slug or uuid) — optional</label>
+                        <input type="text" id="exportDummyTenant" placeholder="e.g. fixedwing — blank = all tenants" style="padding:8px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.84rem;">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-outline" onclick="exportDummy('all')"><i class="fas fa-file-csv"></i> Export All</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('vsr')">VSR</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('mor')">MOR</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('can')">CAN</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('cap')">CAP</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('survey')">Survey</button>
+                </div>
+                <div id="exportDummyStatus"></div>
             </div>
             <div id="demoDataArea" style="margin-top:14px;"></div>
         </div>
@@ -961,42 +1003,129 @@ async function execStateRisk(body) {
 }
 
 // ============================================================================
-// STEP 8 — PURGE DEMO DATA
+// STEP 8 — UNIFIED PURGE (Supabase + Firestore)
 // ============================================================================
 
-function purgeDemoData() {
+function purgeUnifiedDemo() {
     openConfirm(
-        '⚠️ Purge ALL Demo Data',
-        'This will permanently delete <strong>ALL demo data</strong> (<code>is_demo = true</code>) — hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie analyses, risk/barrier/state registers and their child rows — across <strong>every tenant</strong>.<br><br>' +
-        '<span style="color:#b91c1c;font-weight:700;">This is IRREVERSIBLE.</span> Real paying-tenant data (<code>is_demo = false</code>) and the PSOE question bank are preserved.',
-        { type: 'purge', body: {} }
+        '⚠️ Purge ALL Demo Data (Unified)',
+        'This will permanently delete <strong>ALL demo data</strong> from <strong>BOTH</strong> Supabase AND Firestore: Postgres rows with <code>is_demo = true</code> (hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows) plus the Firestore <code>audit_logs</code>, <code>psoe_assessments</code> baselines and <code>state</code> SSP reference tree.<br><br>' +
+        '<span style="color:#b91c1c;font-weight:700;">This is IRREVERSIBLE.</span> Tenants, regulators, users and the PSOE question bank are preserved.',
+        { type: 'purgeUnified', body: {} }
     );
 }
 
-async function execPurge(body) {
-    var area = document.getElementById('purgeResult');
-    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging demo data...</div>';
+async function execPurgeUnified(body) {
+    var area = document.getElementById('purgeUnifiedResult');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging unified demo data...</div>';
     try {
-        var resp = await AdminUI.apiPost('/api/v1/admin/purge-demo-data', body);
-        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'Purge request failed');
-        var rows = Object.keys(resp.details).map(function (table) {
-            return '<tr><td><code>' + esc(table) + '</code></td><td>' + esc(resp.details[table]) + '</td></tr>';
-        }).join('');
-        var hasErrors = Object.keys(resp.details).some(function (k) { return String(resp.details[k]).indexOf('Error') === 0; });
-        if (area) {
-            area.innerHTML = '<div class="status-box ' + (hasErrors ? 'error' : 'success') + '">' +
-                '<strong>✅ Purged ' + resp.deleted_count + ' demo records</strong>' +
-                (hasErrors ? '<div style="margin-top:6px;color:#b91c1c;">Some tables failed — inspect the table list below.</div>' : '') +
-                '</div>' +
-                '<div style="overflow-x:auto;margin-top:12px;"><table class="admin-table">' +
-                '<thead><tr><th style="text-align:left;">Table</th><th>Deleted</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-        }
-        toast('Demo data purged: ' + resp.deleted_count + ' records.', hasErrors ? 'error' : 'success');
+        var resp = await AdminUI.apiPost('/api/v1/admin/purge-unified-demo', body);
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'Unified purge request failed');
+
+        var pg = resp.postgres || {};
+        var pgDetails = pg.details || {};
+        var pgHasErrors = Object.keys(pgDetails).some(function (k) { return String(pgDetails[k]).indexOf('Error') === 0; });
+        var fs = resp.firestore || {};
+        var fsDeleted = fs.deleted || {};
+
+        var html = '<div class="status-box ' + (pgHasErrors ? 'warn' : 'success') + '">' +
+            '<strong>✅ Unified purge complete &mdash; ' + esc(resp.deleted_count) + ' records across both databases.</strong>' +
+            (pgHasErrors ? '<div style="margin-top:6px;color:#92400e;">Some Postgres tables failed &mdash; inspect the table list below.</div>' : '') +
+            '</div>';
+
+        html += '<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:6px;">Supabase / Postgres</div>';
+        html += '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th style="text-align:left;">Table</th><th>Deleted</th></tr></thead><tbody>';
+        Object.keys(pgDetails).forEach(function (k) {
+            html += '<tr><td><code>' + esc(k) + '</code></td><td>' + esc(pgDetails[k]) + '</td></tr>';
+        });
+        html += '<tr style="font-weight:600;"><td>TOTAL</td><td>' + esc(pg.deleted_count || 0) + '</td></tr>';
+        html += '</tbody></table></div></div>';
+
+        html += '<div style="margin-top:14px;"><div style="font-weight:700;margin-bottom:6px;">Firestore</div>';
+        html += '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th style="text-align:left;">Collection</th><th>Deleted</th></tr></thead><tbody>';
+        Object.keys(fsDeleted).forEach(function (k) {
+            html += '<tr><td><code>' + esc(k) + '</code></td><td>' + esc(fsDeleted[k]) + '</td></tr>';
+        });
+        html += '<tr style="font-weight:600;"><td>TOTAL</td><td>' + esc(fs.total || 0) + '</td></tr>';
+        html += '</tbody></table></div></div>';
+
+        if (area) area.innerHTML = html;
+        toast('Unified purge complete: ' + resp.deleted_count + ' records.', pgHasErrors ? 'warn' : 'success');
         loadAuditLog();
     } catch (err) {
-        if (area) area.innerHTML = '<div class="status-box error">❌ Purge failed: ' + esc(err.message) + '</div>';
-        toast('Purge failed: ' + err.message, 'error');
+        if (area) area.innerHTML = '<div class="status-box error">❌ Unified purge failed: ' + esc(err.message) + '</div>';
+        toast('Unified purge failed: ' + (err && err.message || String(err)), 'error');
     }
+}
+
+// ============================================================================
+// SUPER_ADMIN DATA EXPORT — CSV downloads (Bearer token via fetch + Blob).
+// The endpoints are GET /api/v1/admin/export/* guarded by get_admin_user, so
+// each request must carry the Firebase ID token in the Authorization header
+// (plain window.location navigation would drop it).
+// ============================================================================
+
+function exportStatus(id, msgHtml, type) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="status-box ' + (type || 'info') + '">' + msgHtml + '</div>';
+}
+
+async function exportCsv(url, statusId) {
+    var statusEl = document.getElementById(statusId);
+    if (statusEl) statusEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Preparing export...</div>';
+    try {
+        var token = await ApiClient._getToken();
+        if (!token) return;
+        var resp = await fetch(ApiClient._baseUrl() + url, {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (resp.status === 401) { window.location.href = '/admin/login.html'; return; }
+        if (!resp.ok) {
+            var err = await resp.json().catch(function () { return { detail: 'HTTP ' + resp.status }; });
+            var detail = err.detail || ('Request failed: ' + resp.status);
+            if (Array.isArray(detail)) detail = detail.map(function (e) { return e.msg || JSON.stringify(e); }).join('; ');
+            throw new Error(detail);
+        }
+        var disp = resp.headers.get('Content-Disposition') || '';
+        var m = disp.match(/filename="?([^";]+)"?/i);
+        var filename = m ? m[1] : ('export_' + Date.now() + '.csv');
+        var rowCount = resp.headers.get('X-Row-Count') || '';
+        var blob = await resp.blob();
+        var a = document.createElement('a');
+        var urlObj = URL.createObjectURL(blob);
+        a.href = urlObj;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(urlObj); }, 1000);
+        exportStatus(statusId, 'Downloaded <strong>' + esc(filename) + '</strong>' +
+            (rowCount ? ' <span style="color:#475569;">(' + esc(rowCount) + ' row(s))</span>' : '') + '.', 'success');
+    } catch (err) {
+        exportStatus(statusId, esc(err && err.message ? err.message : String(err)), 'error');
+    }
+}
+
+function exportDummy(type) {
+    var input = document.getElementById('exportDummyTenant');
+    var tenant = input ? input.value.trim() : '';
+    var qs = tenant ? ('?tenant_id=' + encodeURIComponent(tenant)) : '';
+    exportCsv('/api/v1/admin/export/dummy-data?type=' + encodeURIComponent(type) + qs, 'exportDummyStatus');
+}
+
+function exportPurgeSummary() {
+    exportCsv('/api/v1/admin/export/purge-data', 'exportPurgeStatus');
+}
+
+function exportAllTables() {
+    exportCsv('/api/v1/admin/export/all-tables', 'exportPurgeStatus');
+}
+
+function exportSelectedTable() {
+    var sel = document.getElementById('exportTableSelect');
+    var table = sel ? sel.value : '';
+    if (!table) { exportStatus('exportPurgeStatus', 'Select a table first.', 'error'); return; }
+    exportCsv('/api/v1/admin/export/table/' + encodeURIComponent(table), 'exportPurgeStatus');
 }
 
 // ============================================================================
@@ -1008,7 +1137,7 @@ function openConfirm(title, html, action) {
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmText').innerHTML = html;
     // Show setup-key field for destructive actions — prompt inside the warning modal
-    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purge' || action.type === 'deleteUser');
+    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'deleteUser');
     var wrap = document.getElementById('confirmSetupKeyWrap');
     var input = document.getElementById('confirmSetupKey');
     var errEl = document.getElementById('confirmSetupKeyError');
@@ -1034,7 +1163,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     var action = pendingConfirm;
     if (!action) return;
     // For destructive actions, require setup key from the modal input
-    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purge' || action.type === 'deleteUser';
+    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'deleteUser';
     var setupKey = '';
     if (needsKey) {
         var input = document.getElementById('confirmSetupKey');
@@ -1061,7 +1190,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     if (action.type === 'demo') execDemo(action.body);
     else if (action.type === 'psoe') execPsoe(action.body);
     else if (action.type === 'stateRisk') execStateRisk(action.body);
-    else if (action.type === 'purge') execPurge(action.body);
+    else if (action.type === 'purgeUnified') execPurgeUnified(action.body);
     else if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid, action.setup_key);
 });
 

@@ -10,7 +10,7 @@
 # ============================================================================
 
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, Response
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from loguru import logger
@@ -688,6 +688,10 @@ class PurgeDemoDataRequest(BaseModel):
     setup_key: str
 
 
+class PurgeUnifiedRequest(BaseModel):
+    setup_key: str
+
+
 @router.post("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
 async def admin_update_tenant_status(
     tenant_id: str,
@@ -895,6 +899,91 @@ async def admin_purge_demo_data(
     except Exception as e:
         logger.error(f"Purge demo data failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/purge-unified-demo", status_code=status.HTTP_200_OK)
+async def admin_purge_unified_demo(
+    req: PurgeUnifiedRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Purge demo data from BOTH Supabase (Postgres) AND Firestore.
+
+    Removes Postgres rows with is_demo=true (+ FK-scoped children) AND the
+    Firestore setup surfaces (audit_logs, production-setup psoe_assessments
+    baselines, and the `state` ICAO SSP reference tree). Tenants, regulators,
+    users and the global psoe_questions reference bank are preserved.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import purge_all_demo_data_unified
+
+    try:
+        return await purge_all_demo_data_unified(user)
+    except Exception as e:
+        logger.error(f"Unified purge failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# SUPER_ADMIN data export endpoints — read-only CSV dumps (downloads)
+# ============================================================================
+
+
+def _csv_download_response(csv_text: str, filename: str, rows: int) -> Response:
+    """Return a downloadable CSV with a UTF-8 BOM so Excel renders headers."""
+    return Response(
+        content="\ufeff" + csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Row-Count": str(rows),
+        },
+    )
+
+
+@router.get("/export/dummy-data")
+async def admin_export_dummy_data(
+    type: str = Query("all", description="is_demo scope: all, vsr, mor, can, cap, survey"),
+    tenant_id: Optional[str] = Query(None, description="Tenant slug or uuid to scope the dump (optional)"),
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Export seeded demo rows (is_demo = true) as a CSV download. SUPER_ADMIN only."""
+    from app.services.admin_data_service import export_demo_data_csv
+
+    try:
+        csv_text, filename, csv_rows = await export_demo_data_csv(type, tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _csv_download_response(csv_text, filename, csv_rows)
+
+
+@router.get("/export/purge-data")
+async def admin_export_purge_data(user: Dict[str, Any] = Depends(get_admin_user)):
+    """Export a per-table count summary of what purge_all_demo_data would delete."""
+    from app.services.admin_data_service import export_purge_summary_csv
+
+    csv_text, filename, csv_rows = await export_purge_summary_csv()
+    return _csv_download_response(csv_text, filename, csv_rows)
+
+
+@router.get("/export/all-tables")
+async def admin_export_all_tables(user: Dict[str, Any] = Depends(get_admin_user)):
+    """Export every operational Postgres table (all rows) as one CSV download."""
+    from app.services.admin_data_service import export_all_tables_csv
+
+    csv_text, filename, csv_rows = await export_all_tables_csv()
+    return _csv_download_response(csv_text, filename, csv_rows)
+
+
+@router.get("/export/table/{table_name}")
+async def admin_export_table(table_name: str, user: Dict[str, Any] = Depends(get_admin_user)):
+    """Export a single table (all rows) as a CSV download. Unknown table -> 404."""
+    from app.services.admin_data_service import export_single_table_csv
+
+    try:
+        csv_text, filename, csv_rows = await export_single_table_csv(table_name)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return _csv_download_response(csv_text, filename, csv_rows)
 
 
 @router.post("/psoe", status_code=status.HTTP_200_OK)

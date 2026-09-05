@@ -12,13 +12,16 @@
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
 
+import csv
+import io
+import json
 import random
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
-from sqlalchemy import and_, delete, or_, select, union_all
+from sqlalchemy import and_, delete, func, or_, select, union_all
 
 from app.core.config import settings
 from app.firebase import get_db
@@ -55,6 +58,7 @@ from app.db.db_models import (
 )
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.production_seed import _audit, _validate_id
+from app.services.state_risk_service import STATE_COLLECTION
 
 TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "SUSPENDED", "RETIRED", "CANCELLED", "INACTIVE"}
 # Back-compat alias: retired/cancelled written as single string maps to RETIRED
@@ -748,3 +752,375 @@ async def purge_all_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
     )
     logger.info(f"Purged {total} demo records across {len(details)} tables")
     return {"success": True, "deleted_count": total, "details": details}
+
+
+# ============================================================================
+# Export helpers (SUPER_ADMIN) — read-only CSV dumps for setup / audit / purge
+# backups. Multi-table dumps are one CSV file with a `# TABLE:<name>  rows=<n>`
+# delimiter line before each table's own header + rows, so spreadsheet apps
+# still open the file and the block structure survives a raw round-trip.
+#
+# VSR / MOR live in the same `reports` table discriminated by
+# `report_type` = "voluntary" / "mandatory" — the same values the seed / unseed
+# / delete logic use (see _seed_reports / unseed_tenant_demo_data).
+# ============================================================================
+
+DEMO_EXPORT_KINDS = {"all", "vsr", "mor", "can", "cap", "survey"}
+
+# Tables carrying the is_demo flag — the dumpable demo scope (type=all),
+# kept in sync with the purge table list (see _build_purge_steps).
+DEMO_EXPORT_TABLES = [
+    "hazards",
+    "reports",
+    "cans",
+    "caps",
+    "surveys",
+    "survey_responses",
+    "psoe_assessments",
+    "state_risk_register",
+    "regulatory_reports",
+    "bow_tie_analyses",
+    "risk_register",
+    "barrier_register",
+]
+
+
+def _registered_models() -> List[Any]:
+    """Every mapped ORM class keyed by its table name (single source of truth)."""
+    from app.db import db_models
+
+    return list({mapper.class_.__tablename__: mapper.class_
+                 for mapper in db_models.Base.registry.mappers}.values())
+
+
+def _model_for_table(table_name: str):
+    target = str(table_name or "").strip().lower()
+    for model in _registered_models():
+        if getattr(model, "__tablename__", "") == target:
+            return model
+    return None
+
+
+def _demo_export_models() -> List[tuple]:
+    blocks = []
+    for name in DEMO_EXPORT_TABLES:
+        model = _model_for_table(name)
+        if model is not None:
+            blocks.append((name, model))
+    return blocks
+
+
+def _export_tenant_uuid(tenant_id: Optional[str]) -> Optional[uuid.UUID]:
+    """Resolve a tenant slug (or raw uuid) to the Postgres tenant uuid."""
+    if not tenant_id:
+        return None
+    t = tenant_id.strip()
+    try:
+        return uuid.UUID(t)
+    except ValueError:
+        return uuid.UUID(tenant_uuid(t))
+
+
+def _csv_repr(value: Any) -> Any:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value
+
+
+def _dicts_to_csv(rows: List[Dict[str, Any]]) -> str:
+    """Serialize a list of dicts (RowMapping-friendly) to a CSV string."""
+    if not rows:
+        return ""
+    fieldnames = list(dict.fromkeys(k for r in rows for k in r.keys()))
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({k: _csv_repr(v) for k, v in r.items()})
+    return buf.getvalue()
+
+
+def _blocks_to_csv(blocks: List[tuple]) -> str:
+    """Join per-table CSVs into one file with `# TABLE:<name>` delimiters."""
+    parts = []
+    for label, text in blocks:
+        row_count = max(len(text.splitlines()) - 1, 0) if text else 0
+        parts.append(f"# TABLE:{label}  rows={row_count}")
+        if text:
+            parts.append(text)
+    return "\n".join(parts)
+
+
+async def _export_rows(model, *, where=None, limit: int = 200_000) -> List[Dict[str, Any]]:
+    stmt = select(model)
+    if where is not None:
+        stmt = stmt.where(where)
+    stmt = stmt.limit(limit)
+    async with session_scope() as session:
+        rows = (await session.execute(stmt)).mappings().all()
+    return [dict(r) for r in rows]
+
+
+async def export_demo_data_csv(kind: str = "all",
+                               tenant_id: Optional[str] = None) -> Tuple[str, str, int]:
+    """CSV dump of is_demo rows scoped by kind (all/vsr/mor/can/cap/survey).
+
+    Returns (csv_text, filename, row_count).
+    """
+    kind = (kind or "all").strip().lower()
+    if kind not in DEMO_EXPORT_KINDS:
+        raise ValueError(f"invalid export type '{kind}' (allowed: {sorted(DEMO_EXPORT_KINDS)})")
+    tid = _export_tenant_uuid(tenant_id)
+    stamp = _now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    def _where(model, *extra):
+        conds = []
+        if tid is not None and hasattr(model, "tenant_id"):
+            conds.append(model.tenant_id == tid)
+        for e in extra:
+            if e is not None:
+                conds.append(e)
+        return and_(*conds) if conds else None
+
+    if kind == "vsr":
+        rows = await _export_rows(
+            Report,
+            where=_where(Report, Report.is_demo == True, Report.report_type == "voluntary"),
+        )
+        return _dicts_to_csv(rows), f"dummy_data_vsr_{stamp}.csv", len(rows)
+
+    if kind == "mor":
+        rows = await _export_rows(
+            Report,
+            where=_where(Report, Report.is_demo == True, Report.report_type == "mandatory"),
+        )
+        return _dicts_to_csv(rows), f"dummy_data_mor_{stamp}.csv", len(rows)
+
+    if kind == "can":
+        rows = await _export_rows(Can, where=_where(Can, Can.is_demo == True))
+        return _dicts_to_csv(rows), f"dummy_data_can_{stamp}.csv", len(rows)
+
+    if kind == "cap":
+        rows = await _export_rows(Cap, where=_where(Cap, Cap.is_demo == True))
+        return _dicts_to_csv(rows), f"dummy_data_cap_{stamp}.csv", len(rows)
+
+    if kind == "survey":
+        # Surveys + their child responses — the same scope unseed removes
+        # (see unseed_tenant_demo_data).
+        blocks, total = [], 0
+        for name, model in (("surveys", Survey), ("survey_responses", SurveyResponse)):
+            rows = await _export_rows(model, where=_where(model, model.is_demo == True))
+            blocks.append((name, _dicts_to_csv(rows)))
+            total += len(rows)
+        return _blocks_to_csv(blocks), f"dummy_data_survey_{stamp}.csv", total
+
+    # "all" — every is_demo table, block-delimited into one CSV
+    blocks, total = [], 0
+    for name, model in _demo_export_models():
+        rows = await _export_rows(model, where=_where(model, model.is_demo == True))
+        blocks.append((name, _dicts_to_csv(rows)))
+        total += len(rows)
+    return _blocks_to_csv(blocks), f"dummy_data_all_{stamp}.csv", total
+
+
+async def _purge_counts() -> List[Dict[str, Any]]:
+    """Per-table rows purge_all_demo_data WOULD delete, mirroring its scoping.
+
+    Deliberately mirrors the subquery scopes of _build_purge_steps so the
+    summary always matches what the purge removes.
+    """
+    demo_tenant_ids = union_all(
+        select(Hazard.tenant_id).where(Hazard.is_demo == True),
+        select(Report.tenant_id).where(Report.is_demo == True),
+        select(Survey.tenant_id).where(Survey.is_demo == True),
+        select(Can.tenant_id).where(Can.is_demo == True),
+        select(Cap.tenant_id).where(Cap.is_demo == True),
+    ).scalar_subquery()
+    demo_hazards = select(Hazard.id).where(Hazard.is_demo == True).scalar_subquery()
+    demo_cans = select(Can.id).where(Can.is_demo == True).scalar_subquery()
+    demo_caps = select(Cap.id).where(Cap.is_demo == True).scalar_subquery()
+    demo_reports = select(Report.id).where(Report.is_demo == True).scalar_subquery()
+    demo_assessments = select(PsoeAssessment.id).where(PsoeAssessment.is_demo == True).scalar_subquery()
+    demo_bowties = select(BowTieAnalysis.id).where(BowTieAnalysis.is_demo == True).scalar_subquery()
+    demo_rca_entries = (
+        select(HazardRcaEntry.id)
+        .where(HazardRcaEntry.tenant_id.in_(demo_tenant_ids))
+        .scalar_subquery()
+    )
+
+    spec: List[tuple] = [
+        ("hazard_rca_factors", select(func.count()).select_from(HazardRcaFactor).where(HazardRcaFactor.entry_id.in_(demo_rca_entries))),
+        ("hazard_assessments", select(func.count()).select_from(HazardAssessment).where(HazardAssessment.entry_id.in_(demo_rca_entries))),
+        ("hazard_capas", select(func.count()).select_from(HazardCapa).where(HazardCapa.entry_id.in_(demo_rca_entries))),
+        ("hazard_rca_entries", select(func.count()).select_from(HazardRcaEntry).where(HazardRcaEntry.tenant_id.in_(demo_tenant_ids))),
+        ("verifications", select(func.count()).select_from(Verification).where(
+            or_(Verification.hazard_id.in_(demo_hazards), Verification.cap_id.in_(demo_caps)))),
+        ("closures", select(func.count()).select_from(Closure).where(Closure.hazard_id.in_(demo_hazards))),
+        ("corrective_actions", select(func.count()).select_from(CorrectiveAction).where(
+            or_(CorrectiveAction.hazard_id.in_(demo_hazards), CorrectiveAction.can_id.in_(demo_cans)))),
+        ("flight_diversions", select(func.count()).select_from(FlightDiversion).where(FlightDiversion.hazard_id.in_(demo_hazards))),
+        ("safety_deficiencies", select(func.count()).select_from(SafetyDeficiency).where(and_(
+            SafetyDeficiency.tenant_id.in_(demo_tenant_ids),
+            or_(
+                SafetyDeficiency.event_id.in_(demo_hazards),
+                SafetyDeficiency.event_id.in_(demo_cans),
+                SafetyDeficiency.event_id.in_(demo_reports),
+            ),
+        ))),
+        ("psoe_findings", select(func.count()).select_from(PsoeFinding).where(PsoeFinding.assessment_id.in_(demo_assessments))),
+        ("psoe_assessments", select(func.count()).select_from(PsoeAssessment).where(PsoeAssessment.is_demo == True)),
+        ("survey_responses", select(func.count()).select_from(SurveyResponse).where(SurveyResponse.is_demo == True)),
+        ("surveys", select(func.count()).select_from(Survey).where(Survey.is_demo == True)),
+        ("caps", select(func.count()).select_from(Cap).where(Cap.is_demo == True)),
+        ("cans", select(func.count()).select_from(Can).where(Can.is_demo == True)),
+        ("reports", select(func.count()).select_from(Report).where(Report.is_demo == True)),
+        ("hazards", select(func.count()).select_from(Hazard).where(Hazard.is_demo == True)),
+        ("bow_tie_controls", select(func.count()).select_from(BowTieControl).where(BowTieControl.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_consequences", select(func.count()).select_from(BowTieConsequence).where(BowTieConsequence.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_threats", select(func.count()).select_from(BowTieThreat).where(BowTieThreat.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_analyses", select(func.count()).select_from(BowTieAnalysis).where(BowTieAnalysis.is_demo == True)),
+        ("risk_register", select(func.count()).select_from(RiskRegisterEntry).where(RiskRegisterEntry.is_demo == True)),
+        ("barrier_register", select(func.count()).select_from(BarrierRegisterEntry).where(BarrierRegisterEntry.is_demo == True)),
+        ("state_risk_register", select(func.count()).select_from(StateRiskRegisterEntry).where(StateRiskRegisterEntry.is_demo == True)),
+        ("regulatory_reports", select(func.count()).select_from(RegulatoryReport).where(RegulatoryReport.is_demo == True)),
+    ]
+
+    counts: List[Dict[str, Any]] = []
+    async with session_scope() as session:
+        for table, stmt in spec:
+            n = (await session.execute(stmt)).scalar_one()
+            counts.append({"table": table, "demo_rows": n})
+    return counts
+
+
+async def export_purge_summary_csv() -> Tuple[str, str, int]:
+    """CSV of the per-table rows purge_all_demo_data would delete."""
+    stamp = _now().strftime("%Y-%m-%d_%H-%M-%S")
+    counts = await _purge_counts()
+    total = sum(int(r["demo_rows"]) for r in counts)
+    return _dicts_to_csv(counts), f"purge_summary_{stamp}.csv", total
+
+
+async def export_all_tables_csv() -> Tuple[str, str, int]:
+    """Full dump of every operational Postgres table (all rows, demo + real)."""
+    stamp = _now().strftime("%Y-%m-%d_%H-%M-%S")
+    blocks, total = [], 0
+    for model in sorted(_registered_models(), key=lambda m: m.__tablename__):
+        rows = await _export_rows(model)
+        blocks.append((model.__tablename__, _dicts_to_csv(rows)))
+        total += len(rows)
+    return _blocks_to_csv(blocks), f"all_tables_{stamp}.csv", total
+
+
+async def export_single_table_csv(table_name: str) -> Tuple[str, str, int]:
+    """Full dump of one table (all rows, demo + real). Unknown table -> KeyError."""
+    model = _model_for_table(table_name)
+    if model is None:
+        raise KeyError(f"unknown table '{table_name}'")
+    stamp = _now().strftime("%Y-%m-%d_%H-%M-%S")
+    rows = await _export_rows(model)
+    return _dicts_to_csv(rows), f"{model.__tablename__}_{stamp}.csv", len(rows)
+
+
+# ============================================================================
+# Unified purge — is_demo rows in Postgres + Firestore setup surfaces
+# ============================================================================
+# Operational demo rows live in Postgres (is_demo=true) and are fully handled by
+# purge_all_demo_data. Firestore holds the surfaces the Super-Admin panel wrote:
+# the `audit_logs` history, the `psoe_assessments` baseline docs (created by
+# "production-setup") and the `state` ICAO SSP reference tree. Tenants,
+# regulators, users and the global `psoe_questions` reference bank are preserved.
+
+FIRESTORE_PURGE_COLLECTIONS = ["audit_logs", "psoe_assessments", "state"]
+
+
+def _delete_firestore_doc_tree(doc_ref, _visited=None, _count=None) -> None:
+    """Delete a Firestore doc and every subcollection doc (recursive)."""
+    if _visited is None:
+        _visited = set()
+    if _count is None:
+        _count = [0]
+    key = ":".join(getattr(doc_ref, "path", None) or [getattr(doc_ref, "id", str(id(doc_ref)))])
+    if key in _visited:
+        return
+    _visited.add(key)
+    for sub in doc_ref.collections():
+        for snap in sub.get():
+            _delete_firestore_doc_tree(snap.reference, _visited, _count)
+    doc_ref.delete()
+    _count[0] += 1
+
+
+async def purge_firestore_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Delete Firestore demo/setup surfaces, preserving authority/identity data."""
+    db = get_db()
+    deleted: Dict[str, int] = {}
+    total = 0
+
+    # audit_logs — setup/action history; wiped in full.
+    count = 0
+    for snap in db.collection(settings.FIREBASE_COLLECTION_AUDIT_LOGS).get():
+        snap.reference.delete()
+        count += 1
+    if count:
+        deleted["audit_logs"] = count
+    total += count
+
+    # psoe_assessments — only the Production-Setup baselines (created_by marker).
+    count = 0
+    for snap in db.collection("psoe_assessments").get():
+        data = snap.to_dict() or {}
+        if (data.get("created_by") == "production-setup"
+                or str(snap.id).endswith("-baseline-completed")
+                or str(snap.id).endswith("-baseline-draft")):
+            snap.reference.delete()
+            count += 1
+    if count:
+        deleted["psoe_assessments"] = count
+    total += count
+
+    # state — the ICAO SSP reference tree (docs + subcollections).
+    count = 0
+    for snap in db.collection(STATE_COLLECTION).get():
+        counter = [0]
+        _delete_firestore_doc_tree(snap.reference, _count=counter)
+        count += counter[0]
+    if count:
+        deleted["state"] = count
+    total += count
+
+    details = ", ".join(f"{k}={v}" for k, v in sorted(deleted.items())) or "none"
+    _audit("DEMO_DATA_PURGE_FIRESTORE", actor, "all",
+           f"Purged {total} Firestore docs ({details})")
+    logger.info(f"Firestore demo surfaces purged: {deleted} ({total} total)")
+    return {"deleted": deleted, "total": total}
+
+
+async def purge_all_demo_data_unified(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Purge demo data from BOTH Postgres (is_demo) AND Firestore surfaces.
+
+    Firestore is purged first so the Postgres DEMO_DATA_PURGE audit entry
+    (written by purge_all_demo_data) survives in the freshly-cleared
+    audit_logs, alongside the DEMO_DATA_PURGE_FIRESTORE entry written above.
+    """
+    firestore_result = await purge_firestore_demo_data(actor)
+    postgres_result = await purge_all_demo_data(actor)
+
+    total = (
+        int(postgres_result.get("deleted_count", 0) or 0)
+        + int(firestore_result.get("total", 0) or 0)
+    )
+    return {
+        "success": True,
+        "postgres": postgres_result,
+        "firestore": firestore_result,
+        "deleted_count": total,
+    }
