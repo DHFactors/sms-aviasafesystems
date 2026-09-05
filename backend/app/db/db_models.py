@@ -1327,6 +1327,7 @@ class RiskRegisterEntry(Base):
         SEVERITY_RESULTANT_CHECK,
         Index("ux_risk_register_tenant_hazard", "tenant_id", "hazard_id", unique=True),
         Index("ix_risk_register_tenant", "tenant_id"),
+        {"extend_existing": True},
     )
 
 
