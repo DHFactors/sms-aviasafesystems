@@ -14,6 +14,7 @@ from datetime import datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -613,73 +614,6 @@ class CorrectiveAction(Base):
 
 
 # ============================================================================
-# 8. RISK REGISTER (per-hazard SRM)
-# ============================================================================
-
-RR_EXISTING_SEV_CHECK = CheckConstraint(
-    "existing_severity BETWEEN 1 AND 5", name="ck_risk_register_existing_severity"
-)
-RR_EXISTING_PROB_CHECK = CheckConstraint(
-    "existing_probability BETWEEN 1 AND 5", name="ck_risk_register_existing_probability"
-)
-RR_RESULTANT_SEV_CHECK = CheckConstraint(
-    "resultant_severity BETWEEN 1 AND 5", name="ck_risk_register_resultant_severity"
-)
-RR_RESULTANT_PROB_CHECK = CheckConstraint(
-    "resultant_probability BETWEEN 1 AND 5", name="ck_risk_register_resultant_probability"
-)
-
-
-class RiskRegisterEntry(Base):
-    __tablename__ = "risk_register"
-
-    id: Mapped[object] = _uuid_pk()
-    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    hazard_id: Mapped[object] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("hazards.id"), nullable=False
-    )
-
-    srm_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ultimate_consequence: Mapped[str] = mapped_column(Text, nullable=False)
-
-    existing_severity: Mapped[object] = mapped_column(Integer, nullable=True)
-    existing_probability: Mapped[object] = mapped_column(Integer, nullable=True)
-    existing_risk_index: Mapped[object] = mapped_column(Integer, nullable=True)
-    existing_risk_tolerability: Mapped[object] = mapped_column(Text, nullable=True)
-
-    resultant_severity: Mapped[object] = mapped_column(Integer, nullable=True)
-    resultant_probability: Mapped[object] = mapped_column(Integer, nullable=True)
-    resultant_risk_index: Mapped[object] = mapped_column(Integer, nullable=True)
-    resultant_risk_tolerability: Mapped[object] = mapped_column(Text, nullable=True)
-
-    status: Mapped[str] = mapped_column(Text, nullable=False)
-    follow_up_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
-    date_completed: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
-    remarks: Mapped[object] = mapped_column(Text, nullable=True)
-    concerned_department: Mapped[object] = mapped_column(Text, nullable=True)
-
-    created_by: Mapped[object] = mapped_column(Text, nullable=True)
-    updated_by: Mapped[object] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
-    )
-
-    __table_args__ = (
-        RR_EXISTING_SEV_CHECK,
-        RR_EXISTING_PROB_CHECK,
-        RR_RESULTANT_SEV_CHECK,
-        RR_RESULTANT_PROB_CHECK,
-        Index("ix_risk_register_tenant", "tenant_id"),
-        Index("ix_risk_register_tenant_status", "tenant_id", "status"),
-        Index("ix_risk_register_tenant_hazard", "tenant_id", "hazard_id"),
-        Index("ix_risk_register_tenant_srmdate", "tenant_id", "srm_date"),
-    )
-
-
-# ============================================================================
 # 9. SAFETY DEFICIENCIES
 # ============================================================================
 
@@ -981,6 +915,78 @@ class PsoeAssessment(Base):
         Index("ix_psoe_assessments_tenant_status", "tenant_id", "status"),
         Index("ix_psoe_assessments_tenant_date", "tenant_id", "assessment_date"),
         Index("idx_psoe_assessments_tenant_demo", "tenant_id", "is_demo"),
+    )
+
+
+# ============================================================================
+# 14a. PSOE QUESTIONS (ICAO Annex 19 / CAAN Appendix 10 checklist)
+# ============================================================================
+
+PSOE_COMPONENT_CHECK = CheckConstraint(
+    "component IN ('Safety Management', 'Risk Management', 'Safety Assurance', 'Safety Promotion')",
+    name="ck_psoe_questions_component",
+)
+
+
+class PsoeQuestion(Base):
+    __tablename__ = "psoe_questions"
+
+    id: Mapped[object] = _uuid_pk()
+    component: Mapped[str] = mapped_column(Text, nullable=False)
+    question_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        PSOE_COMPONENT_CHECK,
+        Index("ix_psoe_questions_component", "component"),
+        Index("uq_psoe_questions_component_number", "component", "question_number", unique=True),
+    )
+
+
+# ============================================================================
+# 14b. PSOE FINDINGS (linked to psoe_assessments)
+# ============================================================================
+
+PSOE_FINDING_TYPE_CHECK = CheckConstraint(
+    "finding_type IN ('Observation', 'Finding', 'Major Finding', 'Critical Finding')",
+    name="ck_psoe_findings_type",
+)
+
+PSOE_FINDING_STATUS_CHECK = CheckConstraint(
+    "status IN ('open', 'in_progress', 'closed')", name="ck_psoe_findings_status"
+)
+
+
+class PsoeFinding(Base):
+    __tablename__ = "psoe_findings"
+
+    id: Mapped[object] = _uuid_pk()
+    assessment_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("psoe_assessments.id", ondelete="CASCADE"), nullable=False
+    )
+
+    finding_type: Mapped[object] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    corrective_action: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
+    target_date: Mapped[object] = mapped_column(Date, nullable=True)
+    closed_date: Mapped[object] = mapped_column(Date, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        PSOE_FINDING_TYPE_CHECK,
+        PSOE_FINDING_STATUS_CHECK,
+        Index("ix_psoe_findings_assessment", "assessment_id"),
     )
 
 

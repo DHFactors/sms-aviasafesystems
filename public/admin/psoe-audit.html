@@ -1,0 +1,765 @@
+<!-- ============================================================================
+FILE: public/admin/psoe-audit.html
+PATH: public/admin/psoe-audit.html
+PURPOSE: CAAN PSOE (Post Safety Oversight Evaluation) — ICAO Annex 19 /
+         CAAN Appendix 10 surveillance module (SUPABASE-backed).
+         Full access for SUPER_ADMIN / CAAN regulator / CAAN auditor roles.
+         List, create, edit (4 components x 21 questions), categorical scoring,
+         findings CRUD, complete + HTML surveillance report.
+API:     /api/v1/supabase/psoe/*
+AUTHOR:  AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSOE Audit — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+
+    <style>
+        body { font-family: var(--font-family); background: var(--color-bg, #f1f5f9); color: var(--color-text, #1e293b); }
+
+        .admin-shell { min-height: 100vh; display: flex; flex-direction: column; }
+        .topbar {
+            background: linear-gradient(135deg, var(--color-deep-teal-950, #051a26), var(--color-deep-teal-900, #0b3a4d));
+            color: #fff; padding: 14px 26px; display: flex; align-items: center;
+            justify-content: space-between; gap: 14px; flex-wrap: wrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,.18); position: sticky; top: 0; z-index: 20;
+        }
+        .tb-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .tb-brand { font-weight: 800; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+        .tb-brand i { color: #4fc3f7; }
+        .tb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .tb-actions a.nav-link {
+            color: #cbd5e1; text-decoration: none; font-size: .82rem; padding: 6px 12px;
+            border-radius: 8px; transition: background .15s, color .15s;
+        }
+        .tb-actions a.nav-link:hover, .tb-actions a.nav-link.active { background: rgba(255,255,255,.12); color: #fff; }
+        .user-badge { background: rgba(255,255,255,.14); color: #fff; padding: .3rem 1rem; border-radius: 999px; font-size: .82rem; }
+        .user-badge .role-chip { background: #4fc3f7; color: #072535; padding: .02rem .5rem; border-radius: 999px; margin-right: .4rem; font-weight: 700; }
+
+        .content-area { padding: 26px; flex: 1; max-width: 1100px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+        .page-head h1 { margin: 0 0 4px; font-size: 1.5rem; color: var(--color-text-strong, #0f172a); }
+        .page-head .sub { color: var(--color-text-muted, #64748b); font-size: .9rem; }
+
+        .admin-card { background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; margin-bottom: 20px; }
+        .admin-card h2 { margin: 0 0 6px; font-size: 1.05rem; color: var(--color-text-strong, #0f172a); display: flex; align-items: center; gap: 10px; }
+        .admin-card .card-sub { color: var(--color-text-muted, #64748b); font-size: .84rem; margin: 0 0 14px; line-height: 1.5; }
+
+        .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+        .form-group { flex: 1; min-width: 150px; }
+        .form-group label { display: block; font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 9px 11px; border: 1px solid var(--color-border, #cbd5e1);
+            border-radius: 8px; font-size: .86rem; box-sizing: border-box; background: #fff;
+        }
+        .form-group small { display: block; color: #94a3b8; font-size: .72rem; margin-top: 3px; }
+
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        .empty-state { padding: 22px; text-align: center; color: #94a3b8; font-size: .85rem; background: #f8fafc; border-radius: 8px; }
+        .loading { padding: 18px; text-align: center; color: #64748b; font-size: .85rem; }
+        .status-box { padding: 12px 14px; border-radius: 8px; font-size: .85rem; margin-top: 12px; }
+        .status-box.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+        .status-box.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .status-box.warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+        .section-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; margin: 26px 0 10px; }
+
+        .admin-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+        .admin-table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; }
+        .admin-table td { padding: 9px 10px; border-bottom: 1px solid #eef2f6; vertical-align: middle; }
+        .admin-table tr:hover td { background: #f8fafc; }
+
+        .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warn { background: #fff7ed; color: #c2410c; }
+        .badge-danger { background: #fee2e2; color: #b91c1c; }
+        .badge-info { background: #e0f2fe; color: #075985; }
+        .badge-muted { background: #f1f5f9; color: #475569; }
+
+        .score-strip { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 14px; }
+        .score-pill { flex: 1; min-width: 180px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; }
+        .score-pill .sp-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; }
+        .score-pill .sp-val { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+        .score-pill .sp-sub { font-size: .74rem; color: #64748b; }
+
+        .comp-block { border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+        .comp-head { background: #eef3f9; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .comp-head h3 { margin: 0; font-size: .92rem; color: #0f3d63; }
+        .comp-head .comp-pct { font-size: .8rem; font-weight: 700; color: #0f3d63; }
+        .q-row { border-top: 1px solid #eef2f6; padding: 12px 14px; }
+        .q-row .q-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+        .q-row .q-num { flex: 0 0 34px; font-weight: 800; font-size: .78rem; color: #0f3d63; background: #eef3f9; border-radius: 8px; text-align: center; padding: 6px 0; }
+        .q-row .q-text { font-size: .86rem; color: #1e293b; line-height: 1.45; }
+        .q-row .q-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-left: 44px; }
+        .q-row select { padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: .82rem; background: #fff; min-width: 190px; }
+        .q-row input, .q-row textarea { flex: 1; min-width: 200px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: .82rem; }
+        .q-row textarea { min-height: 44px; resize: vertical; }
+
+        .findings-table td.ft-actions { white-space: nowrap; }
+        .side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
+        .side-foot i { color: #e2574c; }
+
+        @media (max-width: 720px) { .content-area { padding: 16px; } }
+    </style>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title" style="font-weight:600;font-size:.9rem;color:#bcd6e3;">PSOE Audit</span>
+        </div>
+        <div class="tb-actions" id="topNav"></div>
+    </div>
+
+    <div class="content-area">
+
+        <!-- ===================== LIST VIEW ===================== -->
+        <div id="viewList">
+            <div class="page-head">
+                <h1><i class="fas fa-clipboard-check" style="color:var(--color-brand-600);"></i> PSOE Audit &amp; Surveillance</h1>
+                <div class="sub">CAAN Appendix 10 assessments (Post Safety Oversight Evaluation). Regulator / auditor / super-admin full access.</div>
+            </div>
+
+            <div class="admin-card">
+                <div class="btn-row" style="margin-bottom:14px;">
+                    <div class="form-group" style="max-width:260px;">
+                        <label>Tenant scope</label>
+                        <select id="tenantSelect" onchange="loadAssessments()"></select>
+                    </div>
+                    <div class="form-group" style="max-width:220px;">
+                        <label>Status filter</label>
+                        <select id="statusFilter" onchange="loadAssessments()">
+                            <option value="">All statuses</option>
+                            <option value="draft">Draft</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="btn-row" style="align-self:flex-end; padding-bottom:14px;">
+                        <button class="btn btn-primary" onclick="openCreateModal()"><i class="fas fa-plus"></i> New Assessment</button>
+                    </div>
+                </div>
+                <div id="assessmentList"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading assessments...</div></div>
+            </div>
+
+            <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+        </div>
+
+        <!-- ===================== EDITOR VIEW ===================== -->
+        <div id="viewEditor" style="display:none;">
+            <div class="page-head">
+                <h1><i class="fas fa-edit" style="color:var(--color-brand-600);"></i> <span id="edTitle">Assessment</span></h1>
+                <div class="sub" id="edMeta">—</div>
+            </div>
+
+            <div class="admin-card" id="scoreSummaryWrap" style="display:none;">
+                <h2><i class="fas fa-chart-simple"></i> Score Summary</h2>
+                <div class="score-strip" id="scoreStrip"></div>
+                <div class="status-box success" id="scoreLevelBox" style="display:none;"></div>
+            </div>
+
+            <form onsubmit="saveResponses(event)">
+                <div class="admin-card">
+                    <div class="btn-row" style="margin-bottom:12px;">
+                        <button type="button" class="btn btn-outline" onclick="showList()"><i class="fas fa-arrow-left"></i> Back</button>
+                        <button type="button" class="btn" onclick="renderEditor()"><i class="fas fa-rotate"></i> Reload</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Responses</button>
+                        <button type="button" class="btn" onclick="calculateScores()"><i class="fas fa-calculator"></i> Calculate Scores</button>
+                        <button type="button" class="btn btn-success" id="completeBtn" onclick="completeAssessment()"><i class="fas fa-check-double"></i> Complete Assessment</button>
+                        <button type="button" class="btn btn-outline" onclick="openReport()"><i class="fas fa-file-lines"></i> View Report</button>
+                    </div>
+                    <div id="editorBody"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading question bank...</div></div>
+                    <div id="saveStatus"></div>
+                </div>
+            </form>
+
+            <div class="section-title"><i class="fas fa-folder-open"></i> Findings &amp; Observations</div>
+            <div class="admin-card">
+                <div class="btn-row" style="margin-bottom:12px;">
+                    <button class="btn btn-outline" onclick="openFindingModal()"><i class="fas fa-plus"></i> Add Finding</button>
+                    <button class="btn btn-outline btn-sm" onclick="loadFindings()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+                <div id="findingsList"><div class="empty-state">Loading findings...</div></div>
+            </div>
+        </div>
+
+        <div class="side-foot" id="footerNote" style="display:none;">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- ===================== CREATE MODAL ===================== -->
+<div id="createModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:12px;max-width:560px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:92vh;overflow:auto;">
+        <h3 style="margin:0 0 4px;color:#0f172a;"><i class="fas fa-clipboard-check" style="color:var(--color-brand-600);"></i> New PSOE Assessment</h3>
+        <p id="createTenantHint" style="margin:0 0 14px;color:#64748b;font-size:.85rem;"></p>
+        <div class="form-group" style="margin-bottom:10px;"><label>Title *</label><input type="text" id="cTitle" placeholder="CAAN Appendix 10 Surveillance Audit — Operator (2026)"></div>
+        <div class="form-row">
+            <div class="form-group"><label>Department</label><input type="text" id="cDepartment" placeholder="Safety"></div>
+            <div class="form-group"><label>Assessment date</label><input type="date" id="cDate"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Auditor name</label><input type="text" id="cAuditor" placeholder="Lead Auditor"></div>
+            <div class="form-group"><label>Assessor email</label><input type="email" id="cEmail" placeholder="auditor@caan.gov"></div>
+        </div>
+        <div class="form-group"><label>Scope</label><textarea id="cScope" rows="2" placeholder="Full SMS surveillance audit against CAAN Appendix 10"></textarea></div>
+        <div class="form-group"><label>Notes</label><textarea id="cNotes" rows="2" placeholder="Optional notes"></textarea></div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeCreateModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="createAssessment()"><i class="fas fa-plus"></i> Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== FINDING MODAL ===================== -->
+<div id="findingModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:998;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:12px;max-width:540px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);">
+        <h3 style="margin:0 0 14px;color:#0f172a;"><i class="fas fa-folder-open" style="color:var(--color-brand-600);"></i> <span id="fModalTitle">Add Finding</span></h3>
+        <input type="hidden" id="fId">
+        <div class="form-group" style="margin-bottom:10px;">
+            <label>Finding type</label>
+            <select id="fType">
+                <option value="Observation">Observation</option>
+                <option value="Finding">Finding</option>
+                <option value="Major Finding">Major Finding</option>
+                <option value="Critical Finding">Critical Finding</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;"><label>Description *</label><textarea id="fDesc" rows="3" placeholder="What was found during the surveillance audit"></textarea></div>
+        <div class="form-group" style="margin-bottom:10px;"><label>Corrective action / recommended action</label><textarea id="fAction" rows="2" placeholder="Client action expected"></textarea></div>
+        <div class="form-row">
+            <div class="form-group"><label>Status</label>
+                <select id="fStatus">
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Target date</label><input type="date" id="fTarget"></div>
+            <div class="form-group"><label>Closed date</label><input type="date" id="fClosed"></div>
+        </div>
+        <div id="findingStatus"></div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeFindingModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveFinding()"><i class="fas fa-check"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// STATE
+// ============================================================================
+
+var currentUser = null;
+var currentTenant = '';
+var QUESTION_BANK = null;      // { components: [{ name, questions:[{id,question_number,question_text}] }] }
+var ACTIVE_ASSESSMENT = null;  // dict from GET /assessments/{id}
+var EDITORS = {};              // {"componentName": { "qn": {response:.., evidence:.., findings:..} }}
+var FINDINGS = [];
+var EDITABLE = false;          // full-access role -> can mutate
+
+var PSOE_API = '/api/v1/supabase/psoe';
+var FULL_ROLES = ['SUPER_ADMIN', 'CAAN_SMD', 'CAAN_ADMIN', 'CAAN_AUDITOR'];
+
+var NAV_ITEMS = [
+    { label: 'Production Setup', path: '/admin/production-setup.html' },
+    { label: 'PSOE Audit', path: '/admin/psoe-audit.html' },
+    { label: 'Audit Log', path: '/admin/audit-log.html' },
+    { label: 'User Management', path: '/admin/user-management.html' },
+];
+
+function esc(v) { return AdminUI.esc(v); }
+function toast(m, t) { AdminUI.toast(m, t); }
+
+// ============================================================================
+// AUTH + NAV
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (FULL_ROLES.indexOf(user.role) === -1) { adminAccessDenied(user); return; }
+
+    currentUser = user;
+    EDITABLE = true;
+    document.getElementById('topNav').innerHTML =
+        NAV_ITEMS.map(function (n) {
+            return '<a class="nav-link' + (n.path === '/admin/psoe-audit.html' ? ' active' : '') + '" href="' + n.path + '">' +
+                '<i class="fas ' + (n.label === 'Production Setup' ? 'fa-cogs' : n.label === 'Audit Log' ? 'fa-clipboard-list' : n.label === 'User Management' ? 'fa-users-gear' : 'fa-clipboard-check') + '"></i> ' + n.label + '</a>';
+        }).join('') +
+        '<span class="user-badge"><span class="role-chip">' + esc(user.role) + '</span><span>' + esc(user.email) + '</span></span>' +
+        '<button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>';
+
+    await initTenantSelect();
+    await loadAssessments();
+});
+
+function adminAccessDenied(user) {
+    var gate = document.createElement('div');
+    gate.style.cssText = 'max-width:520px;margin:5rem auto;text-align:center;background:#fff;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,.08);padding:3rem 2rem;';
+    gate.innerHTML =
+        '<i class="fas fa-lock" style="font-size:3rem;color:#dc3545;"></i>' +
+        '<h2 style="color:#0f172a;margin:1rem 0 .5rem;">Access Denied</h2>' +
+        '<p>Full PSOE access requires a regulator (CAAN), auditor or super-admin role. You are signed in as <strong>' + esc((user && user.email) || 'a user') + '</strong>.</p>' +
+        '<button class="btn btn-primary" onclick="logout()">Sign out</button>';
+    document.body.appendChild(gate);
+}
+
+function logout() {
+    firebase.auth().signOut().then(function () { window.location.href = '/'; })
+        .catch(function () { window.location.href = '/'; });
+}
+
+// ============================================================================
+// TENANT SCOPE
+// ============================================================================
+
+function resolveMyTenant(user) {
+    if (user && user.tenantId) return user.tenantId;
+    try {
+        if (typeof TenantResolver !== 'undefined' && TenantResolver.getCurrentTenant) {
+            return TenantResolver.getCurrentTenant();
+        }
+    } catch (_) { /* ignore */ }
+    return '';
+}
+
+async function initTenantSelect() {
+    var sel = document.getElementById('tenantSelect');
+    var own = resolveMyTenant(currentUser);
+    var tenants = [];
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        tenants = (resp && resp.tenants) || [];
+    } catch (_) {
+        // CAAN roles without admin access: fall back to seeded demo tenant slugs.
+        tenants = [];
+    }
+    if (tenants.length) {
+        sel.innerHTML = tenants.map(function (t) {
+            return '<option value="' + esc(t.id) + '">' + esc(t.name || t.id) + ' (' + esc(t.id) + ')</option>';
+        }).join('');
+    } else {
+        sel.innerHTML = '';
+        var manual = document.createElement('option');
+        manual.value = '__manual';
+        manual.textContent = '— type tenant id —';
+        sel.appendChild(manual);
+    }
+    var initial = own || (tenants.length ? tenants[0].id : '');
+    if (initial && Array.from(sel.options).some(function (o) { return o.value === initial; })) {
+        sel.value = initial;
+    } else if (sel.value === '__manual') {
+        currentTenant = '';
+    }
+    applyTenant();
+}
+
+function applyTenant() {
+    var val = document.getElementById('tenantSelect').value;
+    if (val === '__manual') {
+        val = (prompt('Enter operator tenant slug (e.g. fixedwing):') || '').trim();
+        if (!val) return;
+        var opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = val;
+        document.getElementById('tenantSelect').appendChild(opt);
+        document.getElementById('tenantSelect').value = val;
+    }
+    currentTenant = val;
+    document.getElementById('createTenantHint').textContent =
+        'This assessment will be created under tenant: ' + (val || '—');
+}
+
+function tenantQuery() {
+    return currentTenant ? '?tenant_id=' + encodeURIComponent(currentTenant) : '';
+}
+
+// ============================================================================
+// LIST VIEW
+// ============================================================================
+
+async function loadAssessments() {
+    applyTenant();
+    if (!currentTenant) {
+        document.getElementById('assessmentList').innerHTML =
+            '<div class="status-box warn"><i class="fas fa-circle-info"></i> No tenant selected. Pick a tenant scope above.</div>';
+        return;
+    }
+    var el = document.getElementById('assessmentList');
+    var status = document.getElementById('statusFilter').value;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading assessments...</div>';
+    try {
+        var qs = tenantQuery() + (status ? '&status=' + encodeURIComponent(status) : '');
+        var resp = await AdminUI.apiGet(PSOE_API + '/assessments' + qs);
+        var rows = (resp && resp.rows) || [];
+        if (!rows.length) {
+            el.innerHTML = '<div class="empty-state">No assessments for <code>' + esc(currentTenant) + '</code>' +
+                (status ? ' with status <code>' + esc(status) + '</code>' : '') + '.</div>';
+            return;
+        }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>Title</th><th>Status</th><th>Date</th><th>Auditor</th><th>Overall</th><th>Actions</th></tr></thead><tbody>' +
+            rows.map(function (a) {
+                return '<tr><td><strong>' + esc(a.title || '—') + '</strong>' +
+                    (a.department ? '<br><span style="color:#94a3b8;font-size:.74rem;">' + esc(a.department) + '</span>' : '') + '</td>' +
+                    '<td>' + statusBadge(a.status) + '</td>' +
+                    '<td style="white-space:nowrap;">' + (a.assessment_date ? AdminUI.fmtDate(a.assessment_date) : '—') + '</td>' +
+                    '<td>' + esc(a.auditor_name || '—') + '</td>' +
+                    '<td>' + (a.overall_score_pct != null
+                        ? '<strong>' + esc(a.overall_score_pct) + '%</strong><br><span style="font-size:.72rem;color:#64748b;">' + esc(a.overall_level || '') + '</span>'
+                        : '<span class="badge badge-muted">not scored</span>') + '</td>' +
+                    '<td class="ft-actions"><button class="btn btn-outline btn-sm" onclick="openEditor(\'' + a.id + '\')"><i class="fas fa-edit"></i> Open</button>' +
+                    '<button class="btn btn-outline btn-sm" onclick="openReportFor(\'' + a.id + '\')"><i class="fas fa-file-lines"></i> Report</button></td></tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch (err) {
+        el.innerHTML = '<div class="status-box error">Failed to load assessments: ' + esc(err.message) + '</div>';
+    }
+}
+
+function statusBadge(st) {
+    st = (st || '').toLowerCase();
+    if (st === 'completed') return '<span class="badge badge-success">COMPLETED</span>';
+    if (st === 'draft') return '<span class="badge badge-info">DRAFT</span>';
+    return '<span class="badge badge-muted">' + esc(st) + '</span>';
+}
+
+// ============================================================================
+// CREATE
+// ============================================================================
+
+function openCreateModal() {
+    if (!currentTenant) { toast('Select a tenant scope first.', 'error'); return; }
+    document.getElementById('cTitle').value = '';
+    document.getElementById('cDepartment').value = 'Safety';
+    document.getElementById('cDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('cAuditor').value = currentUser ? (currentUser.name || '') : '';
+    document.getElementById('cEmail').value = currentUser ? currentUser.email : '';
+    document.getElementById('cScope').value = 'Full SMS surveillance audit against CAAN Appendix 10';
+    document.getElementById('cNotes').value = '';
+    document.getElementById('createTenantHint').textContent =
+        'This assessment will be created under tenant: ' + (currentTenant || '—');
+    document.getElementById('createModal').style.display = 'flex';
+}
+
+function closeCreateModal() { document.getElementById('createModal').style.display = 'none'; }
+
+async function createAssessment() {
+    var title = document.getElementById('cTitle').value.trim();
+    if (!title) { toast('Title is required.', 'error'); return; }
+    var payload = {
+        title: title,
+        department: document.getElementById('cDepartment').value.trim() || null,
+        assessment_date: document.getElementById('cDate').value || null,
+        auditor_name: document.getElementById('cAuditor').value.trim() || null,
+        assessor_email: document.getElementById('cEmail').value.trim() || null,
+        scope: document.getElementById('cScope').value.trim() || null,
+        notes: document.getElementById('cNotes').value.trim() || null,
+    };
+    try {
+        var created = await AdminUI.apiPost(PSOE_API + '/assessments' + tenantQuery(), payload);
+        toast('Assessment created.', 'success');
+        closeCreateModal();
+        await loadAssessments();
+        openEditor(created.id || created.assessment_id);
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+// ============================================================================
+// EDITOR
+// ============================================================================
+
+async function openEditor(id) {
+    document.getElementById('viewList').style.display = 'none';
+    document.getElementById('viewEditor').style.display = 'block';
+    document.getElementById('footerNote').style.display = 'block';
+    document.getElementById('editorBody').innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading assessment...</div>';
+    document.getElementById('scoreSummaryWrap').style.display = 'none';
+    ACTIVE_ASSESSMENT = null;
+    FINDINGS = [];
+    try {
+        if (!QUESTION_BANK) {
+            var qb = await AdminUI.apiGet(PSOE_API + '/questions');
+            QUESTION_BANK = (qb && qb.components) || [];
+        }
+        var data = await AdminUI.apiGet(PSOE_API + '/assessments/' + id + tenantQuery());
+        ACTIVE_ASSESSMENT = data;
+        document.getElementById('edTitle').textContent = data.title || 'Assessment';
+        document.getElementById('edMeta').textContent =
+            'Tenant: ' + (data.tenant_id || currentTenant) + '  |  Status: ' + (data.status || 'draft') +
+            '  |  Auditor: ' + (data.auditor_name || '—') + '  |  Date: ' + (data.assessment_date ? AdminUI.fmtDate(data.assessment_date) : '—');
+        document.getElementById('completeBtn').style.display =
+            (data.status === 'completed') ? 'none' : '';
+        renderEditor();
+        renderScoreSummary();
+        await loadFindings();
+    } catch (err) {
+        document.getElementById('editorBody').innerHTML = '<div class="status-box error">Failed to load assessment: ' + esc(err.message) + '</div>';
+    }
+}
+
+function showList() {
+    document.getElementById('viewEditor').style.display = 'none';
+    document.getElementById('viewList').style.display = 'block';
+    document.getElementById('footerNote').style.display = 'none';
+    loadAssessments();
+}
+
+function renderEditor() {
+    var body = document.getElementById('editorBody');
+    if (!QUESTION_BANK || !QUESTION_BANK.length) {
+        body.innerHTML = '<div class="status-box warn">Question bank is empty. Run the PSOE question seed first.</div>';
+        return;
+    }
+    var responses = (ACTIVE_ASSESSMENT && ACTIVE_ASSESSMENT.responses) || {};
+    var html = '';
+    QUESTION_BANK.forEach(function (comp) {
+        html += '<div class="comp-block"><div class="comp-head"><h3><i class="fas fa-layer-group"></i> ' + esc(comp.name) + '</h3>' +
+            '<span class="comp-pct" id="compPct-' + esc(comp.name) + '"></span></div>';
+        (comp.questions || []).forEach(function (q) {
+            var num = String(q.question_number);
+            var ans = responses[num] || {};
+            var opts = ['', 'Compliant', 'Partially Compliant', 'Non-Compliant', 'Not Applicable']
+                .map(function (o) {
+                    return '<option value="' + o + '"' + ((ans.response || '') === o ? ' selected' : '') + (o ? '' : ' disabled') + '>' + (o || '— not answered —') + '</option>';
+                }).join('');
+            html += '<div class="q-row">' +
+                '<div class="q-head"><span class="q-num">Q' + num + '</span><span class="q-text">' + esc(q.question_text) + '</span></div>' +
+                '<div class="q-controls">' +
+                '<select data-comp="' + esc(comp.name) + '" data-q="' + num + '" data-k="response" onchange="markChanged()">' + opts + '</select>' +
+                '<input type="text" placeholder="Evidence / reference" data-comp="' + esc(comp.name) + '" data-q="' + num + '" data-k="evidence" value="' + esc(ans.evidence || '') + '" oninput="markChanged()">' +
+                '<textarea placeholder="Findings / notes" data-comp="' + esc(comp.name) + '" data-q="' + num + '" data-k="findings" oninput="markChanged()">' + esc(ans.findings || '') + '</textarea>' +
+                '</div></div>';
+        });
+        html += '</div>';
+    });
+    body.innerHTML = html;
+}
+
+function collectResponses() {
+    var out = {};
+    document.querySelectorAll('#editorBody [data-q]').forEach(function (el) {
+        var num = el.getAttribute('data-q');
+        var key = el.getAttribute('data-k');
+        if (!out[num]) out[num] = {};
+        out[num][key] = el.value;
+    });
+    return out;
+}
+
+function markChanged() {
+    document.getElementById('saveStatus').innerHTML =
+        '<div class="status-box warn" style="margin-top:12px;"><i class="fas fa-pen"></i> Unsaved changes — click <strong>Save Responses</strong>.</div>';
+}
+
+async function saveResponses(e) {
+    if (e) e.preventDefault();
+    var statusEl = document.getElementById('saveStatus');
+    statusEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Saving...</div>';
+    try {
+        var updated = await ApiClient.put(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + tenantQuery(), {
+            responses: collectResponses(),
+        });
+        ACTIVE_ASSESSMENT.responses = (updated && updated.responses) || collectResponses();
+        statusEl.innerHTML = '<div class="status-box success">Responses saved.</div>';
+        setTimeout(function () { statusEl.innerHTML = ''; }, 4000);
+    } catch (err) {
+        statusEl.innerHTML = '<div class="status-box error">Save failed: ' + esc(err.message) + '</div>';
+    }
+}
+
+async function calculateScores() {
+    var statusEl = document.getElementById('saveStatus');
+    statusEl.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Calculating scores...</div>';
+    try {
+        var resp = await AdminUI.apiPost(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + '/calculate' + tenantQuery(), {});
+        statusEl.innerHTML = '<div class="status-box success">Scores calculated. Refresh the question responses from the summary panel below.</div>';
+        if (resp && resp.assessment) ACTIVE_ASSESSMENT = resp.assessment;
+        if (resp && resp.scores) ACTIVE_ASSESSMENT.component_scores = resp.scores.components;
+        var detail = await AdminUI.apiGet(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + tenantQuery());
+        ACTIVE_ASSESSMENT = detail;
+        renderScoreSummary();
+        setTimeout(function () { statusEl.innerHTML = ''; }, 5000);
+    } catch (err) {
+        statusEl.innerHTML = '<div class="status-box error">Calculate failed: ' + esc(err.message) + '</div>';
+    }
+}
+
+async function completeAssessment() {
+    if (!confirm('Complete this assessment? Scores will be finalised and the status set to COMPLETED.')) return;
+    try {
+        var resp = await AdminUI.apiPost(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + '/complete' + tenantQuery(), {});
+        toast('Assessment completed.', 'success');
+        ACTIVE_ASSESSMENT = resp.assessment || ACTIVE_ASSESSMENT;
+        document.getElementById('completeBtn').style.display = 'none';
+        renderScoreSummary();
+    } catch (err) { toast('Complete failed: ' + err.message, 'error'); }
+}
+
+function renderScoreSummary() {
+    var wrap = document.getElementById('scoreSummaryWrap');
+    var scores = ACTIVE_ASSESSMENT && ACTIVE_ASSESSMENT.component_scores;
+    if (!scores || !Object.keys(scores).length) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'block';
+    var strip = document.getElementById('scoreStrip');
+    strip.innerHTML = Object.keys(scores).map(function (comp) {
+        var s = scores[comp] || {};
+        return '<div class="score-pill"><div class="sp-label">' + esc(comp) + '</div>' +
+            '<div class="sp-val">' + esc(s.percentage != null ? s.percentage + '%' : '—') + '</div>' +
+            '<div class="sp-sub">' + esc(s.compliant || 0) + ' / ' + esc(s.answered || 0) + ' compliant</div></div>';
+    }).join('');
+
+    var levelBox = document.getElementById('scoreLevelBox');
+    if (ACTIVE_ASSESSMENT.overall_score_pct != null) {
+        levelBox.style.display = 'block';
+        levelBox.textContent = 'Overall: ' + ACTIVE_ASSESSMENT.overall_score_pct + '% — ' + (ACTIVE_ASSESSMENT.overall_level || '');
+    } else {
+        levelBox.style.display = 'none';
+    }
+}
+
+// ============================================================================
+// FINDINGS
+// ============================================================================
+
+async function loadFindings() {
+    var el = document.getElementById('findingsList');
+    if (!ACTIVE_ASSESSMENT) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading findings...</div>';
+    try {
+        var detail = await AdminUI.apiGet(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + tenantQuery());
+        FINDINGS = (detail && detail.findings) || [];
+        if (!FINDINGS.length) {
+            el.innerHTML = '<div class="empty-state">No findings recorded for this assessment.</div>';
+            return;
+        }
+        el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+            '<th>Type</th><th>Description</th><th>Corrective action</th><th>Status</th><th>Target</th><th>Closed</th><th></th></tr></thead><tbody>' +
+            FINDINGS.map(function (f) {
+                return '<tr><td>' + findingTypeBadge(f.finding_type) + '</td>' +
+                    '<td style="max-width:300px;">' + esc(f.description) + '</td>' +
+                    '<td style="max-width:220px;">' + esc(f.corrective_action || '—') + '</td>' +
+                    '<td>' + statusBadge(f.status) + '</td>' +
+                    '<td style="white-space:nowrap;font-size:.78rem;">' + (f.target_date ? esc(String(f.target_date).slice(0, 10)) : '—') + '</td>' +
+                    '<td style="white-space:nowrap;font-size:.78rem;">' + (f.closed_date ? esc(String(f.closed_date).slice(0, 10)) : '—') + '</td>' +
+                    '<td class="ft-actions"><button class="btn btn-outline btn-sm" onclick="openFindingModal(\'' + f.id + '\')"><i class="fas fa-edit"></i></button>' +
+                    '<button class="btn btn-danger btn-sm" onclick="deleteFinding(\'' + f.id + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+            }).join('') + '</tbody></table></div>';
+    } catch (err) {
+        el.innerHTML = '<div class="status-box error">Failed to load findings: ' + esc(err.message) + '</div>';
+    }
+}
+
+function findingTypeBadge(t) {
+    t = t || 'Finding';
+    if (t === 'Critical Finding') return '<span class="badge badge-danger">CRITICAL</span>';
+    if (t === 'Major Finding') return '<span class="badge badge-warn">MAJOR</span>';
+    if (t === 'Finding') return '<span class="badge badge-info">FINDING</span>';
+    return '<span class="badge badge-muted">OBSERVATION</span>';
+}
+
+function openFindingModal(id) {
+    var f = id ? (FINDINGS.find(function (x) { return x.id === id; }) || {}) : {};
+    document.getElementById('fModalTitle').textContent = id ? 'Edit Finding' : 'Add Finding';
+    document.getElementById('fId').value = f.id || '';
+    document.getElementById('fType').value = f.finding_type || 'Finding';
+    document.getElementById('fDesc').value = f.description || '';
+    document.getElementById('fAction').value = f.corrective_action || '';
+    document.getElementById('fStatus').value = f.status || 'open';
+    document.getElementById('fTarget').value = f.target_date ? String(f.target_date).slice(0, 10) : '';
+    document.getElementById('fClosed').value = f.closed_date ? String(f.closed_date).slice(0, 10) : '';
+    document.getElementById('findingStatus').innerHTML = '';
+    document.getElementById('findingModal').style.display = 'flex';
+}
+
+function closeFindingModal() { document.getElementById('findingModal').style.display = 'none'; }
+
+function findingPayload() {
+    return {
+        finding_type: document.getElementById('fType').value,
+        description: document.getElementById('fDesc').value.trim(),
+        corrective_action: document.getElementById('fAction').value.trim() || null,
+        status: document.getElementById('fStatus').value,
+        target_date: document.getElementById('fTarget').value || null,
+        closed_date: document.getElementById('fClosed').value || null,
+    };
+}
+
+async function saveFinding() {
+    var id = document.getElementById('fId').value;
+    var desc = document.getElementById('fDesc').value.trim();
+    if (!desc) { toast('Description is required.', 'error'); return; }
+    var box = document.getElementById('findingStatus');
+    box.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Saving...</div>';
+    try {
+        if (id) {
+            await ApiClient.put(PSOE_API + '/findings/' + id + tenantQuery(), findingPayload());
+            toast('Finding updated.', 'success');
+        } else {
+            await AdminUI.apiPost(PSOE_API + '/assessments/' + ACTIVE_ASSESSMENT.id + '/findings' + tenantQuery(), findingPayload());
+            toast('Finding added.', 'success');
+        }
+        closeFindingModal();
+        await loadFindings();
+    } catch (err) {
+        box.innerHTML = '<div class="status-box error">Save failed: ' + esc(err.message) + '</div>';
+    }
+}
+
+async function deleteFinding(id) {
+    if (!confirm('Delete this finding? This cannot be undone.')) return;
+    try {
+        await ApiClient.del(PSOE_API + '/findings/' + id + tenantQuery());
+        toast('Finding deleted.', 'success');
+        await loadFindings();
+    } catch (err) { toast('Delete failed: ' + err.message, 'error'); }
+}
+
+// ============================================================================
+// REPORT
+// ============================================================================
+
+function openReportFor(id) {
+    AdminUI.apiGet(PSOE_API + '/assessments/' + id + '/report' + (currentTenant ? '?tenant_id=' + encodeURIComponent(currentTenant) : ''))
+        .then(function (resp) {
+            openReportWindow(resp && resp.html);
+        })
+        .catch(function (err) { toast('Report failed: ' + err.message, 'error'); });
+}
+
+function openReport() {
+    if (!ACTIVE_ASSESSMENT) return;
+    openReportFor(ACTIVE_ASSESSMENT.id);
+}
+
+function openReportWindow(htmlString) {
+    if (!htmlString) { toast('No report content returned.', 'error'); return; }
+    var win = window.open('', '_blank');
+    if (!win) { toast('Pop-up blocked — allow pop-ups to view the report.', 'error'); return; }
+    win.document.open();
+    win.document.write(htmlString);
+    win.document.close();
+}
+</script>
+</body>
+</html>
