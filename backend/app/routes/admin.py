@@ -692,6 +692,10 @@ class PurgeUnifiedRequest(BaseModel):
     setup_key: str
 
 
+class DeleteDemoTenantsRequest(BaseModel):
+    setup_key: str
+
+
 @router.post("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
 async def admin_update_tenant_status(
     tenant_id: str,
@@ -920,6 +924,29 @@ async def admin_purge_unified_demo(
         return await purge_all_demo_data_unified(user)
     except Exception as e:
         logger.error(f"Unified purge failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/delete-demo-tenants", status_code=status.HTTP_200_OK)
+async def admin_delete_demo_tenants(
+    req: DeleteDemoTenantsRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Permanently delete demo operators from BOTH Supabase AND Firestore.
+
+    Demo operators are tenants flagged `is_demo` / legacy `is_beta_sandbox`,
+    or in the terminal `CANCELLED` state. Every Postgres row for the tenant is
+    removed (all child tables) plus its Firestore doc including subcollections.
+    Regulators (incl. the demo state regulator), auth users and the global
+    psoe_questions reference bank are preserved.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import delete_demo_tenants
+
+    try:
+        return await delete_demo_tenants(user)
+    except Exception as e:
+        logger.error(f"Delete demo tenants failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

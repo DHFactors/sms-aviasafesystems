@@ -57,7 +57,7 @@ from app.db.db_models import (
     Verification,
 )
 from app.services.risk_matrix import compute_risk_index, get_risk_level
-from app.services.production_seed import _audit, _validate_id
+from app.services.production_seed import _audit, _is_regulator_doc, _validate_id
 from app.services.state_risk_service import STATE_COLLECTION
 
 TENANT_STATUSES = {"DEMO", "TRIAL", "ACTIVE", "SUSPENDED", "RETIRED", "CANCELLED", "INACTIVE"}
@@ -643,30 +643,50 @@ def demo_data_scope(tenant_ids: Optional[List[str]] = None, all_tenants: bool = 
 # psoe_questions is GLOBAL reference data with no is_demo flag — never purged.
 
 
-async def _build_purge_steps():
+async def _build_purge_steps(tenant_uuids: Optional[List[uuid.UUID]] = None):
     """Return an ordered list of (table_name, delete_statement) pairs.
 
     Order is child → parent so FK constraints are satisfied. Subqueries scope
     child deletes to the demo parents' id sets / demo tenants only.
+
+    When `tenant_uuids` is provided every row for those tenants is deleted
+    (regardless of is_demo) so a demo tenant can be fully removed; otherwise
+    only `is_demo = true` rows are targeted (the cluster-wide purge).
     """
-    demo_tenant_ids = union_all(
-        select(Hazard.tenant_id).where(Hazard.is_demo == True),
-        select(Report.tenant_id).where(Report.is_demo == True),
-        select(Survey.tenant_id).where(Survey.is_demo == True),
-        select(Can.tenant_id).where(Can.is_demo == True),
-        select(Cap.tenant_id).where(Cap.is_demo == True),
-    ).scalar_subquery()
-    demo_hazards = select(Hazard.id).where(Hazard.is_demo == True).scalar_subquery()
-    demo_cans = select(Can.id).where(Can.is_demo == True).scalar_subquery()
-    demo_caps = select(Cap.id).where(Cap.is_demo == True).scalar_subquery()
-    demo_reports = select(Report.id).where(Report.is_demo == True).scalar_subquery()
-    demo_assessments = select(PsoeAssessment.id).where(PsoeAssessment.is_demo == True).scalar_subquery()
-    demo_bowties = select(BowTieAnalysis.id).where(BowTieAnalysis.is_demo == True).scalar_subquery()
+    if tenant_uuids is not None:
+        targets = tuple(tenant_uuids)
+        demo_tenant_ids: Any = targets
+        is_demo_scope = False
+        demo_hazards = select(Hazard.id).where(Hazard.tenant_id.in_(targets)).scalar_subquery()
+        demo_cans = select(Can.id).where(Can.tenant_id.in_(targets)).scalar_subquery()
+        demo_caps = select(Cap.id).where(Cap.tenant_id.in_(targets)).scalar_subquery()
+        demo_reports = select(Report.id).where(Report.tenant_id.in_(targets)).scalar_subquery()
+        demo_assessments = select(PsoeAssessment.id).where(PsoeAssessment.tenant_id.in_(targets)).scalar_subquery()
+        demo_bowties = select(BowTieAnalysis.id).where(BowTieAnalysis.tenant_id.in_(targets)).scalar_subquery()
+    else:
+        demo_tenant_ids = union_all(
+            select(Hazard.tenant_id).where(Hazard.is_demo == True),
+            select(Report.tenant_id).where(Report.is_demo == True),
+            select(Survey.tenant_id).where(Survey.is_demo == True),
+            select(Can.tenant_id).where(Can.is_demo == True),
+            select(Cap.tenant_id).where(Cap.is_demo == True),
+        ).scalar_subquery()
+        is_demo_scope = True
+        demo_hazards = select(Hazard.id).where(Hazard.is_demo == True).scalar_subquery()
+        demo_cans = select(Can.id).where(Can.is_demo == True).scalar_subquery()
+        demo_caps = select(Cap.id).where(Cap.is_demo == True).scalar_subquery()
+        demo_reports = select(Report.id).where(Report.is_demo == True).scalar_subquery()
+        demo_assessments = select(PsoeAssessment.id).where(PsoeAssessment.is_demo == True).scalar_subquery()
+        demo_bowties = select(BowTieAnalysis.id).where(BowTieAnalysis.is_demo == True).scalar_subquery()
+
     demo_rca_entries = (
         select(HazardRcaEntry.id)
         .where(HazardRcaEntry.tenant_id.in_(demo_tenant_ids))
         .scalar_subquery()
     )
+
+    def parent_scope(model):
+        return model.is_demo == True if is_demo_scope else model.tenant_id.in_(demo_tenant_ids)
 
     steps: List[tuple] = [
         # RCA subtree (no tenant_id-level is_demo; scoped by demo tenant)
@@ -691,27 +711,27 @@ async def _build_purge_steps():
         ))),
         # PSOE (findings first — child of assessments)
         ("psoe_findings", delete(PsoeFinding).where(PsoeFinding.assessment_id.in_(demo_assessments))),
-        ("psoe_assessments", delete(PsoeAssessment).where(PsoeAssessment.is_demo == True)),
+        ("psoe_assessments", delete(PsoeAssessment).where(parent_scope(PsoeAssessment))),
         # Survey subtree
-        ("survey_responses", delete(SurveyResponse).where(SurveyResponse.is_demo == True)),
-        ("surveys", delete(Survey).where(Survey.is_demo == True)),
+        ("survey_responses", delete(SurveyResponse).where(parent_scope(SurveyResponse))),
+        ("surveys", delete(Survey).where(parent_scope(Survey))),
         # CAN/CAP subtree
-        ("caps", delete(Cap).where(Cap.is_demo == True)),
-        ("cans", delete(Can).where(Can.is_demo == True)),
-        ("reports", delete(Report).where(Report.is_demo == True)),
-        ("hazards", delete(Hazard).where(Hazard.is_demo == True)),
+        ("caps", delete(Cap).where(parent_scope(Cap))),
+        ("cans", delete(Can).where(parent_scope(Can))),
+        ("reports", delete(Report).where(parent_scope(Report))),
+        ("hazards", delete(Hazard).where(parent_scope(Hazard))),
         # Bow-tie subtree (children first; FKs are CASCADE but delete explicitly
         # so per-table counts are reported)
         ("bow_tie_controls", delete(BowTieControl).where(BowTieControl.bowtie_id.in_(demo_bowties))),
         ("bow_tie_consequences", delete(BowTieConsequence).where(BowTieConsequence.bowtie_id.in_(demo_bowties))),
         ("bow_tie_threats", delete(BowTieThreat).where(BowTieThreat.bowtie_id.in_(demo_bowties))),
-        ("bow_tie_analyses", delete(BowTieAnalysis).where(BowTieAnalysis.is_demo == True)),
+        ("bow_tie_analyses", delete(BowTieAnalysis).where(parent_scope(BowTieAnalysis))),
         # Registers (risk_register FK to bow_tie is SET NULL; barrier_register
         # FKs to bow_tie/controls are SET NULL — already handled above)
-        ("risk_register", delete(RiskRegisterEntry).where(RiskRegisterEntry.is_demo == True)),
-        ("barrier_register", delete(BarrierRegisterEntry).where(BarrierRegisterEntry.is_demo == True)),
-        ("state_risk_register", delete(StateRiskRegisterEntry).where(StateRiskRegisterEntry.is_demo == True)),
-        ("regulatory_reports", delete(RegulatoryReport).where(RegulatoryReport.is_demo == True)),
+        ("risk_register", delete(RiskRegisterEntry).where(parent_scope(RiskRegisterEntry))),
+        ("barrier_register", delete(BarrierRegisterEntry).where(parent_scope(BarrierRegisterEntry))),
+        ("state_risk_register", delete(StateRiskRegisterEntry).where(parent_scope(StateRiskRegisterEntry))),
+        ("regulatory_reports", delete(RegulatoryReport).where(parent_scope(RegulatoryReport))),
     ]
     return steps
 
@@ -1123,4 +1143,110 @@ async def purge_all_demo_data_unified(actor: Dict[str, Any]) -> Dict[str, Any]:
         "postgres": postgres_result,
         "firestore": firestore_result,
         "deleted_count": total,
+    }
+
+
+# ============================================================================
+# Delete demo tenants (Supabase rows + Firestore docs)
+# ============================================================================
+
+DELETABLE_TENANT_TERMINAL_STATUSES = {"CANCELLED"}
+
+
+def _is_deleteable_demo_tenant(data: Dict[str, Any]) -> bool:
+    """True when a tenants-collection doc is an OPERATOR to fully delete.
+
+    Demo operators are flagged with `is_demo` (or legacy `is_beta_sandbox`)
+    or are in the terminal `CANCELLED` state. Authority docs (state
+    regulators) that also carry is_demo are never matched here.
+    """
+    if _is_regulator_doc(data):
+        return False
+    if data.get("is_demo") or data.get("is_beta_sandbox"):
+        return True
+    status = str(data.get("status") or "").strip().upper()
+    return status in DELETABLE_TENANT_TERMINAL_STATUSES
+
+
+async def _delete_tenant_postgres_data(tenant_uuids: List[uuid.UUID]) -> Dict[str, Any]:
+    """Delete every Postgres row belonging to the given tenant uuids.
+
+    Runs in the child→parent order from _build_purge_steps so FK constraints
+    are satisfied. Each table runs in its own transaction so one failing table
+    does not abort the rest. Returns per-table counts (or an error string).
+    """
+    if not tenant_uuids:
+        return {"deleted_count": 0, "details": {}}
+    steps = await _build_purge_steps(tenant_uuids=tenant_uuids)
+    details: Dict[str, Any] = {}
+    total = 0
+    for table, stmt in steps:
+        try:
+            async with session_scope() as session:
+                result = await session.execute(stmt)
+                count = result.rowcount or 0
+            details[table] = count
+            total += count
+        except Exception as e:  # per-table isolation
+            logger.error(f"Delete tenant data failed for {table}: {e}")
+            details[table] = f"Error: {e}"
+    return {"deleted_count": total, "details": details}
+
+
+async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Permanently delete demo operators from BOTH stores.
+
+    Removes every Postgres row for the tenant (all child tables) and the
+    tenant's Firestore doc including all subcollections (reports, CAN/CAP,
+    surveys, PSOE assessments, bow-tie, flight diversions, …). Regulators,
+    auth users and the global `psoe_questions` reference bank are preserved.
+    """
+    db = get_db()
+    candidates: List[Tuple[str, Dict[str, Any]]] = []
+    for snap in db.collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
+        data = snap.to_dict() or {}
+        if _is_deleteable_demo_tenant(data):
+            candidates.append((snap.id, data))
+
+    if not candidates:
+        _audit("TENANTS_DEMO_DELETED", actor, "none",
+               "No demo / CANCELLED tenants found to delete")
+        return {
+            "success": True,
+            "deleted_count": 0,
+            "tenants": [],
+            "postgres": {"deleted_count": 0, "details": {}},
+            "firestore": {"deleted": {}},
+        }
+
+    postgres_result = await _delete_tenant_postgres_data(
+        [tenant_uuid(slug) for slug, _ in candidates]
+    )
+
+    firestore_deleted: Dict[str, int] = {}
+    for slug, _ in candidates:
+        counter = [0]
+        _delete_firestore_doc_tree(
+            db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(slug),
+            _count=counter,
+        )
+        firestore_deleted[slug] = counter[0]
+
+    names = {slug: (data.get("name") or slug) for slug, data in candidates}
+    tenant_list = [slug for slug, _ in candidates]
+    fs_total = sum(firestore_deleted.values()) or 0
+    _audit(
+        "TENANTS_DEMO_DELETED",
+        actor,
+        ",".join(tenant_list) or "-",
+        f"Deleted demo tenants: {', '.join(f'{s} ({names[s]})' for s in tenant_list)} — "
+        f"Firestore docs removed: {fs_total}, Postgres rows removed: {postgres_result.get('deleted_count', 0)}",
+    )
+    logger.info(f"Demo tenants deleted: {tenant_list} ({fs_total} Firestore docs)")
+    return {
+        "success": True,
+        "deleted_count": len(tenant_list),
+        "tenants": tenant_list,
+        "postgres": postgres_result,
+        "firestore": {"deleted": firestore_deleted},
     }
