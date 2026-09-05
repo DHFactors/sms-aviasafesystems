@@ -526,6 +526,64 @@ def test_admin_tenant_status_route_bad_key(monkeypatch):
     assert resp.status_code == 403
 
 
+def test_update_tenant_modules_service(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _seed_tenant(db)
+    from app.services.admin_data_service import update_tenant_modules
+    doc = update_tenant_modules("tara-air", _admin_user(), {
+        "module1": True, "module2": "yes", "module3": 0, "module4": False, "junk": True,
+    })
+    stored = db._stores["tenants"]["tara-air"]
+    assert stored["modules"] == {"module1": True, "module2": True, "module3": False, "module4": False}
+    assert any(l["action"] == "TENANT_MODULES_UPDATED" for l in db._stores["audit_logs"].values())
+    assert doc["modules"]["module1"] is True
+
+
+def test_update_tenant_modules_missing_tenant(monkeypatch):
+    _patch_db(monkeypatch)
+    from app.services.admin_data_service import update_tenant_modules
+    try:
+        update_tenant_modules("nope", _admin_user(), {"module1": True})
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "not found" in str(e)
+
+
+def test_admin_tenant_modules_route(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/tenants/tara-air/modules", json={
+        "setup_key": "test-setup-key",
+        "modules": {"module1": True, "module2": False, "module3": True, "module4": True},
+    })
+    assert resp.status_code == 200
+    assert resp.json()["tenant"]["modules"]["module3"] is True
+    assert db._stores["tenants"]["tara-air"]["modules"]["module2"] is False
+    assert any(l["action"] == "TENANT_MODULES_UPDATED" for l in db._stores["audit_logs"].values())
+
+
+def test_admin_tenant_modules_route_bad_key(monkeypatch):
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    _seed_tenant(db)
+    resp = _client().post("/api/v1/admin/tenants/tara-air/modules", json={
+        "setup_key": "wrong",
+        "modules": {"module1": True},
+    })
+    assert resp.status_code == 403
+
+
+def test_admin_tenant_modules_route_missing_tenant(monkeypatch):
+    _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    resp = _client().post("/api/v1/admin/tenants/nope/modules", json={
+        "setup_key": "test-setup-key",
+        "modules": {"module1": True},
+    })
+    assert resp.status_code == 404
+
+
 def test_seed_psoe_tenant_writes_baselines(monkeypatch):
     db = _patch_db(monkeypatch)
     _seed_tenant(db)

@@ -727,6 +727,38 @@ async def admin_update_tenant_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class TenantModulesRequest(BaseModel):
+    setup_key: str
+    modules: Dict[str, bool]
+
+
+@router.post("/tenants/{tenant_id}/modules", status_code=status.HTTP_200_OK)
+async def admin_update_tenant_modules(
+    tenant_id: str,
+    req: TenantModulesRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Persist a tenant's subscribed-module toggles (M1-M4, SUPER_ADMIN).
+
+    Stores a sanitized ``{module1..module4: bool}`` map on the tenant doc under
+    ``modules`` and audit-logs it as TENANT_MODULES_UPDATED.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import update_tenant_modules
+    try:
+        doc = update_tenant_modules(tenant_id, user, req.modules)
+        return {"success": True, "tenant": doc}
+    except ValueError as e:
+        msg = str(e)
+        raise HTTPException(
+            status_code=404 if "not found" in msg else 400,
+            detail=msg,
+        )
+    except Exception as e:
+        logger.error(f"Update tenant modules failed ({tenant_id}): {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class RegulatorStatusRequest(BaseModel):
     setup_key: str = Field(..., description="Admin setup key (SETUP_SECRET)")
     status: Optional[str] = Field(None, description="Lifecycle status: demo, trial, active, suspended, retired, cancelled, inactive")

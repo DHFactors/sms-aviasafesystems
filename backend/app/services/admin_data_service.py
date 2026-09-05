@@ -250,6 +250,49 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
     return merged
 
 
+MODULE_KEYS = ("module1", "module2", "module3", "module4")
+
+
+def update_tenant_modules(tenant_id: str, actor: Dict[str, Any],
+                          modules: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist a tenant's subscribed-module toggles (M1 SMS maturity, M2 hazard
+    & risk, M3 PSOE audit, M4 regulator dashboard).
+
+    Values are coerced to booleans, unknown keys are dropped, and the result is
+    merged into the tenant doc under ``modules``. Requires SUPER_ADMIN + setup
+    key and is audit-logged.
+    """
+    tid = _validate_id(tenant_id, "tenant id")
+    doc = _get_tenant(tid)
+
+    clean = {}
+    for key in MODULE_KEYS:
+        clean[key] = bool(modules.get(key))
+
+    now = datetime.now(timezone.utc)
+    # Merge so undeclared keys (future modules) are preserved on the doc.
+    merged_modules = dict(doc.get("modules") or {})
+    merged_modules.update(clean)
+
+    updates = {
+        "modules": merged_modules,
+        "modules_updated_at": now,
+        "modules_updated_by": actor.get("uid"),
+        "updated_at": now,
+    }
+    _tenant_ref(tid).set(updates, merge=True)
+
+    merged = dict(doc)
+    merged.update(updates)
+    merged["modules"] = clean
+    _audit(
+        "TENANT_MODULES_UPDATED", actor, tid,
+        "Modules set to " + ", ".join(f"{k}={v}" for k, v in clean.items()),
+    )
+    logger.info(f"Tenant {tid} modules -> {clean} by {actor.get('uid')}")
+    return merged
+
+
 # ============================================================================
 # Dummy data — PostgreSQL writer
 # ============================================================================

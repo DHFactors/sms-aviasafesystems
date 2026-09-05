@@ -1,8 +1,9 @@
 <!-- ============================================================================
 FILE: public/admin/super-admin.html
 PATH: public/admin/super-admin.html
-PURPOSE: Super Admin hub — navigation to the admin modules and a PSOE Audit
-         entry point. SUPER_ADMIN only.
+PURPOSE: Super Admin hub — quick access to the admin modules, live tenant
+         management (status + subscribed modules M1-M4) and platform stats.
+         SUPER_ADMIN only.
 AUTHOR:  AviaSAFE Systems
 ============================================================================ -->
 
@@ -23,6 +24,7 @@ AUTHOR:  AviaSAFE Systems
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="/js/firebase.js?v=4.0.1"></script>
     <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
 
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; }
@@ -44,7 +46,7 @@ AUTHOR:  AviaSAFE Systems
         .user-badge { background: rgba(255,255,255,.14); color: #fff; padding: .3rem 1rem; border-radius: 999px; font-size: .82rem; }
         .user-badge .role-chip { background: #4fc3f7; color: #072535; padding: .02rem .5rem; border-radius: 999px; margin-right: .4rem; font-weight: 700; }
 
-        .content-area { padding: 26px; flex: 1; max-width: 1080px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+        .content-area { padding: 26px; flex: 1; max-width: 1180px; width: 100%; margin: 0 auto; box-sizing: border-box; }
         .page-head h1 { margin: 0 0 4px; font-size: 1.5rem; color: #0f172a; }
         .page-head .sub { color: #64748b; font-size: .9rem; }
 
@@ -59,6 +61,58 @@ AUTHOR:  AviaSAFE Systems
         .admin-tile h2 { margin: 0 0 4px; font-size: 1.02rem; color: #0f172a; }
         .admin-tile p { margin: 0; color: #64748b; font-size: .84rem; line-height: 1.5; }
         .admin-tile .tile-go { margin-top: .8rem; font-weight: 700; font-size: .8rem; color: #0ea5e9; }
+
+        /* ---- Section title / cards ------------------------------------- */
+        .section-title {
+            font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+            color: #94a3b8; margin: 26px 0 10px;
+        }
+        .admin-card {
+            background: #fff; border-radius: 14px; padding: 22px;
+            box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6;
+        }
+        .btn-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .empty-state { padding: 26px 12px; text-align: center; color: #64748b; font-size: .88rem; }
+        .loading { padding: 26px 12px; text-align: center; color: #64748b; font-size: .88rem; }
+
+        /* ---- Stats strip ------------------------------------------------ */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+        .stat-card {
+            background: #fff; border-radius: 14px; padding: 18px 20px;
+            box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6;
+        }
+        .stat-card .stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; }
+        .stat-card .stat-value { font-size: 1.55rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+        .stat-card .stat-icon { float: right; font-size: 1.5rem; color: #cbd5e1; }
+
+        /* ---- Status select + dots --------------------------------------- */
+        .status-select {
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
+            background: #fff; font-size: .82rem; font-weight: 600; color: #1e293b; cursor: pointer;
+        }
+        .status-select:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 2px rgba(14,165,233,.15); }
+        .status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+        .dot-demo { background: #7c3aed; }
+        .dot-trial { background: #f59e0b; }
+        .dot-active { background: #22c55e; }
+        .dot-suspended { background: #ef4444; }
+        .dot-retired { background: #6b7280; }
+        .dot-cancelled { background: #d1d5db; }
+        .dot-inactive { background: #94a3b8; }
+
+        /* ---- Toggle switches (M1-M4) ------------------------------------ */
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background: #cbd5e1; border-radius: 22px; transition: .3s;
+        }
+        .toggle-switch .slider:before {
+            content: ""; position: absolute; height: 18px; width: 18px; left: 2px; bottom: 2px;
+            background: white; border-radius: 50%; transition: .3s;
+        }
+        .toggle-switch input:checked + .slider { background: #0ea5e9; }
+        .toggle-switch input:checked + .slider:before { transform: translateX(18px); }
 
         .side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
         .side-foot i { color: #e2574c; }
@@ -81,7 +135,29 @@ AUTHOR:  AviaSAFE Systems
             <div class="sub">Administrative modules for production setup, PSOE audit &amp; surveillance, and platform management.</div>
         </div>
 
+        <div class="section-title"><i class="fas fa-chart-simple"></i> Summary</div>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><span class="stat-icon"><i class="fas fa-building"></i></span><div class="stat-label">Tenants</div><div class="stat-value" id="statTenants">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#22c55e;"><i class="fas fa-play-circle"></i></span><div class="stat-label">Active</div><div class="stat-value" id="statActive">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#f59e0b;"><i class="fas fa-flask"></i></span><div class="stat-label">Demo</div><div class="stat-value" id="statDemo">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#7c3aed;"><i class="fas fa-hourglass-half"></i></span><div class="stat-label">Trial</div><div class="stat-value" id="statTrial">–</div></div>
+        </div>
+
+        <div class="section-title"><i class="fas fa-compass"></i> Quick Access</div>
         <div class="grid" id="moduleGrid"></div>
+
+        <div class="section-title"><i class="fas fa-building"></i> Tenant Management</div>
+        <div class="admin-card">
+            <div class="btn-row" style="margin-bottom:12px;">
+                <button class="btn btn-outline btn-sm" onclick="loadTenants()">
+                    <i class="fas fa-rotate"></i> Refresh
+                </button>
+                <span style="margin-left:auto;font-size:.85rem;color:#64748b;" id="tenantCount"></span>
+            </div>
+            <div id="tenantManagementList">
+                <div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div>
+            </div>
+        </div>
 
         <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
     </div>
@@ -99,10 +175,173 @@ var NAV_ITEMS = [
       desc: 'Tenant users, roles and account management.' },
 ];
 
+var STATUS_VALUES = ['demo', 'trial', 'active', 'suspended', 'retired', 'cancelled'];
+var MODULE_LABELS = { module1: 'SMS', module2: 'Risk', module3: 'PSOE', module4: 'Regulator' };
+var DEFAULT_MODULES = { module1: true, module2: false, module3: false, module4: false };
+var CACHED_TENANTS = [];
+
 function esc(v) {
     return String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toast(m, t) { AdminUI.toast(m, t); }
+
+function normStatus(s) { return String(s || 'demo').trim().toUpperCase(); }
+
+function renderStats() {
+    var by = { ACTIVE: 0, DEMO: 0, TRIAL: 0 };
+    (CACHED_TENANTS || []).forEach(function (t) {
+        var s = normStatus(t.status || 'demo');
+        if (s in by) by[s]++;
+    });
+    function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    set('statTenants', CACHED_TENANTS.length);
+    set('statActive', by.ACTIVE);
+    set('statDemo', by.DEMO);
+    set('statTrial', by.TRIAL);
+}
+
+async function loadTenants() {
+    var el = document.getElementById('tenantManagementList');
+    if (!el) return;
+    el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading tenants...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        CACHED_TENANTS = resp.tenants || [];
+        renderTenantTable();
+        renderStats();
+        var count = document.getElementById('tenantCount');
+        if (count) count.textContent = CACHED_TENANTS.length + ' tenant(s)';
+    } catch (err) {
+        el.innerHTML = '<div class="status-box error">Failed to load tenants: ' + esc(err.message) + '</div>';
+    }
+}
+
+function statusOptions(tenantId, statusVal) {
+    return STATUS_VALUES.map(function (v) {
+        return '<option value="' + v + '"' + (normStatus(statusVal) === v.toUpperCase() ? ' selected' : '') + '>' +
+            v.charAt(0).toUpperCase() + v.slice(1) + '</option>';
+    }).join('');
+}
+
+function toggleHtml(tenantId, moduleKey, isChecked) {
+    var checked = isChecked ? 'checked' : '';
+    return '<label class="toggle-switch" title="' + (MODULE_LABELS[moduleKey] || moduleKey) + '">' +
+        '<input type="checkbox" ' + checked + ' data-tenant="' + esc(tenantId) + '" data-module="' + esc(moduleKey) + '" onchange="onToggleChange(this)">' +
+        '<span class="slider"></span></label>';
+}
+
+function renderTenantTable() {
+    var el = document.getElementById('tenantManagementList');
+    if (!el) return;
+    if (!CACHED_TENANTS.length) {
+        el.innerHTML = '<div class="empty-state">No tenants found.</div>';
+        return;
+    }
+    var html = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
+        '<th>Tenant</th><th>Status</th>' +
+        '<th style="text-align:center;">M1<br><span style="font-weight:400;font-size:.7rem;">SMS</span></th>' +
+        '<th style="text-align:center;">M2<br><span style="font-weight:400;font-size:.7rem;">Risk</span></th>' +
+        '<th style="text-align:center;">M3<br><span style="font-weight:400;font-size:.7rem;">PSOE</span></th>' +
+        '<th style="text-align:center;">M4<br><span style="font-weight:400;font-size:.7rem;">Regulator</span></th>' +
+        '<th>Actions</th></tr></thead><tbody>';
+
+    CACHED_TENANTS.forEach(function (t) {
+        var modules = t.modules || DEFAULT_MODULES;
+        var statusVal = t.status || 'demo';
+        var dotClass = 'dot-' + (STATUS_VALUES.indexOf(normStatus(statusVal).toLowerCase()) >= 0
+            ? normStatus(statusVal).toLowerCase() : 'inactive');
+        html += '<tr data-tenant="' + esc(t.id) + '">' +
+            '<td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
+            '<td><span class="status-dot ' + dotClass + '"></span><select class="status-select" data-tenant="' + esc(t.id) + '" onchange="onStatusChange(this)">' +
+            statusOptions(t.id, statusVal) + '</select></td>' +
+            '<td style="text-align:center;">' + toggleHtml(t.id, 'module1', !!modules.module1) + '</td>' +
+            '<td style="text-align:center;">' + toggleHtml(t.id, 'module2', !!modules.module2) + '</td>' +
+            '<td style="text-align:center;">' + toggleHtml(t.id, 'module3', !!modules.module3) + '</td>' +
+            '<td style="text-align:center;">' + toggleHtml(t.id, 'module4', !!modules.module4) + '</td>' +
+            '<td><button class="btn btn-primary btn-sm" onclick="saveTenant(\'' + esc(t.id) + '\')"><i class="fas fa-save"></i> Save</button></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+}
+
+function onStatusChange(sel) {
+    var row = sel.closest('tr');
+    if (row) row.style.borderLeft = '3px solid #f59e0b';
+}
+
+function onToggleChange(cb) {
+    var row = cb.closest('tr');
+    if (row) row.style.borderLeft = '3px solid #f59e0b';
+}
+
+function readModules(row) {
+    return {
+        module1: row.querySelector('input[data-module="module1"]').checked,
+        module2: row.querySelector('input[data-module="module2"]').checked,
+        module3: row.querySelector('input[data-module="module3"]').checked,
+        module4: row.querySelector('input[data-module="module4"]').checked
+    };
+}
+
+async function saveTenant(tenantId) {
+    var row = document.querySelector('tr[data-tenant="' + tenantId + '"]');
+    if (!row) return;
+
+    var cached = null;
+    for (var i = 0; i < CACHED_TENANTS.length; i++) {
+        if (CACHED_TENANTS[i].id === tenantId) { cached = CACHED_TENANTS[i]; break; }
+    }
+
+    var status = row.querySelector('.status-select').value;
+    var modules = readModules(row);
+    var cachedModules = (cached && cached.modules) || DEFAULT_MODULES;
+
+    var statusChanged = normStatus(status) !== normStatus(cached ? cached.status : 'demo');
+    var modulesChanged = ['module1', 'module2', 'module3', 'module4'].some(function (k) {
+        return !!cachedModules[k] !== !!modules[k];
+    });
+
+    if (!statusChanged && !modulesChanged) {
+        toast('No changes to save for ' + tenantId + '.', 'info');
+        return;
+    }
+
+    var setupKey;
+    try {
+        setupKey = AdminUI.ensureSetupKey();
+    } catch (err) {
+        row.style.borderLeft = '3px solid #ef4444';
+        toast('Setup key required to save tenant changes.', 'error');
+        return;
+    }
+
+    try {
+        if (statusChanged) {
+            await AdminUI.apiPost('/api/v1/admin/tenants/' + tenantId + '/status', {
+                setup_key: setupKey,
+                status: status
+            });
+        }
+        if (modulesChanged) {
+            await AdminUI.apiPost('/api/v1/admin/tenants/' + tenantId + '/modules', {
+                setup_key: setupKey,
+                modules: modules
+            });
+        }
+        if (cached) {
+            cached.status = status;
+            cached.modules = modules;
+        }
+        row.style.borderLeft = '3px solid #10b981';
+        renderStats();
+        toast('Tenant ' + tenantId + ' updated successfully.', 'success');
+    } catch (err) {
+        row.style.borderLeft = '3px solid #ef4444';
+        toast('Update failed: ' + err.message, 'error');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -136,6 +375,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             '<p>' + esc(n.desc) + '</p>' +
             '<div class="tile-go">Open &nbsp;<i class="fas fa-arrow-right"></i></div></a>';
     }).join('');
+
+    loadTenants();
 });
 
 function logout() {
