@@ -6,6 +6,7 @@ from app.api.v1.tenant_reports import router as tenant_reports_router
 from app.api.v1.nhrc import router as nhrc_router
 from app.api.v1.spi import router as spi_router
 from app.api.v1.endpoints.tenants import router as tenant_onboarding_router
+from app.api.v1.endpoints.sram import router as sram_router
 
 router = APIRouter()
 
@@ -15,3 +16,4 @@ router.include_router(tenant_reports_router, prefix="/tenants", tags=["Tenant SM
 router.include_router(tenant_onboarding_router, prefix="/tenants", tags=["Tenant Onboarding"])
 router.include_router(nhrc_router, tags=["N-HRC National High-Risk Categories"])
 router.include_router(spi_router, tags=["SPI/SPT Safety Performance"])
+router.include_router(sram_router, tags=["SRAM - Safety Risk Assessment & Mitigation"])

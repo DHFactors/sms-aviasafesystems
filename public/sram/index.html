@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRAM (Bow-Tie) - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f5f7fa; font-family: 'Inter', system-ui, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 1280px; margin: 0 auto; padding: 1.5rem; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+        .header-bar h2 { margin: 0; color: #0b2a42; }
+        .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+        .card h3 { margin: 0 0 1rem; color: #0b2a42; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .card h3 .sub { font-size: 0.75rem; font-weight: 500; color: #64748b; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+        .filter-bar label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        select, input, textarea { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; font-family: inherit; color: #0b2a42; }
+        textarea { resize: vertical; }
+        .btn { background: #1a6b8a; color: #fff; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .btn:hover { background: #0d5572; }
+        .btn-secondary { background: #64748b; }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-outline { background: #fff; color: #1a6b8a; border: 1px solid #1a6b8a; }
+        .btn-outline:hover { background: #eaf4f8; }
+        .btn-small { padding: 0.25rem 0.7rem; font-size: 0.78rem; }
+        .btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .badge-intolerable { background: #fde8e8; color: #b91c1c; }
+        .badge-tolerable { background: #fef3c7; color: #b45309; }
+        .badge-acceptable { background: #e8f5e9; color: #2e7d32; }
+        .badge-prev { background: #e3f2fd; color: #1565c0; }
+        .badge-recv { background: #ede7f6; color: #5e35b1; }
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-processing { background: #fff3e0; color: #e65100; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        .bowtie-pane { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 1rem; }
+        .bowtie-pane .pane { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem; }
+        .pane h4 { margin: 0 0 0.6rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; display: flex; align-items: center; gap: 0.4rem; }
+        .pane .pane-body { display: flex; flex-direction: column; gap: 0.5rem; min-height: 4rem; }
+        .pane-item { background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid #1a6b8a; border-radius: 8px; padding: 0.5rem 0.75rem; font-size: 0.85rem; }
+        .pane-item .meta { font-size: 0.72rem; color: #64748b; margin-top: 0.25rem; }
+        .pane-top { border-left-color: #dc3545; }
+        .control-item { border-left: 4px solid #2e7d32; }
+        .control-item.recv { border-left-color: #5e35b1; }
+        .matrix-wrap { overflow-x: auto; }
+        .matrix { border-collapse: collapse; margin-top: 0.5rem; min-width: 480px; }
+        .matrix th, .matrix td { border: 1px solid #e2e8f0; text-align: center; padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+        .matrix th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: 0.72rem; }
+        .matrix td.cell { cursor: pointer; transition: transform 0.08s; }
+        .matrix td.cell:hover { transform: scale(1.08); outline: 2px solid #0b2a42; }
+        .matrix td.cell.selected { outline: 3px solid #0b2a42; }
+        .matrix td.cell.red { background: #fde8e8; }
+        .matrix td.cell.yellow { background: #fef3c7; }
+        .matrix td.cell.green { background: #e8f5e9; }
+        .risk-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .risk-block { border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.75rem 1rem; background: #f8fafc; }
+        .risk-block .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; color: #64748b; }
+        .risk-block .val { font-size: 1.25rem; font-weight: 700; margin-top: 0.2rem; }
+        .score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
+        .score-grid label { font-size: 0.75rem; color: #475569; font-weight: 600; }
+        .score-grid select { width: 100%; }
+        .inline-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-top: 0.75rem; }
+        .inline-form input[type="text"] { flex: 1 1 220px; }
+        .form-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 0.5rem; }
+        .form-row label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        .legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b; margin-top: 0.5rem; }
+        .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+        .swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; border: 1px solid #cbd5e1; }
+        .muted { color: #64748b; font-size: 0.8rem; }
+        .empty-hint { color: #94a3b8; font-size: 0.8rem; text-align: center; padding: 1rem 0; }
+        .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: #0b2a42; color: #fff; padding: 0.75rem 1.25rem; border-radius: 10px; font-size: 0.85rem; box-shadow: 0 4px 16px rgba(0,0,0,0.25); opacity: 0; transform: translateY(8px); transition: 0.25s; z-index: 200; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: #b91c1c; }
+        .divider { border: none; border-top: 1px solid #eef2f6; margin: 0.9rem 0; }
+        .field-group { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.75rem; }
+        .field-group label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        @media (max-width: 860px) { .bowtie-pane { grid-template-columns: 1fr; } }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+<div class="app-shell">
+<div class="page">
+
+    <div class="header-bar">
+        <h2><i class="fas fa-project-diagram"></i> SRAM - Safety Risk Assessment &amp; Mitigation</h2>
+    </div>
+
+    <!-- Hazard selection -->
+    <div class="card">
+        <h3><i class="fas fa-triangle-exclamation"></i> Hazard <span class="sub">Select the hazard to analyse</span></h3>
+        <div class="filter-bar">
+            <label>Hazard:</label>
+            <select id="hazardSelect" style="min-width:320px;"><option value="">Loading hazards...</option></select>
+            <button class="btn" onclick="loadSelectedHazard()"><i class="fas fa-flask"></i> Load / Create Bow-Tie</button>
+            <span id="hazardMeta" class="muted"></span>
+        </div>
+    </div>
+
+    <!-- Bow-Tie -->
+    <div class="card" id="bowtieCard" style="display:none;">
+        <h3><i class="fas fa-project-diagram"></i> Bow-Tie Analysis <span class="sub">Threats &rarr; Top Event &rarr; Consequences</span></h3>
+        <div class="bowtie-pane">
+            <div class="pane">
+                <h4><i class="fas fa-arrow-right"></i> Threats</h4>
+                <div class="pane-body" id="threatList"></div>
+                <div class="inline-form">
+                    <input type="text" id="threatInput" placeholder="Add a threat e.g. Engine bird strike">
+                    <select id="threatProbability" title="Likelihood 1-5">
+                        <option value="">Prob</option>
+                        <option value="1">1 Rare</option>
+                        <option value="2">2</option>
+                        <option value="3">3 Possible</option>
+                        <option value="4">4</option>
+                        <option value="5">5 Frequent</option>
+                    </select>
+                    <button class="btn btn-small" onclick="addThreat()"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </div>
+            <div class="pane">
+                <h4><i class="fas fa-bullseye"></i> Top Event</h4>
+                <div class="pane-body"><div class="pane-item pane-top" id="topEventDisplay">-</div></div>
+                <div class="inline-form">
+                    <input type="text" id="topEventInput" placeholder="Top event e.g. Engine failure">
+                    <button class="btn btn-small btn-outline" onclick="setTopEvent()"><i class="fas fa-save"></i> Set</button>
+                </div>
+            </div>
+            <div class="pane">
+                <h4><i class="fas fa-arrow-left"></i> Consequences</h4>
+                <div class="pane-body" id="consequenceList"></div>
+                <div class="inline-form">
+                    <input type="text" id="consequenceInput" placeholder="Consequence e.g. Forced landing">
+                    <select id="consequenceSeverity" title="Severity A-E">
+                        <option value="A">A Negligible</option>
+                        <option value="B">B Minor</option>
+                        <option value="C" selected>C Moderate</option>
+                        <option value="D">D Major</option>
+                        <option value="E">E Catastrophic</option>
+                    </select>
+                    <button class="btn btn-small" onclick="addConsequence()"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </div>
+        </div>
+        <hr class="divider">
+        <div class="form-row">
+            <label>Description / context:</label>
+            <input type="text" id="descriptionInput" placeholder="Optional context for this Bow-Tie" style="flex:1;">
+        </div>
+    </div>
+
+    <!-- Controls / Barriers -->
+    <div class="card" id="controlsCard" style="display:none;">
+        <h3><i class="fas fa-shield-halved"></i> Controls &amp; Barriers <span class="sub">Preventive (left of top event) · Recovery (right)</span></h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;" class="controls-grid">
+            <div>
+                <h4 style="margin:0 0 0.5rem;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;"><i class="fas fa-shield"></i> Preventive</h4>
+                <div class="pane-body" id="controlListP" style="min-height:3rem;"></div>
+                <div class="inline-form">
+                    <input type="text" id="controlInputP" placeholder="Preventive barrier e.g. Bird patrol">
+                    <button class="btn btn-small" onclick="addControl(false)"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </div>
+            <div>
+                <h4 style="margin:0 0 0.5rem;font-size:0.8rem;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;"><i class="fas fa-life-ring"></i> Recovery</h4>
+                <div class="pane-body" id="controlListR" style="min-height:3rem;"></div>
+                <div class="inline-form">
+                    <input type="text" id="controlInputR" placeholder="Recovery barrier e.g. ATS assistance">
+                    <button class="btn btn-small" onclick="addControl(true)"><i class="fas fa-plus"></i> Add</button>
+                </div>
+            </div>
+        </div>
+        <p class="muted" style="margin:0.75rem 0 0;">Barrier element scores (1-5) feed the <strong>Barrier Strength Value (BSV)</strong>. Use <em>Score</em> on any barrier to rate its elements.</p>
+    </div>
+
+    <!-- Risk assessment -->
+    <div class="card" id="riskCard" style="display:none;">
+        <h3><i class="fas fa-table-cells"></i> Risk Assessment &amp; Matrix <span class="sub">Click a matrix cell to set the current risk</span></h3>
+        <div class="form-row">
+            <label>Current probability:</label>
+            <select id="riskCurrentProb">
+                <option value="">Select</option>
+                <option value="1">1 Rare</option>
+                <option value="2">2</option>
+                <option value="3">3 Possible</option>
+                <option value="4">4</option>
+                <option value="5">5 Frequent</option>
+            </select>
+            <label>Current severity:</label>
+            <select id="riskCurrentSev">
+                <option value="">Select</option>
+                <option value="A">A Negligible</option>
+                <option value="B">B Minor</option>
+                <option value="C">C Moderate</option>
+                <option value="D">D Major</option>
+                <option value="E">E Catastrophic</option>
+            </select>
+            <label>Residual probability:</label>
+            <select id="riskResultantProb">
+                <option value="">n/a</option>
+                <option value="1">1 Rare</option>
+                <option value="2">2</option>
+                <option value="3">3 Possible</option>
+                <option value="4">4</option>
+                <option value="5">5 Frequent</option>
+            </select>
+            <label>Residual severity:</label>
+            <select id="riskResultantSev">
+                <option value="">n/a</option>
+                <option value="A">A Negligible</option>
+                <option value="B">B Minor</option>
+                <option value="C">C Moderate</option>
+                <option value="D">D Major</option>
+                <option value="E">E Catastrophic</option>
+            </select>
+            <button class="btn" onclick="calculateRisk()"><i class="fas fa-calculator"></i> Calculate</button>
+        </div>
+        <div class="matrix-wrap">
+            <table class="matrix" id="matrixTable"></table>
+        </div>
+        <div class="legend">
+            <span><span class="swatch" style="background:#fde8e8;"></span> Intolerable</span>
+            <span><span class="swatch" style="background:#fef3c7;"></span> Tolerable (ALARP)</span>
+            <span><span class="swatch" style="background:#e8f5e9;"></span> Acceptable</span>
+        </div>
+        <div class="risk-summary" id="riskSummary" style="display:none;">
+            <div class="risk-block"><div class="lbl">Current Index</div><div class="val" id="currentIndexVal">-</div><div id="currentIndexBadge"></div></div>
+            <div class="risk-block"><div class="lbl">Residual Index</div><div class="val" id="resultantIndexVal">-</div><div id="resultantIndexBadge"></div></div>
+            <div class="risk-block"><div class="lbl">Barrier Strength (BSV)</div><div class="val" id="bsvVal">-</div><div id="bsvBadge"></div></div>
+        </div>
+    </div>
+
+    <!-- Acceptance -->
+    <div class="card" id="acceptanceCard" style="display:none;">
+        <h3><i class="fas fa-file-signature"></i> Risk Acceptance (ALARP) <span class="sub">Justify acceptance or escalation &ge; 10 characters</span></h3>
+        <div class="field-group">
+            <label for="acceptanceJustify">ALARP justification</label>
+            <textarea id="acceptanceJustify" rows="3" placeholder="Explain why the residual risk is tolerable (ALARP) for this hazard..."></textarea>
+        </div>
+        <div class="form-row">
+            <label>Status:</label>
+            <select id="acceptanceStatus">
+                <option value="open">Open</option>
+                <option value="in_progress" selected>In Progress</option>
+                <option value="closed">Closed</option>
+            </select>
+            <label>Review date:</label>
+            <input type="date" id="acceptanceReview">
+            <button class="btn" onclick="saveAll()"><i class="fas fa-save"></i> Save &amp; Accept</button>
+        </div>
+        <div id="acceptanceResult" class="muted" style="margin-top:0.75rem;"></div>
+    </div>
+
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
+<script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    heroTitle: 'SRAM (Bow-Tie)',
+    heroSubtitle: 'Safety Risk Assessment & Mitigation - ICAO Annex 19 / Doc 9859 / CAAN Ch. 2.3'
+};
+</script>
+<script src="/js/shell.js"></script>
+<script src="/js/sram.js"></script>
+<script>
+// ============================================================================
+// SRAM page controller
+// ============================================================================
+var state = {
+    hazard: null,
+    bowtie: null,
+    threats: [],
+    consequences: [],
+    controls: [],
+    risk: null,
+    tenant: ''
+};
+
+var currentUser = null;
+
+function toast(msg, isError) {
+    var el = document.getElementById('sramToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'sramToast';
+        el.className = 'toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.toggle('error', !!isError);
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.classList.remove('show'); }, 3200);
+}
+
+function esc(text) {
+    var div = document.createElement('div');
+    div.textContent = String(text == null ? '' : text);
+    return div.innerHTML;
+}
+
+// ---- hazard selection ------------------------------------------------------
+
+function getTenant() {
+    if (state.tenant) return state.tenant;
+    try {
+        return (currentUser && currentUser.tenant_id) || '';
+    } catch (e) { return ''; }
+}
+
+function loadHazards() {
+    var sel = document.getElementById('hazardSelect');
+    SRAM.loadHazards().then(function (hazards) {
+        sel.innerHTML = '';
+        if (!hazards.length) {
+            sel.innerHTML = '<option value="">No hazards found</option>';
+            return;
+        }
+        hazards.forEach(function (h) {
+            var opt = document.createElement('option');
+            opt.value = h.id;
+            opt.textContent = (h.reference || h.id) + ' - ' + (h.title || '');
+            sel.appendChild(opt);
+        });
+    }).catch(function (err) {
+        sel.innerHTML = '<option value="">Failed to load hazards</option>';
+        toast('Failed to load hazards: ' + err.message, true);
+    });
+}
+
+function loadSelectedHazard() {
+    var sel = document.getElementById('hazardSelect');
+    var hazardId = sel.value;
+    if (!hazardId) { toast('Select a hazard first', true); return; }
+    var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : hazardId;
+    state.hazard = { id: hazardId, label: label };
+    document.getElementById('hazardMeta').textContent = label;
+    ['bowtieCard', 'controlsCard', 'riskCard', 'acceptanceCard'].forEach(function (id) {
+        document.getElementById(id).style.display = '';
+    });
+    document.getElementById('threatList').innerHTML = '';
+    document.getElementById('consequenceList').innerHTML = '';
+    document.getElementById('controlListP').innerHTML = '';
+    document.getElementById('controlListR').innerHTML = '';
+    document.getElementById('riskSummary').style.display = 'none';
+    document.getElementById('acceptanceResult').textContent = '';
+
+    ensureBowtie().then(function () {
+        renderThreats(); renderConsequences(); renderControls(); renderTopEvent(); renderMatrix();
+        loadExistingRisk();
+    }).catch(function (err) {
+        toast('Failed to load Bow-Tie: ' + err.message, true);
+    });
+}
+
+function ensureBowtie() {
+    if (state.bowtie && state.bowtie.id) return Promise.resolve(state.bowtie);
+    return SRAM.getBowtie(state.hazard.id).then(function (data) {
+        if (data && data.id) {
+            state.bowtie = data;
+            state.threats = data.threats || [];
+            state.consequences = data.consequences || [];
+            state.controls = data.controls || [];
+            document.getElementById('topEventInput').value = data.top_event || '';
+            document.getElementById('descriptionInput').value = data.description || '';
+            return data;
+        }
+        state.bowtie = null;
+        return data;
+    }).catch(function (err) {
+        // No Bow-Tie yet for this hazard - create one lazily.
+        if (err && err.status === 404) return createBowtie();
+        throw err;
+    });
+}
+
+function createBowtie() {
+    return SRAM.createBowtie(state.hazard.id, {
+        top_event: document.getElementById('topEventInput').value || undefined,
+        description: document.getElementById('descriptionInput').value || undefined
+    }).then(function (data) {
+        state.bowtie = data;
+        return data;
+    });
+}
+
+// ---- bow tie rendering ----------------------------------------------------
+
+function renderTopEvent() {
+    var top = (state.bowtie && state.bowtie.top_event) ? state.bowtie.top_event : 'Set a top event';
+    document.getElementById('topEventDisplay').textContent = top;
+}
+
+function setTopEvent() {
+    var val = document.getElementById('topEventInput').value.trim();
+    if (!val) { toast('Enter a top event', true); return; }
+    ensureBowtie().then(function () {
+        return SRAM.createBowtie(state.hazard.id, {
+            top_event: val,
+            description: document.getElementById('descriptionInput').value.trim() || undefined
+        });
+    }).then(function (data) {
+        state.bowtie = data;
+        renderTopEvent();
+        toast('Top event updated');
+    }).catch(function (err) { toast('Failed to set top event: ' + err.message, true); });
+}
+
+function renderThreats() {
+    var box = document.getElementById('threatList');
+    if (!state.threats.length) { box.innerHTML = '<div class="empty-hint">No threats yet</div>'; return; }
+    box.innerHTML = state.threats.map(function (t) {
+        var prob = t.probability ? '<span class="badge badge-default">p=' + t.probability + '</span>' : '';
+        return '<div class="pane-item">' + esc(t.threat) + '<div class="meta">#' + (t.threat_order || '-') + ' ' + prob + '</div></div>';
+    }).join('');
+}
+
+function addThreat() {
+    var input = document.getElementById('threatInput');
+    var val = input.value.trim();
+    if (!val) { toast('Enter a threat', true); return; }
+    ensureBowtie().then(function () {
+        return SRAM.addThreat(state.bowtie.id, val, {
+            probability: document.getElementById('threatProbability').value || undefined
+        });
+    }).then(function (data) {
+        state.threats.push(data);
+        input.value = '';
+        renderThreats();
+        toast('Threat added');
+    }).catch(function (err) { toast('Failed to add threat: ' + err.message, true); });
+}
+
+function renderConsequences() {
+    var box = document.getElementById('consequenceList');
+    if (!state.consequences.length) { box.innerHTML = '<div class="empty-hint">No consequences yet</div>'; return; }
+    box.innerHTML = state.consequences.map(function (c) {
+        return '<div class="pane-item">' + esc(c.consequence) + '<div class="meta">#' + (c.consequence_order || '-') + ' severity ' + (c.severity_level || 'C') + '</div></div>';
+    }).join('');
+}
+
+function addConsequence() {
+    var input = document.getElementById('consequenceInput');
+    var val = input.value.trim();
+    if (!val) { toast('Enter a consequence', true); return; }
+    ensureBowtie().then(function () {
+        return SRAM.addConsequence(state.bowtie.id, val,
+            document.getElementById('consequenceSeverity').value || 'C', {});
+    }).then(function (data) {
+        state.consequences.push(data);
+        input.value = '';
+        renderConsequences();
+        toast('Consequence added');
+    }).catch(function (err) { toast('Failed to add consequence: ' + err.message, true); });
+}
+
+// ---- controls --------------------------------------------------------------
+
+function renderControls() {
+    ['controlListP', 'controlListR'].forEach(function (listId) {
+        var isRecovery = listId === 'controlListR';
+        var box = document.getElementById(listId);
+        var items = state.controls.filter(function (c) { return (c.control_type === 'recovery') === isRecovery; });
+        if (!items.length) { box.innerHTML = '<div class="empty-hint">No ' + (isRecovery ? 'recovery' : 'preventive') + ' barriers yet</div>'; return; }
+        box.innerHTML = items.map(controlHtml).join('');
+    });
+}
+
+function controlHtml(c) {
+    var score = c.barrier_scores && Object.keys(c.barrier_scores).length
+        ? SRAM.bsvFromScores(c.barrier_scores)
+        : null;
+    var statusBadge = c.implementation_status
+        ? '<span class="badge ' + SRAM.statusBadgeClass(c.implementation_status) + '">' + esc(SRAM.statusLabel(c.implementation_status)) + '</span>' : '';
+    var bsv = score ? '<span class="badge badge-default">BSV ' + score.bsv + ' ' + esc(score.correlation) + '</span>' : '';
+    return '<div class="pane-item control-item' + (c.control_type === 'recovery' ? ' recv' : '') + '" data-type="' + esc(c.control_type) + '">' +
+        esc(c.control) +
+        '<div class="meta">' + (c.owner ? 'Owner: ' + esc(c.owner) + ' · ' : '') + statusBadge + ' ' + bsv +
+        '<button class="btn btn-outline btn-small" style="margin-left:0.5rem;" onclick="toggleScoring(\'' + esc(c.control_id || c.id) + '\')"><i class="fas fa-sliders"></i> Score</button>' +
+        '</div>' +
+        '<div class="score-panel" id="scorePanel-' + esc(c.control_id || c.id) + '" style="display:none;"></div>' +
+        '</div>';
+}
+
+function toggleScoring(controlId) {
+    var panel = document.getElementById('scorePanel-' + controlId);
+    if (!panel) return;
+    var control = state.controls.filter(function (c) { return (c.control_id || c.id) === controlId; })[0];
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    var scores = control.barrier_scores || {};
+    var html = '<div class="score-grid">' + SRAM.ELEMENT_KEYS.map(function (k) {
+        var cur = scores[k];
+        var opts = ['', '1', '2', '3', '4', '5'].map(function (v) {
+            return '<option value="' + v + '"' + (String(cur) === v ? ' selected' : '') + '>' + (v === '' ? '—' : v) + '</option>';
+        }).join('');
+        return '<div><label>' + (SRAM.ELEMENT_LABELS[k] || k) + ' (w=' + SRAM.ELEMENT_WEIGHTS[k] + ')</label><select data-k="' + k + '">' + opts + '</select></div>';
+    }).join('') + '</div>' +
+        '<div class="inline-form"><button class="btn btn-small btn-outline" onclick="saveScores(\'' + esc(controlId) + '\')"><i class="fas fa-save"></i> Save Scores</button></div>';
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+}
+
+function saveScores(controlId) {
+    var panel = document.getElementById('scorePanel-' + controlId);
+    var control = state.controls.filter(function (c) { return (c.control_id || c.id) === controlId; })[0];
+    if (!control) return;
+    var scores = {};
+    panel.querySelectorAll('select[data-k]').forEach(function (sel) {
+        if (sel.value !== '') scores[sel.dataset.k] = parseInt(sel.value, 10);
+    });
+    var body = { barrier_scores: scores };
+    SRAM.updateBarrier(control.barrier_id || controlId, body).then(function () {
+        control.barrier_scores = scores;
+        renderControls();
+        toast('Barrier scores saved (BSV updated)');
+    }).catch(function (err) { toast('Failed to save scores: ' + err.message, true); });
+}
+
+function addControl(isRecovery) {
+    var listId = isRecovery ? 'controlInputR' : 'controlInputP';
+    var input = document.getElementById(listId);
+    var val = input.value.trim();
+    if (!val) { toast('Enter a barrier name', true); return; }
+    var type = isRecovery ? 'recovery' : 'preventive';
+    ensureBowtie().then(function () {
+        return SRAM.addControl(state.bowtie.id, val, type, {});
+    }).then(function (data) {
+        state.controls.push(data);
+        input.value = '';
+        renderControls();
+        toast((isRecovery ? 'Recovery' : 'Preventive') + ' barrier added');
+    }).catch(function (err) { toast('Failed to add barrier: ' + err.message, true); });
+}
+
+// ---- risk matrix + assessment ----------------------------------------------
+
+function renderMatrix() {
+    var table = document.getElementById('matrixTable');
+    var html = '<thead><tr><th>Prob \\ Sev</th>' + SRAM.SEVERITY_LETTERS.map(function (s) { return '<th>Severity ' + s + '</th>'; }).join('') + '</tr></thead><tbody>';
+    SRAM.buildRiskMatrix().forEach(function (row) {
+        html += '<tr><th>P' + row.probability + '</th>';
+        row.cells.forEach(function (cell) {
+            html += '<td class="cell ' + cell.color + '" data-p="' + cell.probability + '" data-s="' + cell.severity + '" onclick="setCurrentRisk(' + cell.probability + ',\'' + cell.severity + '\')">' +
+                cell.risk_index + '<br><span style="font-size:0.65rem;">' + cell.tolerability + '</span></td>';
+        });
+        html += '</tr>';
+    });
+    html += '</tbody>';
+    table.innerHTML = html;
+}
+
+function setCurrentRisk(p, s) {
+    document.getElementById('riskCurrentProb').value = String(p);
+    document.getElementById('riskCurrentSev').value = s;
+    document.querySelectorAll('#matrixTable td.cell').forEach(function (td) {
+        td.classList.toggle('selected', td.dataset.p === String(p) && td.dataset.s === s);
+    });
+}
+
+function collectBarrierScores() {
+    var map = {};
+    state.controls.forEach(function (c) {
+        if (c.barrier_scores && Object.keys(c.barrier_scores).length) {
+            map[c.control_id || c.id] = c.barrier_scores;
+        }
+    });
+    return map;
+}
+
+function calculateRisk() {
+    var pc = document.getElementById('riskCurrentProb').value;
+    var sc = document.getElementById('riskCurrentSev').value;
+    if (!pc || !sc) { toast('Select current probability and severity', true); return; }
+    var assessment = {
+        probability_current: parseInt(pc, 10),
+        severity_current: sc,
+        probability_resultant: document.getElementById('riskResultantProb').value ? parseInt(document.getElementById('riskResultantProb').value, 10) : undefined,
+        severity_resultant: document.getElementById('riskResultantSev').value || undefined,
+        barrier_scores: collectBarrierScores()
+    };
+    SRAM.calculateRisk(state.hazard.id, assessment).then(function (data) {
+        state.risk = data;
+        renderRiskSummary(data);
+        toast('Risk calculated &amp; saved to register');
+    }).catch(function (err) { toast('Failed to calculate risk: ' + err.message, true); });
+}
+
+function renderRiskSummary(data) {
+    var d = data || {};
+    var summary = document.getElementById('riskSummary');
+    summary.style.display = 'grid';
+    document.getElementById('currentIndexVal').textContent = d.current_index || '-';
+    document.getElementById('currentIndexBadge').innerHTML = '<span class="badge badge-' + (d.current_tolerability || '').toLowerCase() + '">' + esc(d.current_tolerability || '-') + '</span>';
+    document.getElementById('resultantIndexVal').textContent = d.resultant_index || '-';
+    document.getElementById('resultantIndexBadge').innerHTML = '<span class="badge badge-' + (d.resultant_tolerability || '').toLowerCase() + '">' + esc(d.resultant_tolerability || '-') + '</span>';
+    var agg = d.aggregate_bsv;
+    document.getElementById('bsvVal').textContent = agg ? agg.bsv : '-';
+    document.getElementById('bsvBadge').innerHTML = agg ? '<span class="badge badge-default">' + esc(agg.correlation) + '</span>' : '';
+}
+
+// ---- acceptance -------------------------------------------------------------
+
+function loadExistingRisk() {
+    var tenant = getTenant();
+    if (!tenant) return;
+    SRAM.loadRiskRegister(tenant).then(function (data) {
+        var rows = data.rows || data || [];
+        var match = rows.filter(function (r) { return r.hazard_id === state.hazard.id; })[0];
+        if (match) {
+            var box = document.getElementById('acceptanceResult');
+            box.innerHTML = '<i class="fas fa-circle-check"></i> Last assessed: ' +
+                esc(match.current_index || '-') + ' (' + esc(match.current_tolerability || '-') + ')' +
+                (match.resultant_index ? ' &rarr; residual ' + esc(match.resultant_index) + ' (' + esc(match.resultant_tolerability) + ')' : '') +
+                (match.accepted ? ' · <strong>Accepted</strong> by ' + esc(match.accepted_by || 'unknown') : ' · not yet accepted');
+        }
+    }).catch(function () { /* ignore - register may be empty */ });
+}
+
+function saveAll() {
+    var justification = document.getElementById('acceptanceJustify').value.trim();
+    if (justification && justification.length < 10) { toast('ALARP justification must be at least 10 characters', true); return; }
+    var pc = document.getElementById('riskCurrentProb').value;
+    var sc = document.getElementById('riskCurrentSev').value;
+
+    ensureBowtie().then(function () {
+        var saveState = {
+            hazard_id: state.hazard.id,
+            bowtie_id: state.bowtie.id,
+            top_event: document.getElementById('topEventInput').value.trim() || undefined,
+            description: document.getElementById('descriptionInput').value.trim() || undefined,
+            pending: { threats: [], consequences: [], controls: [] },
+            assessment: (pc && sc) ? {
+                probability_current: parseInt(pc, 10),
+                severity_current: sc,
+                probability_resultant: document.getElementById('riskResultantProb').value ? parseInt(document.getElementById('riskResultantProb').value, 10) : undefined,
+                severity_resultant: document.getElementById('riskResultantSev').value || undefined,
+                barrier_scores: collectBarrierScores()
+            } : null,
+            acceptance: justification ? {
+                alarp_justification: justification,
+                status: document.getElementById('acceptanceStatus').value,
+                review_date: document.getElementById('acceptanceReview').value || undefined
+            } : null
+        };
+        return SRAM.saveSRAM(saveState);
+    }).then(function (result) {
+        var box = document.getElementById('acceptanceResult');
+        var r = (result && result.data) || {};
+        box.innerHTML = '<i class="fas fa-circle-check" style="color:#2e7d32;"></i> SRAM saved' +
+            (r.current_index ? ' · index ' + esc(r.current_index) + ' (' + esc(r.current_tolerability || '') + ')' : '') +
+            (r.accepted ? ' · <strong>Risk accepted</strong> under ALARP' : '');
+        toast('SRAM saved successfully');
+    }).catch(function (err) {
+        toast('SRAM save failed: ' + err.message, true);
+    });
+}
+
+// ---- boot -------------------------------------------------------------------
+
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!user) { window.location.href = '/login.html'; return; }
+    currentUser = user;
+    if (typeof applyDepartmentContext === 'function') applyDepartmentContext(user.email);
+    user.getIdTokenResult(true).then(function (tr) {
+        var t = (tr.claims && tr.claims.tenant_id) || '';
+        state.tenant = t;
+        if (t && typeof updateShellTenant === 'function') updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
+    }).catch(function () {});
+    loadHazards();
+});
+</script>
+
+</body>
+</html>

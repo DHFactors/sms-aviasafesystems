@@ -11,7 +11,7 @@
     "php": "php -S localhost:8000",
     "live": "live-server --port=5500",
     "build": "echo 'No build step required'",
-    "test": "node frontend-tests/dashboard.test.js"
+    "test": "node frontend-tests/dashboard.test.js && node frontend-tests/sram.test.js"
   },
   "keywords": [
     "safety-management",

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barrier Register - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f5f7fa; font-family: 'Inter', system-ui, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+        .header-bar h2 { margin: 0; color: #0b2a42; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: #fff; padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.25rem; }
+        .filter-bar label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        select, input { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; font-family: inherit; color: #0b2a42; }
+        .btn { background: #1a6b8a; color: #fff; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .btn:hover { background: #0d5572; }
+        .table-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+        .table-card table { width: 100%; border-collapse: collapse; }
+        .table-card th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.85rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        .table-card td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; vertical-align: top; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .badge-prev { background: #e3f2fd; color: #1565c0; }
+        .badge-recv { background: #ede7f6; color: #5e35b1; }
+        .badge-strong { background: #dcfce7; color: #15803d; }
+        .badge-satisfactory { background: #d1fae5; color: #059669; }
+        .badge-moderate { background: #fef3c7; color: #b45309; }
+        .badge-weak { background: #fde8e8; color: #b91c1c; }
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-processing { background: #fff3e0; color: #e65100; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
+        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+        .score-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+        .chip { background: #f1f5f9; border-radius: 6px; padding: 0.2rem 0.5rem; font-size: 0.72rem; color: #475569; white-space: nowrap; }
+        .chip b { color: #0b2a42; }
+        @media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+<div class="app-shell">
+
+<div class="page">
+    <div class="header-bar">
+        <h2><i class="fas fa-shield-halved"></i> Barrier Register</h2>
+        <span class="badge badge-default" id="rowCount">0 barriers</span>
+    </div>
+
+    <div class="filter-bar">
+        <label>Type:</label>
+        <select id="filterType">
+            <option value="">All</option>
+            <option value="preventive">Preventive</option>
+            <option value="recovery">Recovery</option>
+        </select>
+        <label>Search:</label>
+        <input type="text" id="filterSearch" placeholder="Barrier or hazard..." style="flex:1;min-width:160px;">
+        <button class="btn" onclick="renderTable()"><i class="fas fa-search"></i> Filter</button>
+        <button class="btn" style="background:#64748b;" onclick="loadBarriers()"><i class="fas fa-refresh"></i> Reload</button>
+    </div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Hazard</th>
+                    <th>Barrier / Control</th>
+                    <th>Type</th>
+                    <th>Barrier Strength</th>
+                    <th>Elements</th>
+                    <th>Implementation</th>
+                    <th>Owner</th>
+                    <th>Next Action</th>
+                </tr>
+            </thead>
+            <tbody id="barrierBody"></tbody>
+        </table>
+        <div id="loadingIndicator" class="loading-state" style="display:none;">
+            <i class="fas fa-spinner fa-spin"></i> Loading Barrier Register...
+        </div>
+        <div id="emptyIndicator" class="empty-state" style="display:none;">
+            <i class="fas fa-shield-halved" style="font-size:2rem;margin-bottom:0.5rem;"></i>
+            <p>No barriers yet. Add preventive / recovery controls via the SRAM (Bow-Tie) module.</p>
+            <a href="/sram/index.html" style="color:#1a6b8a;font-weight:600;">Open SRAM</a>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
+<script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    heroTitle: 'Barrier Register',
+    heroSubtitle: 'Control effectiveness & Barrier Strength Values - ICAO Doc 9859'
+};
+</script>
+<script src="/js/shell.js"></script>
+<script src="/js/sram.js"></script>
+<script>
+var currentUser = null;
+var allRows = [];
+
+function esc(text) {
+    var div = document.createElement('div');
+    div.textContent = String(text == null ? '' : text);
+    return div.innerHTML;
+}
+
+function formatDate(iso) { return SRAM.formatDate(iso); }
+
+function bsvBadge(bsv) {
+    var v = Number(bsv);
+    if (isNaN(v)) return null;
+    var corr = SRAM.bsvLabel(v);
+    var cls = corr === 'Strong' ? 'badge-strong'
+        : corr === 'Satisfactory' ? 'badge-satisfactory'
+        : corr === 'Moderate' ? 'badge-moderate'
+        : 'badge-weak';
+    return '<span class="badge ' + cls + '">BSV ' + v + ' · ' + corr + '</span>';
+}
+
+function elementChips(scores) {
+    if (!scores || !Object.keys(scores).length) return '<span class="muted" style="font-size:0.78rem;color:#94a3b8;">Not scored</span>';
+    return '<div class="score-row">' + SRAM.ELEMENT_KEYS.map(function (k) {
+        if (scores[k] === undefined || scores[k] === null || scores[k] === '') return '';
+        return '<span class="chip">' + (SRAM.ELEMENT_LABELS[k] || k) + ' <b>' + scores[k] + '</b></span>';
+    }).join('') + '</div>';
+}
+
+function loadBarriers() {
+    var tbody = document.getElementById('barrierBody');
+    var loading = document.getElementById('loadingIndicator');
+    var empty = document.getElementById('emptyIndicator');
+    tbody.innerHTML = '';
+    loading.style.display = 'flex';
+    empty.style.display = 'none';
+    SRAM.loadBarriers().then(function (data) {
+        allRows = (data && (data.rows || data.barriers)) || data || [];
+        loading.style.display = 'none';
+        document.getElementById('rowCount').textContent = allRows.length + ' barriers';
+        renderTable();
+    }).catch(function (err) {
+        loading.style.display = 'none';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ' + esc(err.message) + '</td></tr>';
+    });
+}
+
+function filteredRows() {
+    var type = document.getElementById('filterType').value;
+    var q = document.getElementById('filterSearch').value.trim().toLowerCase();
+    return allRows.filter(function (r) {
+        if (type && String(r.barrier_type || r.control_type || '').toLowerCase() !== type) return false;
+        if (q) {
+            var hay = ((r.barrier_name || r.control || '') + ' ' + (r.hazard_title || '')).toLowerCase();
+            if (hay.indexOf(q) === -1) return false;
+        }
+        return true;
+    });
+}
+
+function renderTable() {
+    var tbody = document.getElementById('barrierBody');
+    var empty = document.getElementById('emptyIndicator');
+    var rows = filteredRows();
+    tbody.innerHTML = '';
+    if (!rows.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    rows.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var type = String(r.barrier_type || r.control_type || '').toLowerCase();
+        var typeBadge = '<span class="badge ' + (type === 'recovery' ? 'badge-recv' : 'badge-prev') + '">' + esc(type || '-') + '</span>';
+        var name = r.barrier_name || r.control || '-';
+        var hazardRef = r.hazard_reference || r.hazard_id;
+        var hazardTitle = r.hazard_title || '';
+        var scores = elementChips(r.element_scores || r.barrier_scores);
+        var bsv = (typeof r.bsv === 'number' || (r.bsv && r.bsv !== 'Unassessed'))
+            ? bsvBadge(r.bsv) : null;
+        if (!bsv && r.element_scores) bsv = bsvBadge(SRAM.bsvFromScores(r.element_scores).bsv);
+        if (!bsv) bsv = '<span class="badge badge-default">Not scored</span>';
+        var impl = '<span class="badge ' + SRAM.statusBadgeClass(r.implementation_status) + '">' + esc(SRAM.statusLabel(r.implementation_status)) + '</span>';
+        var owner = r.owner || '-';
+        var action = (r.action_by ? esc(r.action_by) : '-') + (r.follow_up_date ? '<div style="font-size:0.75rem;color:#64748b;">follow-up ' + formatDate(r.follow_up_date) + '</div>' : '');
+        tr.innerHTML = '<td><strong>' + esc(hazardRef || '-') + '</strong>' + (hazardTitle ? '<div style="font-size:0.8rem;color:#64748b;">' + esc(hazardTitle) + '</div>' : '') + '</td>' +
+            '<td>' + esc(name) + '</td>' +
+            '<td>' + typeBadge + '</td>' +
+            '<td>' + bsv + '</td>' +
+            '<td>' + scores + '</td>' +
+            '<td>' + impl + '</td>' +
+            '<td>' + esc(owner) + '</td>' +
+            '<td>' + action + '</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!user) { window.location.href = '/login.html'; return; }
+    currentUser = user;
+    if (typeof applyDepartmentContext === 'function') applyDepartmentContext(user.email);
+    user.getIdTokenResult(true).then(function (tr) {
+        var t = (tr.claims && tr.claims.tenant_id) || '';
+        if (t && typeof updateShellTenant === 'function') updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
+    }).catch(function () {});
+    loadBarriers();
+});
+</script>
+
+</body>
+</html>

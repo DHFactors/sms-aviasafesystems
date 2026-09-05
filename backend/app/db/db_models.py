@@ -1147,3 +1147,220 @@ class HazardCapa(Base):
     )
 
     __table_args__ = (Index("ix_hazard_capas_tenant", "tenant_id"),)
+
+
+# ============================================================================
+# 17. SRAM - BOW-TIE ANALYSIS + RISK / BARRIER REGISTERS
+# ============================================================================
+
+BOW_TIE_STATUS_CHECK = CheckConstraint(
+    "status IN ('In Progress', 'Assessed', 'Accepted', 'Rejected')",
+    name="ck_bow_tie_analyses_status",
+)
+SEVERITY_LETTER_CHECK = CheckConstraint(
+    "severity_level IN ('A', 'B', 'C', 'D', 'E')",
+    name="ck_bow_tie_consequences_severity",
+)
+CONTROL_TYPE_CHECK = CheckConstraint(
+    "control_type IN ('preventive', 'recovery')",
+    name="ck_bow_tie_controls_type",
+)
+RISK_REGISTER_STATUS_CHECK = CheckConstraint(
+    "status IN ('open', 'in_progress', 'closed')",
+    name="ck_risk_register_status",
+)
+BARRIER_TYPE_CHECK = CheckConstraint(
+    "barrier_type IN ('preventive', 'recovery')",
+    name="ck_barrier_register_type",
+)
+BARRIER_IMPL_STATUS_CHECK = CheckConstraint(
+    "implementation_status IN ('not_started', 'in_progress', 'implemented', 'verified')",
+    name="ck_barrier_register_impl_status",
+)
+SEVERITY_CURRENT_CHECK = CheckConstraint(
+    "severity_current IN ('A', 'B', 'C', 'D', 'E')",
+    name="ck_risk_register_severity_current",
+)
+SEVERITY_RESULTANT_CHECK = CheckConstraint(
+    "severity_resultant IS NULL OR severity_resultant IN ('A', 'B', 'C', 'D', 'E')",
+    name="ck_risk_register_severity_resultant",
+)
+
+
+class BowTieAnalysis(Base):
+    __tablename__ = "bow_tie_analyses"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    hazard_id: Mapped[str] = mapped_column(Text, nullable=False)
+    hazard_title: Mapped[object] = mapped_column(Text, nullable=True)
+    top_event: Mapped[object] = mapped_column(Text, nullable=True)
+    description: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="In Progress")
+    created_by: Mapped[object] = mapped_column(Text, nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        BOW_TIE_STATUS_CHECK,
+        Index("ux_bow_tie_analyses_tenant_hazard", "tenant_id", "hazard_id", unique=True),
+        Index("ix_bow_tie_analyses_tenant", "tenant_id"),
+    )
+
+
+class BowTieThreat(Base):
+    __tablename__ = "bow_tie_threats"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    bowtie_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_analyses.id", ondelete="CASCADE"), nullable=False
+    )
+    threat: Mapped[str] = mapped_column(Text, nullable=False)
+    probability: Mapped[object] = mapped_column(Integer, nullable=True)
+    threat_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ux_bow_tie_threats_order", "bowtie_id", "threat_order", unique=True),
+        Index("ix_bow_tie_threats_tenant", "tenant_id"),
+    )
+
+
+class BowTieConsequence(Base):
+    __tablename__ = "bow_tie_consequences"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    bowtie_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_analyses.id", ondelete="CASCADE"), nullable=False
+    )
+    consequence: Mapped[str] = mapped_column(Text, nullable=False)
+    severity_level: Mapped[str] = mapped_column(Text, nullable=False, default="C")
+    consequence_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        SEVERITY_LETTER_CHECK,
+        Index("ux_bow_tie_consequences_order", "bowtie_id", "consequence_order", unique=True),
+        Index("ix_bow_tie_consequences_tenant", "tenant_id"),
+    )
+
+
+class BowTieControl(Base):
+    __tablename__ = "bow_tie_controls"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    bowtie_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_analyses.id", ondelete="CASCADE"), nullable=False
+    )
+    control: Mapped[str] = mapped_column(Text, nullable=False)
+    control_type: Mapped[str] = mapped_column(Text, nullable=False)
+    control_order: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    owner: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="Planned")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        CONTROL_TYPE_CHECK,
+        Index("ux_bow_tie_controls_order", "bowtie_id", "control_type", "control_order", unique=True),
+        Index("ix_bow_tie_controls_tenant", "tenant_id"),
+    )
+
+
+class RiskRegisterEntry(Base):
+    __tablename__ = "risk_register"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    bowtie_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_analyses.id", ondelete="SET NULL"), nullable=True
+    )
+    hazard_id: Mapped[str] = mapped_column(Text, nullable=False)
+    hazard_title: Mapped[object] = mapped_column(Text, nullable=True)
+    probability_current: Mapped[int] = mapped_column(Integer, nullable=False)
+    severity_current: Mapped[str] = mapped_column(Text, nullable=False)
+    risk_index_current: Mapped[str] = mapped_column(Text, nullable=False)
+    tolerability_current: Mapped[str] = mapped_column(Text, nullable=False)
+    probability_resultant: Mapped[object] = mapped_column(Integer, nullable=True)
+    severity_resultant: Mapped[object] = mapped_column(Text, nullable=True)
+    risk_index_resultant: Mapped[object] = mapped_column(Text, nullable=True)
+    tolerability_resultant: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
+    accepted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    alarp_justification: Mapped[object] = mapped_column(Text, nullable=True)
+    accepted_by: Mapped[object] = mapped_column(Text, nullable=True)
+    accepted_on: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        RISK_REGISTER_STATUS_CHECK,
+        SEVERITY_CURRENT_CHECK,
+        SEVERITY_RESULTANT_CHECK,
+        Index("ux_risk_register_tenant_hazard", "tenant_id", "hazard_id", unique=True),
+        Index("ix_risk_register_tenant", "tenant_id"),
+    )
+
+
+class BarrierRegisterEntry(Base):
+    __tablename__ = "barrier_register"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    bowtie_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_analyses.id", ondelete="SET NULL"), nullable=True
+    )
+    control_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("bow_tie_controls.id", ondelete="SET NULL"), nullable=True
+    )
+    hazard_id: Mapped[str] = mapped_column(Text, nullable=False)
+    barrier: Mapped[str] = mapped_column(Text, nullable=False)
+    barrier_type: Mapped[str] = mapped_column(Text, nullable=False)
+    effectiveness: Mapped[object] = mapped_column(Integer, nullable=True)
+    cost_benefit: Mapped[object] = mapped_column(Integer, nullable=True)
+    practicality: Mapped[object] = mapped_column(Integer, nullable=True)
+    acceptability: Mapped[object] = mapped_column(Integer, nullable=True)
+    enforceability: Mapped[object] = mapped_column(Integer, nullable=True)
+    durability: Mapped[object] = mapped_column(Integer, nullable=True)
+    disinclination: Mapped[object] = mapped_column(Integer, nullable=True)
+    bsv: Mapped[object] = mapped_column(Float, nullable=True)
+    implementation_status: Mapped[str] = mapped_column(Text, nullable=False, default="not_started")
+    action_by: Mapped[object] = mapped_column(Text, nullable=True)
+    follow_up_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[object] = mapped_column(Text, nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        BARRIER_TYPE_CHECK,
+        BARRIER_IMPL_STATUS_CHECK,
+        Index("ix_barrier_register_tenant", "tenant_id"),
+        Index("ix_barrier_register_tenant_hazard", "tenant_id", "hazard_id"),
+    )

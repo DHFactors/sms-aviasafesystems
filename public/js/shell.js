@@ -66,14 +66,122 @@
         return cfg;
     }
 
-    // ---- Header navigation: [Home] + direct links (no dropdowns) ----
+    // ---- Header navigation: ICAO Annex 19 4-pillar structure ----
+    // Each item opens a WordPress-style dropdown. Visibility gates:
+    //   requires: 'pro'  -> tenant plan pro/addon, or a regulator account
+    //   requires: 'admin' -> airline/system admin or regulator account
     const NAV_ITEMS = [
-        { label: 'SMS Maturity', href: '/dashboard/sms-maturity.html' },
-        { label: 'Risk & Trends', href: '/risk-trends.html' },
-        { label: 'Top Hazards', href: '/top-hazards.html' },
-        { label: 'SPI/SPT', href: '/dashboard/spi-dashboard.html' },
-        { label: 'Administration', href: '/administration.html' }
+        {
+            label: 'SMS Maturity',
+            icon: '\uD83D\uDCCA',
+            dropdown: [
+                { label: 'Dashboard', path: '/dashboard/sms-maturity.html' },
+                { label: 'Survey Management', path: '/administration.html#survey-management' },
+                { label: 'Gap Analysis', path: '/dashboard/gap-analysis.html' }
+            ]
+        },
+        {
+            label: 'Risk Management',
+            icon: '\u26A0\uFE0F',
+            dropdown: [
+                { label: 'Hazard Register', path: '/dashboard/master-register.html' },
+                { label: 'SRAM (Bow-Tie)', path: '/sram/index.html' },
+                { label: 'Risk Register', path: '/risk-register/index.html' },
+                { label: 'Barrier Register', path: '/barrier-register/index.html' },
+                { label: 'Reports', path: '/reports/index.html' }
+            ],
+            requires: 'pro'
+        },
+        {
+            label: 'Assurance',
+            icon: '\uD83D\uDD0D',
+            dropdown: [
+                { label: 'SPI/SPT Dashboard', path: '/dashboard/spi-dashboard.html' },
+                { label: 'PSOE Audit', path: '/audits/psoe.html' },
+                { label: 'Management of Change', path: '/moc/index.html' }
+            ],
+            requires: 'pro'
+        },
+        {
+            label: 'Promotion',
+            icon: '\uD83D\uDCE2',
+            dropdown: [
+                { label: 'Surveys', path: '/survey/index.html' },
+                { label: 'Training', path: '/training/index.html' },
+                { label: 'Communication', path: '/communication/index.html' }
+            ]
+        },
+        {
+            label: 'Administration',
+            icon: '\u2699\uFE0F',
+            dropdown: [
+                { label: 'System Settings', path: '/administration.html' },
+                { label: 'Team Management', path: '/settings/team.html' },
+                { label: 'Super Admin', path: '/admin/super-admin.html' }
+            ],
+            requires: 'admin'
+        }
     ];
+
+    // Normalize any role string (claims / RBAC / local) into the small
+    // vocabulary the nav gates understand: 'admin' | 'super_admin' |
+    // 'regulator' | 'user'.
+    function normalizeRole(role) {
+        const r = String(role || '').toLowerCase();
+        if (r === 'super_admin' || r === 'system') return 'super_admin';
+        if (r === 'airline_admin' || r === 'tenant_admin' || r === 'admin' ||
+            r === 'safety' || r === 'safety_manager') return 'admin';
+        if (r === 'caan_smd' || r === 'caan_regulator' || r === 'regulator') return 'regulator';
+        return 'user';
+    }
+
+    // Current user role used by nav gating. Prefers resolved auth claims, then
+    // the cached context / storage, with a safe 'user' default.
+    function getUserRole() {
+        if (currentUserState.role) return normalizeRole(currentUserState.role);
+        try {
+            if (window.currentUser && window.currentUser.role) {
+                return normalizeRole(window.currentUser.role);
+            }
+            const stored = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
+            if (stored) return normalizeRole(stored);
+            // Local development: mock user -> full nav preview.
+            if (getLocalUser()) return 'admin';
+        } catch (e) {}
+        return 'user';
+    }
+
+    // Tenant plan ('free' | 'pro' | 'addon'). Local development defaults to
+    // 'pro' so every pillar is visible while previewing; an explicit stored
+    // 'tenantPlan' takes precedence so gating can be tested on localhost.
+    function getTenantPlan() {
+        try {
+            if (currentUserState.plan) return currentUserState.plan;
+            if (window.currentUser && window.currentUser.claims && window.currentUser.claims.plan) {
+                return window.currentUser.claims.plan;
+            }
+            const stored = localStorage.getItem('tenantPlan');
+            if (stored) return stored;
+            if (getLocalUser()) return 'pro';
+        } catch (e) {}
+        return 'free';
+    }
+
+    // Visibility filter over NAV_ITEMS driven by role + plan.
+    function getVisibleNavItems() {
+        const userRole = getUserRole();
+        const tenantPlan = getTenantPlan();
+        const isRegulator = userRole === 'regulator';
+        return NAV_ITEMS.filter(function (item) {
+            if (item.requires === 'pro') {
+                return tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator;
+            }
+            if (item.requires === 'admin') {
+                return userRole === 'admin' || userRole === 'super_admin' || isRegulator;
+            }
+            return true;
+        });
+    }
 
     // Persistent user session surface so static pages can share tenant/user info.
     const currentUserState = { email: null, tenant: null, dept: null };
@@ -108,6 +216,86 @@
             const href = a.getAttribute('href') || '';
             const hrefBase = href.split('/').pop().split('#')[0] || '';
             a.classList.toggle('active', hrefBase === base && href !== '#');
+        });
+        // Highlight the parent dropdown toggle when one of its links is active.
+        document.querySelectorAll('.app-header .header-nav .nav-dropdown').forEach(function (dd) {
+            const btn = dd.querySelector('.dropdown-toggle');
+            if (btn) btn.classList.toggle('active', !!dd.querySelector('.dropdown-link.active'));
+        });
+    }
+
+    function closeAllDropdowns(except) {
+        document.querySelectorAll('.app-header .header-nav .nav-dropdown.open').forEach(function (dd) {
+            if (except && dd === except) return;
+            dd.classList.remove('open');
+            const btn = dd.querySelector('.dropdown-toggle');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function toggleDropdown(wrapper, btn) {
+        const willOpen = !wrapper.classList.contains('open');
+        closeAllDropdowns(wrapper);
+        wrapper.classList.toggle('open', willOpen);
+        btn.setAttribute('aria-expanded', String(willOpen));
+    }
+
+    // Render a single top-level nav item as a dropdown (button + menu).
+    function buildNavItem(item) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'nav-dropdown';
+        wrapper.dataset.navItem = item.label;
+        if (item.requires) wrapper.dataset.requires = item.requires;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'nav-link dropdown-toggle';
+        btn.setAttribute('aria-haspopup', 'true');
+        btn.setAttribute('aria-expanded', 'false');
+
+        const icon = document.createElement('span');
+        icon.className = 'nav-icon';
+        icon.textContent = item.icon || '';
+        btn.appendChild(icon);
+        btn.appendChild(document.createTextNode(' ' + item.label + ' '));
+
+        const chevron = document.createElement('span');
+        chevron.className = 'chevron';
+        chevron.textContent = '\u25BE';
+        chevron.setAttribute('aria-hidden', 'true');
+        btn.appendChild(chevron);
+
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDropdown(wrapper, btn);
+        });
+
+        const menu = document.createElement('div');
+        menu.className = 'dropdown-menu';
+        (item.dropdown || []).forEach(function (d) {
+            const link = document.createElement('a');
+            link.href = d.path;
+            link.className = 'nav-link dropdown-link';
+            link.textContent = d.label;
+            menu.appendChild(link);
+        });
+
+        wrapper.appendChild(btn);
+        wrapper.appendChild(menu);
+        return wrapper;
+    }
+
+    // Hide/show top-level items based on the current role + plan. Keeps the
+    // full NAV_ITEMS in the DOM and toggles visibility, so items reappear as
+    // soon as auth claims resolve without rebuilding the header.
+    function applyNavVisibility() {
+        const visible = {};
+        getVisibleNavItems().forEach(function (item) {
+            visible[item.label] = true;
+        });
+        document.querySelectorAll('.app-header .header-nav .nav-dropdown[data-nav-item]').forEach(function (dd) {
+            dd.style.display = visible[dd.dataset.navItem] ? '' : 'none';
         });
     }
 
@@ -181,12 +369,8 @@
             nav.appendChild(homeLink);
         }
 
-        NAV_ITEMS.forEach(function (item) {
-            const a = document.createElement('a');
-            a.href = item.href;
-            a.className = 'nav-link';
-            a.textContent = item.label;
-            nav.appendChild(a);
+        getVisibleNavItems().forEach(function (item) {
+            nav.appendChild(buildNavItem(item));
         });
         header.appendChild(nav);
 
@@ -471,6 +655,13 @@
         }
 
         setActiveNav();
+        applyNavVisibility();
+
+        // Close dropdowns when clicking anywhere else, and on Escape.
+        document.addEventListener('click', function () { closeAllDropdowns(); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeAllDropdowns();
+        });
 
         // Populate the header user email once auth is ready.
         if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -485,6 +676,9 @@
                         const claims = (tokenResult && tokenResult.claims) || {};
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                         currentUserState.tenant = claims.tenant_id || null;
+                        currentUserState.role = claims.role || claims.roles || null;
+                        currentUserState.plan = claims.plan || null;
+                        applyNavVisibility();
                         if (pageSubtitle && typeof getDepartmentLabel === 'function') {
                             pageSubtitle.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }
@@ -513,6 +707,12 @@
         const pageTitle = document.getElementById('pageTitle');
         if (pageTitle) pageTitle.textContent = cfg.tenantTitle || pageTitle.textContent;
     };
+
+    // Expose nav helper functions. getUserRole may already be provided by
+    // rbac.js, so only install when it is missing.
+    global.getTenantPlan = getTenantPlan;
+    global.getVisibleNavItems = getVisibleNavItems;
+    if (typeof global.getUserRole !== 'function') global.getUserRole = getUserRole;
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initShell);

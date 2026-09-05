@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Register - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f5f7fa; font-family: 'Inter', system-ui, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
+        .header-bar h2 { margin: 0; color: #0b2a42; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: #fff; padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.25rem; }
+        .filter-bar label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        select, input { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; font-family: inherit; color: #0b2a42; }
+        .btn { background: #1a6b8a; color: #fff; border: none; padding: 0.45rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .btn:hover { background: #0d5572; }
+        .table-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+        .table-card table { width: 100%; border-collapse: collapse; }
+        .table-card th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.85rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
+        .table-card td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; vertical-align: top; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+        .badge-intolerable { background: #fde8e8; color: #b91c1c; }
+        .badge-tolerable { background: #fef3c7; color: #b45309; }
+        .badge-acceptable { background: #e8f5e9; color: #2e7d32; }
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-processing { background: #fff3e0; color: #e65100; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
+        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+        .justify { max-width: 420px; font-size: 0.82rem; color: #475569; }
+        @media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+<div class="app-shell">
+
+<div class="page">
+    <div class="header-bar">
+        <h2><i class="fas fa-triangle-exclamation"></i> Risk Register</h2>
+        <span class="badge badge-default" id="rowCount">0 entries</span>
+    </div>
+
+    <div class="filter-bar">
+        <label>Status:</label>
+        <select id="filterStatus">
+            <option value="">All</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="closed">Closed</option>
+        </select>
+        <label>Search:</label>
+        <input type="text" id="filterSearch" placeholder="Hazard reference or title..." style="flex:1;min-width:160px;">
+        <button class="btn" onclick="renderTable()"><i class="fas fa-search"></i> Filter</button>
+        <button class="btn" style="background:#64748b;" onclick="loadRegister()"><i class="fas fa-refresh"></i> Reload</button>
+    </div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Hazard</th>
+                    <th>Current Risk</th>
+                    <th>Residual Risk</th>
+                    <th>Status</th>
+                    <th>Acceptance</th>
+                    <th>ALARP Justification</th>
+                    <th>Review Date</th>
+                </tr>
+            </thead>
+            <tbody id="registerBody"></tbody>
+        </table>
+        <div id="loadingIndicator" class="loading-state" style="display:none;">
+            <i class="fas fa-spinner fa-spin"></i> Loading Risk Register...
+        </div>
+        <div id="emptyIndicator" class="empty-state" style="display:none;">
+            <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.5rem;"></i>
+            <p>No assessed risks yet. Assess a hazard via the SRAM (Bow-Tie) module.</p>
+            <a href="/sram/index.html" style="color:#1a6b8a;font-weight:600;">Open SRAM</a>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
+<script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    heroTitle: 'Risk Register',
+    heroSubtitle: 'Assessed risks per hazard - ICAO Doc 9859'
+};
+</script>
+<script src="/js/shell.js"></script>
+<script src="/js/sram.js"></script>
+<script>
+var currentUser = null;
+var allRows = [];
+
+function esc(text) {
+    var div = document.createElement('div');
+    div.textContent = String(text == null ? '' : text);
+    return div.innerHTML;
+}
+
+function formatDate(iso) { return SRAM.formatDate(iso); }
+
+function toleranceBadge(tol) {
+    var t = String(tol || '').toLowerCase();
+    return '<span class="badge badge-' + t + '">' + esc(tol || '-') + '</span>';
+}
+
+function statusBadgeClass(status) { return SRAM.statusBadgeClass(status); }
+
+function loadRegister() {
+    var tbody = document.getElementById('registerBody');
+    var loading = document.getElementById('loadingIndicator');
+    var empty = document.getElementById('emptyIndicator');
+    tbody.innerHTML = '';
+    loading.style.display = 'flex';
+    empty.style.display = 'none';
+    var tenantId = (currentUser && currentUser.tenant_id) || '';
+    SRAM.loadRiskRegister(tenantId).then(function (data) {
+        allRows = data.rows || data || [];
+        loading.style.display = 'none';
+        document.getElementById('rowCount').textContent = allRows.length + (allRows.length === 1 ? ' entry' : ' entries');
+        renderTable();
+    }).catch(function (err) {
+        loading.style.display = 'none';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ' + esc(err.message) + '</td></tr>';
+    });
+}
+
+function filteredRows() {
+    var status = document.getElementById('filterStatus').value;
+    var q = document.getElementById('filterSearch').value.trim().toLowerCase();
+    return allRows.filter(function (r) {
+        if (status && String(r.status || '').toLowerCase() !== status) return false;
+        if (q) {
+            var hay = ((r.hazard_reference || '') + ' ' + (r.hazard_title || '')).toLowerCase();
+            if (hay.indexOf(q) === -1) return false;
+        }
+        return true;
+    });
+}
+
+function renderTable() {
+    var tbody = document.getElementById('registerBody');
+    var empty = document.getElementById('emptyIndicator');
+    var rows = filteredRows();
+    tbody.innerHTML = '';
+    if (!rows.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    rows.forEach(function (r) {
+        var tr = document.createElement('tr');
+        var hazardRef = r.hazard_reference || r.hazard_id;
+        var title = r.hazard_title || '';
+        var current = '<strong>' + esc(r.current_index || '-') + '</strong> ' + toleranceBadge(r.current_tolerability);
+        var residual = r.resultant_index
+            ? '<strong>' + esc(r.resultant_index) + '</strong> ' + toleranceBadge(r.resultant_tolerability)
+            : '-';
+        var status = '<span class="badge ' + statusBadgeClass(r.status) + '">' + esc(SRAM.statusLabel(r.status)) + '</span>';
+        var acceptance = r.accepted
+            ? '<span class="badge badge-completed"><i class="fas fa-check-circle"></i> Accepted</span><div class="muted" style="font-size:0.72rem;color:#64748b;margin-top:0.25rem;">by ' + esc(r.accepted_by || 'unknown') + '</div>'
+            : '<span class="badge badge-processing">Not accepted</span>';
+        tr.innerHTML = '<td><strong>' + esc(hazardRef || '-') + '</strong>' + (title ? '<div style="font-size:0.8rem;color:#64748b;">' + esc(title) + '</div>' : '') + '</td>' +
+            '<td>' + current + '</td>' +
+            '<td>' + residual + '</td>' +
+            '<td>' + status + '</td>' +
+            '<td>' + acceptance + '</td>' +
+            '<td><div class="justify">' + (r.accept_justification ? esc(r.accept_justification) : '-') + '</div></td>' +
+            '<td>' + formatDate(r.review_date) + '</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!user) { window.location.href = '/login.html'; return; }
+    currentUser = user;
+    if (typeof applyDepartmentContext === 'function') applyDepartmentContext(user.email);
+    user.getIdTokenResult(true).then(function (tr) {
+        var t = (tr.claims && tr.claims.tenant_id) || '';
+        if (t) currentUser.tenant_id = t;
+        if (t && typeof updateShellTenant === 'function') updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
+        loadRegister();
+    }).catch(function () { loadRegister(); });
+});
+</script>
+
+</body>
+</html>

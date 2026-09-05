@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training - AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f5f7fa; font-family: 'Inter', system-ui, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 1100px; margin: 0 auto; }
+        .stub-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); padding: 3rem 2rem; text-align: center; border-top: 4px solid #ffd700; }
+        .stub-card .stub-icon { font-size: 2.75rem; color: #1a6b8a; margin-bottom: 0.75rem; }
+        .stub-card h2 { margin: 0 0 0.5rem; color: #0b2a42; }
+        .stub-card p { color: #64748b; font-size: 0.95rem; max-width: 560px; margin: 0 auto 1.5rem; }
+        .stub-card .btn-home { display: inline-flex; align-items: center; gap: 0.5rem; background: #1a6b8a; color: #fff; text-decoration: none; padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; }
+        .stub-card .btn-home:hover { background: #0d5572; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+  <div class="page">
+    <div class="stub-card">
+      <div class="stub-icon"><i class="fas fa-graduation-cap"></i></div>
+      <h2>Safety Training</h2>
+      <p>This Training module is part of the next ICAO 4-pillar release and is arriving in an upcoming phase.</p>
+      <a class="btn-home" href="/survey/index.html"><i class="fas fa-arrow-left"></i> Back to Surveys</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
+<script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Operator Safety Dashboard',
+    heroTitle: 'Safety Training',
+    heroSubtitle: 'Coming in the next Phase 2 release'
+};
+</script>
+<script src="/js/shell.js"></script>
+</body>
+</html>
