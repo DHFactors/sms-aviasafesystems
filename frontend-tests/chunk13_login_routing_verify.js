@@ -52,7 +52,7 @@ assert(fb.resolveTenantContext('unknown@x.com') === null, '3. unregistered email
 
 // ── 4. Reference formatter ─────────────────────────────────────────────────
 assert(fb.formatReference('FW-CAN-01-26', 'YT') === 'YT-CAN-01-26', '4. FW- swapped to IATA');
-assert(fb.formatReference('RW-HZ-0003-25', 'MA') === 'MA-HZ-0003-25', '4. RW- swapped to IATA');
+assert(fb.formatReference('OPS/002/H/2026', 'MA') === 'OPS/002/H/2026', '4. CAAN hazard ref passes through');
 
 // ── 5. Auth observer / context handoff to ae-dashboard ────────────────────
 delete storage['demoContext'];

@@ -11,7 +11,10 @@ from app.models.hazard import (
     HazardStatus,
     HazardSource,
     HazardTaxonomy,
+    HazardFunctionCode,
     HAZARD_CREATION_SOURCES,
+    HAZARD_FUNCTION_CODES,
+    revalue_taxonomy,
     AnalysisMode,
     SramCalculateRequest,
     SramSaveRequest,
@@ -179,6 +182,7 @@ async def assign_hazard(
 _VALID_SOURCES = {s.value for s in HazardSource}
 _VALID_TAXONOMIES = {t.value for t in HazardTaxonomy}
 _VALID_ANALYSIS_MODES = {m.value for m in AnalysisMode}
+_VALID_FUNCTIONS = {f.value for f in HazardFunctionCode}
 
 
 def _severity_inputs(data: dict) -> dict:
@@ -366,23 +370,29 @@ def _normalize_taxonomy(value, occurrence_category=None):
     if value in _VALID_TAXONOMIES:
         return value
     taxonomy_map = {
-        "BIRD": "Wildlife",
+        "BIRD": "Environmental",
         "FIRE": "Technical",
         "ENG": "Technical",
         "SYS": "Technical",
         "MAC": "Technical",
-        "CFIT": "Organizational-Facilities",
-        "GCOL": "Organizational-Facilities",
-        "RI": "Organizational-Facilities",
-        "RE": "Organizational-Facilities",
-        "LOCI": "Organizational-Facilities",
-        "CABIN": "Human Factors",
-        "PRO": "Organizational-Documentation, Processes and Procedures",
-        "ARC": "Organizational-Documentation, Processes and Procedures",
+        "CFIT": "Organizational",
+        "GCOL": "Organizational",
+        "RI": "Organizational",
+        "RE": "Organizational",
+        "LOCI": "Organizational",
+        "CABIN": "Human",
+        "PRO": "Organizational",
+        "ARC": "Organizational",
         "WX": "Environmental",
     }
     mapped = taxonomy_map.get((occurrence_category or value or "").upper())
-    return mapped or "Other"
+    return revalue_taxonomy(mapped or "")
+
+
+def _normalize_function(value):
+    if value in _VALID_FUNCTIONS:
+        return value
+    return "GEN"
 
 
 def _normalize_priority(value):
@@ -400,11 +410,14 @@ def _to_hazard_response(data: dict) -> dict:
         "source": _normalize_source(data.get("source", "")),
         "source_id": data.get("source_id"),
         "source_url": data.get("source_url"),
+        "function": _normalize_function(data.get("function", "")),
         "adrep_category": data.get("adrep_category"),
         "occurrence_type": data.get("occurrence_type"),
         "taxonomy": _normalize_taxonomy(data.get("taxonomy", ""), data.get("occurrence_category")),
         "taxonomy_specific": data.get("taxonomy_specific"),
+        "threat": data.get("threat"),
         "consequence": data.get("consequence"),
+        "top_event": data.get("top_event"),
         "severity": data.get("severity"),
         "probability": data.get("probability"),
         "risk_index": data.get("risk_index"),
@@ -413,6 +426,8 @@ def _to_hazard_response(data: dict) -> dict:
         "priority": _normalize_priority(data.get("priority", "")),
         "recommended_action": data.get("recommended_action"),
         "corrective_action": data.get("corrective_action"),
+        "corrective_action_flag": data.get("corrective_action_flag", False),
+        "srm_flag": data.get("srm_flag", False),
         "assigned_to": data.get("assigned_to"),
         "assigned_to_uid": data.get("assigned_to_uid"),
         "department": data.get("department"),
@@ -422,6 +437,8 @@ def _to_hazard_response(data: dict) -> dict:
         "analysis_mode": data.get("analysis_mode", "FISHBONE_ONLY"),
         "sram_data": data.get("sram_data"),
         "status": data.get("status", "Open"),
+        "priority_date": data.get("priority_date"),
+        "status_date": data.get("status_date"),
         "follow_up_date": data.get("follow_up_date"),
         "closed_at": data.get("closed_at"),
         "closed_by": data.get("closed_by"),
@@ -440,6 +457,7 @@ def _to_list_item(data: dict) -> dict:
         "title": data.get("title", ""),
         "source": _normalize_source(data.get("source", "")),
         "taxonomy": _normalize_taxonomy(data.get("taxonomy", ""), data.get("occurrence_category")),
+        "function": _normalize_function(data.get("function", "")),
         "priority": _normalize_priority(data.get("priority", "")),
         "risk_level": data.get("risk_level"),
         "status": data.get("status", "Open"),

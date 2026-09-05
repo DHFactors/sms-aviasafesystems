@@ -29,11 +29,14 @@ from app.core.config import settings
 SUPER_ADMIN_EMAIL = "ezondiza.dhf@gmail.com"
 SUPER_ADMIN_UID = "hLXs4mvtf5bb1hRSifnh6HuUHpC2"
 
+# Keep ONLY production-setup tenants. No tenant outside this set is written.
+PRODUCTION_TENANTS = ["fixedwing", "rotarywing", "demoairport", "demostate", "sita-air", "sourya-air"]
+
 # Tenants that must NEVER be removed by unseed().
-PROTECTED_TENANTS: List[str] = []
+PROTECTED_TENANTS: List[str] = list(PRODUCTION_TENANTS)
 
 # Regulators that must NEVER be removed by unseed().
-PROTECTED_REGULATORS: List[str] = []
+PROTECTED_REGULATORS: List[str] = ["demostate", "caan"]
 
 TENANTS: List[Dict[str, Any]] = [
     {"id": "fixedwing", "name": "Fixed-Wing Operator", "shorthand": "fw", "classification": "AIRLINE_FIXED_WING", "regulator_id": "demostate", "country": "Nepal"},

@@ -206,7 +206,7 @@ AUTHOR: AviaSAFE Systems
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>
-                        <div class="form-group"><label>Regulator ID</label><input type="text" id="tenantRegulator" placeholder="caan"></div>
+                        <div class="form-group"><label>Regulator (State Regulator from Step 1)</label><select id="tenantRegulator"><option value="">— none —</option></select></div>
                     </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>
@@ -393,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
     loadExistingRegulators();
+    populateRegulatorDropdown();
     loadExistingTenants();
     loadSeedTenants('psoeTenant');
     loadAuditLog();
@@ -443,7 +444,24 @@ async function createRegulator(e) {
         toast('Regulator "' + resp.regulator.id + '" created.', 'success');
         e.target.reset();
         loadExistingRegulators();
+        populateRegulatorDropdown();
     } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+// Populate the Step 2 Regulator dropdown from the regulators created in Step 1.
+async function populateRegulatorDropdown() {
+    var sel = document.getElementById('tenantRegulator');
+    if (!sel) return;
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+        var regs = resp.regulators || [];
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">— none —</option>' +
+            regs.map(function (r) {
+                return '<option value="' + esc(r.id) + '">' + esc(r.name || r.id) + ' (' + esc(r.id) + ')</option>';
+            }).join('');
+        if (prev && Array.from(sel.options).some(function (o) { return o.value === prev; })) sel.value = prev;
+    } catch (err) { /* dropdown is non-critical; leave current options */ }
 }
 
 // ============================================================================

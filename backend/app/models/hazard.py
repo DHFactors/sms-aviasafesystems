@@ -20,13 +20,67 @@ class HazardPriority(str, Enum):
 
 
 class HazardTaxonomy(str, Enum):
-    ORGANIZATIONAL_FACILITIES = "Organizational-Facilities"
-    ORGANIZATIONAL_DOCUMENTATION = "Organizational-Documentation, Processes and Procedures"
+    """CAAN CAR-19 / ICAO Annex 19 hazard taxonomy (4 values).
+
+    Revalued from the legacy set (Organizational-Facilities, Organizational-
+    Documentation / Processes and Procedures, Wildlife, Human Factors, Other)
+    so the register conforms to the four ICAO-aligned human-organizational /
+    technical / environmental / human-factors buckets.
+    """
+
+    ORGANIZATIONAL = "Organizational"
     TECHNICAL = "Technical"
-    WILDLIFE = "Wildlife"
-    HUMAN_FACTORS = "Human Factors"
+    HUMAN = "Human"
     ENVIRONMENTAL = "Environmental"
-    OTHER = "Other"
+
+
+# Legacy taxonomy value -> ICAO-aligned (4-value) taxonomy. Used by the data
+# migration, the unified seeder and every serializer so no legacy value can
+# survive a round-trip.
+TAXONOMY_REVALUE_MAP = {
+    "Organizational-Facilities": "Organizational",
+    "Organizational-Documentation, Processes and Procedures": "Organizational",
+    "Technical": "Technical",
+    "Wildlife": "Environmental",
+    "Human Factors": "Human",
+    "Environmental": "Environmental",
+    "Other": "Organizational",
+}
+
+
+def revalue_taxonomy(value: Optional[str]) -> str:
+    """Map any taxonomy value (legacy or current) onto the 4-value set."""
+    if value and value in {t.value for t in HazardTaxonomy}:
+        return value
+    return TAXONOMY_REVALUE_MAP.get(value or "", "Organizational")
+
+
+class HazardFunctionCode(str, Enum):
+    """ICAO-aligned hazard reference function codes.
+
+    Each code prefixes the hazard reference: OPS/001/M/2026. HQVAD
+    (hazard-qualified value-add department) — tenants without a matching
+    department use GEN (Generic).
+    """
+
+    OPS = "OPS"  # Flight Operations
+    ENG = "ENG"  # Engineering / Maintenance
+    CAB = "CAB"  # Cabin Operations
+    MNT = "MNT"  # Ground / Line Maintenance
+    GHD = "GHD"  # Ground Handling
+    DSP = "DSP"  # Dispatch / Operations Control
+    SAF = "SAF"  # Safety
+    SEC = "SEC"  # Security
+    MED = "MED"  # Aeromedical / Aviation Medicine
+    TRN = "TRN"  # Training / TRTO
+    ADM = "ADM"  # Administration
+    ENV = "ENV"  # Environmental
+    HUM = "HUM"  # Human Factors
+    ORG = "ORG"  # Organizational
+    GEN = "GEN"  # Generic fallback
+
+
+HAZARD_FUNCTION_CODES = {f.value for f in HazardFunctionCode}
 
 
 class HazardSource(str, Enum):
@@ -147,12 +201,15 @@ class HazardCreate(BaseModel):
     source_id: str = Field(...)
     source_url: Optional[str] = None
 
+    function: Optional[HazardFunctionCode] = None
     adrep_category: Optional[str] = None
     occurrence_type: Optional[str] = None
     taxonomy: HazardTaxonomy = Field(...)
     taxonomy_specific: Optional[str] = None
 
+    threat: Optional[str] = None
     consequence: Optional[str] = None
+    top_event: Optional[str] = None
 
     severity: Optional[int] = Field(None, ge=1, le=5)
     probability: Optional[int] = Field(None, ge=1, le=5)
@@ -165,6 +222,8 @@ class HazardCreate(BaseModel):
 
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None
+    corrective_action_flag: bool = False
+    srm_flag: bool = False
     assigned_to: Optional[str] = None
     assigned_to_uid: Optional[str] = None
     department: Optional[str] = None
@@ -176,6 +235,8 @@ class HazardCreate(BaseModel):
     sram_data: Optional[Dict[str, Any]] = None
 
     status: HazardStatus = HazardStatus.OPEN
+    priority_date: Optional[datetime] = None
+    status_date: Optional[datetime] = None
     follow_up_date: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     closed_by: Optional[str] = None
@@ -191,11 +252,14 @@ class HazardUpdate(BaseModel):
     source: Optional[HazardSource] = None
     source_id: Optional[str] = None
     source_url: Optional[str] = None
+    function: Optional[HazardFunctionCode] = None
     adrep_category: Optional[str] = None
     occurrence_type: Optional[str] = None
     taxonomy: Optional[HazardTaxonomy] = None
     taxonomy_specific: Optional[str] = None
+    threat: Optional[str] = None
     consequence: Optional[str] = None
+    top_event: Optional[str] = None
     severity: Optional[int] = Field(None, ge=1, le=5)
     probability: Optional[int] = Field(None, ge=1, le=5)
     risk_index: Optional[int] = None
@@ -205,6 +269,8 @@ class HazardUpdate(BaseModel):
     priority: Optional[HazardPriority] = None
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None
+    corrective_action_flag: Optional[bool] = None
+    srm_flag: Optional[bool] = None
     assigned_to: Optional[str] = None
     assigned_to_uid: Optional[str] = None
     department: Optional[str] = None
@@ -213,6 +279,9 @@ class HazardUpdate(BaseModel):
     srm_status: Optional[str] = None
     analysis_mode: Optional[AnalysisMode] = None
     sram_data: Optional[Dict[str, Any]] = None
+    status: Optional[HazardStatus] = None
+    priority_date: Optional[datetime] = None
+    status_date: Optional[datetime] = None
     follow_up_date: Optional[datetime] = None
     remarks: Optional[str] = None
 
@@ -225,11 +294,14 @@ class HazardResponse(BaseModel):
     source: HazardSource
     source_id: Optional[str] = None
     source_url: Optional[str] = None
+    function: Optional[HazardFunctionCode] = None
     adrep_category: Optional[str] = None
     occurrence_type: Optional[str] = None
     taxonomy: HazardTaxonomy
     taxonomy_specific: Optional[str] = None
+    threat: Optional[str] = None
     consequence: Optional[str] = None
+    top_event: Optional[str] = None
     severity: Optional[int] = None
     probability: Optional[int] = None
     risk_index: Optional[int] = None
@@ -239,6 +311,8 @@ class HazardResponse(BaseModel):
     priority: HazardPriority
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None
+    corrective_action_flag: bool = False
+    srm_flag: bool = False
     assigned_to: Optional[str] = None
     assigned_to_uid: Optional[str] = None
     department: Optional[str] = None
@@ -246,6 +320,8 @@ class HazardResponse(BaseModel):
     srm_date: Optional[datetime] = None
     srm_status: Optional[str] = None
     status: HazardStatus
+    priority_date: Optional[datetime] = None
+    status_date: Optional[datetime] = None
     follow_up_date: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     closed_by: Optional[str] = None

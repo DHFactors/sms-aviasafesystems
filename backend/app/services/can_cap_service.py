@@ -212,7 +212,7 @@ async def _resolve_hazard(session, tid: str, ref: str, now: datetime) -> Hazard:
         ),
         source="CAN",
         source_id=stub_ref,
-        taxonomy="Other",
+        taxonomy="Organizational",
         priority="M",
         status="Open",
         is_demo=demo_scope(),

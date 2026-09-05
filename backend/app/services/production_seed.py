@@ -154,6 +154,13 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
 
     db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(doc)
 
+    if regulator_id:
+        # Keep the regulator link bidirectional: append this tenant to the
+        # regulator's operator_tenant_ids so downstream tools (production-setup
+        # tables, seeders, cross-tenant aggregation) can resolve operators from
+        # the regulator alone.
+        _link_tenant_to_regulator(tid, regulator_id)
+
     _audit("TENANT_CREATED", actor, tid,
            f"Created operator tenant '{name}' (regulator={regulator_id or 'none'})")
     logger.info(f"Tenant {tid} created by {actor.get('uid')}")
@@ -182,6 +189,36 @@ def bulk_create_tenants(records: List[Dict[str, Any]], actor: Dict[str, Any]) ->
 # Admin lists
 # ============================================================================
 
+# State regulators that legacy demo seeding also wrote into the tenants
+# collection (e.g. tenants/demostate). These must never surface as operators.
+_REGULATOR_TYPE_MARKERS = {"state_regulator", "STATE_REGULATOR"}
+
+
+def _is_regulator_doc(data: Dict[str, Any]) -> bool:
+    """True when a tenants-collection doc is really a State Regulator record."""
+    raw_type = str(data.get("type") or "").strip()
+    if raw_type and raw_type in _REGULATOR_TYPE_MARKERS:
+        return True
+    raw_name = str(data.get("name") or "").strip().lower()
+    return bool(raw_name) and raw_name.endswith("state regulator")
+
+
+def _link_tenant_to_regulator(tid: str, regulator_id: str) -> None:
+    """Idempotently add `tid` to the regulator's operator_tenant_ids."""
+    try:
+        db = get_db()
+        reg_ref = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(regulator_id)
+        reg_doc = reg_ref.get()
+        if not reg_doc.exists:
+            return
+        ops = list((reg_doc.to_dict() or {}).get("operator_tenant_ids") or [])
+        if tid not in ops:
+            ops.append(tid)
+            reg_ref.set({"operator_tenant_ids": ops}, merge=True)
+    except Exception as e:
+        logger.warning(f"Failed to link tenant {tid} to regulator {regulator_id}: {e}")
+
+
 def list_regulators_admin() -> List[Dict[str, Any]]:
     try:
         docs = get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
@@ -194,11 +231,19 @@ def list_regulators_admin() -> List[Dict[str, Any]]:
 def list_tenants_admin() -> List[Dict[str, Any]]:
     try:
         db = get_db()
+        # Operators overseen by a State Regulator (regulators collection). Any
+        # tenants-collection doc that is actually a regulator (legacy demo seed
+        # writes, e.g. tenants/demostate) must be excluded from operator lists.
+        regulator_ids = {
+            snap.id for snap in db.collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
+        }
         tenants = db.collection(settings.FIREBASE_COLLECTION_TENANTS).get()
         rows = []
         for t in tenants:
             td = dict(t.to_dict() or {})
             td["id"] = t.id
+            if t.id in regulator_ids or _is_regulator_doc(td):
+                continue
             td["counts"] = {}
             for sub in ("surveys", "hazards", "reports", "can_cap"):
                 try:

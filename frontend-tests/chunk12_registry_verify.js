@@ -70,7 +70,7 @@ assert(fa && fa.iataCode === 'FA', 'getProspectByEmail case-insensitive lookup')
 assert(dp.getProspectByEmail('unknown@x.com') === null, 'unknown email -> null');
 assert(dp.getArchetypeId('ae@buddha-air.com') === 'demo-fixed-wing', 'getArchetypeId fixed-wing');
 assert(dp.getArchetypeId('ae@fishtailair.com') === 'demo-rotary-wing', 'getArchetypeId rotary-wing');
-assert(dp.formatReference('FW-HZ-0007-26', 'BA') === 'BA-HZ-0007-26', 'formatReference FW swap');
+assert(dp.formatReference('OPS/001/M/2026', 'BA') === 'OPS/001/M/2026', 'CAAN hazard ref passes through unharmed');
 assert(dp.formatReference('RW-CAN-0003-26', 'FA') === 'FA-CAN-0003-26', 'formatReference RW swap');
 
 console.log(fails ? `\nRESULT: ${fails} FAILURES` : '\nRESULT: CHUNK 12 FULLY SATISFIED BY EXISTING IMPLEMENTATION');

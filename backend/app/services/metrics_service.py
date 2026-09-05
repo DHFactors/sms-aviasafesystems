@@ -250,23 +250,24 @@ class MetricsService:
         }
 
     # ICAO ADREP occurrence categories → SMS taxonomy (mirrors CAAN dashboard
-    # mapping and the seed ICAO_TO_TAXONOMY table).
+    # mapping and the seed ICAO_TO_TAXONOMY table). Values are the ICAO-aligned
+    # 4-value set: Organizational, Technical, Human, Environmental.
     ICAO_TO_TAXONOMY = {
-        "LOCI": "Organizational-Facilities",
-        "CFIT": "Organizational-Facilities",
-        "RE": "Organizational-Facilities",
-        "RI": "Organizational-Facilities",
-        "GCOL": "Organizational-Facilities",
+        "LOCI": "Organizational",
+        "CFIT": "Organizational",
+        "RE": "Organizational",
+        "RI": "Organizational",
+        "GCOL": "Organizational",
         "MAC": "Technical",
         "ENG": "Technical",
         "SYS": "Technical",
         "FIRE": "Technical",
-        "BIRD": "Wildlife",
-        "CABIN": "Human Factors",
-        "ARC": "Organizational-Documentation, Processes and Procedures",
-        "PRO": "Organizational-Documentation, Processes and Procedures",
+        "BIRD": "Environmental",
+        "CABIN": "Human",
+        "ARC": "Organizational",
+        "PRO": "Organizational",
         "WX": "Environmental",
-        "OTHER": "Other",
+        "OTHER": "Organizational",
     }
 
     @staticmethod
@@ -277,15 +278,15 @@ class MetricsService:
         taxonomy = (
             report.get("taxonomy")
             or MetricsService.ICAO_TO_TAXONOMY.get(
-                (report.get("occurrence_category") or "").upper(), "Other"
+                (report.get("occurrence_category") or "").upper(), "Organizational"
             )
-            or "Other"
+            or "Organizational"
         )
         if taxonomy == "Technical":
             return "Technical"
-        if taxonomy in ("Wildlife", "Environmental"):
+        if taxonomy in ("Environmental", "Wildlife"):
             return "External"
-        if taxonomy == "Human Factors":
+        if taxonomy in ("Human", "Human Factors"):
             return "Human Factors"
         if taxonomy.startswith("Organizational"):
             return "Organizational"

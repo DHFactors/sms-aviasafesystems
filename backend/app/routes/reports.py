@@ -15,7 +15,13 @@ from typing import List, Dict, Any, Optional
 from loguru import logger
 
 from app.models.report import ReportCreate, MorCreate, ReportResponse, ReportListItem
-from app.models.hazard import HazardCreate, HazardSource, HazardTaxonomy, HazardPriority
+from app.models.hazard import (
+    HazardCreate,
+    HazardSource,
+    HazardTaxonomy,
+    HazardPriority,
+    revalue_taxonomy,
+)
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.core.config import settings
 from app.services.report_service import ReportService
@@ -25,6 +31,25 @@ from app.services.audit_service import log_audit, request_context
 from app.middleware.rate_limit import rate_limit
 
 router = APIRouter()
+
+# ICAO ADREP occurrence category -> hazard taxonomy. Values align to the
+# ICAO-aligned 4-value set after revalue_taxonomy().
+TAXONOMY_FROM_OCCURRENCE = {
+    "BIRD": "Environmental",
+    "FIRE": "Technical",
+    "ENG": "Technical",
+    "SYS": "Technical",
+    "MAC": "Technical",
+    "CFIT": "Organizational",
+    "GCOL": "Organizational",
+    "RI": "Organizational",
+    "RE": "Organizational",
+    "LOCI": "Organizational",
+    "CABIN": "Human",
+    "PRO": "Organizational",
+    "ARC": "Organizational",
+    "WX": "Environmental",
+}
 
 
 class RiskAssessmentRequest(BaseModel):
@@ -290,23 +315,7 @@ def _to_list_item(data: dict) -> dict:
 
 
 def _determine_hazard_taxonomy(occurrence_category: Optional[str]) -> str:
-    taxonomy_map = {
-        "BIRD": "Wildlife",
-        "FIRE": "Technical",
-        "ENG": "Technical",
-        "SYS": "Technical",
-        "MAC": "Technical",
-        "CFIT": "Organizational-Facilities",
-        "GCOL": "Organizational-Facilities",
-        "RI": "Organizational-Facilities",
-        "RE": "Organizational-Facilities",
-        "LOCI": "Organizational-Facilities",
-        "CABIN": "Human Factors",
-        "PRO": "Organizational-Documentation, Processes and Procedures",
-        "ARC": "Organizational-Documentation, Processes and Procedures",
-        "WX": "Environmental",
-    }
-    return taxonomy_map.get(occurrence_category or "", "Other")
+    return revalue_taxonomy(TAXONOMY_FROM_OCCURRENCE.get(occurrence_category or "", ""))
 
 
 def _determine_hazard_priority(severity_level: Optional[int], probability_level: Optional[int]) -> str:
@@ -340,7 +349,7 @@ def _auto_create_hazard_from_report(stored: dict, user: dict):
             source_url=f"/report/detail.html?id={stored.get('id')}",
             adrep_category=stored.get("occurrence_category"),
             occurrence_type=stored.get("occurrence_type"),
-            taxonomy=HazardTaxonomy(taxonomy_str) if taxonomy_str in [e.value for e in HazardTaxonomy] else HazardTaxonomy.OTHER,
+            taxonomy=HazardTaxonomy(taxonomy_str),
             severity=sev,
             probability=prob,
             risk_index=compute_risk_index(sev, prob) if sev and prob else None,

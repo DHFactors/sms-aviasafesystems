@@ -363,7 +363,7 @@ def _create_hazard(client, fs):
         "description": "Aircraft wheel jack sunk into apron surface during jacking operations.",
         "source": "Internal Audit",
         "source_id": "AUD-25-1296",
-        "taxonomy": "Organizational-Facilities",
+        "taxonomy": "Organizational",
         "priority": "H",
         "tenant_id": "test_airline",
     }

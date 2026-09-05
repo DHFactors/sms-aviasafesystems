@@ -28,6 +28,11 @@ from loguru import logger
 from sqlalchemy import or_, select
 
 from app.core.config import settings
+from app.models.hazard import (
+    HAZARD_FUNCTION_CODES,
+    HazardFunctionCode,
+    revalue_taxonomy,
+)
 from app.db.db_models import (
     Hazard,
     HazardAssessment,
@@ -35,7 +40,7 @@ from app.db.db_models import (
     HazardRcaEntry,
     HazardRcaFactor,
 )
-from app.db.ids import get_tenant_shorthand, register_tenant, tenant_slug, tenant_uuid
+from app.db.ids import register_tenant, tenant_slug, tenant_uuid
 from app.db.isolation import demo_scope
 from app.db.runner import run
 from app.db.schema_init import ensure_v2_schema_async
@@ -65,22 +70,105 @@ SEVERITY_LABELS = {5: "Catastrophic", 4: "Hazardous", 3: "Major", 2: "Minor", 1:
 PROBABILITY_LABELS = {"A": "Frequent", "B": "Occasional", "C": "Remote", "D": "Improbable", "E": "Extremely Improbable"}
 
 
-def generate_hazard_id(tenant_code: str, priority: str, year: int, seq: int) -> str:
-    """Generate the hazard reference per the CAAN SRM Procedure Manual format.
+def generate_hazard_id(function: str, priority: str, year: int, seq: int) -> str:
+    """Generate the hazard reference per the CAAN Annex 19 / CAR-19 format.
 
-    Format: {TENANT_CODE}-{SEQ:03d}-{PRIORITY}-{YEAR}
-    Example: FW-001-H-2026
+    Format: {FUNCTION}/{SEQ:03d}/{PRIORITY}/{YEAR}
+    Example: OPS/001/M/2026
 
     Args:
-        tenant_code: 2-letter tenant code (FW, RW, AP, ST).
+        function: ICAO function code (OPS, ENG, CAB, MNT, ...).
         priority: H, M, or L.
         year: 4-digit year (e.g. 2026).
-        seq: Sequence number (e.g. 1, 2, 3).
+        seq: Sequence number (e.g. 1, 2, 3), scoped to (function, year).
     """
+    function_code = (function or "GEN").upper()
+    if function_code not in HAZARD_FUNCTION_CODES:
+        function_code = "GEN"
     priority_code = (priority or "M").upper()
     if priority_code not in ("H", "M", "L"):
         priority_code = "M"
-    return f"{tenant_code.upper()}-{seq:03d}-{priority_code}-{year}"
+    return f"{function_code}/{seq:03d}/{priority_code}/{year}"
+
+
+def parse_hazard_id(hazard_id: str) -> Optional[dict]:
+    """Parse a hazard reference into its structured parts.
+
+    Supports both the legacy tenant-coded format (FW-001-H-2026) and the
+    CAAN function format (OPS/001/M/2026). Returns None when the reference
+    has no parseable shape (e.g. demo references like FW-HZ-0007-26).
+    """
+    if not hazard_id:
+        return None
+    parts = str(hazard_id).split("/")
+    if len(parts) == 4:
+        function, seq, priority, year = parts
+        if function and seq.isdigit() and priority in ("H", "M", "L") and year.isdigit():
+            return {"function": function.upper(), "seq": int(seq), "priority": priority.upper(), "year": int(year)}
+    parts = str(hazard_id).split("-")
+    if len(parts) == 4 and parts[0] and parts[1].isdigit():
+        return {"function": parts[0].upper(), "seq": int(parts[1]), "priority": (parts[2] or "M").upper(), "year": int(parts[3])}
+    return None
+
+
+# Department display-label -> ICAO function code. Matched case-insensitively
+# against the department claim the frontend already understands (getDepartmentLabel).
+DEPARTMENT_FUNCTION_RULES = [
+    ("flight operation", "OPS"),
+    ("line crew", "OPS"),
+    ("pilot", "OPS"),
+    ("dispatch", "DSP"),
+    ("operations control", "DSP"),
+    ("airside", "DSP"),
+    ("apron control", "DSP"),
+    ("camo", "ENG"),
+    ("engineering", "ENG"),
+    ("technical services", "ENG"),
+    ("maintenance", "MNT"),
+    ("workshop", "MNT"),
+    ("component", "MNT"),
+    ("145", "MNT"),
+    ("cabin", "CAB"),
+    ("ground handling", "GHD"),
+    ("ground operation", "GHD"),
+    ("ground safety", "GHD"),
+    ("ramp", "GHD"),
+    ("arff", "ENV"),
+    ("rescue", "ENV"),
+    ("firefight", "ENV"),
+    ("security", "SEC"),
+    ("medical", "MED"),
+    ("aeromedical", "MED"),
+    ("training", "TRN"),
+    ("treat", "TRN"),
+    ("administration", "ADM"),
+    ("administrative", "ADM"),
+    ("quality", "SAF"),
+    ("safety", "SAF"),
+    ("smd", "ORG"),
+    ("caan", "ORG"),
+    ("standards", "ORG"),
+    ("oversight", "ORG"),
+    ("environment", "ENV"),
+    ("human factor", "HUM"),
+]
+
+
+def resolve_function_code(department: Optional[str], explicit: Optional[str] = None) -> str:
+    """Resolve the ICAO function code for a hazard.
+
+    Priority: an explicit function code (frontend dropdown) wins; otherwise the
+    user's department label is matched back to a function code; the final
+    fallback is GEN (generic).
+    """
+    if explicit and str(explicit).upper() in HAZARD_FUNCTION_CODES:
+        return str(explicit).upper()
+    dept = (department or "").strip().lower()
+    if dept:
+        for token, code in DEPARTMENT_FUNCTION_RULES:
+            if token in dept:
+                return code
+    return "GEN"
 
 
 _HZ_MUTABLE_COLUMNS = [
@@ -102,7 +190,8 @@ def _row_to_dict(row: Hazard) -> dict:
 
 
 def _serialize_timestamps(data: dict) -> None:
-    for key in ("created_at", "updated_at", "srm_date", "follow_up_date", "closed_at"):
+    for key in ("created_at", "updated_at", "srm_date", "follow_up_date", "closed_at",
+                "priority_date", "status_date"):
         if key in data and hasattr(data[key], "isoformat"):
             data[key] = data[key].isoformat()
 
@@ -186,7 +275,19 @@ class HazardService:
         if tolerability_tier is None and risk_level is not None:
             tolerability_tier = normalize_tolerability(risk_level)
 
-        taxonomy = payload.get("taxonomy", "Other")
+        taxonomy = revalue_taxonomy(payload.get("taxonomy", "Organizational"))
+        function = resolve_function_code(
+            payload.get("department")
+            or (
+                get_user_department(
+                    uid=payload.get("assigned_to_uid"), email=payload.get("assigned_to")
+                )
+                if payload.get("assigned_to_uid") or payload.get("assigned_to")
+                else ""
+            )
+            or "",
+            payload.get("function"),
+        )
         tid = register_tenant(self.tenant_id)
 
         async with session_scope() as session:
@@ -199,23 +300,22 @@ class HazardService:
             )
             max_seq = 0
             for hid in existing:
-                # FW-001-H-2026
-                parts = hid.split("-")
-                if len(parts) == 4 and parts[3] == str(year):
-                    try:
-                        seq = int(parts[1])
-                        if seq > max_seq:
-                            max_seq = seq
-                    except ValueError:
-                        pass
+                # New-format: OPS/001/M/2026 (sequence scoped to function+year).
+                # Legacy-format: FW-001-H-2026 (kept for defensive back-compat).
+                fields = parse_hazard_id(hid)
+                if fields and fields["function"] == function and fields["year"] == year:
+                    if fields["seq"] > max_seq:
+                        max_seq = fields["seq"]
             sequence = max_seq + 1
             priority = payload.get("priority") or "M"
-            tenant_code = get_tenant_shorthand(self.tenant_id)
-            hazard_id = generate_hazard_id(tenant_code, priority, year, sequence)
+            hazard_id = generate_hazard_id(function, priority, year, sequence)
+            now = datetime.now(timezone.utc)
+            status = payload.get("status", "Open")
 
             row = Hazard(
                 tenant_id=tid,
                 hazard_id=hazard_id,
+                function=function,
                 title=payload.get("title") or "",
                 description=payload.get("description") or "",
                 source=payload.get("source") or "",
@@ -225,6 +325,8 @@ class HazardService:
                 occurrence_type=payload.get("occurrence_type"),
                 taxonomy=taxonomy,
                 taxonomy_specific=payload.get("taxonomy_specific"),
+                threat=payload.get("threat"),
+                top_event=payload.get("top_event"),
                 consequence=payload.get("consequence"),
                 severity=severity,
                 probability=probability,
@@ -235,6 +337,8 @@ class HazardService:
                 priority=payload.get("priority") or "M",
                 recommended_action=payload.get("recommended_action"),
                 corrective_action=payload.get("corrective_action"),
+                corrective_action_flag=payload.get("corrective_action_flag", False),
+                srm_flag=payload.get("srm_flag", False),
                 assigned_to=payload.get("assigned_to"),
                 assigned_to_uid=payload.get("assigned_to_uid"),
                 department=payload.get("department")
@@ -250,7 +354,9 @@ class HazardService:
                 srm_status=payload.get("srm_status"),
                 analysis_mode=payload.get("analysis_mode", "FISHBONE_ONLY"),
                 sram_data=payload.get("sram_data"),
-                status=payload.get("status", "Open"),
+                status=status,
+                priority_date=payload.get("priority_date") or now,
+                status_date=payload.get("status_date") or now,
                 follow_up_date=payload.get("follow_up_date"),
                 closed_at=payload.get("closed_at"),
                 closed_by=payload.get("closed_by"),
@@ -344,10 +450,36 @@ class HazardService:
 
     async def _update_hazard_async(self, hazard_id: str, payload: dict, user: dict) -> Optional[dict]:
         tid = register_tenant(self.tenant_id)
+        now = datetime.now(timezone.utc)
         async with session_scope() as session:
             row = (await session.execute(_lookup_hazard_stmt(tid, hazard_id))).scalars().first()
             if not row:
                 return None
+
+            # Taxonomy revalue: any legacy taxonomy value is forced onto the 4-value set.
+            if "taxonomy" in payload:
+                payload["taxonomy"] = revalue_taxonomy(payload.get("taxonomy"))
+
+            # Priority change stamps priority_date (the date the current priority
+            # was assigned / last changed).
+            new_priority = payload.get("priority", row.priority)
+            if new_priority and new_priority != row.priority:
+                payload["priority_date"] = now
+
+            # Status change stamps status_date (the date of the latest transition).
+            new_status = payload.get("status", row.status)
+            if new_status and new_status != row.status:
+                payload["status_date"] = now
+
+            # Function change regenerates the reference — the function code is the
+            # first component of the CAAN hazard reference.
+            if "function" in payload and payload["function"] and payload["function"] != row.function:
+                resolved = resolve_function_code("", payload["function"])
+                fields = parse_hazard_id(row.hazard_id)
+                if fields:
+                    payload["hazard_id"] = generate_hazard_id(
+                        resolved, row.priority, fields["year"], fields["seq"]
+                    )
 
             if "severity" in payload or "probability" in payload:
                 sev = payload.get("severity", row.severity)
@@ -385,6 +517,7 @@ class HazardService:
             if not row:
                 return None
             row.status = status
+            row.status_date = now
             row.updated_at = now
             if status == "Closed":
                 row.closed_at = now

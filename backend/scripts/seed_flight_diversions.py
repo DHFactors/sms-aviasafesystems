@@ -30,6 +30,7 @@ SEED_CREATOR = "seed-flight-diversions"
 HAZARD_SEQ_BASE = 8000
 
 from seed.config import OPERATOR_PROFILES, FLIGHT_OPERATOR_TYPES
+from app.services.hazard_service import generate_hazard_id, resolve_function_code
 
 
 def _operator_code(iata: str, tenant_id: str) -> str:
@@ -77,13 +78,13 @@ REASONS = [
 REASON_TAXONOMY = {
     "Weather": "Environmental",
     "Technical": "Technical",
-    "Medical": "Human Factors",
+    "Medical": "Human",
     "Fuel": "Technical",
-    "Security": "Other",
-    "Operational": "Other",
-    "Airport Closure": "Other",
-    "Air Traffic Control": "Other",
-    "Other": "Other",
+    "Security": "Organizational",
+    "Operational": "Organizational",
+    "Airport Closure": "Organizational",
+    "Air Traffic Control": "Organizational",
+    "Other": "Organizational",
 }
 
 NAMES = ["Rajesh Shrestha", "Binay Gurung", "Anil Thapa", "Dipesh Karki", "Suman Rai", "Prakash Adhikari"]
@@ -128,7 +129,7 @@ def make_diversion_doc(tid: str, op: dict, seq: int, year: int, when: datetime) 
         "delay_minutes": random.choice([0, 0, 20, 35, 55, 90, 120, 180, 240]),
         "remarks": random.choice(REMARKS),
         "status": random.choices(["Pending", "Pending", "Reviewed", "Investigating", "Closed"], weights=[4, 3, 2, 2, 1])[0],
-        "hazard_id": f"{tid}-HZ-{year}-{HAZARD_SEQ_BASE + seq:03d}",
+        "hazard_id": generate_hazard_id(resolve_function_code("", None), "M", year, HAZARD_SEQ_BASE + seq),
         "created_by": SEED_CREATOR,
         "created_at": when,
         "updated_at": when,

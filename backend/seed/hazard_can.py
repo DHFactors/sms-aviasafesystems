@@ -18,7 +18,6 @@ from loguru import logger
 from seed import config as _cfg
 from seed.archetype_config import (
     season_rules_for,
-    neutral_hazard_ref,
     neutral_can_ref,
     neutral_cap_ref,
 )
@@ -34,8 +33,9 @@ from seed.config import (
 )
 from seed.generator import SeededRandom, generate_timestamp, _make_id
 from seed.tenant_profiles import hazard_titles_for_tenant
+from app.models.hazard import revalue_taxonomy
 from app.services.risk_matrix import compute_risk_index, get_risk_level, risk_outcome
-from app.services.hazard_service import generate_hazard_id
+from app.services.hazard_service import generate_hazard_id, resolve_function_code
 
 SEVERITY_LETTERS = ["A", "B", "C", "D", "E"]
 
@@ -70,20 +70,20 @@ CAN_STATUSES = ["Open", "Open", "Under Review"]
 CAP_STATUSES = ["Draft", "In Progress", "In Progress", "Completed"]
 
 TAXONOMY_POOL = {
-    "LOCI": "Organizational-Facilities",
-    "CFIT": "Organizational-Facilities",
-    "RE": "Organizational-Facilities",
-    "RI": "Organizational-Facilities",
-    "GCOL": "Organizational-Facilities",
+    "LOCI": "Organizational",
+    "CFIT": "Organizational",
+    "RE": "Organizational",
+    "RI": "Organizational",
+    "GCOL": "Organizational",
     "MAC": "Technical",
     "ENG": "Technical",
     "SYS": "Technical",
     "FIRE": "Technical",
-    "BIRD": "Wildlife",
-    "CABIN": "Human Factors",
-    "ARC": "Organizational-Documentation, Processes and Procedures",
+    "BIRD": "Environmental",
+    "CABIN": "Human",
+    "ARC": "Organizational",
     "WX": "Environmental",
-    "OTHER": "Other",
+    "OTHER": "Organizational",
 }
 ICAO_CATEGORIES = list(TAXONOMY_POOL.keys())
 
@@ -509,18 +509,25 @@ def _hazard_doc(rng: SeededRandom, profile: dict, index: int, created_at: dateti
     custodian = _custodian(tenant_id, index)
 
     if hazard_id is None:
-        hazard_id = generate_hazard_id(tenant_id, taxonomy, year, index + 1)
+        function = resolve_function_code(profile.get("department") or custodian.get("department") or "")
+        hazard_id = generate_hazard_id(function, priority, year, index + 1)
     title_pool = hazard_titles_for_tenant(tenant_id, HAZARD_TITLES)
+    operation_context = "monsoon-exposed" if _season_of(month) == "MONSOON" else "routine"
 
     doc = {
         "tenant_id": tenant_id,
         "hazard_id": hazard_id,
+        "function": hazard_id.split("/")[0] if "/" in hazard_id else "GEN",
         "title": rng.choice(title_pool),
         "description": rng.choice(HAZARD_DESCRIPTIONS),
         "source": rng.choice(SOURCES),
+        "source_id": f"seed-{year}-{index + 1:03d}",
         "occurrence_type": category,
-        "taxonomy": taxonomy,
+        "taxonomy": revalue_taxonomy(taxonomy),
+        "taxonomy_specific": category,
+        "threat": f"{category} precursor observed during {operation_context} operations",
         "consequence": rng.choice(["Minor", "Major", "Hazardous", "Catastrophic"]),
+        "top_event": "Loss-of-control / collision with terrain" if category in ("LOCI", "CFIT", "MAC", "RE") else "Operational disruption with safety margin reduction",
         "severity": severity,
         "probability": probability,
         "risk_index": risk_index,
@@ -530,10 +537,14 @@ def _hazard_doc(rng: SeededRandom, profile: dict, index: int, created_at: dateti
         "priority": priority,
         "recommended_action": rng.choice(REQUIRED_ACTIONS),
         "corrective_action": "Pending CAN issuance",
+        "corrective_action_flag": True,
+        "srm_flag": True,
         "assigned_to": custodian["assigned_to"],
         "assigned_to_uid": custodian["assigned_to_uid"],
         "department": custodian["department"],
         "status": status,
+        "priority_date": created_at,
+        "status_date": created_at,
         "follow_up_date": created_at + timedelta(days=rng.randint(14, 60)),
         "created_by": "seed.runner",
         "created_at": created_at,
@@ -804,12 +815,7 @@ def create_all_hazard_can_data(db, tenant_ids=None, profiles=None) -> dict:
             for _ in range(entry["hazard_count"]):
                 rng.seed(base_seed + h_index)
                 created_at = _month_datetime(entry["year"], entry["month"], rng, now)
-                neutral_haz = None
-                if is_archetype:
-                    neutral_haz = neutral_hazard_ref(tenant_id, h_index + 1,
-                                                     year=created_at.year % 100 + 2000)
-                doc = _hazard_doc(rng, profile, h_index, created_at=created_at,
-                                  hazard_id=neutral_haz)
+                doc = _hazard_doc(rng, profile, h_index, created_at=created_at)
                 doc_id = _make_id("haz", tenant_id, h_index)
                 ref = tenant_ref.collection("hazards").document(doc_id)
                 batch.set(ref, doc)

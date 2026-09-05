@@ -390,10 +390,14 @@ function renderSSMRiskChart(data) {
     }
 
     const colors = {
-        Operational: '#1a73e8',
-        Technical: '#e8710a',
-        'Human Factors': '#9334e6',
         Organizational: '#188038',
+        Technical: '#e8710a',
+        Human: '#9334e6',
+        Environmental: '#c5221f',
+        // Legacy aliases kept so already-stored series still colour correctly.
+        Operational: '#1a73e8',
+        'Human Factors': '#9334e6',
+        Wildlife: '#c5221f',
         External: '#c5221f',
     };
 

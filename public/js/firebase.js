@@ -605,7 +605,8 @@ function getStoredDemoContext() {
 
 /**
  * Reference formatter convenience — uses the active DEMO_CONTEXT IATA code
- * unless an explicit code is passed.
+ * unless an explicit code is passed. Only swaps the legacy FW-/RW- prefix on
+ * CAN/CAP references; ICAO hazard references (OPS/001/M/2026) pass through.
  */
 function formatReference(refString, iataCode) {
     var ctx = window.DEMO_CONTEXT || getStoredDemoContext() || {};

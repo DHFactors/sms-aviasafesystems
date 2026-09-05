@@ -15,6 +15,40 @@ from app.core.config import settings
 from app.firebase import initialize_firebase, get_firestore_db
 from app.services.hazard_service import HazardService
 
+# Keep ONLY production-setup tenants. No tenant outside this set is written.
+PRODUCTION_TENANTS = ["fixedwing", "rotarywing", "demoairport", "demostate", "sita-air", "sourya-air"]
+
+async def resolve_seed_tenant(db) -> str:
+    """Pick the operator tenant created from /admin/production-setup.html.
+
+    Preference order:
+      1. first operator declared by any State Regulator's operator_tenant_ids,
+         but only if it is in PRODUCTION_TENANTS
+      2. first tenants-collection doc (that is not itself a regulator) also in
+         PRODUCTION_TENANTS
+      3. fallback: first operator in PRODUCTION_TENANTS
+    """
+    try:
+        regs = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).stream()
+        for reg in regs:
+            ops = (reg.to_dict() or {}).get("operator_tenant_ids") or []
+            for oid in ops:
+                if oid in PRODUCTION_TENANTS:
+                    return oid
+        tenants = db.collection(settings.FIREBASE_COLLECTION_TENANTS).stream()
+        for t in tenants:
+            if t.id not in PRODUCTION_TENANTS:
+                continue
+            td = t.to_dict() or {}
+            if (str(td.get("type") or "").strip().upper() == "STATE_REGULATOR"
+                    or str(td.get("name") or "").strip().lower().endswith("state regulator")):
+                continue
+            return t.id
+    except Exception:
+        pass
+    return next(t for t in PRODUCTION_TENANTS if t != "demostate")
+
+
 async def seed_hazards():
     if settings.FIRESTORE_DATABASE_ID != "sms-db":
         print(f"❌ Safety block: Script must target 'sms-db', got '{settings.FIRESTORE_DATABASE_ID}'.")
@@ -24,20 +58,21 @@ async def seed_hazards():
     db = get_firestore_db()
     service = HazardService(db=db)
 
-    print("🌱 Seeding demo hazards and RCA factors onto sms-db...")
+    tid = await resolve_seed_tenant(db)
+    print(f"🌱 Seeding demo hazards and RCA factors onto sms-db (tenant: {tid})...")
 
-    # Sample Hazard 1: Fishtail Air
+    # Sample Hazard 1
     h1 = {
         "title": "Unstabilized Approach during Monsoonal Windshear at Lukla",
         "description": "Tailwind component exceeded company SOP limits on final approach.",
         "source_type": "occurrence",
         "source_reference_id": "OCC-2026-0819",
         "functional_area": "flight_operations",
-        "assigned_owner_email": "safety@fishtailair.com.np",
+        "assigned_owner_email": f"safety@{tid}.com.np",
         "target_completion_date": None
     }
-    user_info = {"email": "ops@fishtailair.com.np", "name": "Flight Operations"}
-    h1_id = await service.create_hazard("fishtail-air", h1, user_info)
+    user_info = {"email": f"ops@{tid}.com.np", "name": "Flight Operations"}
+    h1_id = await service.create_hazard(tid, h1, user_info)
     print(f"  ✓ Created Hazard: {h1_id}")
 
     # Tag HFACS RCA Nanocode
@@ -50,7 +85,7 @@ async def seed_hazards():
         "contributing_narrative": "Heavy rain showers reduced runway visual reference prior to decision point.",
         "order_sequence": 1
     }
-    await service.add_rca_factor("fishtail-air", h1_id, rca1)
+    await service.add_rca_factor(tid, h1_id, rca1)
     print(f"    ✓ Linked RCA Factor: PE101")
 
     # Initial Assessment
@@ -61,7 +96,7 @@ async def seed_hazards():
         "probability_score": "D",
         "probability_justification": "Occurs only during specific monsoon wind shifts."
     }
-    await service.record_assessment("fishtail-air", h1_id, asm1, "safety@fishtailair.com.np")
+    await service.record_assessment(tid, h1_id, asm1, f"safety@{tid}.com.np")
     print(f"    ✓ Attached 4D Tolerability Assessment")
 
     print("✓ Hazard seed completed successfully.")

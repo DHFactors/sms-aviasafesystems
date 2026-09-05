@@ -38,10 +38,14 @@ let fails = 0;
 for (const [email, dest, archetype, company, iata] of MATRIX) {
     const d = fb.getRoleDestination({ role: 'AIRLINE_ADMIN', email });
     const ctx = fb.resolveTenantContext({ email });
-    const formatted = fb.formatReference('FW-HZ-0001-26', ctx.iataCode);
+    // ICAO hazard references carry no tenant code and must pass through
+    // unchanged (only legacy CAN/CAP FW-/RW- prefixes get swapped to IATA).
+    const formatted = fb.formatReference('OPS/001/M/2026', ctx.iataCode);
+    const canFormatted = fb.formatReference('FW-CAN-0001-26', ctx.iataCode);
     const ok = d === dest && ctx.archetypeId === archetype &&
                ctx.companyName === company && ctx.iataCode === iata &&
-               formatted === iata + '-HZ-0001-26';
+               formatted === 'OPS/001/M/2026' &&
+               canFormatted === iata + '-CAN-0001-26';
     console.log(`[${ok ? 'PASS' : 'FAIL'}] ${email} -> ${d} | ${ctx.archetypeId} | ${ctx.companyName} | ${ctx.iataCode} | ${formatted}`);
     if (!ok) fails++;
 }

@@ -3,13 +3,16 @@
 UAT Seed Data Utility — writes deterministic test fixtures into Firestore.
 
 Targets ONLY the configured FIREBASE_DATABASE_ID (defaults to sms-db).
-Creates:
-  - 2 tenants (fishtail-air, nepal-wings) with AOC, tier, safety manager
+Seeds data strictly within the production-setup tenant set
+(PRODUCTION_TENANTS — see below). Creates:
   - 5 hazards per tenant spanning matrix cells 5A, 4C, 3D, 2E, 1E
   - Voluntary + mandatory occurrences for operational reporting rates
-  - Open / in-progress / overdue CAPA records for fishtail-air
+  - Open / in-progress / overdue CAPA records for the first production operator
   - Baseline SPIs with current values exceeding 1-Sigma thresholds
   - Regulator entity regulators/caan with distribution recipients
+
+PRODUCTION_TENANTS lists every tenant created through
+/admin/production-setup.html. No tenant outside this set is ever written.
 
 Idempotent: overwrites documents with same seed_version tag.
 Usage:
@@ -52,11 +55,51 @@ db = fs.client(app=firebase_admin.get_app(), database_id=DB_ID)
 
 # Patch app.firebase so internal helpers can resolve db
 import app.firebase as fb
+from app.services.hazard_service import generate_hazard_id, resolve_function_code
+
+# ICAO ADREP occurrence category -> ICAO-aligned 4-value hazard taxonomy.
+ICAO_TO_TAXONOMY = {
+    "LOCI": "Organizational", "CFIT": "Organizational", "RE": "Organizational",
+    "RI": "Organizational", "GCOL": "Organizational", "MAC": "Technical",
+    "ENG": "Technical", "SYS": "Technical", "FIRE": "Technical",
+    "BIRD": "Environmental", "CABIN": "Human", "ARC": "Organizational",
+    "PRO": "Organizational", "WX": "Environmental", "OTHER": "Organizational",
+}
 fb._db = db
 fb._firebase_app = firebase_admin.get_app()
 
 SEED_VERSION = "uat-v1"
 NOW = datetime.now(timezone.utc)
+
+# Keep ONLY production-setup tenants. Every seeding path below intersects its
+# resolved tenant targets with this set; tenants outside it are never written.
+PRODUCTION_TENANTS = ["fixedwing", "rotarywing", "demoairport", "demostate", "sita-air", "sourya-air"]
+
+# Operators (non-state) inside PRODUCTION_TENANTS — the writeable UAT targets.
+PRODUCTION_OPERATORS = [t for t in PRODUCTION_TENANTS if t != "demostate"]
+
+
+def _production_tenant_ids() -> List[str]:
+    """Operator tenant IDs created from /admin/production-setup.html.
+
+    Reads each State Regulator's `operator_tenant_ids`, then intersects the
+    union with PRODUCTION_TENANTS so no removed/legacy tenant can be seeded.
+    Falls back to PRODUCTION_OPERATORS on a fresh database.
+    """
+    ids: List[str] = []
+    try:
+        for reg_snap in db.collection("regulators").stream():
+            data = reg_snap.to_dict() or {}
+            for oid in data.get("operator_tenant_ids") or []:
+                if oid and oid not in ids:
+                    ids.append(oid)
+    except Exception as e:
+        print(f"[warn] Failed to read production-setup regulators: {e}")
+    ids = [i for i in ids if i in PRODUCTION_TENANTS]
+    return ids or list(PRODUCTION_OPERATORS)
+
+
+UAT_TENANT_IDS = _production_tenant_ids()
 
 print(f"[seed_uat_data] Target database: {DB_ID}")
 print(f"[seed_uat_data] Seed version:    {SEED_VERSION}")
@@ -142,10 +185,17 @@ TENANTS: List[Dict[str, Any]] = [
 
 def seed_tenants():
     print("\n── Seeding Tenants ──")
+    seeded = 0
     for t in TENANTS:
+        if t["id"] not in PRODUCTION_TENANTS:
+            print(f"  - skip {t['id']}: not in PRODUCTION_TENANTS")
+            continue
         ref = db.collection("tenants").document(t["id"])
         ref.set(t["data"])
+        seeded += 1
         print(f"  ✓ {t['id']}: AOC={t['data']['aoc_number']}, Tier={t['data']['sms_tier']}")
+    if seeded == 0:
+        print("  (no tenant fixtures apply to PRODUCTION_TENANTS — already created via production-setup)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -163,18 +213,29 @@ HAZARD_TEMPLATES = [
 
 def _hazard_doc(tenant_id: str, idx: int, t: Dict[str, Any]) -> Dict[str, Any]:
     created = NOW - timedelta(days=30 * (5 - idx))
+    priority = "H" if t["sev"] * t["prob"] >= 12 else "M" if t["sev"] * t["prob"] >= 6 else "L"
+    function = resolve_function_code("", None)
     return {
         "tenant_id": tenant_id,
-        "hazard_id": f"{tenant_id}-HZ-2026-{idx:03d}",
+        "hazard_id": generate_hazard_id(function, priority, created.year, idx),
+        "function": function,
         "title": t["title"],
         "description": f"UAT seed hazard: {t['title']}",
         "source": "VSR",
         "occurrence_category": t["cat"],
+        "taxonomy": ICAO_TO_TAXONOMY.get(t["cat"], "Organizational"),
+        "threat": f"UAT seed threat for {t['cat']}.",
+        "top_event": "UAT seed top event.",
         "severity": t["sev"],
         "probability": t["prob"],
         "risk_index": f"{t['sev']}{chr(64 + t['prob'])}",
         "risk_level": t["risk_level"],
+        "priority": priority,
+        "corrective_action_flag": True,
+        "srm_flag": True,
         "status": t["status"],
+        "priority_date": created,
+        "status_date": created,
         "created_by": "seed-uat",
         "created_at": created,
         "updated_at": created,
@@ -183,8 +244,8 @@ def _hazard_doc(tenant_id: str, idx: int, t: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def seed_hazards():
-    print("\n── Seeding Hazards ──")
-    for tenant_id in ["fishtail-air", "nepal-wings"]:
+    print(f"\n── Seeding Hazards (tenants: {', '.join(UAT_TENANT_IDS)}) ──")
+    for tenant_id in UAT_TENANT_IDS:
         batch = db.batch()
         for i, t in enumerate(HAZARD_TEMPLATES, start=1):
             ref = db.collection("tenants").document(tenant_id).collection("hazards").document(f"hz-{i:03d}")
@@ -229,7 +290,7 @@ def _report_doc(tenant_id: str, idx: int, r: Dict[str, Any]) -> Dict[str, Any]:
 
 def seed_reports():
     print("\n── Seeding Reports ──")
-    for tenant_id in ["fishtail-air", "nepal-wings"]:
+    for tenant_id in UAT_TENANT_IDS:
         batch = db.batch()
         for i, r in enumerate(REPORTS_DATA, start=1):
             ref = db.collection("tenants").document(tenant_id).collection("reports").document(f"rpt-{i:03d}")
@@ -239,7 +300,7 @@ def seed_reports():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Section 4: CAPAs (open / in-progress / overdue — fishtail-air only)
+# Section 4: CAPAs (open / in-progress / overdue — first production operator)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 CAPAS_DATA = [
@@ -301,21 +362,28 @@ CAPAS_DATA = [
 ]
 
 
+def _capa_tenant() -> str:
+    """First production operator, used for CAPA/SPI fixtures."""
+    return next((t for t in UAT_TENANT_IDS if t in PRODUCTION_TENANTS), PRODUCTION_OPERATORS[0])
+
+
 def seed_capas():
-    print("\n── Seeding CAPAs (fishtail-air) ──")
+    tenant_id = _capa_tenant()
+    print(f"\n── Seeding CAPAs ({tenant_id}) ──")
     batch = db.batch()
     for i, c in enumerate(CAPAS_DATA, start=1):
-        ref = db.collection("tenants").document("fishtail-air").collection("cans").document(f"capa-{i:03d}")
+        ref = db.collection("tenants").document(tenant_id).collection("cans").document(f"capa-{i:03d}")
         doc = dict(c)
+        doc["tenant_id"] = tenant_id
         doc["updated_at"] = doc["created_at"]
         doc["seed_version"] = SEED_VERSION
         batch.set(ref, doc)
     batch.commit()
-    print(f"  ✓ fishtail-air: {len(CAPAS_DATA)} CAPAs (2 open, 2 in-progress, 1 overdue)")
+    print(f"  ✓ {tenant_id}: {len(CAPAS_DATA)} CAPAs (2 open, 2 in-progress, 1 overdue)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Section 5: SPIs (baseline operational indicators — fishtail-air)
+# Section 5: SPIs (baseline operational indicators — first production operator)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SPI_DATA = [
@@ -393,18 +461,19 @@ SPI_DATA = [
 
 
 def seed_spis():
-    print("\n── Seeding SPIs (fishtail-air) ──")
+    tenant_id = _capa_tenant()
+    print(f"\n── Seeding SPIs ({tenant_id}) ──")
     batch = db.batch()
     for i, s in enumerate(SPI_DATA, start=1):
-        ref = db.collection("tenants").document("fishtail-air").collection("spis").document(f"spi-{i:03d}")
+        ref = db.collection("tenants").document(tenant_id).collection("spis").document(f"spi-{i:03d}")
         doc = dict(s)
-        doc["tenant_id"] = "fishtail-air"
+        doc["tenant_id"] = tenant_id
         doc["created_at"] = NOW - timedelta(days=60)
         doc["updated_at"] = NOW
         doc["seed_version"] = SEED_VERSION
         batch.set(ref, doc)
     batch.commit()
-    print(f"  ✓ fishtail-air: {len(SPI_DATA)} SPIs seeded (2 on-target, 3 off-target)")
+    print(f"  ✓ {tenant_id}: {len(SPI_DATA)} SPIs seeded (2 on-target, 3 off-target)")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -423,7 +492,7 @@ REGULATOR_DATA = {
         "caan.ssp@caanepal.gov.np",
         "caan.safety@caanepal.gov.np",
     ],
-    "oversight_tenants": ["fishtail-air", "nepal-wings", "buddha-air", "air-dynasty"],
+    "oversight_tenants": UAT_TENANT_IDS,
     "ssp_targets": {
         "total_hazards_intolerable": 5,
         "max_unresolved_capas": 10,
@@ -438,7 +507,7 @@ REGULATOR_DATA = {
 def seed_regulator():
     print("\n── Seeding Regulator ──")
     db.collection("regulators").document("caan").set(REGULATOR_DATA)
-    print("  ✓ regulators/caan: CAAN Nepal with 4 oversight tenants")
+    print(f"  ✓ regulators/caan: CAAN Nepal with {len(UAT_TENANT_IDS)} oversight tenants")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -457,11 +526,11 @@ def main():
     seed_regulator()
     print("\n" + "=" * 70)
     print("  Seed complete. Summary:")
-    print(f"    Tenants:   2 (fishtail-air, nepal-wings)")
-    print(f"    Hazards:   10 (5 per tenant)")
-    print(f"    Reports:   10 (5 per tenant)")
-    print(f"    CAPAs:     5 (fishtail-air)")
-    print(f"    SPIs:      5 (fishtail-air)")
+    print(f"    Tenants:   {len(UAT_TENANT_IDS)} ({', '.join(UAT_TENANT_IDS)})")
+    print(f"    Hazards:   {5 * len(UAT_TENANT_IDS)} (5 per tenant)")
+    print(f"    Reports:   {5 * len(UAT_TENANT_IDS)} (5 per tenant)")
+    print(f"    CAPAs:     5 ({_capa_tenant()})")
+    print(f"    SPIs:      5 ({_capa_tenant()})")
     print(f"    Regulator: 1 (caan)")
     print("=" * 70)
 

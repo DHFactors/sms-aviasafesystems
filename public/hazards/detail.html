@@ -106,6 +106,7 @@
                     <div class="label">Description</div>
                     <div class="value" style="white-space:pre-wrap;" id="fieldDescription"></div>
                 </div>
+                <div class="detail-field"><div class="label">Functional Area</div><div class="value" id="fieldFunction"></div></div>
                 <div class="detail-field"><div class="label">Source</div><div class="value" id="fieldSource"></div></div>
                 <div class="detail-field"><div class="label">Source Reference</div><div class="value" id="fieldSourceRef"></div></div>
                 <div class="detail-field"><div class="label">Taxonomy</div><div class="value" id="fieldTaxonomy"></div></div>
@@ -114,6 +115,8 @@
                 <div class="detail-field"><div class="label">Occurrence Type</div><div class="value" id="fieldOccurrenceType"></div></div>
                 <div class="detail-field"><div class="label">Priority</div><div class="value" id="fieldPriority"></div></div>
                 <div class="detail-field"><div class="label">Status</div><div class="value" id="fieldStatus"></div></div>
+                <div class="detail-field full-width"><div class="label">Threat</div><div class="value" style="white-space:pre-wrap;" id="fieldThreat"></div></div>
+                <div class="detail-field full-width"><div class="label">Top Event</div><div class="value" style="white-space:pre-wrap;" id="fieldTopEvent"></div></div>
                 <div class="detail-field"><div class="label">Consequence</div><div class="value" id="fieldConsequence"></div></div>
                 <div class="detail-field"><div class="label">Assigned To</div><div class="value" id="fieldAssignedTo"></div></div>
                 <div class="detail-field"><div class="label">Assigned UID</div><div class="value" id="fieldAssignedUid"></div></div>
@@ -122,7 +125,11 @@
                 <div class="detail-field"><div class="label">Updated At</div><div class="value" id="fieldUpdatedAt"></div></div>
                 <div class="detail-field"><div class="label">Follow-up Date</div><div class="value" id="fieldFollowUp"></div></div>
                 <div class="detail-field"><div class="label">Closed At</div><div class="value" id="fieldClosedAt"></div></div>
+                <div class="detail-field"><div class="label">Priority Date</div><div class="value" id="fieldPriorityDate"></div></div>
+                <div class="detail-field"><div class="label">Status Date</div><div class="value" id="fieldStatusDate"></div></div>
                 <div class="detail-field full-width"><div class="label">Recommended Action</div><div class="value" style="white-space:pre-wrap;" id="fieldRecommendedAction"></div></div>
+                <div class="detail-field"><div class="label">Corrective Action Flag</div><div class="value" id="fieldCorrectiveActionFlag"></div></div>
+                <div class="detail-field"><div class="label">SRM Required Flag</div><div class="value" id="fieldSrmFlag"></div></div>
                 <div class="detail-field full-width"><div class="label">Corrective Action (CAP)</div><div class="value" style="white-space:pre-wrap;" id="fieldCorrectiveAction"></div></div>
                 <div class="detail-field full-width"><div class="label">Remarks</div><div class="value" style="white-space:pre-wrap;" id="fieldRemarks"></div></div>
             </div>
@@ -226,6 +233,7 @@ function renderHazard() {
 
     document.getElementById('fieldTitle').textContent = h.title || '-';
     document.getElementById('fieldDescription').textContent = h.description || '-';
+    document.getElementById('fieldFunction').textContent = h.function || '-';
     document.getElementById('fieldSource').textContent = h.source || '-';
     document.getElementById('fieldSourceRef').innerHTML = h.source_url
         ? `<a href="${h.source_url}" target="_blank">${h.source_id || 'View Source'}</a>`
@@ -236,6 +244,8 @@ function renderHazard() {
     document.getElementById('fieldOccurrenceType').textContent = h.occurrence_type || '-';
     document.getElementById('fieldPriority').innerHTML = `<span class="badge ${hazardPriorityBadgeClass(h.priority)}">${h.priority}</span>`;
     document.getElementById('fieldStatus').innerHTML = `<span class="badge ${hazardStatusBadgeClass(h.status)}">${h.status}</span>`;
+    document.getElementById('fieldThreat').textContent = h.threat || '-';
+    document.getElementById('fieldTopEvent').textContent = h.top_event || '-';
     document.getElementById('fieldConsequence').textContent = h.consequence || '-';
     document.getElementById('fieldAssignedTo').textContent = h.assigned_to || 'Unassigned';
     document.getElementById('fieldAssignedUid').textContent = h.assigned_to_uid || '-';
@@ -244,7 +254,11 @@ function renderHazard() {
     document.getElementById('fieldUpdatedAt').textContent = formatDate(h.updated_at);
     document.getElementById('fieldFollowUp').textContent = formatDate(h.follow_up_date);
     document.getElementById('fieldClosedAt').textContent = formatDate(h.closed_at);
+    document.getElementById('fieldPriorityDate').textContent = formatDate(h.priority_date);
+    document.getElementById('fieldStatusDate').textContent = formatDate(h.status_date);
     document.getElementById('fieldRecommendedAction').textContent = h.recommended_action || '-';
+    document.getElementById('fieldCorrectiveActionFlag').textContent = h.corrective_action_flag ? 'Yes' : 'No';
+    document.getElementById('fieldSrmFlag').textContent = h.srm_flag ? 'Yes' : 'No';
     document.getElementById('fieldCorrectiveAction').textContent = h.corrective_action || '-';
     document.getElementById('fieldRemarks').textContent = h.remarks || '-';
 

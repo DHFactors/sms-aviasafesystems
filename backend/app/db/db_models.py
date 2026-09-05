@@ -52,6 +52,10 @@ PROBABILITY_CHECK = CheckConstraint(
 PRIORITY_HML_CHECK = CheckConstraint(
     "priority IN ('H', 'M', 'L')", name="ck_hazards_priority"
 )
+TAXONOMY_ICAO_CHECK = CheckConstraint(
+    "taxonomy IN ('Organizational', 'Technical', 'Human', 'Environmental')",
+    name="ck_hazards_taxonomy",
+)
 
 
 class Hazard(Base):
@@ -61,6 +65,7 @@ class Hazard(Base):
     hazard_id: Mapped[str] = mapped_column(Text, nullable=False)
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
 
+    function: Mapped[str] = mapped_column(Text, nullable=False, default="GEN")
     title: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(Text, nullable=False)
@@ -71,7 +76,9 @@ class Hazard(Base):
     occurrence_type: Mapped[object] = mapped_column(Text, nullable=True)
     taxonomy: Mapped[str] = mapped_column(Text, nullable=False)
     taxonomy_specific: Mapped[object] = mapped_column(Text, nullable=True)
+    threat: Mapped[object] = mapped_column(Text, nullable=True)
     consequence: Mapped[object] = mapped_column(Text, nullable=True)
+    top_event: Mapped[object] = mapped_column(Text, nullable=True)
 
     severity: Mapped[object] = mapped_column(Integer, nullable=True)
     probability: Mapped[object] = mapped_column(Integer, nullable=True)
@@ -83,6 +90,8 @@ class Hazard(Base):
     priority: Mapped[str] = mapped_column(Text, nullable=False, default="M")
     recommended_action: Mapped[object] = mapped_column(Text, nullable=True)
     corrective_action: Mapped[object] = mapped_column(Text, nullable=True)
+    corrective_action_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    srm_flag: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     assigned_to: Mapped[object] = mapped_column(Text, nullable=True)
     assigned_to_uid: Mapped[object] = mapped_column(Text, nullable=True)
     department: Mapped[object] = mapped_column(Text, nullable=True)
@@ -96,6 +105,8 @@ class Hazard(Base):
     sram_data: Mapped[object] = mapped_column(JSONB, nullable=True)
 
     status: Mapped[str] = mapped_column(Text, nullable=False)
+    priority_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    status_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     follow_up_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_by: Mapped[object] = mapped_column(Text, nullable=True)
@@ -115,6 +126,7 @@ class Hazard(Base):
         SEVERITY_CHECK,
         PROBABILITY_CHECK,
         PRIORITY_HML_CHECK,
+        TAXONOMY_ICAO_CHECK,
         Index("ux_hazards_tenant_id", "tenant_id", "hazard_id", unique=True),
         Index("ix_hazards_tenant", "tenant_id"),
         Index("ix_hazards_tenant_status", "tenant_id", "status"),

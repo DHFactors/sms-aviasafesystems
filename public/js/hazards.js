@@ -42,9 +42,25 @@ const HAZARD_CREATION_SOURCES = [
     'VSR', 'MOR', 'Internal Audit', 'Quality Audit', 'CAAN Audit', 'Flight Diversion'
 ];
 const HAZARD_TAXONOMIES = [
-    'Organizational-Facilities',
-    'Organizational-Documentation, Processes and Procedures',
-    'Technical', 'Wildlife', 'Human Factors', 'Environmental', 'Other'
+    'Organizational', 'Technical', 'Human', 'Environmental'
+];
+
+const HAZARD_FUNCTION_CODES = [
+    { code: 'OPS', label: 'Flight Operations' },
+    { code: 'ENG', label: 'Engineering / CAMO' },
+    { code: 'CAB', label: 'Cabin Crew' },
+    { code: 'MNT', label: 'Maintenance (Part-145)' },
+    { code: 'GHD', label: 'Ground Handling' },
+    { code: 'DSP', label: 'Dispatch / Operations Control' },
+    { code: 'SAF', label: 'Safety Management' },
+    { code: 'SEC', label: 'Security' },
+    { code: 'MED', label: 'Medical / Aeromedical' },
+    { code: 'TRN', label: 'Training' },
+    { code: 'ADM', label: 'Administration' },
+    { code: 'ENV', label: 'Environmental / Wildlife' },
+    { code: 'HUM', label: 'Human Factors' },
+    { code: 'ORG', label: 'Organizational / Governance' },
+    { code: 'GEN', label: 'General' },
 ];
 
 function hazardStatusBadgeClass(status) {

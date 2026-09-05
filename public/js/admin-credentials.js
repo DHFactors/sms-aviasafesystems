@@ -56,7 +56,22 @@
         buildProgress();
         addUserRow();
         addUserRow();
+        populateRegulatorDropdown();
         renderStep();
+    }
+
+    async function populateRegulatorDropdown() {
+        var sel = document.getElementById('tcRegulator');
+        if (!sel) return;
+        try {
+            var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+            var regs = resp.regulators || [];
+            sel.innerHTML = '<option value="">— none —</option>' +
+                regs.map(function (r) {
+                    return '<option value="' + AdminUI.esc(r.id) + '">' +
+                        AdminUI.esc(r.name || r.id) + ' (' + AdminUI.esc(r.id) + ')</option>';
+                }).join('');
+        } catch (err) { /* dropdown is non-critical; leave current options */ }
     }
 
     function logout() {

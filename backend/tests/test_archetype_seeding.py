@@ -18,10 +18,10 @@ from seed.archetype_config import (
     archetype_seed_profiles,
     neutral_can_ref,
     neutral_cap_ref,
-    neutral_hazard_ref,
     season_rules_for,
     validate_archetype_config,
 )
+import re
 from seed.generator import SeededRandom
 from seed.hazard_can import (
     _annual_hazard_count,
@@ -37,6 +37,9 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+_CAAN_REF_RE = re.compile(r"^[A-Z]{3}/\d{3}/[HML]/\d{4}$")
+
+
 def test_archetype_config_is_valid():
     assert validate_archetype_config() == []
     assert set(all_ids := ARCHETYPE_DATASETS) == {"demo-fixed-wing", "demo-rotary-wing"}
@@ -45,10 +48,10 @@ def test_archetype_config_is_valid():
 
 
 def test_neutral_reference_formats_with_year():
-    assert neutral_hazard_ref("demo-fixed-wing", 7, 2026) == "FW-HZ-0007-26"
+    # CAN/CAP neutral references keep their FW-/RW- branding (out of the CAAN
+    # hazard-reference scope); hazard references now use the CAAN function format.
     assert neutral_can_ref("demo-fixed-wing", 12, 2026) == "FW-CAN-0012-26"
     assert neutral_cap_ref("demo-fixed-wing", 40, 2026) == "FW-CAP-0040-26"
-    assert neutral_hazard_ref("demo-rotary-wing", 3, 2025) == "RW-HZ-0003-25"
 
 
 def test_archetype_seed_profiles_inherit_mirror_shape():
@@ -86,13 +89,14 @@ def test_annual_volume_meets_demonstration_minimum():
         assert _annual_hazard_count(profile) >= 52
 
 
-def test_archetype_documents_carry_neutral_references():
+def test_archetype_documents_carry_icao_references():
     profile = archetype_seed_profiles(["demo-fixed-wing"])[0]
     created = datetime(2026, 7, 14, tzinfo=timezone.utc)  # monsoon month
 
-    hazard = _hazard_doc(SeededRandom(seed=1), profile, 6, created_at=created,
-                         hazard_id=neutral_hazard_ref("demo-fixed-wing", 7, 2026))
-    assert hazard["hazard_id"] == "FW-HZ-0007-26"
+    # Hazards are referenced with the CAAN function format (no tenant code).
+    hazard = _hazard_doc(SeededRandom(seed=1), profile, 6, created_at=created)
+    assert _CAAN_REF_RE.match(hazard["hazard_id"])
+    assert hazard["hazard_id"].count("-") == 0
 
     can = _can_doc(SeededRandom(seed=2), profile, 6, "haz-doc", hazard["hazard_id"],
                    issued_at=created, can_reference=neutral_can_ref("demo-fixed-wing", 7, 2026))

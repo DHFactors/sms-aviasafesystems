@@ -228,11 +228,11 @@
     }
 
     /**
-     * Swap the neutral master prefix ('FW-' / 'RW-') on a seeded reference
-     * for the prospect's own two-letter IATA code.
-     *   formatReference('FW-HZ-0007-26', 'BA') -> 'BA-HZ-0007-26'
-     *   formatReference('RW-CAN-0003-26', 'FA') -> 'FA-CAN-0003-26'
-     * Unprefixed references pass through untouched.
+     * Swap the neutral master prefix ('FW-' / 'RW-') on a seeded CAN/CAP
+     * reference for the prospect's own two-letter IATA code.
+     *   formatReference('FW-CAN-0003-26', 'FA') -> 'FA-CAN-0003-26'
+     * ICAO hazard references (OPS/001/M/2026) carry no tenant code and pass
+     * through untouched.
      * @param {string} neutralRef
      * @param {string} iataCode
      */

@@ -57,14 +57,32 @@
         </p>
 
         <form id="hazardForm" onsubmit="return false;">
-            <div class="form-group">
-                <label>Title <span class="required">*</span></label>
-                <input class="form-control" id="fieldTitle" required minlength="3" maxlength="200" placeholder="Brief title describing the hazard">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Title <span class="required">*</span></label>
+                    <input class="form-control" id="fieldTitle" required minlength="3" maxlength="200" placeholder="Brief title describing the hazard">
+                </div>
+                <div class="form-group">
+                    <label>Functional Area <span class="required">*</span></label>
+                    <select class="form-control" id="fieldFunction" required></select>
+                    <div class="form-hint">Prefilled from your department — override if needed.</div>
+                </div>
             </div>
 
             <div class="form-group">
                 <label>Description <span class="required">*</span></label>
                 <textarea class="form-control" id="fieldDescription" required minlength="10" placeholder="Detailed description of the unsafe event"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Threat</label>
+                    <textarea class="form-control" id="fieldThreat" placeholder="The condition that could release the hazard (ICAO Doc 9859)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Top Event</label>
+                    <textarea class="form-control" id="fieldTopEvent" placeholder="The worst credible event if the hazard is released (Bow-Tie top event)"></textarea>
+                </div>
             </div>
 
             <div class="form-row">
@@ -152,8 +170,19 @@
 
             <h3 style="font-size:0.9rem;color:#0b2a42;margin:1.5rem 0 0.75rem;"><i class="fas fa-tasks"></i> Corrective Actions</h3>
             <div class="form-group">
-                <label>Recommended Action</label>
-                <textarea class="form-control" id="fieldRecommendedAction" placeholder="What action is recommended to mitigate this hazard?"></textarea>
+                <label>Recommended Action <span class="required">*</span></label>
+                <select class="form-control" id="fieldRecommendedAction" required>
+                    <option value="">— Select —</option>
+                    <option value="corrective">Corrective Action</option>
+                    <option value="srm">SRM Required</option>
+                    <option value="both">Corrective Action + SRM</option>
+                    <option value="none">None / Monitor</option>
+                </select>
+                <div class="form-hint">Sets the Corrective Action and SRM flags per CAAN Ch. 2.3.</div>
+            </div>
+            <div class="form-group">
+                <label>Recommended Action Detail</label>
+                <textarea class="form-control" id="fieldRecommendedActionDetail" placeholder="What action is recommended to mitigate this hazard?"></textarea>
             </div>
 
             <div class="form-row">
@@ -203,7 +232,39 @@
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
     populateDropdowns();
+    user.getIdTokenResult().then(function(tokenResult) {
+        const claims = (tokenResult && tokenResult.claims) || {};
+        const dept = claims.department || '';
+        const fnSel = document.getElementById('fieldFunction');
+        if (dept && fnSel) fnSel.value = resolveFunctionFromDepartment(dept);
+    }).catch(function() { /* prefill is a convenience; ignore token errors */ });
 });
+
+const DEPARTMENT_FUNCTION_HINTS = [
+    [/flight operation|line crew|pilot/i, 'OPS'],
+    [/dispatch|operations control/i, 'DSP'],
+    [/apron control|airside/i, 'DSP'],
+    [/camo|engineering|technical/i, 'ENG'],
+    [/maintenance|workshop|component|145/i, 'MNT'],
+    [/cabin/i, 'CAB'],
+    [/ground handling|ground operation|ground safety|ramp/i, 'GHD'],
+    [/arff|rescue|firefight/i, 'ENV'],
+    [/security/i, 'SEC'],
+    [/medical|aeromedical/i, 'MED'],
+    [/training/i, 'TRN'],
+    [/administration|administrative/i, 'ADM'],
+    [/quality|safety/i, 'SAF'],
+    [/smd|caan|standards|oversight/i, 'ORG'],
+    [/environment/i, 'ENV'],
+    [/human factor/i, 'HUM'],
+];
+
+function resolveFunctionFromDepartment(dept) {
+    const deptText = String(dept || '').trim();
+    if (!deptText) return 'GEN';
+    const hit = DEPARTMENT_FUNCTION_HINTS.find(([re]) => re.test(deptText));
+    return hit ? hit[1] : 'GEN';
+}
 
 function populateDropdowns() {
     const sourceSel = document.getElementById('fieldSource');
@@ -217,6 +278,11 @@ function populateDropdowns() {
     const priSel = document.getElementById('fieldPriority');
     priSel.innerHTML = '<option value="">— Select —</option>' +
         HAZARD_PRIORITIES.map(p => `<option value="${p}">${p === 'H' ? 'High' : p === 'M' ? 'Medium' : 'Low'}</option>`).join('');
+
+    const fnSel = document.getElementById('fieldFunction');
+    const relevant = HAZARD_FUNCTION_CODES.map(({ code, label }) =>
+        `<option value="${code}">${code} — ${label}</option>`).join('');
+    fnSel.innerHTML = '<option value="">— Select —</option>' + relevant;
 }
 
 function updateRiskPreview() {
@@ -234,9 +300,11 @@ async function submitHazard() {
     const source = document.getElementById('fieldSource').value;
     const taxonomy = document.getElementById('fieldTaxonomy').value;
     const priority = document.getElementById('fieldPriority').value;
+    const functionCode = document.getElementById('fieldFunction').value;
 
     if (!title || title.length < 3) { showMessage('Title is required (min 3 characters)', 'error'); return; }
     if (!description || description.length < 10) { showMessage('Description is required (min 10 characters)', 'error'); return; }
+    if (!functionCode) { showMessage('Functional Area is required', 'error'); return; }
     if (!source) { showMessage('Source is required', 'error'); return; }
     const sourceId = document.getElementById('fieldSourceId').value.trim();
     if (!sourceId) { showMessage('Source ID (reference) is required', 'error'); return; }
@@ -246,9 +314,19 @@ async function submitHazard() {
     const sev = parseInt(document.getElementById('fieldSeverity').value) || null;
     const prob = parseInt(document.getElementById('fieldProbability').value) || null;
 
+    const recommendedActionChoice = document.getElementById('fieldRecommendedAction').value;
+    if (!recommendedActionChoice) { showMessage('Recommended Action is required', 'error'); return; }
+
+    const correctiveActionFlag = recommendedActionChoice === 'corrective' || recommendedActionChoice === 'both';
+    const srmFlag = recommendedActionChoice === 'srm' || recommendedActionChoice === 'both';
+    const recommendedActionDetail = document.getElementById('fieldRecommendedActionDetail').value.trim();
+    const recommendedAction = recommendedActionDetail
+        || (correctiveActionFlag ? 'Corrective action identified under CAAN Ch. 2.3.' : null);
+
     const data = {
         title,
         description,
+        function: functionCode,
         source,
         taxonomy,
         priority,
@@ -257,10 +335,14 @@ async function submitHazard() {
         adrep_category: document.getElementById('fieldAdrep').value.trim() || null,
         occurrence_type: document.getElementById('fieldOccurrenceType').value.trim() || null,
         taxonomy_specific: document.getElementById('fieldTaxonomySpecific').value.trim() || null,
+        threat: document.getElementById('fieldThreat').value.trim() || null,
+        top_event: document.getElementById('fieldTopEvent').value.trim() || null,
         consequence: document.getElementById('fieldConsequence').value.trim() || null,
         severity: sev,
         probability: prob,
-        recommended_action: document.getElementById('fieldRecommendedAction').value.trim() || null,
+        recommended_action: recommendedAction,
+        corrective_action_flag: correctiveActionFlag,
+        srm_flag: srmFlag,
         assigned_to: document.getElementById('fieldAssignedTo').value.trim() || null,
         assigned_to_uid: document.getElementById('fieldAssignedUid').value.trim() || null,
         srm_conducted: document.getElementById('fieldSrmConducted').value === 'true',

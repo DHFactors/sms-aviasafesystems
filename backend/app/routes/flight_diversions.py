@@ -18,13 +18,13 @@ router = APIRouter()
 _DIVERSION_REASON_TAXONOMY = {
     "Weather": HazardTaxonomy.ENVIRONMENTAL,
     "Technical": HazardTaxonomy.TECHNICAL,
-    "Medical": HazardTaxonomy.HUMAN_FACTORS,
+    "Medical": HazardTaxonomy.HUMAN,
     "Fuel": HazardTaxonomy.TECHNICAL,
-    "Security": HazardTaxonomy.OTHER,
-    "Operational": HazardTaxonomy.OTHER,
-    "Airport Closure": HazardTaxonomy.OTHER,
-    "Air Traffic Control": HazardTaxonomy.OTHER,
-    "Other": HazardTaxonomy.OTHER,
+    "Security": HazardTaxonomy.ORGANIZATIONAL,
+    "Operational": HazardTaxonomy.ORGANIZATIONAL,
+    "Airport Closure": HazardTaxonomy.ORGANIZATIONAL,
+    "Air Traffic Control": HazardTaxonomy.ORGANIZATIONAL,
+    "Other": HazardTaxonomy.ORGANIZATIONAL,
 }
 
 
@@ -36,7 +36,7 @@ def _auto_create_hazard_from_diversion(stored: dict, user: dict):
         if not tenant_id or not doc_id:
             return None
         reason = stored.get("reason", "")
-        taxonomy = _DIVERSION_REASON_TAXONOMY.get(reason, HazardTaxonomy.OTHER)
+        taxonomy = _DIVERSION_REASON_TAXONOMY.get(reason, HazardTaxonomy.ORGANIZATIONAL)
         parts = [p for p in [
             stored.get("description"),
             stored.get("reason_details"),

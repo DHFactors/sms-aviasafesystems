@@ -22,6 +22,8 @@ from sqlalchemy import delete
 
 from app.core.config import settings
 from app.firebase import get_db
+from app.models.hazard import revalue_taxonomy
+from app.services.hazard_service import generate_hazard_id, resolve_function_code
 from app.db.ids import register_tenant, tenant_uuid
 from app.db.session import session_scope
 from app.db.db_models import Can, Cap, Hazard, Report, Survey, SurveyResponse
@@ -42,13 +44,13 @@ _DEPARTMENTS = ["Flight Operations", "Maintenance & Engineering",
 _ICAO_CATEGORIES = ["LOCI", "CFIT", "RE", "RI", "MAC", "WX", "ENG", "SYS",
                     "FIRE", "BIRD", "GCOL", "CABIN", "ARC", "OTHER"]
 _ICAO_TO_TAXONOMY = {
-    "LOCI": "Organizational-Facilities", "CFIT": "Organizational-Facilities",
-    "RE": "Organizational-Facilities", "RI": "Organizational-Facilities",
-    "GCOL": "Organizational-Facilities", "MAC": "Technical", "ENG": "Technical",
-    "SYS": "Technical", "FIRE": "Technical", "BIRD": "Wildlife",
-    "CABIN": "Human Factors", "ARC": "Organizational-Documentation, Processes and Procedures",
-    "PRO": "Organizational-Documentation, Processes and Procedures",
-    "WX": "Environmental", "OTHER": "Other",
+    "LOCI": "Organizational", "CFIT": "Organizational",
+    "RE": "Organizational", "RI": "Organizational",
+    "GCOL": "Organizational", "MAC": "Technical", "ENG": "Technical",
+    "SYS": "Technical", "FIRE": "Technical", "BIRD": "Environmental",
+    "CABIN": "Human", "ARC": "Organizational",
+    "PRO": "Organizational",
+    "WX": "Environmental", "OTHER": "Organizational",
 }
 
 DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 3, "survey": 12}
@@ -385,22 +387,33 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
                 created = base - timedelta(days=i)
                 # Use ICAO category as occurrence_type/adrep for realistic hazard frequency chart
                 occ_type = cat  # e.g., CFIT, RE, BIRD, etc. — matches seeded adrep for frequency grouping
+                dept = random.choice(_DEPARTMENTS)
+                priority = "H" if idx >= 12 else "M" if idx >= 6 else "L"
+                function = resolve_function_code(dept, None)
+                taxonomy = revalue_taxonomy(_ICAO_TO_TAXONOMY.get(cat, ""))
                 hazard = Hazard(
                     tenant_id=uuid.UUID(tuuid),
-                    hazard_id=f"{tid}-HZ-DEMO-{i + 1:03d}",
+                    hazard_id=generate_hazard_id(function, priority, created.year, i + 1),
+                    function=function,
                     title=f"Dummy hazard {i + 1} for demonstration",
                     description="Dummy demonstration hazard created by the Super-Admin seed tool.",
                     source="Internal Audit",
                     source_id="",
                     occurrence_type=occ_type,
                     adrep_category=cat,
-                    taxonomy=_ICAO_TO_TAXONOMY.get(cat, "Other"),
+                    threat=f"Demonstration {cat} precursor (Super-Admin seed).",
+                    top_event="Demonstration top event (seed data).",
+                    taxonomy=taxonomy,
                     severity=sev,
                     probability=prob,
                     risk_index=idx,
                     risk_level=lvl,
-                    priority="H" if idx >= 12 else "M" if idx >= 6 else "L",
+                    priority=priority,
+                    corrective_action_flag=True,
+                    srm_flag=True,
                     status="Open",
+                    priority_date=created,
+                    status_date=created,
                     srm_conducted=True,
                     analysis_mode="FISHBONE_ONLY",
                     is_demo=True,

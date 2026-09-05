@@ -195,11 +195,15 @@ if r4b.status_code == 200:
             if hid and hid.startswith('SA-HZ'):
                 test_id = hid
                 break
+        # Fall back: the CAAN references (OPS/001/M/2026) contain no tenant
+        # code; look any hazard up by its uuid `id` instead.
+        if not test_id:
+            test_id = next((h.get('id') for h in hazards if h.get('id')), None)
         if test_id:
             r4c = api('GET', '/api/v1/hazards/' + test_id, t['airline_admin'])
             s4_results.append(test('Hazard detail accessible', r4c.status_code == 200, f'{test_id}: {r4c.status_code}'))
         else:
-            s4_results.append(test('Found hazard with SA-HZ prefix', False, 'No matching hazard found'))
+            s4_results.append(test('Found a hazard in the register', False, 'No matching hazard found'))
 else:
     s4_results.append(test('Hazard list accessible', False, f'Got {r4b.status_code} {r4b.text[:100]}'))
 

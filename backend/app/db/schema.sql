@@ -34,6 +34,7 @@ CREATE TABLE hazards (
     hazard_id           TEXT NOT NULL,
     tenant_id           UUID NOT NULL,
 
+    function            TEXT NOT NULL DEFAULT 'GEN',
     title               TEXT NOT NULL,
     description         TEXT NOT NULL,
     source              TEXT NOT NULL,
@@ -42,9 +43,11 @@ CREATE TABLE hazards (
 
     adrep_category      TEXT,
     occurrence_type     TEXT,
-    taxonomy            TEXT NOT NULL,
+    taxonomy            TEXT NOT NULL CHECK (taxonomy IN ('Organizational', 'Technical', 'Human', 'Environmental')),
     taxonomy_specific   TEXT,
+    threat              TEXT,
     consequence         TEXT,
+    top_event           TEXT,
 
     severity            INT CHECK (severity BETWEEN 1 AND 5),
     probability         INT CHECK (probability BETWEEN 1 AND 5),
@@ -57,6 +60,8 @@ CREATE TABLE hazards (
 
     recommended_action  TEXT,
     corrective_action   TEXT,
+    corrective_action_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    srm_flag            BOOLEAN NOT NULL DEFAULT FALSE,
     assigned_to         TEXT,
     assigned_to_uid     TEXT,
     department          TEXT,
@@ -68,6 +73,8 @@ CREATE TABLE hazards (
     sram_data           JSONB,              -- SramData: severity/barriers/risk_profile/bowtie/fishbone/signoffs
 
     status              TEXT NOT NULL,
+    priority_date       TIMESTAMPTZ,
+    status_date         TIMESTAMPTZ,
     follow_up_date      TIMESTAMPTZ,
     closed_at           TIMESTAMPTZ,
     closed_by           TEXT,
@@ -86,6 +93,7 @@ CREATE INDEX        ix_hazards_tenant_status   ON hazards (tenant_id, status);
 CREATE INDEX        ix_hazards_tenant_assignee ON hazards (tenant_id, assigned_to);
 CREATE INDEX        ix_hazards_tenant_created  ON hazards (tenant_id, created_at);
 CREATE INDEX        idx_hazards_tenant_demo    ON hazards (tenant_id, is_demo);
+CREATE INDEX        ix_hazards_tenant_function ON hazards (tenant_id, function);
 
 -- ============================================================================
 -- 2. VSR / MOR REPORTS  (backend/app/models/report.py)

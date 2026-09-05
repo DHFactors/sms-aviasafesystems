@@ -31,16 +31,18 @@ REGULATOR_ID = "caan"
 COUNTRY = "NP"
 COUNTRY_NAME = "Nepal"
 
-# The operators overseen by the CAAN State Regulator. Matches the 5 active beta
-# provider tenants (seed/config.py OPERATOR_PROFILES). Legacy operators were
-# archived and are no longer overseen. Base maturity (1-5) drives the seeded
+# Keep ONLY production-setup tenants. No tenant outside this set is written.
+PRODUCTION_TENANTS = ["fixedwing", "rotarywing", "demoairport", "demostate", "sita-air", "sourya-air"]
+
+# Deterministic production-operator fixtures (used only as a fallback when no
+# production-setup regulators exist yet). Base maturity (1-5) drives the seeded
 # SMS culture so the CAAN dashboard shows a realistic spread of maturity.
-OPERATORS = [
-    {"id": "buddha-air", "name": "Buddha Air", "maturity": 4.1},
-    {"id": "air-dynasty", "name": "Air Dynasty Heli Services", "maturity": 3.0},
-    {"id": "ktm-mro", "name": "KTM MRO Services", "maturity": 3.5},
-    {"id": "pokhara-aerodrome", "name": "Pokhara Aerodrome", "maturity": 2.8},
-    {"id": "himalaya-ground-services", "name": "Himalaya Ground Handling", "maturity": 3.3},
+DEFAULT_OPERATORS = [
+    {"id": "fixedwing", "name": "Fixed-Wing Operator", "maturity": 4.1},
+    {"id": "rotarywing", "name": "Rotary-Wing Operator", "maturity": 3.7},
+    {"id": "demoairport", "name": "Demo Airport", "maturity": 3.4},
+    {"id": "sita-air", "name": "Sita Air Ltd", "maturity": 3.1},
+    {"id": "sourya-air", "name": "Sourya Airlines", "maturity": 2.9},
 ]
 
 ICAO_CATEGORIES = [
@@ -72,6 +74,7 @@ from app.services.survey_scoring import (
     compute_question_scores,
 )
 from app.services.risk_matrix import compute_risk_index, get_risk_level
+from app.services.hazard_service import generate_hazard_id, resolve_function_code
 
 creds = credentials.Certificate({
     "type": "service_account",
@@ -89,6 +92,41 @@ db = firestore.client(app=app, database_id=DB_ID)
 import app.firebase as fb
 fb._db = db
 fb._firebase_app = app
+
+
+def _resolve_operators() -> list:
+    """Prefer operators created from /admin/production-setup.html.
+
+    Reads the `regulators` collection and uses each regulator's declared
+    `operator_tenant_ids`, restricted to PRODUCTION_TENANTS. Every resolved
+    operator records the regulator that actually owns it, so later tags never
+    re-point an operator at the wrong regulator. Falls back to the
+    deterministic production-operator list when no such operators exist.
+    """
+    out: list = []
+    seen: set = set()
+    try:
+        for reg_snap in db.collection("regulators").stream():
+            data = reg_snap.to_dict() or {}
+            for oid in data.get("operator_tenant_ids") or []:
+                if not oid or oid in seen or oid not in PRODUCTION_TENANTS:
+                    continue
+                seen.add(oid)
+                matched = next((o for o in DEFAULT_OPERATORS if o["id"] == oid), None)
+                out.append({
+                    "id": oid,
+                    "name": matched["name"] if matched else str(oid),
+                    "maturity": matched["maturity"] if matched else 3.0,
+                    "regulator_id": reg_snap.id,
+                })
+    except Exception as e:
+        print(f"[warn] Failed to resolve production-setup operators: {e}")
+    if out:
+        return out
+    return [dict(o, regulator_id=REGULATOR_ID) for o in DEFAULT_OPERATORS]
+
+
+OPERATORS = _resolve_operators()
 
 
 # ============================================================================
@@ -153,22 +191,23 @@ def survey_doc(tid: str, answers: dict, submitted_at: datetime, idx: int) -> dic
 
 # Mirrors app/routes/reports.py:_determine_hazard_taxonomy so seeded hazards
 # carry a taxonomy value accepted by the HazardTaxonomy enum (API contract).
+# Values are the ICAO-aligned 4-value set.
 ICAO_TO_TAXONOMY = {
-    "LOCI": "Organizational-Facilities",
-    "CFIT": "Organizational-Facilities",
-    "RE": "Organizational-Facilities",
-    "RI": "Organizational-Facilities",
-    "GCOL": "Organizational-Facilities",
+    "LOCI": "Organizational",
+    "CFIT": "Organizational",
+    "RE": "Organizational",
+    "RI": "Organizational",
+    "GCOL": "Organizational",
     "MAC": "Technical",
     "ENG": "Technical",
     "SYS": "Technical",
     "FIRE": "Technical",
-    "BIRD": "Wildlife",
-    "CABIN": "Human Factors",
-    "ARC": "Organizational-Documentation, Processes and Procedures",
-    "PRO": "Organizational-Documentation, Processes and Procedures",
+    "BIRD": "Environmental",
+    "CABIN": "Human",
+    "ARC": "Organizational",
+    "PRO": "Organizational",
     "WX": "Environmental",
-    "OTHER": "Other",
+    "OTHER": "Organizational",
 }
 
 
@@ -176,20 +215,29 @@ def hazard_doc(tid: str, cat: str, created_at: datetime, idx: int) -> dict:
     severity = random.randint(2, 4)
     probability = random.randint(2, 4)
     risk_index = compute_risk_index(severity, probability)
+    priority = "H" if risk_index >= 12 else "M" if risk_index >= 6 else "L"
+    function = resolve_function_code("", None)
     return {
         "tenant_id": tid,
-        "hazard_id": f"{tid}-HZ-{created_at.year}-{idx:03d}",
+        "hazard_id": generate_hazard_id(function, priority, created_at.year, idx),
+        "function": function,
         "title": f"Demo hazard {cat} at {tid}",
         "description": f"Seeded demonstration hazard classified as {cat}.",
         "source": random.choice(["VSR", "MOR", "Safety Inspection"]),
         "occurrence_category": cat,
-        "taxonomy": ICAO_TO_TAXONOMY.get(cat, "Other"),
+        "taxonomy": ICAO_TO_TAXONOMY.get(cat, "Organizational"),
+        "threat": f"Demo threat precursor for {cat}.",
+        "top_event": "Demo top event for demonstration data.",
         "severity": severity,
         "probability": probability,
         "risk_index": risk_index,
         "risk_level": get_risk_level(risk_index),
-        "priority": "H" if risk_index >= 12 else "M" if risk_index >= 6 else "L",
+        "priority": priority,
+        "corrective_action_flag": True,
+        "srm_flag": True,
         "status": random.choice(["Open", "Open", "Under Review", "Closed"]),
+        "priority_date": created_at,
+        "status_date": created_at,
         "created_by": "seed-caan-demo",
         "created_at": created_at,
         "updated_at": created_at,
@@ -244,6 +292,7 @@ def count_docs(tid: str, sub: str) -> int:
 # ============================================================================
 
 def seed_regulator():
+    caan_ops = [o["id"] for o in OPERATORS if o.get("regulator_id") == REGULATOR_ID]
     regulator_ref = db.collection("regulators").document(REGULATOR_ID)
     regulator_ref.set({
         "id": REGULATOR_ID,
@@ -253,19 +302,20 @@ def seed_regulator():
         "country": COUNTRY,
         "country_name": COUNTRY_NAME,
         "domain": "ssp.caanepal.gov.np",
-        "operator_tenant_ids": [o["id"] for o in OPERATORS],
+        "operator_tenant_ids": caan_ops,
         "active": True,
         "updated_at": datetime.now(timezone.utc),
     }, merge=True)
-    print(f"[1] State Regulator '{REGULATOR_ID}' ({COUNTRY_NAME}) ensured.")
+    print(f"[1] State Regulator '{REGULATOR_ID}' ({COUNTRY_NAME}) ensured with {len(caan_ops)} operators.")
 
     for op in OPERATORS:
+        rid = op.get("regulator_id") or REGULATOR_ID
         db.collection("tenants").document(op["id"]).set({
-            "regulator_id": REGULATOR_ID,
+            "regulator_id": rid,
             "country": COUNTRY,
             "active": True,
         }, merge=True)
-    print(f"[1] {len(OPERATORS)} operator tenants tagged regulator_id={REGULATOR_ID}, country={COUNTRY}.")
+    print(f"[1] {len(OPERATORS)} operator tenants tagged by owning regulator (country={COUNTRY}).")
 
 
 # ============================================================================

@@ -39,7 +39,7 @@ class _CaptureService:
                  "residual_risk_index": 4, "barrier_health": {}}]
 
     def list_hazards(self, user, filters):
-        return [{"id": "h1", "hazard_id": "FW-HZ-0001-26", "title": "t",
+        return [{"id": "h1", "hazard_id": "OPS/001/H/2026", "title": "t",
                  "status": "Open", "severity": 3, "probability": 3,
                  "risk_index": 9, "created_at": None}]
 
