@@ -7,29 +7,29 @@ const HazardsAPI = {
         if (params.taxonomy) qs.set('taxonomy', params.taxonomy);
         if (params.tenant_id) qs.set('tenant_id', params.tenant_id);
         if (params.search) qs.set('search', params.search);
-        return ApiClient.get(`/api/hazards?${qs.toString()}`);
+        return ApiClient.get(`/api/v1/hazards?${qs.toString()}`);
     },
 
-    get: (hazardId) => ApiClient.get(`/api/hazards/${hazardId}`),
+    get: (hazardId) => ApiClient.get(`/api/v1/hazards/${hazardId}`),
 
-    create: (data) => ApiClient.post('/api/hazards', data),
+    create: (data) => ApiClient.post('/api/v1/hazards', data),
 
-    update: (hazardId, data) => ApiClient.put(`/api/hazards/${hazardId}`, data),
+    update: (hazardId, data) => ApiClient.put(`/api/v1/hazards/${hazardId}`, data),
 
     updateStatus: (hazardId, status) =>
-        ApiClient._request('PATCH', `/api/hazards/${hazardId}/status?status=${status}`),
+        ApiClient._request('PATCH', `/api/v1/hazards/${hazardId}/status?status=${status}`),
 
     assign: (hazardId, assignedTo, assignedToUid) =>
-        ApiClient._request('PATCH', `/api/hazards/${hazardId}/assign?assigned_to=${encodeURIComponent(assignedTo)}&assigned_to_uid=${assignedToUid}`),
+        ApiClient._request('PATCH', `/api/v1/hazards/${hazardId}/assign?assigned_to=${encodeURIComponent(assignedTo)}&assigned_to_uid=${assignedToUid}`),
 
-    getStats: () => ApiClient.get('/api/hazards/stats'),
+    getStats: () => ApiClient.get('/api/v1/hazards/stats'),
 
     // ── CAAN CAR-19 SRM (Bow-Tie) ──
     sramCalculate: (hazardId, payload) =>
-        ApiClient.post(`/api/hazards/${hazardId}/sram/calculate`, payload),
+        ApiClient.post(`/api/v1/hazards/${hazardId}/sram/calculate`, payload),
 
     sramSave: (hazardId, payload) =>
-        ApiClient.put(`/api/hazards/${hazardId}/sram/save`, payload),
+        ApiClient.put(`/api/v1/hazards/${hazardId}/sram/save`, payload),
 };
 
 const HAZARD_STATUSES = ['Open', 'Processing', 'Under Review', 'Closed', 'Reopened'];

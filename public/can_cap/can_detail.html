@@ -60,9 +60,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link rel="stylesheet" href="/css/shell.css">
     </head>
 <body>
 
+<div class="app-shell">
 <div class="page">
     <a href="/can_cap/cans.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to CANs</a>
     <div id="message"></div>
@@ -154,10 +157,21 @@
     </div>
 </div>
 
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
 <script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Corrective Action Management',
+};
+</script>
+<script src="/js/shell.js"></script>
 <script src="/js/risk_matrix.js"></script>
 <script src="/js/fishbone.js"></script>
 <script src="/js/srm.js"></script>

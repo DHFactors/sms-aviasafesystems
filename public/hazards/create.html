@@ -42,9 +42,11 @@
 
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    <link rel="stylesheet" href="/css/shell.css">
     </head>
 <body>
 
+<div class="app-shell">
 <div class="page">
     <a href="/dashboard/master-register.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Master Hazard Register</a>
 
@@ -222,11 +224,21 @@
         </form>
     </div>
 </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
 <script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Hazard Management',
+};
+</script>
+<script src="/js/shell.js"></script>
 <script src="/js/hazards.js"></script>
 <script>
 firebase.auth().onAuthStateChanged(function(user) {
