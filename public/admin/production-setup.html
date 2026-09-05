@@ -243,6 +243,16 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
                 <button class="btn btn-primary" onclick="seedStateRisk()"><i class="fas fa-shield-halved"></i> Seed State Risk Reference</button>
                 <div id="stateRiskArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
             </div>
+
+            <!-- ============ STEP 8 — PURGE DEMO DATA ============ -->
+            <div class="admin-card" style="border-color:#e2b8b8;">
+                <div class="card-head"><span class="step-badge">Step 8</span></div>
+                <h2><i class="fas fa-trash-can" style="color:#b91c1c;"></i> Purge Demo Data</h2>
+                <p class="card-sub">Delete ALL demo data (<code>is_demo = true</code>) from every table &mdash; hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows &mdash; across all tenants. Real paying-tenant data and the PSOE question bank are preserved.</p>
+                <p style="margin:0 0 12px;color:#b91c1c;font-weight:600;">⚠️ This is irreversible!</p>
+                <button id="purgeDemoDataBtn" class="btn btn-danger" onclick="purgeDemoData()"><i class="fas fa-trash-can"></i> Purge All Demo Data</button>
+                <div id="purgeResult" style="margin-top: 12px;"></div>
+            </div>
         </div>
 
         <!-- ============ EXISTING REGULATORS ============ -->
@@ -951,6 +961,45 @@ async function execStateRisk(body) {
 }
 
 // ============================================================================
+// STEP 8 — PURGE DEMO DATA
+// ============================================================================
+
+function purgeDemoData() {
+    openConfirm(
+        '⚠️ Purge ALL Demo Data',
+        'This will permanently delete <strong>ALL demo data</strong> (<code>is_demo = true</code>) — hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie analyses, risk/barrier/state registers and their child rows — across <strong>every tenant</strong>.<br><br>' +
+        '<span style="color:#b91c1c;font-weight:700;">This is IRREVERSIBLE.</span> Real paying-tenant data (<code>is_demo = false</code>) and the PSOE question bank are preserved.',
+        { type: 'purge', body: {} }
+    );
+}
+
+async function execPurge(body) {
+    var area = document.getElementById('purgeResult');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging demo data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/purge-demo-data', body);
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'Purge request failed');
+        var rows = Object.keys(resp.details).map(function (table) {
+            return '<tr><td><code>' + esc(table) + '</code></td><td>' + esc(resp.details[table]) + '</td></tr>';
+        }).join('');
+        var hasErrors = Object.keys(resp.details).some(function (k) { return String(resp.details[k]).indexOf('Error') === 0; });
+        if (area) {
+            area.innerHTML = '<div class="status-box ' + (hasErrors ? 'error' : 'success') + '">' +
+                '<strong>✅ Purged ' + resp.deleted_count + ' demo records</strong>' +
+                (hasErrors ? '<div style="margin-top:6px;color:#b91c1c;">Some tables failed — inspect the table list below.</div>' : '') +
+                '</div>' +
+                '<div style="overflow-x:auto;margin-top:12px;"><table class="admin-table">' +
+                '<thead><tr><th style="text-align:left;">Table</th><th>Deleted</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+        }
+        toast('Demo data purged: ' + resp.deleted_count + ' records.', hasErrors ? 'error' : 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">❌ Purge failed: ' + esc(err.message) + '</div>';
+        toast('Purge failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
 // SHARED CONFIRM MODAL
 // ============================================================================
 
@@ -959,7 +1008,7 @@ function openConfirm(title, html, action) {
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmText').innerHTML = html;
     // Show setup-key field for destructive actions — prompt inside the warning modal
-    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'deleteUser');
+    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purge' || action.type === 'deleteUser');
     var wrap = document.getElementById('confirmSetupKeyWrap');
     var input = document.getElementById('confirmSetupKey');
     var errEl = document.getElementById('confirmSetupKeyError');
@@ -985,7 +1034,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     var action = pendingConfirm;
     if (!action) return;
     // For destructive actions, require setup key from the modal input
-    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'deleteUser';
+    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purge' || action.type === 'deleteUser';
     var setupKey = '';
     if (needsKey) {
         var input = document.getElementById('confirmSetupKey');
@@ -1012,6 +1061,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     if (action.type === 'demo') execDemo(action.body);
     else if (action.type === 'psoe') execPsoe(action.body);
     else if (action.type === 'stateRisk') execStateRisk(action.body);
+    else if (action.type === 'purge') execPurge(action.body);
     else if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid, action.setup_key);
 });
 

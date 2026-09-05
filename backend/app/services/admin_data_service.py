@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from sqlalchemy import delete
+from sqlalchemy import and_, delete, or_, select, union_all
 
 from app.core.config import settings
 from app.firebase import get_db
@@ -26,7 +26,33 @@ from app.models.hazard import revalue_taxonomy
 from app.services.hazard_service import generate_hazard_id, resolve_function_code
 from app.db.ids import register_tenant, tenant_uuid
 from app.db.session import session_scope
-from app.db.db_models import Can, Cap, Hazard, Report, Survey, SurveyResponse
+from app.db.db_models import (
+    BarrierRegisterEntry,
+    BowTieAnalysis,
+    BowTieConsequence,
+    BowTieControl,
+    BowTieThreat,
+    Can,
+    Cap,
+    Closure,
+    CorrectiveAction,
+    FlightDiversion,
+    Hazard,
+    HazardAssessment,
+    HazardCapa,
+    HazardRcaEntry,
+    HazardRcaFactor,
+    PsoeAssessment,
+    PsoeFinding,
+    RegulatoryReport,
+    Report,
+    RiskRegisterEntry,
+    SafetyDeficiency,
+    StateRiskRegisterEntry,
+    Survey,
+    SurveyResponse,
+    Verification,
+)
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.production_seed import _audit, _validate_id
 
@@ -554,3 +580,128 @@ def demo_data_scope(tenant_ids: Optional[List[str]] = None, all_tenants: bool = 
             logger.error(f"Failed to list tenants for demo-data scope: {e}")
             return []
     return []
+
+
+# ============================================================================
+# Purge ALL demo data (is_demo = true) — cluster wide
+# ============================================================================
+# Deleting demo data requires FK-safe ordering (child → parent) plus handling
+# of child tables that carry no is_demo flag themselves (they only reference
+# demo parents through their FKs). Child rows are matched against the id sets
+# of demo parents, so real (is_demo=false) tenant data is never touched.
+#
+# Tables with an is_demo column: hazards, reports, cans, caps, surveys,
+# survey_responses, psoe_assessments, state_risk_register, regulatory_reports,
+# bow_tie_analyses, risk_register, barrier_register.
+# psoe_questions is GLOBAL reference data with no is_demo flag — never purged.
+
+
+async def _build_purge_steps():
+    """Return an ordered list of (table_name, delete_statement) pairs.
+
+    Order is child → parent so FK constraints are satisfied. Subqueries scope
+    child deletes to the demo parents' id sets / demo tenants only.
+    """
+    demo_tenant_ids = union_all(
+        select(Hazard.tenant_id).where(Hazard.is_demo == True),
+        select(Report.tenant_id).where(Report.is_demo == True),
+        select(Survey.tenant_id).where(Survey.is_demo == True),
+        select(Can.tenant_id).where(Can.is_demo == True),
+        select(Cap.tenant_id).where(Cap.is_demo == True),
+    ).scalar_subquery()
+    demo_hazards = select(Hazard.id).where(Hazard.is_demo == True).scalar_subquery()
+    demo_cans = select(Can.id).where(Can.is_demo == True).scalar_subquery()
+    demo_caps = select(Cap.id).where(Cap.is_demo == True).scalar_subquery()
+    demo_reports = select(Report.id).where(Report.is_demo == True).scalar_subquery()
+    demo_assessments = select(PsoeAssessment.id).where(PsoeAssessment.is_demo == True).scalar_subquery()
+    demo_bowties = select(BowTieAnalysis.id).where(BowTieAnalysis.is_demo == True).scalar_subquery()
+    demo_rca_entries = (
+        select(HazardRcaEntry.id)
+        .where(HazardRcaEntry.tenant_id.in_(demo_tenant_ids))
+        .scalar_subquery()
+    )
+
+    steps: List[tuple] = [
+        # RCA subtree (no tenant_id-level is_demo; scoped by demo tenant)
+        ("hazard_rca_factors", delete(HazardRcaFactor).where(HazardRcaFactor.entry_id.in_(demo_rca_entries))),
+        ("hazard_assessments", delete(HazardAssessment).where(HazardAssessment.entry_id.in_(demo_rca_entries))),
+        ("hazard_capas", delete(HazardCapa).where(HazardCapa.entry_id.in_(demo_rca_entries))),
+        ("hazard_rca_entries", delete(HazardRcaEntry).where(HazardRcaEntry.tenant_id.in_(demo_tenant_ids))),
+        # Children of demo hazards / cans / caps (no is_demo flag)
+        ("verifications", delete(Verification).where(
+            or_(Verification.hazard_id.in_(demo_hazards), Verification.cap_id.in_(demo_caps)))),
+        ("closures", delete(Closure).where(Closure.hazard_id.in_(demo_hazards))),
+        ("corrective_actions", delete(CorrectiveAction).where(
+            or_(CorrectiveAction.hazard_id.in_(demo_hazards), CorrectiveAction.can_id.in_(demo_cans)))),
+        ("flight_diversions", delete(FlightDiversion).where(FlightDiversion.hazard_id.in_(demo_hazards))),
+        ("safety_deficiencies", delete(SafetyDeficiency).where(and_(
+            SafetyDeficiency.tenant_id.in_(demo_tenant_ids),
+            or_(
+                SafetyDeficiency.event_id.in_(demo_hazards),
+                SafetyDeficiency.event_id.in_(demo_cans),
+                SafetyDeficiency.event_id.in_(demo_reports),
+            ),
+        ))),
+        # PSOE (findings first — child of assessments)
+        ("psoe_findings", delete(PsoeFinding).where(PsoeFinding.assessment_id.in_(demo_assessments))),
+        ("psoe_assessments", delete(PsoeAssessment).where(PsoeAssessment.is_demo == True)),
+        # Survey subtree
+        ("survey_responses", delete(SurveyResponse).where(SurveyResponse.is_demo == True)),
+        ("surveys", delete(Survey).where(Survey.is_demo == True)),
+        # CAN/CAP subtree
+        ("caps", delete(Cap).where(Cap.is_demo == True)),
+        ("cans", delete(Can).where(Can.is_demo == True)),
+        ("reports", delete(Report).where(Report.is_demo == True)),
+        ("hazards", delete(Hazard).where(Hazard.is_demo == True)),
+        # Bow-tie subtree (children first; FKs are CASCADE but delete explicitly
+        # so per-table counts are reported)
+        ("bow_tie_controls", delete(BowTieControl).where(BowTieControl.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_consequences", delete(BowTieConsequence).where(BowTieConsequence.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_threats", delete(BowTieThreat).where(BowTieThreat.bowtie_id.in_(demo_bowties))),
+        ("bow_tie_analyses", delete(BowTieAnalysis).where(BowTieAnalysis.is_demo == True)),
+        # Registers (risk_register FK to bow_tie is SET NULL; barrier_register
+        # FKs to bow_tie/controls are SET NULL — already handled above)
+        ("risk_register", delete(RiskRegisterEntry).where(RiskRegisterEntry.is_demo == True)),
+        ("barrier_register", delete(BarrierRegisterEntry).where(BarrierRegisterEntry.is_demo == True)),
+        ("state_risk_register", delete(StateRiskRegisterEntry).where(StateRiskRegisterEntry.is_demo == True)),
+        ("regulatory_reports", delete(RegulatoryReport).where(RegulatoryReport.is_demo == True)),
+    ]
+    return steps
+
+
+async def purge_all_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Delete ALL demo data cluster-wide.
+
+    Irreversible. Removes every row with `is_demo = true` across the Postgres
+    tables plus FK-scoped child rows (verifications, closures, corrective
+    actions, flight diversions, safety deficiencies, RCA subtree, PSOE
+    findings, bow-tie children) of demo parents. Real tenant data
+    (is_demo = false) and the global psoe_questions reference bank (no is_demo
+    column) are never touched.
+
+    Each table runs in its own transaction so one failing table does not abort
+    the rest. Returns per-table deletion counts (or an error string).
+    """
+    steps = await _build_purge_steps()
+    details: Dict[str, Any] = {}
+    total = 0
+    for table, stmt in steps:
+        try:
+            async with session_scope() as session:
+                result = await session.execute(stmt)
+                count = result.rowcount or 0
+            details[table] = count
+            total += count
+        except Exception as e:  # per-table isolation
+            logger.error(f"Purge demo data failed for {table}: {e}")
+            details[table] = f"Error: {e}"
+
+    _audit(
+        "DEMO_DATA_PURGE",
+        actor,
+        "all",
+        f"Purged {total} demo records across {len(details)} tables",
+        result="success" if not any(str(v).startswith("Error") for v in details.values()) else "partial",
+    )
+    logger.info(f"Purged {total} demo records across {len(details)} tables")
+    return {"success": True, "deleted_count": total, "details": details}

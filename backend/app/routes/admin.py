@@ -684,6 +684,10 @@ class StateRiskSetupRequest(BaseModel):
     setup_key: str
 
 
+class PurgeDemoDataRequest(BaseModel):
+    setup_key: str
+
+
 @router.post("/tenants/{tenant_id}/status", status_code=status.HTTP_200_OK)
 async def admin_update_tenant_status(
     tenant_id: str,
@@ -835,6 +839,30 @@ async def admin_demo_data(
         "kinds": req.kinds,
         "results": results,
     }
+
+
+@router.post("/purge-demo-data", status_code=status.HTTP_200_OK)
+async def admin_purge_demo_data(
+    req: PurgeDemoDataRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Delete ALL demo data cluster-wide (is_demo = true).
+
+    Irreversible. Removes demo rows from every Postgres table carrying the
+    is_demo flag, plus FK-scoped child rows (verifications, closures,
+    corrective actions, flight diversions, safety deficiencies, RCA subtree,
+    PSOE findings, bow-tie children). Real tenant data (is_demo = false) and
+    the global psoe_questions reference bank are never touched. Returns
+    per-table deletion counts.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import purge_all_demo_data
+
+    try:
+        return await purge_all_demo_data(user)
+    except Exception as e:
+        logger.error(f"Purge demo data failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/psoe", status_code=status.HTTP_200_OK)
