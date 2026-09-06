@@ -20,7 +20,7 @@ from app.db import pg as pg_mod
 
 # Firestore-style collection names our fake DBs expose for the new domain
 # tables (model __tablename__ == fake collection name already for these).
-_ID_KEYS = ("slug", "uid", "id", "report_id", "code")
+_ID_KEYS = ("slug", "uid", "id", "report_id", "code", "audit_id")
 
 
 def _col_name(node):

@@ -1501,6 +1501,27 @@ class SmsDispatch(Base):
     )
 
 
+class AuditDispatch(Base):
+    __tablename__ = "audit_dispatches"
+
+    audit_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    regulator_id: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_audit_dispatches_tenant", "tenant_id"),
+        Index("ix_audit_dispatches_regulator", "regulator_id"),
+        Index("ix_audit_dispatches_created", "created_at"),
+        Index("ix_audit_dispatches_status", "status"),
+    )
+
+
 class Invite(Base):
     __tablename__ = "invites"
 

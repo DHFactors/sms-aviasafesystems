@@ -25,6 +25,8 @@ from firebase_admin import auth as fb_auth
 from loguru import logger
 
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import Tenant
 from app.firebase import get_auth, get_db
 from app.services import production_seed
 from app.services.email_service import send_welcome_email
@@ -130,7 +132,6 @@ def create_tenant_with_credentials(data: Dict[str, Any], actor: Dict[str, Any]) 
     doc = production_seed.create_tenant(data, actor)
 
     now = datetime.now(timezone.utc)
-    db = get_db()
 
     auth = get_auth()
     user_results = [_create_auth_user(auth, u, tid) for u in users]
@@ -175,7 +176,7 @@ def create_tenant_with_credentials(data: Dict[str, Any], actor: Dict[str, Any]) 
                 "uid": admin.get("uid"),
             }
 
-    db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(update, merge=True)
+    _patch_tenant(tid, update)
 
     ok = sum(1 for r in user_results if r.get("status") == "ok")
     production_seed._audit(
@@ -191,6 +192,27 @@ def create_tenant_with_credentials(data: Dict[str, Any], actor: Dict[str, Any]) 
 # Credentials read / admin user resolution
 # ============================================================================
 
+def _read_tenant(tid: str) -> Dict[str, Any]:
+    """Return the tenant row as a document; raise when missing."""
+    data = pg.fetch_by(Tenant, "slug", tid)
+    if data is None:
+        raise ValueError(f"tenant not found: {tid}")
+    data.pop("id", None)
+    return data
+
+
+def _patch_tenant(tid: str, patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge `patch` into the tenant (PG primary) with best-effort mirror."""
+    existing = _read_tenant(tid)
+    existing.update(patch)
+    pg.upsert(Tenant, "slug", tid, existing)
+    try:
+        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(dict(patch), merge=True)
+    except Exception as e:  # pragma: no cover - mirror best effort
+        logger.warning(f"Tenant mirror write failed ({tid}): {e}")
+    return existing
+
+
 def _admin_user_email(tenant_doc: Dict[str, Any], tid: str) -> str:
     for u in tenant_doc.get("users") or []:
         if u.get("role") == "AIRLINE_ADMIN" and u.get("email"):
@@ -203,11 +225,7 @@ def _admin_user_email(tenant_doc: Dict[str, Any], tid: str) -> str:
 
 def get_tenant_credentials(tid: str) -> Dict[str, Any]:
     """Return the stored credential metadata for a tenant (no passwords)."""
-    doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get()
-    if not doc.exists:
-        raise ValueError(f"tenant not found: {tid}")
-    data = dict(doc.to_dict() or {})
-    data["id"] = tid
+    data = _read_tenant(tid)
     return {
         "tenant_id": tid,
         "name": data.get("name"),
@@ -227,10 +245,7 @@ def get_tenant_credentials(tid: str) -> Dict[str, Any]:
 
 def reset_admin_password(tid: str, actor: Dict[str, Any]) -> Dict[str, Any]:
     """Reset the tenant's admin Auth password; returns it once."""
-    doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get()
-    if not doc.exists:
-        raise ValueError(f"tenant not found: {tid}")
-    data = doc.to_dict() or {}
+    data = _read_tenant(tid)
     email = _admin_user_email(data, tid)
 
     user = get_auth().get_user_by_email(email)
@@ -238,15 +253,12 @@ def reset_admin_password(tid: str, actor: Dict[str, Any]) -> Dict[str, Any]:
     get_auth().update_user(user.uid, password=password)
 
     now = datetime.now(timezone.utc)
-    get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(
-        {"audit": {
-            "created_by": (data.get("audit") or {}).get("created_by"),
-            "created_at": (data.get("audit") or {}).get("created_at"),
-            "last_modified_by": actor.get("email") or actor.get("uid"),
-            "last_modified_at": now.isoformat(),
-        }},
-        merge=True,
-    )
+    _patch_tenant(tid, {"audit": {
+        "created_by": (data.get("audit") or {}).get("created_by"),
+        "created_at": (data.get("audit") or {}).get("created_at"),
+        "last_modified_by": actor.get("email") or actor.get("uid"),
+        "last_modified_at": now.isoformat(),
+    }})
     production_seed._audit("TENANT_PASSWORD_RESET", actor, tid, f"Reset admin password for {email}")
     logger.info(f"Admin password reset for tenant {tid} by {actor.get('uid')}")
     return {"tenant_id": tid, "email": email, "password": password}
@@ -254,10 +266,7 @@ def reset_admin_password(tid: str, actor: Dict[str, Any]) -> Dict[str, Any]:
 
 def send_welcome_email_for_tenant(tid: str, actor: Dict[str, Any]) -> Dict[str, Any]:
     """Set a fresh temporary password and email it to the tenant's admin."""
-    doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get()
-    if not doc.exists:
-        raise ValueError(f"tenant not found: {tid}")
-    data = doc.to_dict() or {}
+    data = _read_tenant(tid)
     email = _admin_user_email(data, tid)
 
     user = get_auth().get_user_by_email(email)
@@ -276,15 +285,12 @@ def send_welcome_email_for_tenant(tid: str, actor: Dict[str, Any]) -> Dict[str, 
     result = send_welcome_email(email, context)
 
     now = datetime.now(timezone.utc)
-    get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(
-        {"audit": {
-            "created_by": (data.get("audit") or {}).get("created_by"),
-            "created_at": (data.get("audit") or {}).get("created_at"),
-            "last_modified_by": actor.get("email") or actor.get("uid"),
-            "last_modified_at": now.isoformat(),
-        }},
-        merge=True,
-    )
+    _patch_tenant(tid, {"audit": {
+        "created_by": (data.get("audit") or {}).get("created_by"),
+        "created_at": (data.get("audit") or {}).get("created_at"),
+        "last_modified_by": actor.get("email") or actor.get("uid"),
+        "last_modified_at": now.isoformat(),
+    }})
     production_seed._audit(
         "TENANT_WELCOME_EMAIL", actor, tid,
         f"Welcome email to {email}: provider={result.get('provider')} sent={result.get('sent', False)}",

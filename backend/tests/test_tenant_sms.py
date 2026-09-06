@@ -658,15 +658,78 @@ from app.repositories.audit_repo import (
     record_tenant_dispatch_intent,
     update_tenant_dispatch_status,
 )
+from pg_bridge import patch_pg_through
+
+
+class _Snap:
+    def __init__(self, data, doc_id, exists=True):
+        self._data = data or {}
+        self.id = doc_id
+        self.exists = exists
+
+    def to_dict(self):
+        return self._data
+
+
+class _DocRef:
+    def __init__(self, db, coll, doc_id):
+        self._db = db
+        self._coll = coll
+        self._id = doc_id
+
+    def get(self):
+        data = self._db._stores.get(self._coll, {}).get(self._id)
+        if data is None:
+            return _Snap({}, self._id, exists=False)
+        return _Snap(dict(data), self._id, exists=True)
+
+    def set(self, data, merge=False):
+        self.update(data)
+
+    def update(self, fields):
+        store = self._db._stores.setdefault(self._coll, {})
+        if self._id not in store:
+            store[self._id] = {}
+        store[self._id].update(fields)
+
+
+class _Coll:
+    def __init__(self, db, name):
+        self._db = db
+        self._name = name
+
+    def get(self):
+        return [
+            _Snap(dict(data), doc_id)
+            for doc_id, data in self._db._stores.get(self._name, {}).items()
+        ]
+
+    def document(self, doc_id):
+        return _DocRef(self._db, self._name, doc_id)
+
+
+class _FakeDB:
+    def __init__(self, stores=None):
+        self._stores = dict(stores or {})
+
+    def collection(self, name):
+        return _Coll(self, name)
+
+
+def _tenant_audit_fake():
+    return _FakeDB({"audit_dispatches": {}})
+
+
+def _patch_audit_repo(monkeypatch, db):
+    import app.repositories.audit_repo as audit_repo_mod
+    monkeypatch.setattr(audit_repo_mod, "get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 class TestTenantAuditRepo:
-    @patch("app.repositories.audit_repo.get_db")
-    def test_record_tenant_dispatch_intent(self, mock_get_db):
-        mock_coll = MagicMock()
-        mock_doc_ref = MagicMock()
-        mock_coll.document.return_value = mock_doc_ref
-        mock_get_db.return_value.collection.return_value = mock_coll
+    def test_record_tenant_dispatch_intent(self, monkeypatch):
+        db = _tenant_audit_fake()
+        _patch_audit_repo(monkeypatch, db)
 
         doc = record_tenant_dispatch_intent(
             tenant_id="t1",
@@ -681,36 +744,39 @@ class TestTenantAuditRepo:
         assert doc["tenant_id"] == "t1"
         assert doc["pdf_sha256_checksum"] == "abc123"
         assert doc["status"] == "pending"
-        mock_doc_ref.set.assert_called_once()
+        stored = db._stores["audit_dispatches"]["srb-t1-202608"]
+        assert stored["status"] == "pending"
+        assert stored["tenant_id"] == "t1"
+        assert "updated_at" in stored
 
-    @patch("app.repositories.audit_repo.get_db")
-    def test_update_tenant_dispatch_status(self, mock_get_db):
-        mock_coll = MagicMock()
-        mock_doc_ref = MagicMock()
-        mock_coll.document.return_value = mock_doc_ref
-        mock_get_db.return_value.collection.return_value = mock_coll
+    def test_update_tenant_dispatch_status(self, monkeypatch):
+        db = _tenant_audit_fake()
+        stored = {
+            "audit_id": "srb-t1-202608",
+            "tenant_id": "t1",
+            "status": "pending",
+            "attempt_count": 0,
+            "created_at": "2026-08-01T00:00:00+00:00",
+            "updated_at": "2026-08-01T00:00:00+00:00",
+        }
+        db._stores["audit_dispatches"]["srb-t1-202608"] = dict(stored)
+        _patch_audit_repo(monkeypatch, db)
 
         update_tenant_dispatch_status("t1", "srb-t1-202608", "delivered")
-        mock_doc_ref.update.assert_called_once()
-        call_args = mock_doc_ref.update.call_args[0][0]
-        assert call_args["status"] == "delivered"
-        assert "updated_at" in call_args
+        call_data = db._stores["audit_dispatches"]["srb-t1-202608"]
+        assert call_data["status"] == "delivered"
+        assert "updated_at" in call_data
 
-    @patch("app.repositories.audit_repo.get_db")
-    def test_list_tenant_dispatches(self, mock_get_db):
-        mock_doc = MagicMock()
-        mock_doc.to_dict.return_value = {
+    def test_list_tenant_dispatches(self, monkeypatch):
+        db = _tenant_audit_fake()
+        db._stores["audit_dispatches"]["srb-t1-202608"] = {
             "audit_id": "srb-t1-202608",
+            "tenant_id": "t1",
             "status": "delivered",
-            "created_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
-            "updated_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
+            "created_at": "2026-08-01T00:00:00+00:00",
+            "updated_at": "2026-08-01T00:00:00+00:00",
         }
-        mock_doc.id = "srb-t1-202608"
-        mock_query = MagicMock()
-        mock_query.limit.return_value.get.return_value = [mock_doc]
-        mock_query.where.return_value = mock_query
-        mock_query.order_by.return_value = mock_query
-        mock_get_db.return_value.collection.return_value.order_by.return_value = mock_query
+        _patch_audit_repo(monkeypatch, db)
 
         results = list_tenant_dispatches("t1", limit=10)
         assert len(results) == 1

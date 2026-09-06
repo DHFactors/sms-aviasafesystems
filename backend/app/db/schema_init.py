@@ -193,6 +193,21 @@ _DOMAIN_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_sms_dispatches_tenant ON sms_dispatches (tenant_id);",
     "CREATE INDEX IF NOT EXISTS ix_sms_dispatches_created ON sms_dispatches (created_at);",
     """
+    CREATE TABLE IF NOT EXISTS audit_dispatches (
+        audit_id     TEXT PRIMARY KEY,
+        tenant_id    TEXT,
+        regulator_id TEXT,
+        status       TEXT,
+        data         JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_audit_dispatches_tenant ON audit_dispatches (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_audit_dispatches_regulator ON audit_dispatches (regulator_id);",
+    "CREATE INDEX IF NOT EXISTS ix_audit_dispatches_created ON audit_dispatches (created_at);",
+    "CREATE INDEX IF NOT EXISTS ix_audit_dispatches_status ON audit_dispatches (status);",
+    """
     CREATE TABLE IF NOT EXISTS invites (
         code       TEXT PRIMARY KEY,
         tenant_id  TEXT,

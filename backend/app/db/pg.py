@@ -31,6 +31,7 @@ _ID_COLUMNS: Dict[str, str] = {
     "caan_reports": "report_id",
     "state_risk_categories": "slug",
     "dead_letter_queue": "key",
+    "audit_dispatches": "audit_id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 
