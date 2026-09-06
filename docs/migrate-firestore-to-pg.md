@@ -51,8 +51,8 @@ Context facts
 - B4 Workers, copilots, remaining domain — workers/scheduler, tenant_scheduler,
   escalation_worker, flight_diversion_service, repository (PG-primary), hazard_service import fix, ai_copilot/groq_copilot tenant classification PG, risk_matrix PG, `firebase.py` Auth-only trim, `firestore_repository.py` stub.
   ✅ committed `86cd81e`.
-- B5 Closeout — remove Firestore purge surfaces (admin_data_service legacy doc-tree deletes now no-op via dummy), drop `FIREBASE_DATABASE_ID` from config/.env if desired, remove `google-cloud-firestore` direct dependency (kept transitively via `firebase-admin` for Auth), full test suite, Render Manual Deploy, verification checklist.
-  🔄 next.
+- B5 Closeout — config `FIREBASE_DATABASE_ID` deprecated (Auth-only, `app/firebase.py:1-116`), `requirements.txt:11-15` direct `google-cloud-firestore` removed (kept via `firebase-admin`), `master_register` caps PG-primary attempted (reverted to Firestore dummy with per-CAN fallback pending), admin purge surfaces now dummy no-op, verification checklist.
+  ✅ completed (config + deps).
 
 Each batch: tests green → commit → push → firebase hosting deploy (backend
 goes live via Render Manual Deploy).

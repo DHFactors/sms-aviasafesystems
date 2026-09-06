@@ -84,11 +84,14 @@ class Settings(BaseSettings):
     # SQLAlchemy engine is created lazily in app/db/session.py.
     DATABASE_URL: Optional[str] = None
 
-    # ── Firebase ──
+    # ── Firebase (Auth-only; Firestore removed B4) ──
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
-    FIREBASE_DATABASE_ID: str = "sms-db"
+    # Deprecated: Firestore named database (sms-db) — no longer used after
+    # B4 Auth-only trim (app/firebase.py no longer creates a Firestore client).
+    # Kept for env backward-compat; ignored.
+    FIREBASE_DATABASE_ID: Optional[str] = None
     # Public Firebase Web API key used by the server-side login endpoint
     # (app/services/login_service.py) to verify credentials against the
     # Identity Toolkit REST API. It is the same public key shipped in

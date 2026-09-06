@@ -8,11 +8,12 @@ sqlalchemy[asyncio]>=2.0.29
 asyncpg>=0.29.0
 alembic>=1.13.1
 
-# Firebase Admin SDK
-# NOTE: firebase-admin>=6.6.0 required for named Firestore databases
-# (firestore.client(database_id=...) support added in 6.6.0).
+# Firebase Admin SDK (Auth-only since B4; Firestore removed)
+# firebase-admin still pulls google-cloud-firestore transitively for Auth,
+# but the app no longer uses Firestore directly. Direct dependency removed
+# in B5 — kept only via firebase-admin.
 firebase-admin>=6.6.0
-google-cloud-firestore>=2.11.0
+# google-cloud-firestore>=2.11.0  # deprecated B5 — Firestore removed
 
 # Authentication
 python-multipart>=0.0.6
