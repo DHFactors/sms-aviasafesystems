@@ -22,6 +22,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     Text,
+    UniqueConstraint,
     Uuid,
     text,
 )
@@ -1370,4 +1371,228 @@ class BarrierRegisterEntry(Base):
         BARRIER_IMPL_STATUS_CHECK,
         Index("ix_barrier_register_tenant", "tenant_id"),
         Index("ix_barrier_register_tenant_hazard", "tenant_id", "hazard_id"),
+    )
+
+
+# ============================================================================
+# F/M. DOMAIN TABLES (Firestore → Postgres migration, Batch 0)
+#
+# Schemaless Firestore documents are stored wholesale in `data` (JSONB) so the
+# one-time migration script preserves every original field; frequently queried
+# fields are promoted to typed columns as consumers migrate (Batches 1-4).
+#
+# `tenants` is the master reference: its primary key is the deterministic
+# uuid5 of the tenant slug (app/db/ids.py tenant_uuid), matching the
+# `tenant_id` UUID columns already used across the operational tables.
+# ============================================================================
+
+DEFAULT_JSONB = text("'{}'::jsonb")
+
+
+class Tenant(Base):
+    __tablename__ = "tenants"
+
+    id: Mapped[object] = _uuid_pk()
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[object] = mapped_column(Text, nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_beta_sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    active: Mapped[object] = mapped_column(Boolean, nullable=True, default=True)
+    auto_expire_days: Mapped[object] = mapped_column(Integer, nullable=True)
+    safety_manager: Mapped[object] = mapped_column(JSONB, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_tenants_status", "status"),
+        Index("ix_tenants_demo", "is_demo"),
+    )
+
+
+class Regulator(Base):
+    __tablename__ = "regulators"
+
+    id: Mapped[object] = _uuid_pk()
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[object] = mapped_column(Text, nullable=True)
+    regulator_type: Mapped[object] = mapped_column(Text, nullable=True)
+    display_name: Mapped[object] = mapped_column(Text, nullable=True)
+    operator_tenant_ids: Mapped[object] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+
+class UserProfile(Base):
+    __tablename__ = "users"
+
+    uid: Mapped[str] = mapped_column(Text, primary_key=True)
+    email: Mapped[object] = mapped_column(Text, nullable=True)
+    display_name: Mapped[object] = mapped_column(Text, nullable=True)
+    role: Mapped[object] = mapped_column(Text, nullable=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    department: Mapped[object] = mapped_column(Text, nullable=True)
+    claims: Mapped[object] = mapped_column(JSONB, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_users_email", "email"),
+        Index("ix_users_tenant", "tenant_id"),
+    )
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[object] = _uuid_pk()
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    actor: Mapped[object] = mapped_column(Text, nullable=True)
+    target: Mapped[object] = mapped_column(Text, nullable=True)
+    target_type: Mapped[object] = mapped_column(Text, nullable=True)
+    target_id: Mapped[object] = mapped_column(Text, nullable=True)
+    detail: Mapped[object] = mapped_column(Text, nullable=True)
+    result: Mapped[object] = mapped_column(Text, nullable=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    ip: Mapped[object] = mapped_column(Text, nullable=True)
+    request_id: Mapped[object] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_audit_logs_tenant", "tenant_id"),
+        Index("ix_audit_logs_created", "created_at"),
+    )
+
+
+class SmsDispatch(Base):
+    __tablename__ = "sms_dispatches"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_sms_dispatches_tenant", "tenant_id"),
+        Index("ix_sms_dispatches_created", "created_at"),
+    )
+
+
+class Invite(Base):
+    __tablename__ = "invites"
+
+    code: Mapped[str] = mapped_column(Text, primary_key=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    email: Mapped[object] = mapped_column(Text, nullable=True)
+    role: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    expires_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("ix_invites_tenant", "tenant_id"),)
+
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id: Mapped[object] = _uuid_pk()
+    email: Mapped[object] = mapped_column(Text, nullable=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    category: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_feedback_tenant", "tenant_id"),
+        Index("ix_feedback_created", "created_at"),
+    )
+
+
+class CaanReport(Base):
+    __tablename__ = "caan_reports"
+
+    id: Mapped[object] = _uuid_pk()
+    report_id: Mapped[object] = mapped_column(Text, nullable=True, unique=True)
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_caan_reports_tenant", "tenant_id"),
+        Index("ix_caan_reports_created", "created_at"),
+    )
+
+
+class SmsMaturity(Base):
+    __tablename__ = "sms_maturity"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[str] = mapped_column(Text, nullable=False)
+    days: Mapped[object] = mapped_column(Integer, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "days", name="ux_sms_maturity_tenant_days"),
+        Index("ix_sms_maturity_tenant", "tenant_id"),
+    )
+
+
+class StateRiskCategory(Base):
+    __tablename__ = "state_risk_categories"
+
+    slug: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+
+class DeadLetterEntry(Base):
+    __tablename__ = "dead_letter_queue"
+
+    id: Mapped[object] = _uuid_pk()
+    key: Mapped[object] = mapped_column(Text, nullable=True, unique=True)
+    status: Mapped[object] = mapped_column(Text, nullable=True)
+    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_dead_letter_queue_created", "created_at"),
+        Index("ix_dead_letter_queue_status", "status"),
     )

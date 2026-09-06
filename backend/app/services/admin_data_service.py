@@ -54,6 +54,7 @@ from app.db.db_models import (
     StateRiskRegisterEntry,
     Survey,
     SurveyResponse,
+    Tenant,
     Verification,
 )
 from app.services.risk_matrix import compute_risk_index, get_risk_level
@@ -732,6 +733,8 @@ async def _build_purge_steps(tenant_uuids: Optional[List[uuid.UUID]] = None):
         ("barrier_register", delete(BarrierRegisterEntry).where(parent_scope(BarrierRegisterEntry))),
         ("state_risk_register", delete(StateRiskRegisterEntry).where(parent_scope(StateRiskRegisterEntry))),
         ("regulatory_reports", delete(RegulatoryReport).where(parent_scope(RegulatoryReport))),
+        # Master tenant registry (demo only; regulators/users reference slugs, not rows)
+        ("tenants", delete(Tenant).where(Tenant.is_demo.is_(True))),
     ]
     return steps
 

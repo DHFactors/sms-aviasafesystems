@@ -36,6 +36,7 @@ EXPECTED_ORDER = [
     "barrier_register",
     "state_risk_register",
     "regulatory_reports",
+    "tenants",
 ]
 
 
