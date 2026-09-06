@@ -72,6 +72,8 @@ function gatherSectionData(sectionIdx) {
             d.latitude = getFloat('latitude');
             d.longitude = getFloat('longitude');
             d.narrative = getVal('narrative');
+            d.immediateCause = getVal('immediateCause');
+            d.safetyRecommendations = getVal('safetyRecommendations') || null;
             break;
         case 6:
             d.occurrenceCategory = getVal('occurrenceCategory');
@@ -126,6 +128,7 @@ function validateSection(sectionIdx) {
             if (!d.occurrenceClass) errors.push('Occurrence class is required');
             if (!d.location) errors.push('Location is required');
             if (!d.narrative || d.narrative.length < 10) errors.push('Narrative must be at least 10 characters');
+            if (!d.immediateCause || d.immediateCause.length < 5) errors.push('Immediate cause is required');
             break;
         case 6:
             if (!d.occurrenceCategory) errors.push('Occurrence category is required');
@@ -217,7 +220,7 @@ function buildReview() {
         ['engineMake', 'engineModel', 'engineSerial', 'propellerMake', 'propellerModel'],
         ['flightPhase', 'flightType', 'flightNumber', 'callSign', 'departureAirport', 'destinationAirport'],
         ['crewCount', 'passengerCount', 'fatalInjuries', 'seriousInjuries', 'minorInjuries'],
-        ['occurrenceType', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'narrative'],
+        ['occurrenceType', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'narrative', 'immediateCause', 'safetyRecommendations'],
         ['occurrenceCategory', 'humanFactors', 'investigationStatus', 'investigationAgency', 'manufacturerAdvised', 'fdrRetained'],
     ];
     const labels = {
@@ -232,9 +235,9 @@ function buildReview() {
         callSign: 'Call Sign', departureAirport: 'Departure', destinationAirport: 'Destination',
         crewCount: 'Crew', passengerCount: 'Passengers', fatalInjuries: 'Fatal',
         seriousInjuries: 'Serious', minorInjuries: 'Minor',
-        occurrenceType: 'Type', occurrenceClass: 'Class', location: 'Location',
-        country: 'Country', latitude: 'Latitude', longitude: 'Longitude',
-        narrative: 'Narrative',
+            occurrenceType: 'Type', occurrenceClass: 'Class', location: 'Location',
+            country: 'Country', latitude: 'Latitude', longitude: 'Longitude',
+            narrative: 'Narrative', immediateCause: 'Immediate Cause', safetyRecommendations: 'Safety Recommendations',
         occurrenceCategory: 'Category', humanFactors: 'Human Factors',
         investigationStatus: 'Investigation Status', investigationAgency: 'Investigation Agency',
         manufacturerAdvised: 'Manufacturer Advised', fdrRetained: 'FDR/CVR Retained',
@@ -330,6 +333,10 @@ function gatherAllData() {
     delete d.occurrenceClass;
     d.occurrence_category = d.occurrenceCategory;
     delete d.occurrenceCategory;
+    d.immediate_cause = d.immediateCause;
+    delete d.immediateCause;
+    d.safety_recommendations = d.safetyRecommendations || null;
+    delete d.safetyRecommendations;
     d.human_factors = d.humanFactors;
     delete d.humanFactors;
     d.contributing_factors = d.contributingFactors;

@@ -317,9 +317,16 @@
                 <h3><i class="fas fa-exclamation-circle"></i> Occurrence Details</h3>
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="occurrenceDate">Date / Time (UTC) <span class="required">*</span></label>
+                        <label for="reportDate">Report Date <span class="required">*</span></label>
+                        <input type="date" id="reportDate" class="form-control" required>
+                        <div class="form-hint">Date you are submitting this report.</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="occurrenceDate">Occurrence Date <span class="required">*</span></label>
                         <input type="datetime-local" id="occurrenceDate" class="form-control" required>
                     </div>
+                </div>
+                <div class="grid-2">
                     <div class="form-group">
                         <label for="occurrenceType">Occurrence Type</label>
                         <select id="occurrenceType" class="form-control">
@@ -402,6 +409,12 @@
                     <textarea id="narrative" class="form-control" rows="5"
                         placeholder="Describe the safety concern factually: What happened? What were the conditions? What was the outcome? Do NOT analyse causes or assign blame." required></textarea>
                     <div class="form-hint">Factual description only — analysis is performed by the safety team and AI after submission.</div>
+                </div>
+                <div class="form-group">
+                    <label for="safetySuggestions">Safety Suggestions</label>
+                    <textarea id="safetySuggestions" class="form-control" rows="3" 
+                        placeholder="Your suggestions for safety improvement..."></textarea>
+                    <div class="form-hint">Optional suggestions for how this safety concern could be addressed.</div>
                 </div>
             </div>
 

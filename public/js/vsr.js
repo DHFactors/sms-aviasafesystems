@@ -57,6 +57,7 @@ function gatherSectionData(sectionIdx) {
             d.destinationAirport = getVal('destinationAirport')?.toUpperCase() || null;
             break;
         case 3:
+            d.reportDate = getVal('reportDate');
             d.occurrenceDate = getVal('occurrenceDate');
             d.occurrenceType = getVal('occurrenceType') || null;
             d.occurrenceClass = getVal('occurrenceClass') || null;
@@ -68,6 +69,7 @@ function gatherSectionData(sectionIdx) {
             const hfChecks = document.querySelectorAll('.hf-checkbox:checked');
             d.humanFactors = Array.from(hfChecks).map(cb => cb.value);
             d.narrative = getVal('narrative');
+            d.safetySuggestions = getVal('safetySuggestions') || null;
             break;
         case 4:
             d.severity = getNum('severityLevel');
@@ -90,7 +92,8 @@ function validateSection(sectionIdx) {
         case 2:
             break;
         case 3:
-            if (!d.occurrenceDate) errors.push('Date/time is required');
+            if (!d.reportDate) errors.push('Report date is required');
+            if (!d.occurrenceDate) errors.push('Occurrence date/time is required');
             if (!d.location) errors.push('Location is required');
             if (!d.narrative || d.narrative.length < 10) errors.push('Narrative must be at least 10 characters');
             break;
@@ -181,7 +184,7 @@ function buildReview() {
         ['reporterName', 'reporterRole', 'reporterOrganisation', 'reporterEmail', 'reporterPhone', 'isAnonymous'],
         ['aircraftMake', 'aircraftModel', 'aircraftReg', 'aircraftSerial', 'aircraftCategory', 'operator', 'operatorIcao'],
         ['flightPhase', 'flightType', 'flightNumber', 'callSign', 'departureAirport', 'destinationAirport'],
-        ['occurrenceType', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'occurrenceCategory', 'humanFactors', 'narrative'],
+        ['reportDate', 'occurrenceDate', 'occurrenceType', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'occurrenceCategory', 'humanFactors', 'narrative', 'safetySuggestions'],
         ['severity', 'probability'],
     ];
     const labels = {
@@ -192,10 +195,10 @@ function buildReview() {
         operatorIcao: 'Operator ICAO',
         flightPhase: 'Phase', flightType: 'Type', flightNumber: 'Flight No.',
         callSign: 'Call Sign', departureAirport: 'Departure', destinationAirport: 'Destination',
-        occurrenceType: 'Type', occurrenceClass: 'Class', location: 'Location',
-        country: 'Country', latitude: 'Latitude', longitude: 'Longitude',
-        occurrenceCategory: 'Category', humanFactors: 'Human Factors',
-        narrative: 'Narrative', severity: 'Severity', probability: 'Probability',
+            reportDate: 'Report Date', occurrenceDate: 'Occurrence Date', occurrenceType: 'Type', occurrenceClass: 'Class', location: 'Location',
+            country: 'Country', latitude: 'Latitude', longitude: 'Longitude',
+            occurrenceCategory: 'Category', humanFactors: 'Human Factors',
+            narrative: 'Narrative', safetySuggestions: 'Safety Suggestions', severity: 'Severity', probability: 'Probability',
     };
     for (let i = 0; i < sections.length; i++) {
         const data = gatherSectionData(i);
@@ -255,8 +258,12 @@ function gatherAllData() {
     d.reporting_date = new Date().toISOString();
     d.is_anonymous = d.isAnonymous || false;
     delete d.isAnonymous;
+    d.report_date = d.reportDate || null;
+    delete d.reportDate;
     d.occurrence_date = d.occurrenceDate;
     delete d.occurrenceDate;
+    d.safety_suggestions = d.safetySuggestions || null;
+    delete d.safetySuggestions;
     d.occurrence_location = d.location;
     delete d.location;
     d.occurrence_country = d.country;
@@ -407,6 +414,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('occurrenceDate').value =
         now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + 'T' +
         pad(now.getHours()) + ':' + pad(now.getMinutes());
+    const reportDateEl = document.getElementById('reportDate');
+    if (reportDateEl) reportDateEl.value = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
 
     if (user.email) {
         document.getElementById('reporterEmail').value = user.email;
