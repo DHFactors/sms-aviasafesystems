@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Report — AviaSAFE</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 720px; margin: 0 auto; padding: 1.5rem; }
+        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #1a6b8a; font-size: 0.875rem; margin-bottom: 1rem; text-decoration: none; }
+        .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 1.25rem; }
+        .card h2 { font-size: 1.05rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .stepper { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .step { flex: 1; min-width: 80px; text-align: center; padding: 0.6rem 0.5rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; cursor: pointer; }
+        .step.active { background: #1a6b8a; color: #fff; border-color: #1a6b8a; }
+        .step.done { background: #e8f5e9; color: #2e7d32; border-color: #a7f3d0; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 0.35rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; background: #fff; }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .radio-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .radio-option { flex: 1; min-width: 140px; padding: 0.9rem; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.15s; }
+        .radio-option.selected { border-color: #1a6b8a; background: #f0f6ff; }
+        .radio-option input { display: none; }
+        .just-culture { background: linear-gradient(135deg, #0b2a42, #1a6b8a); color: #fff; border-radius: 8px; padding: 1rem 1.25rem; display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
+        .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.25rem; border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; }
+        .btn-primary { background: #1a6b8a; color: #fff; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+        .hidden { display: none; }
+        #message { padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; font-size: 0.85rem; }
+        #message.success { display: block; background: #e6f4ea; color: #1e7e34; border-left: 4px solid #34a853; }
+        #message.error { display: block; background: #fce8e6; color: #d33426; border-left: 4px solid #ea4335; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="page">
+    <a href="/reports/index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Reports</a>
+
+    <div class="just-culture">
+        <i class="fas fa-shield-halved" style="font-size:1.4rem;color:#4fc3f7;"></i>
+        <div><strong>Just Culture</strong> — Safety reports are confidential and non-punitive. Information is used only to improve safety.</div>
+    </div>
+
+    <div id="message"></div>
+
+    <div class="stepper" id="stepper">
+        <div class="step active" data-step="1">1. Action</div>
+        <div class="step" data-step="2">2. Type</div>
+        <div class="step" data-step="3">3. Reporter</div>
+        <div class="step" data-step="4">4. Details</div>
+        <div class="step" data-step="5">5. Content</div>
+        <div class="step" data-step="6">6. Submit</div>
+    </div>
+
+    <form id="reportForm">
+        <!-- Step 1 -->
+        <div class="card" data-step-panel="1">
+            <h2><i class="fas fa-bolt"></i> Step 1 — Report Action</h2>
+            <div class="radio-group">
+                <label class="radio-option selected"><input type="radio" name="action" value="new" checked> New Report</label>
+                <label class="radio-option"><input type="radio" name="action" value="update"> Update</label>
+                <label class="radio-option"><input type="radio" name="action" value="draft"> Save Draft</label>
+            </div>
+        </div>
+        <!-- Step 2 -->
+        <div class="card hidden" data-step-panel="2">
+            <h2><i class="fas fa-file-lines"></i> Step 2 — Report Type</h2>
+            <div class="radio-group">
+                <label class="radio-option" data-type="mor"><input type="radio" name="reportType" value="mor"> MOR <small style="display:block;color:#991b1b;">CAMO/QA only</small></label>
+                <label class="radio-option selected" data-type="vsr"><input type="radio" name="reportType" value="vsr" checked> VSR</label>
+                <label class="radio-option" data-type="confidential"><input type="radio" name="reportType" value="confidential"> Confidential</label>
+            </div>
+            <p id="morRestriction" style="display:none;font-size:0.8rem;color:#991b1b;background:#fef2f2;padding:0.5rem;border-radius:6px;margin-top:0.75rem;"><i class="fas fa-lock"></i> MOR restricted to CAMO/QA. Your role will be checked.</p>
+        </div>
+        <!-- Step 3 -->
+        <div class="card hidden" data-step-panel="3">
+            <h2><i class="fas fa-users"></i> Step 3 — Reporter Type</h2>
+            <div class="radio-group">
+                <label class="radio-option selected"><input type="radio" name="reporterType" value="individual" checked> Individual</label>
+                <label class="radio-option"><input type="radio" name="reporterType" value="organisation"> Organisation</label>
+            </div>
+        </div>
+        <!-- Step 4 -->
+        <div class="card hidden" data-step-panel="4">
+            <h2><i class="fas fa-id-card"></i> Step 4 — Reporter Details</h2>
+            <div id="reporterFields">
+                <div class="form-group" data-field="name"><label>Full Name *</label><input type="text" id="reporterName" placeholder="Your name"></div>
+                <div class="form-group" data-field="email"><label>Email *</label><input type="email" id="reporterEmail" placeholder="you@org.com"></div>
+                <div class="form-group" data-field="phone"><label>Phone</label><input type="tel" id="reporterPhone" placeholder="+977..."></div>
+                <div class="form-group"><label>Organization</label><input type="text" id="reporterOrg" placeholder="Airline / Dept"></div>
+            </div>
+            <p style="font-size:0.75rem;color:#94a3b8;">Confidential: leave name/email/phone blank. VSR: name required, email/phone optional. MOR: all required.</p>
+        </div>
+        <!-- Step 5 -->
+        <div class="card hidden" data-step-panel="5">
+            <h2><i class="fas fa-pen"></i> Step 5 — Report Details</h2>
+            <div class="form-group"><label>Title *</label><input type="text" id="reportTitle" required placeholder="Brief title"></div>
+            <div class="form-group"><label>Description *</label><textarea id="reportDesc" required placeholder="What happened?"></textarea></div>
+            <div class="form-group"><label>Date *</label><input type="date" id="reportDate" required></div>
+            <div class="form-group"><label>Location</label><input type="text" id="reportLocation" placeholder="KTM, In-flight, etc."></div>
+            <div class="form-group"><label>Aircraft Registration</label><input type="text" id="reportAircraft" placeholder="9N-ABC"></div>
+        </div>
+        <!-- Step 6 -->
+        <div class="card hidden" data-step-panel="6">
+            <h2><i class="fas fa-check"></i> Step 6 — Just Culture & Submit</h2>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+                <label style="display:flex;gap:0.6rem;cursor:pointer;"><input type="checkbox" id="justCultureCheck" required> <span style="font-size:0.85rem;">I confirm this report is made in good faith under Just Culture principles and understand it will be handled confidentially.</span></label>
+            </div>
+            <button type="submit" class="btn btn-primary" id="submitBtn"><i class="fas fa-paper-plane"></i> Submit Report</button>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:1rem;">
+            <button type="button" class="btn btn-outline" id="prevBtn" style="display:none;">Previous</button>
+            <button type="button" class="btn btn-primary" id="nextBtn">Next</button>
+        </div>
+    </form>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/reports.client.js"></script>
+<script>
+let currentStep = 1;
+const totalSteps = 6;
+firebase.auth().onAuthStateChanged(function(user){ if (!user) window.location.href='/login.html'; });
+
+// Preselect from ?type=mor|vsr|confidential
+const urlType = new URLSearchParams(window.location.search).get('type');
+if (urlType) {
+    const radio = document.querySelector(`input[name="reportType"][value="${urlType}"]`);
+    if (radio) { document.querySelectorAll('input[name="reportType"]').forEach(r=>r.checked=false); radio.checked=true; document.querySelectorAll('.radio-option').forEach(el=>el.classList.toggle('selected', el.dataset.type===urlType)); }
+}
+
+document.querySelectorAll('input[name="reportType"]').forEach(r=>r.addEventListener('change', function(){
+    document.querySelectorAll('.radio-option[data-type]').forEach(el=>el.classList.toggle('selected', el.querySelector('input').checked));
+    const t = document.querySelector('input[name="reportType"]:checked').value;
+    document.getElementById('morRestriction').style.display = t==='mor' ? 'block' : 'none';
+    updateReporterFields();
+}));
+document.querySelectorAll('input[name="action"], input[name="reporterType"]').forEach(r=>r.addEventListener('change', function(){
+    this.closest('.radio-group').querySelectorAll('.radio-option').forEach(el=>el.classList.toggle('selected', el.querySelector('input').checked));
+    if (this.name==='reporterType') updateReporterFields();
+}));
+
+function updateReporterFields() {
+    const type = document.querySelector('input[name="reportType"]:checked').value;
+    const nameEl = document.querySelector('[data-field="name"]');
+    const emailEl = document.querySelector('[data-field="email"]');
+    const phoneEl = document.querySelector('[data-field="phone"]');
+    if (type==='confidential') { nameEl.style.display='none'; emailEl.style.display='none'; phoneEl.style.display='none'; }
+    else if (type==='vsr') { nameEl.style.display='block'; emailEl.style.display='block'; phoneEl.style.display='block'; nameEl.querySelector('label').textContent='Full Name *'; emailEl.querySelector('label').textContent='Email'; phoneEl.querySelector('label').textContent='Phone'; }
+    else { nameEl.style.display='block'; emailEl.style.display='block'; phoneEl.style.display='block'; nameEl.querySelector('label').textContent='Full Name *'; emailEl.querySelector('label').textContent='Email *'; phoneEl.querySelector('label').textContent='Phone *'; }
+}
+updateReporterFields();
+
+function showStep(n) {
+    document.querySelectorAll('[data-step-panel]').forEach(p=>p.classList.toggle('hidden', parseInt(p.dataset.stepPanel)!==n));
+    document.querySelectorAll('.step').forEach(s=>{
+        const sn=parseInt(s.dataset.step);
+        s.classList.toggle('active', sn===n);
+        s.classList.toggle('done', sn<n);
+    });
+    document.getElementById('prevBtn').style.display = n===1? 'none':'inline-flex';
+    document.getElementById('nextBtn').style.display = n===totalSteps? 'none':'inline-flex';
+    document.getElementById('nextBtn').textContent = n===totalSteps-1? 'Review':'Next';
+}
+document.getElementById('nextBtn').addEventListener('click', ()=>{ if(currentStep<totalSteps){ currentStep++; showStep(currentStep); }});
+document.getElementById('prevBtn').addEventListener('click', ()=>{ if(currentStep>1){ currentStep--; showStep(currentStep); }});
+document.querySelectorAll('.step').forEach(s=>s.addEventListener('click', ()=>{ currentStep=parseInt(s.dataset.step); showStep(currentStep); }));
+
+document.getElementById('reportForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const type = document.querySelector('input[name="reportType"]:checked').value;
+    const isConf = type==='confidential';
+    const isMor = type==='mor';
+    const payload = {
+        narrative: document.getElementById('reportDesc').value.trim(),
+        location: document.getElementById('reportLocation').value.trim() || 'Unknown',
+        occurrenceDate: document.getElementById('reportDate').value || new Date().toISOString(),
+        isAnonymous: isConf,
+        occurrenceCategory: 'OTHER',
+        reporterName: isConf? null : document.getElementById('reporterName').value.trim() || null,
+        reporterEmail: isConf? null : document.getElementById('reporterEmail').value.trim() || null,
+        reporterPhone: isConf? null : document.getElementById('reporterPhone').value.trim() || null,
+        reporterOrganisation: document.getElementById('reporterOrg').value.trim() || null,
+    };
+    if (!payload.narrative || !document.getElementById('reportTitle').value.trim()) { showMsg('Title and description required','error'); return; }
+    if (isMor && (!payload.reporterName || !payload.reporterEmail || !payload.reporterPhone)) { showMsg('MOR requires name, email and phone','error'); return; }
+    if (!isConf && !payload.reporterName) { showMsg('Name required','error'); return; }
+    if (!document.getElementById('justCultureCheck').checked) { showMsg('Please confirm Just Culture','error'); return; }
+    const btn=document.getElementById('submitBtn'); btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    try {
+        let res;
+        if (isMor) res = await ReportsClient.submitMOR(payload);
+        else if (type==='vsr') res = await ReportsClient.submitVSR(payload);
+        else res = await ReportsClient.submitReport(payload, 'voluntary');
+        showMsg('Report submitted: '+(res.id||'ok'),'success');
+        setTimeout(()=>window.location.href='/reports/index.html', 1200);
+    } catch(err) {
+        if (err.message && err.message.toLowerCase().includes('403')) showMsg('MOR restricted to CAMO/QA','error');
+        else showMsg('Error: '+err.message,'error');
+    } finally { btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane"></i> Submit Report'; }
+});
+function showMsg(t,ty){ const m=document.getElementById('message'); m.textContent=t; m.className=ty; m.style.display='block'; setTimeout(()=>m.style.display='none',4000); }
+showStep(1);
+</script>
+</body>
+</html>

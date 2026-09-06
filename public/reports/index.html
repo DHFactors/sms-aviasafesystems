@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports - AviaSAFE</title>
+    <title>Reports — AviaSAFE</title>
     <link rel="stylesheet" href="/css/variables.css">
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
         .page { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
-        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem; }
         .page-header h1 { font-size: 1.25rem; color: #0b2a42; margin: 0; }
         .card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.5rem; margin-bottom: 1.25rem; }
         .card h2 { font-size: 1rem; color: #0b2a42; margin: 0 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -18,8 +18,6 @@
         .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-decoration: none; border: none; transition: all 0.15s; }
         .btn-primary { background: #1a6b8a; color: #fff; }
         .btn-primary:hover { background: #0b2a42; }
-        .btn-success { background: #2e7d32; color: #fff; }
-        .btn-success:hover { background: #1b5e20; }
         .btn-outline { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
         .btn-outline:hover { background: #f1f5f9; }
         .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
@@ -27,9 +25,10 @@
         .badge-completed { background: #e8f5e9; color: #2e7d32; }
         .badge-warning { background: #fef3c7; color: #d97706; }
         .badge-critical { background: #fde8e8; color: #dc3545; }
+        .badge-restricted { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         .badge-default { background: #f1f5f9; color: #64748b; }
         .filter-bar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
-        .filter-bar select, .filter-bar input { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; }
+        .filter-bar select { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.75rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; }
         td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
@@ -40,34 +39,77 @@
         .tab-btn { flex: 1; padding: 0.75rem 1rem; border: none; background: transparent; font-size: 0.85rem; font-weight: 600; color: #64748b; cursor: pointer; transition: all 0.15s; border-bottom: 3px solid transparent; }
         .tab-btn.active { color: #1a6b8a; border-bottom-color: #1a6b8a; background: #f0f6ff; }
         .tab-btn:hover:not(.active) { background: #f8fafc; }
+        .just-culture { background: linear-gradient(135deg, #0b2a42, #1a6b8a); color: #fff; border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: flex-start; }
+        .just-culture i { font-size: 1.5rem; color: #4fc3f7; margin-top: 0.2rem; }
+        .just-culture h3 { margin: 0 0 0.3rem; font-size: 1rem; }
+        .just-culture p { margin: 0; font-size: 0.85rem; opacity: 0.9; line-height: 1.5; }
+        .op-tab-content { display: none; }
+        .op-tab-content.active { display: block; }
         @media (max-width: 600px) { .page-header { flex-direction: column; align-items: stretch; } }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
     <link rel="stylesheet" href="../css/theme.css">
-    </head>
+</head>
 <body>
 
 <div class="page">
     <div class="page-header">
-        <h1><i class="fas fa-chart-bar" style="color:#1a6b8a;"></i> Reports & Analytics</h1>
-        <div>
-            <a href="/reports/generate.html" class="btn btn-primary"><i class="fas fa-plus"></i> Generate Report</a>
+        <h1><i class="fas fa-file-lines" style="color:#1a6b8a;"></i> Reports</h1>
+        <div style="display:flex;gap:0.5rem;">
+            <a href="/reports/new.html" class="btn btn-primary"><i class="fas fa-plus"></i> New Report</a>
+            <a href="/reports/generate.html" class="btn btn-outline btn-sm"><i class="fas fa-chart-bar"></i> Generate Report</a>
             <a href="/safety.html" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Dashboard</a>
         </div>
     </div>
 
-    <div id="message" style="padding:0.75rem 1rem;border-radius:6px;margin-bottom:1rem;display:none;font-size:0.85rem;"></div>
+    <!-- Just Culture Banner -->
+    <div class="just-culture">
+        <i class="fas fa-shield-halved"></i>
+        <div>
+            <h3>Just Culture — Report Without Fear</h3>
+            <p>Every report is treated confidentially and without prejudice. Safety information is used solely to improve our SMS and prevent recurrence — never for punitive action. Your trust makes us safer.</p>
+        </div>
+    </div>
 
-    <div class="tab-bar">
+    <!-- Operational Reports Tabs -->
+    <div class="card">
+        <h2><i class="fas fa-paper-plane"></i> Submit a Report</h2>
+        <div class="tab-bar" id="opTabBar">
+            <button class="tab-btn" onclick="switchOpTab('mor')" id="opTabMor"><i class="fas fa-clipboard-check"></i> MOR <span class="badge badge-restricted" style="margin-left:0.4rem;">Restricted</span></button>
+            <button class="tab-btn active" onclick="switchOpTab('vsr')" id="opTabVsr"><i class="fas fa-eye"></i> VSR</button>
+            <button class="tab-btn" onclick="switchOpTab('confidential')" id="opTabConf"><i class="fas fa-user-secret"></i> Confidential</button>
+        </div>
+
+        <div id="opMor" class="op-tab-content">
+            <p style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;"><strong>Mandatory Occurrence Report (MOR)</strong> — ECCAIRS-aligned, for CAMO/QA personnel. Requires aircraft, flight, and reporter identification.</p>
+            <p style="font-size:0.8rem;color:#991b1b;background:#fef2f2;padding:0.5rem 0.75rem;border-radius:6px;border:1px solid #fecaca;margin-bottom:1rem;"><i class="fas fa-lock"></i> Restricted to <strong>CAMO</strong> and <strong>QA</strong> (role or email local part `camo`/`qa`). Other users will be blocked (403).</p>
+            <a href="/reports/new.html?type=mor" class="btn btn-primary" id="morSubmitBtn"><i class="fas fa-arrow-right"></i> Submit MOR</a>
+            <a href="/reports/new.html?type=mor" class="btn btn-outline" style="margin-left:0.5rem;">Learn More</a>
+        </div>
+        <div id="opVsr" class="op-tab-content active">
+            <p style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;"><strong>Voluntary Safety Report (VSR)</strong> — Open to all authenticated users. Reporter fields optional, anonymous allowed. Use for hazards, near-misses, suggestions.</p>
+            <p style="font-size:0.8rem;color:#2e7d32;background:#e8f5e9;padding:0.5rem 0.75rem;border-radius:6px;margin-bottom:1rem;"><i class="fas fa-unlock"></i> Open to all authenticated users.</p>
+            <a href="/reports/new.html?type=vsr" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Submit VSR</a>
+        </div>
+        <div id="opConf" class="op-tab-content">
+            <p style="font-size:0.85rem;color:#475569;margin-bottom:0.75rem;"><strong>Confidential Report</strong> — Anonymous, no identifying details required. For sensitive safety culture reporting.</p>
+            <p style="font-size:0.8rem;color:#64748b;background:#f1f5f9;padding:0.5rem 0.75rem;border-radius:6px;margin-bottom:1rem;"><i class="fas fa-user-secret"></i> No name/email/phone required. Fully confidential.</p>
+            <a href="/reports/new.html?type=confidential" class="btn btn-primary"><i class="fas fa-arrow-right"></i> Submit Confidential</a>
+        </div>
+        <div style="margin-top:1rem;text-align:center;">
+            <a href="/reports/new.html" style="font-size:0.8rem;color:#1a6b8a;">Open unified submission form →</a>
+        </div>
+    </div>
+
+    <div class="tab-bar" style="margin-top:1.5rem;">
         <button class="tab-btn active" onclick="switchTab('quarterly')" id="tabQuarterly"><i class="fas fa-calendar-alt"></i> Quarterly Reports</button>
         <button class="tab-btn" onclick="switchTab('annual')" id="tabAnnual"><i class="fas fa-calendar-check"></i> Annual Reports</button>
     </div>
 
     <div class="card" id="quarterlySection">
-        <h2><i class="fas fa-calendar-alt"></i> Quarterly Reports</h2>
+        <h2><i class="fas fa-calendar-alt"></i> Quarterly Reports — Aggregated</h2>
         <div class="filter-bar">
             <label style="font-size:0.85rem;font-weight:500;">Year:</label>
             <select id="qYearFilter" onchange="loadQuarterly()">
@@ -81,15 +123,12 @@
                 <thead><tr><th>Period</th><th>Year</th><th>Quarter</th><th>Status</th><th>Generated</th><th>Actions</th></tr></thead>
                 <tbody id="quarterlyBody"></tbody>
             </table>
-            <div id="quarterlyEmpty" class="empty-state" style="display:none;">
-                <i class="fas fa-inbox"></i><p>No quarterly reports yet.</p>
-                <a href="/reports/generate.html" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">Generate Report</a>
-            </div>
+            <div id="quarterlyEmpty" class="empty-state" style="display:none;"><i class="fas fa-inbox"></i><p>No quarterly reports yet.</p><a href="/reports/generate.html" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">Generate Report</a></div>
         </div>
     </div>
 
     <div class="card" id="annualSection" style="display:none;">
-        <h2><i class="fas fa-calendar-check"></i> Annual Reports</h2>
+        <h2><i class="fas fa-calendar-check"></i> Annual Reports — Aggregated</h2>
         <div class="filter-bar">
             <label style="font-size:0.85rem;font-weight:500;">Year:</label>
             <select id="aYearFilter" onchange="loadAnnual()">
@@ -103,10 +142,7 @@
                 <thead><tr><th>Period</th><th>Year</th><th>Status</th><th>Generated</th><th>Actions</th></tr></thead>
                 <tbody id="annualBody"></tbody>
             </table>
-            <div id="annualEmpty" class="empty-state" style="display:none;">
-                <i class="fas fa-inbox"></i><p>No annual reports yet.</p>
-                <a href="/reports/generate.html" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">Generate Report</a>
-            </div>
+            <div id="annualEmpty" class="empty-state" style="display:none;"><i class="fas fa-inbox"></i><p>No annual reports yet.</p><a href="/reports/generate.html" class="btn btn-primary btn-sm" style="margin-top:0.5rem;">Generate Report</a></div>
         </div>
     </div>
 </div>
@@ -115,80 +151,55 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="/js/firebase.js?v=4.0.1"></script>
 <script src="/js/api/client.js"></script>
-<script src="/js/reports.js"></script>
+<script src="/js/reports.client.js"></script>
 <script>
 let currentTab = 'quarterly';
-
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
-    loadQuarterly();
-    loadAnnual();
+    loadQuarterly(); loadAnnual();
+    // MOR access hint
+    user.getIdTokenResult().then(r => {
+        const role = (r.claims.role||'').toUpperCase();
+        if (!['CAMO_ADMIN','QA_ADMIN','CAMO_USER','QA_USER','AIRLINE_ADMIN','TENANT_ADMIN','SUPER_ADMIN'].includes(role)) {
+            const btn = document.getElementById('morSubmitBtn');
+            if (btn) { btn.style.opacity='0.6'; btn.title='MOR restricted to CAMO/QA'; }
+        }
+    }).catch(()=>{});
 });
-
+function switchOpTab(tab) {
+    document.querySelectorAll('#opTabBar .tab-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('opTab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+    document.getElementById('opMor').classList.toggle('active', tab==='mor');
+    document.getElementById('opVsr').classList.toggle('active', tab==='vsr');
+    document.getElementById('opConf').classList.toggle('active', tab==='confidential');
+}
 function switchTab(tab) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `tab${tab.charAt(0).toUpperCase()+tab.slice(1)}`));
     document.getElementById('quarterlySection').style.display = tab === 'quarterly' ? 'block' : 'none';
     document.getElementById('annualSection').style.display = tab === 'annual' ? 'block' : 'none';
 }
-
 async function loadQuarterly() {
     const body = document.getElementById('quarterlyBody');
     const empty = document.getElementById('quarterlyEmpty');
     const year = parseInt(document.getElementById('qYearFilter').value);
     try {
-        const list = await ReportsAPI.listQuarterly({ year });
-        if (!list || list.length === 0) {
-            body.innerHTML = '';
-            empty.style.display = 'block';
-            return;
-        }
+        const list = await ReportsClient.listQuarterly({ year });
+        if (!list || list.length === 0) { body.innerHTML = ''; empty.style.display = 'block'; return; }
         empty.style.display = 'none';
-        body.innerHTML = list.map(r => `
-            <tr>
-                <td><strong>${r.period}</strong></td>
-                <td>${r.year}</td>
-                <td>Q${r.quarter}</td>
-                <td><span class="badge ${reportStatusBadgeClass(r.status)}">${r.status}</span></td>
-                <td>${formatReportDate(r.generated_at)}</td>
-                <td>
-                    <a href="/reports/view.html?id=${r.id}&type=quarterly" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></a>
-                    <button class="btn btn-outline btn-sm" onclick="downloadPdf('${r.id}', 'quarterly')"><i class="fas fa-download"></i></button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) {
-        body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc3545;">Error: ${err.message}</td></tr>`;
-    }
+        body.innerHTML = list.map(r => `<tr><td><strong>${r.period}</strong></td><td>${r.year}</td><td>Q${r.quarter}</td><td><span class="badge ${reportStatusBadgeClass(r.status)}">${r.status}</span></td><td>${formatReportDate(r.generated_at)}</td><td><a href="/reports/view.html?id=${r.id}&type=quarterly" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></a><button class="btn btn-outline btn-sm" onclick="downloadPdf('${r.id}', 'quarterly')"><i class="fas fa-download"></i></button></td></tr>`).join('');
+    } catch (err) { body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#dc3545;">Error: ${err.message}</td></tr>`; }
 }
-
 async function loadAnnual() {
     const body = document.getElementById('annualBody');
     const empty = document.getElementById('annualEmpty');
     const year = parseInt(document.getElementById('aYearFilter').value);
     try {
-        const list = await ReportsAPI.listAnnual({ year });
-        if (!list || list.length === 0) {
-            body.innerHTML = '';
-            empty.style.display = 'block';
-            return;
-        }
+        const list = await ReportsClient.listAnnual({ year });
+        if (!list || list.length === 0) { body.innerHTML = ''; empty.style.display = 'block'; return; }
         empty.style.display = 'none';
-        body.innerHTML = list.map(r => `
-            <tr>
-                <td><strong>${r.period}</strong></td>
-                <td>${r.year}</td>
-                <td><span class="badge ${reportStatusBadgeClass(r.status)}">${r.status}</span></td>
-                <td>${formatReportDate(r.generated_at)}</td>
-                <td>
-                    <a href="/reports/view.html?id=${r.id}&type=annual" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></a>
-                    <button class="btn btn-outline btn-sm" onclick="downloadPdf('${r.id}', 'annual')"><i class="fas fa-download"></i></button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (err) {
-        body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#dc3545;">Error: ${err.message}</td></tr>`;
-    }
+        body.innerHTML = list.map(r => `<tr><td><strong>${r.period}</strong></td><td>${r.year}</td><td><span class="badge ${reportStatusBadgeClass(r.status)}">${r.status}</span></td><td>${formatReportDate(r.generated_at)}</td><td><a href="/reports/view.html?id=${r.id}&type=annual" class="btn btn-outline btn-sm"><i class="fas fa-eye"></i></a><button class="btn btn-outline btn-sm" onclick="downloadPdf('${r.id}', 'annual')"><i class="fas fa-download"></i></button></td></tr>`).join('');
+    } catch (err) { body.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#dc3545;">Error: ${err.message}</td></tr>`; }
 }
 </script>
 </body>

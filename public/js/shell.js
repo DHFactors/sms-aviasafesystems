@@ -103,6 +103,16 @@
             requires: 'pro'
         },
         {
+            label: 'Reports',
+            icon: '\uD83D\uDCC4',
+            dropdown: [
+                { label: 'Report Center', path: '/reports/index.html' },
+                { label: 'New Report', path: '/reports/new.html' },
+                { label: 'My Reports', path: '/reports/index.html?filter=mine' },
+                { label: 'Generate Report', path: '/reports/generate.html' }
+            ]
+        },
+        {
             label: 'Promotion',
             icon: '\uD83D\uDCE2',
             dropdown: [
