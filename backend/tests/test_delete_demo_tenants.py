@@ -20,6 +20,7 @@ class _FakeDoc:
         self._data = data or {}
         self.deleted = False
         self._subs = subcollections or {}
+        self.sets = []
 
     @property
     def reference(self):
@@ -27,6 +28,13 @@ class _FakeDoc:
 
     def to_dict(self):
         return dict(self._data)
+
+    def set(self, data, merge=False):
+        self.sets.append((dict(data), merge))
+        if merge:
+            self._data.update(data)
+        else:
+            self._data = dict(data)
 
     def delete(self):
         self.deleted = True
@@ -247,6 +255,108 @@ def test_delete_demo_tenants_audits(fs_patch, monkeypatch):
 
     actions = [a[0] for a in auditor]
     assert "TENANTS_DEMO_DELETED" in actions
+
+
+def test_delete_demo_tenants_detaches_regulators(fs_patch, monkeypatch):
+    fs, _ = fs_patch
+    _seed_tenants(fs)
+
+    async def _fake_pg(tenant_list):
+        return {"deleted_count": 0, "details": {}}
+
+    monkeypatch.setattr("app.services.admin_data_service._delete_tenant_postgres_data", _fake_pg)
+
+    caan = _FakeDoc("caan", {"name": "CAAN", "operator_tenant_ids": ["fixedwing", "sita-air", "active-air"]})
+    fs.seed("regulators", [caan])
+
+    result = _run(delete_demo_tenants(ACTOR))
+
+    assert caan.sets, "regulator should have been updated via set"
+    data, merge = caan.sets[-1]
+    assert merge is True
+    assert data["operator_tenant_ids"] == ["active-air"]
+    assert result["regulators"] == {"caan": {"before": ["fixedwing", "sita-air", "active-air"], "after": ["active-air"]}}
+
+
+def test_delete_demo_tenants_leaves_unaffected_regulators(fs_patch, monkeypatch):
+    fs, _ = fs_patch
+    _seed_tenants(fs)
+
+    async def _fake_pg(tenant_list):
+        return {"deleted_count": 0, "details": {}}
+
+    monkeypatch.setattr("app.services.admin_data_service._delete_tenant_postgres_data", _fake_pg)
+
+    dc_civil = _FakeDoc("dc-civil", {"name": "DC Civil Aviation", "operator_tenant_ids": ["nepal-airlines"]})
+    fs.seed("regulators", [dc_civil])
+
+    result = _run(delete_demo_tenants(ACTOR))
+
+    assert dc_civil.sets == []
+    assert result["regulators"] == {}
+
+
+def test_delete_demo_tenants_deletes_tenant_users(fs_patch, monkeypatch):
+    fs, _ = fs_patch
+    _seed_tenants(fs)
+
+    async def _fake_pg(tenant_list):
+        return {"deleted_count": 0, "details": {}}
+
+    monkeypatch.setattr("app.services.admin_data_service._delete_tenant_postgres_data", _fake_pg)
+
+    deleted_uids = []
+
+    class _FakeAuth:
+        def __init__(self, deleted_uids):
+            self._deleted = deleted_uids
+
+        def delete_user(self, uid):
+            self._deleted.append(uid)
+
+    monkeypatch.setattr("app.services.admin_data_service.get_auth", lambda: _FakeAuth(deleted_uids))
+
+    fs.seed("users", [
+        _FakeDoc("u1", {"uid": "u1", "tenant_id": "fixedwing", "email": "pilot@fixedwing.test"}),
+        _FakeDoc("u2", {"uid": "u2", "tenant_id": "sita-air"}),
+        _FakeDoc("u3", {"uid": "u3", "tenant_id": "nepal-airlines"}),
+    ])
+
+    result = _run(delete_demo_tenants(ACTOR))
+
+    by_id = {d.id: d for d in fs.docs["users"]}
+    assert set(deleted_uids) == {"u1", "u2"}
+    assert by_id["u1"].deleted is True
+    assert by_id["u2"].deleted is True
+    assert by_id["u3"].deleted is False
+    assert result["users_deleted"] == 2
+
+
+def test_delete_demo_tenants_deletes_users_even_when_auth_unavailable(fs_patch, monkeypatch):
+    fs, _ = fs_patch
+    _seed_tenants(fs)
+
+    async def _fake_pg(tenant_list):
+        return {"deleted_count": 0, "details": {}}
+
+    monkeypatch.setattr("app.services.admin_data_service._delete_tenant_postgres_data", _fake_pg)
+
+    def _broken_get_auth():
+        raise RuntimeError("firebase not initialized")
+
+    monkeypatch.setattr("app.services.admin_data_service.get_auth", _broken_get_auth)
+
+    fs.seed("users", [
+        _FakeDoc("u1", {"uid": "u1", "tenant_id": "fixedwing"}),
+        _FakeDoc("u3", {"uid": "u3", "tenant_id": "nepal-airlines"}),
+    ])
+
+    result = _run(delete_demo_tenants(ACTOR))
+
+    by_id = {d.id: d for d in fs.docs["users"]}
+    assert by_id["u1"].deleted is True
+    assert by_id["u3"].deleted is False
+    assert result["users_deleted"] == 1
 
 
 # ---------------------------------------------------------------------------

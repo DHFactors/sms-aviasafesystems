@@ -24,7 +24,7 @@ from loguru import logger
 from sqlalchemy import and_, delete, func, or_, select, union_all
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.firebase import get_auth, get_db
 from app.models.hazard import revalue_taxonomy
 from app.services.hazard_service import generate_hazard_id, resolve_function_code
 from app.db.ids import register_tenant, tenant_uuid
@@ -1198,8 +1198,10 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
 
     Removes every Postgres row for the tenant (all child tables) and the
     tenant's Firestore doc including all subcollections (reports, CAN/CAP,
-    surveys, PSOE assessments, bow-tie, flight diversions, …). Regulators,
-    auth users and the global `psoe_questions` reference bank are preserved.
+    surveys, PSOE assessments, bow-tie, flight diversions, …). Also detaches
+    the deleted tenant slugs from every regulator's `operator_tenant_ids` and
+    deletes the tenant's users (Firebase Auth + Firestore `users` docs). The
+    global `psoe_questions` reference bank is preserved.
     """
     db = get_db()
     candidates: List[Tuple[str, Dict[str, Any]]] = []
@@ -1217,6 +1219,8 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
             "tenants": [],
             "postgres": {"deleted_count": 0, "details": {}},
             "firestore": {"deleted": {}},
+            "users_deleted": 0,
+            "regulators": {},
         }
 
     postgres_result = await _delete_tenant_postgres_data(
@@ -1235,12 +1239,15 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
     names = {slug: (data.get("name") or slug) for slug, data in candidates}
     tenant_list = [slug for slug, _ in candidates]
     fs_total = sum(firestore_deleted.values()) or 0
+    regulator_updates = _detach_deleted_tenants_from_regulators(tenant_list, db)
+    users_deleted = _delete_users_for_deleted_tenants(tenant_list, db)
     _audit(
         "TENANTS_DEMO_DELETED",
         actor,
         ",".join(tenant_list) or "-",
         f"Deleted demo tenants: {', '.join(f'{s} ({names[s]})' for s in tenant_list)} — "
-        f"Firestore docs removed: {fs_total}, Postgres rows removed: {postgres_result.get('deleted_count', 0)}",
+        f"Firestore docs removed: {fs_total}, Postgres rows removed: {postgres_result.get('deleted_count', 0)}, "
+        f"users deleted: {users_deleted}, regulators updated: {len(regulator_updates)}",
     )
     logger.info(f"Demo tenants deleted: {tenant_list} ({fs_total} Firestore docs)")
     return {
@@ -1249,7 +1256,86 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
         "tenants": tenant_list,
         "postgres": postgres_result,
         "firestore": {"deleted": firestore_deleted},
+        "users_deleted": users_deleted,
+        "regulators": regulator_updates,
     }
+
+
+def _detach_deleted_tenants_from_regulators(
+    deleted_tenant_ids: List[str], db: Any
+) -> Dict[str, Dict[str, Any]]:
+    """Remove deleted tenant slugs from every regulator's `operator_tenant_ids`.
+
+    Regulators live in the Firestore `regulators` collection and reference
+    their operator tenants by slug. When a tenant is deleted its slug must be
+    stripped from each regulator so no dangling operator reference remains
+    (and the panel's Existing Regulators list shows accurate counts).
+
+    Returns ``{regulator_id: {"before": [...], "after": [...]}}`` for every
+    regulator whose list actually changed.
+    """
+    if not deleted_tenant_ids:
+        return {}
+    removed = set(deleted_tenant_ids)
+    updated: Dict[str, Dict[str, Any]] = {}
+    try:
+        for snap in db.collection(settings.FIREBASE_COLLECTION_REGULATORS).stream():
+            ops = list((snap.to_dict() or {}).get("operator_tenant_ids") or [])
+            kept = [tid for tid in ops if tid not in removed]
+            if kept == ops:
+                continue
+            snap.reference.set({"operator_tenant_ids": kept}, merge=True)
+            updated[snap.id] = {"before": ops, "after": kept}
+    except Exception as e:
+        logger.warning(f"Failed to detach deleted tenants from regulators: {e}")
+    return updated
+
+
+def _delete_users_for_deleted_tenants(tenant_ids: List[str], db: Any) -> int:
+    """Delete Firestore `users/{uid}` docs + Firebase Auth records for tenants.
+
+    Mirrors the panel's per-user delete: the Firestore user doc (keyed by uid)
+    and the matching Auth record are both removed. Auth failures for
+    already-gone users are tolerated and logged.
+
+    Returns the number of user records deleted.
+    """
+    if not tenant_ids:
+        return 0
+    removed = set(tenant_ids)
+    try:
+        snaps = [
+            snap for snap in db.collection(settings.FIREBASE_COLLECTION_USERS).stream()
+            if (snap.to_dict() or {}).get("tenant_id") in removed
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to list tenant users for deletion: {e}")
+        return 0
+    if not snaps:
+        return 0
+
+    try:
+        auth = get_auth()
+    except Exception as e:
+        logger.warning(f"Firebase Auth unavailable — deleting user docs only: {e}")
+        auth = None
+
+    deleted = 0
+    for snap in snaps:
+        data = snap.to_dict() or {}
+        uid = data.get("uid") or snap.id
+        if auth is not None:
+            try:
+                auth.delete_user(uid)
+            except Exception as e:
+                logger.warning(f"Auth delete failed for {uid}: {e}")
+        try:
+            snap.reference.delete()
+        except Exception as e:
+            logger.warning(f"Firestore user doc delete failed for {uid}: {e}")
+            continue
+        deleted += 1
+    return deleted
 
 
 # ============================================================================

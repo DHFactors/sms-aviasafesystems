@@ -1256,6 +1256,8 @@ async function execDeleteDemoTenants(body) {
         tenantList.forEach(function (t) { html += '<tr><td><code>' + esc(t) + '</code></td><td>' + esc(fs[t] || 0) + '</td></tr>'; });
         html += '<tr style="font-weight:600;"><td>Total</td><td>' + esc(fsTotal) + '</td></tr>';
         html += '</tbody></table></div>';
+        html += '<div style="margin-top:8px;"><strong>Users deleted:</strong> ' + esc(resp.users_deleted || 0) +
+            ' &nbsp;·&nbsp; <strong>Regulators updated:</strong> ' + esc(Object.keys(resp.regulators || {}).length) + '</div>';
 
         if (el) el.innerHTML = html;
         toast('Demo tenants deleted: ' + tenantList.join(', '), 'success');
