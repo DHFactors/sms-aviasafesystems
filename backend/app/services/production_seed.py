@@ -101,6 +101,7 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
         "domain": (data.get("domain") or "").strip() or None,
         "operator_tenant_ids": list(data.get("operator_tenant_ids") or []),
         "active": bool(data.get("active", True)),
+        "is_demo": bool(data.get("is_demo", True)),
         "created_at": now,
         "updated_at": now,
     }
@@ -140,6 +141,7 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
         "status": (data.get("status") or "ACTIVE").upper(),
         "trial_expires_at": data.get("trial_expires_at"),
         "active": bool(data.get("active", True)),
+        "is_demo": bool(data.get("is_demo", True)),
         "created_at": now,
         "updated_at": now,
     }

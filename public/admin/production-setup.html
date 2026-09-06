@@ -197,6 +197,15 @@ AUTHOR: AviaSAFE Systems
                         <div class="form-group"><label>Domain</label><input type="text" id="regDomain" placeholder="ssp.caanepal.gov.np"></div>
                     </div>
                     <div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="regIsDemo" checked>
+                                Demo Regulator
+                            </label>
+                            <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
+                        </div>
+                    </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
                     </div>
@@ -220,6 +229,15 @@ AUTHOR: AviaSAFE Systems
                     <div class="form-row">
                         <div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>
                         <div class="form-group"><label>Regulator (State Regulator from Step 1)</label><select id="tenantRegulator"><option value="">— none —</option></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tenantIsDemo" checked>
+                                Demo Tenant
+                            </label>
+                            <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
+                        </div>
                     </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>
@@ -570,6 +588,7 @@ async function createRegulator(e) {
             country_name: document.getElementById('regCountryName').value.trim(),
             domain: document.getElementById('regDomain').value.trim(),
             operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+            is_demo: document.getElementById('regIsDemo').checked
         }
     };
     try {
@@ -611,6 +630,7 @@ async function createTenant(e) {
             icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
             country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
             regulator_id: document.getElementById('tenantRegulator').value.trim() || null,
+            is_demo: document.getElementById('tenantIsDemo').checked
         }
     };
     try {

@@ -371,6 +371,7 @@ class RegulatorCreate(BaseModel):
     domain: Optional[str] = None
     operator_tenant_ids: Optional[List[str]] = None
     active: bool = True
+    is_demo: bool = True
 
 
 class TenantCreate(BaseModel):
@@ -386,6 +387,7 @@ class TenantCreate(BaseModel):
     contract: Optional[Dict[str, Any]] = None
     users: Optional[List[Dict[str, Any]]] = None
     status: Optional[str] = "active"
+    is_demo: bool = True
 
 
 class TenantBulkRequest(BaseModel):

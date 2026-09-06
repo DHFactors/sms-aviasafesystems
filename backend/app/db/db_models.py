@@ -1426,6 +1426,7 @@ class Regulator(Base):
     operator_tenant_ids: Mapped[object] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb")
     )
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
