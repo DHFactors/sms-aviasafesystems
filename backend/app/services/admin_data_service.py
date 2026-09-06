@@ -1250,3 +1250,109 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
         "postgres": postgres_result,
         "firestore": {"deleted": firestore_deleted},
     }
+
+
+# ============================================================================
+# Granular demo purges — Category C (Steps 6 & 7): PSOE + State Risk
+# ============================================================================
+
+PSOE_SEED_CREATOR = "production-setup"
+PSOE_SEED_VERSION_PREFIX = "production-setup-"
+
+
+async def purge_psoe_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Purge ALL PSOE demo data (is_demo = true).
+
+    Removes Postgres `psoe_assessments` demo rows (+ their `psoe_findings`
+    children) and the Firestore production-setup baseline assessments
+    (created_by = "production-setup" / seed_version "production-setup-*").
+    Real PSOE assessments and the global `psoe_questions` reference bank are
+    never touched.
+    """
+    pg_details: Dict[str, Any] = {}
+    pg_total = 0
+    demo_assessment_ids = (
+        select(PsoeAssessment.id)
+        .where(PsoeAssessment.is_demo == True)
+        .scalar_subquery()
+    )
+    steps = [
+        ("psoe_findings", delete(PsoeFinding).where(PsoeFinding.assessment_id.in_(demo_assessment_ids))),
+        ("psoe_assessments", delete(PsoeAssessment).where(PsoeAssessment.is_demo == True)),
+    ]
+    for table, stmt in steps:
+        try:
+            async with session_scope() as session:
+                result = await session.execute(stmt)
+                count = result.rowcount or 0
+            pg_details[table] = count
+            pg_total += count
+        except Exception as e:
+            logger.error(f"PSOE purge failed for {table}: {e}")
+            pg_details[table] = f"Error: {e}"
+
+    fs_deleted = 0
+    try:
+        coll = get_db().collection("psoe_assessments")
+        for snap in coll.stream():
+            data = snap.to_dict() or {}
+            if (
+                data.get("created_by") == PSOE_SEED_CREATOR
+                or str(data.get("seed_version") or "").startswith(PSOE_SEED_VERSION_PREFIX)
+            ):
+                snap.reference.delete()
+                fs_deleted += 1
+    except Exception as e:
+        logger.error(f"PSOE Firestore purge failed: {e}")
+
+    ok = not any(str(v).startswith("Error") for v in pg_details.values())
+    _audit(
+        "PSOE_DEMO_PURGED",
+        actor,
+        "all",
+        f"Purged {pg_total} Postgres PSOE demo rows, removed {fs_deleted} Firestore baselines",
+        result="success" if ok else "partial",
+    )
+    logger.info(f"PSOE demo data purged: {pg_total} rows, {fs_deleted} Firestore docs")
+    return {
+        "success": ok,
+        "deleted_count": pg_total,
+        "details": pg_details,
+        "firestore_deleted": fs_deleted,
+    }
+
+
+async def purge_state_risk_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Purge ALL State Risk demo data (is_demo = true).
+
+    Removes Postgres `state_risk_register` demo rows. The Firestore ICAO
+    reference taxonomy is global reference data (not per-tenant demo data) and
+    is preserved.
+    """
+    pg_deleted = 0
+    error = ""
+    try:
+        async with session_scope() as session:
+            result = await session.execute(
+                delete(StateRiskRegisterEntry).where(StateRiskRegisterEntry.is_demo == True)
+            )
+            pg_deleted = result.rowcount or 0
+    except Exception as e:
+        error = str(e)
+        logger.error(f"State risk purge failed: {e}")
+
+    _audit(
+        "STATE_RISK_DEMO_PURGED",
+        actor,
+        "all",
+        f"Purged {pg_deleted} State Risk demo rows",
+        result="error" if error else "success",
+    )
+    logger.info(f"State risk demo data purged: {pg_deleted} rows")
+    return {
+        "success": not error,
+        "deleted_count": pg_deleted,
+        "details": {
+            "state_risk_register": pg_deleted if not error else f"Error: {error}"
+        },
+    }

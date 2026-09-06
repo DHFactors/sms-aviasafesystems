@@ -159,12 +159,23 @@ AUTHOR: AviaSAFE Systems
         <div class="step-progress" id="stepProgress">
             <span class="sp-chip"><span class="sp-num">1</span> Regulator</span>
             <span class="sp-chip"><span class="sp-num">2</span> Tenants</span>
+            <span class="sp-chip"><span class="sp-num">3</span> Manage</span>
             <span class="sp-chip"><span class="sp-num">4</span> Audit Log</span>
             <span class="sp-chip"><span class="sp-num">5</span> Dummy Data</span>
             <span class="sp-chip"><span class="sp-num">6</span> PSOE</span>
             <span class="sp-chip"><span class="sp-num">7</span> State Risk</span>
-            <span class="sp-chip"><span class="sp-num">8</span> Unified Purge</span>
+            <span class="sp-chip"><span class="sp-num">8</span> Purge All</span>
             <span class="sp-chip"><span class="sp-num">9</span> Delete Tenants</span>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- CATEGORY A: SETUP & MANAGEMENT (Steps 1-3)                         -->
+        <!-- ================================================================== -->
+        <div class="category-header" style="margin: 24px 0 16px; padding: 12px 16px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+            <h2 style="margin: 0; font-size: 1.1rem; color: #0f172a;">
+                <i class="fas fa-tools" style="color: #0ea5e9;"></i> Category A: Setup &amp; Management
+            </h2>
+            <p style="margin: 4px 0 0; color: #64748b; font-size: .85rem;">Create and manage regulators, tenants, and users.</p>
         </div>
 
         <div class="grid">
@@ -222,34 +233,51 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             </div>
         </div>
 
-        <!-- ============ EXISTING REGULATORS ============ -->
-        <div class="section-title"><i class="fas fa-landmark"></i> Existing Regulators</div>
+        <!-- ============ STEP 3 — MANAGE REGULATORS, TENANTS & USERS ============ -->
         <div class="admin-card">
-            <div class="btn-row" style="margin-bottom:12px;">
-                <button class="btn btn-outline btn-sm" onclick="loadExistingRegulators()"><i class="fas fa-rotate"></i> Refresh</button>
+            <div class="card-head"><span class="step-badge">Step 3</span></div>
+            <h2>Manage Regulators, Tenants &amp; Users</h2>
+            <p class="card-sub">Search and manage existing regulators, operator tenants, and tenant users. Delete actions require the setup key.</p>
+
+            <!-- ============ EXISTING REGULATORS ============ -->
+            <div class="section-title" style="margin-top:18px;"><i class="fas fa-landmark"></i> Existing Regulators</div>
+            <div class="admin-card">
+                <div class="btn-row" style="margin-bottom:12px;">
+                    <button class="btn btn-outline btn-sm" onclick="loadExistingRegulators()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+                <div id="regulatorList"><div class="empty-state">Not loaded.</div></div>
             </div>
-            <div id="regulatorList"><div class="empty-state">Not loaded.</div></div>
+
+            <!-- ============ EXISTING TENANTS ============ -->
+            <div class="section-title" style="margin-top:18px;"><i class="fas fa-building"></i> Existing Tenants</div>
+            <div class="admin-card">
+                <div class="btn-row" style="margin-bottom:12px;">
+                    <button class="btn btn-outline btn-sm" onclick="loadExistingTenants()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+                <div id="tenantList"><div class="empty-state">Not loaded.</div></div>
+            </div>
+
+            <!-- ============ USER MANAGEMENT — CLEANUP ============ -->
+            <div class="section-title" style="margin-top:18px;"><i class="fas fa-users-gear"></i> User Management — Cleanup</div>
+            <div class="admin-card">
+                <p class="card-sub">List tenant users and purge test accounts. Requires SUPER_ADMIN + setup key. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every deletion is audit-logged.</p>
+                <div class="btn-row" style="margin-bottom:12px;">
+                    <select id="userTenantFilter" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;min-width:160px;" onchange="renderUserTable()"><option value="">All tenants</option></select>
+                    <input type="text" id="userSearch" placeholder="Filter by email…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
+                    <button class="btn btn-outline btn-sm" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
+                </div>
+                <div id="userList"><div class="empty-state">Not loaded. Click Refresh to load users.</div></div>
+            </div>
         </div>
 
-        <!-- ============ EXISTING TENANTS ============ -->
-        <div class="section-title"><i class="fas fa-building"></i> Existing Tenants</div>
-        <div class="admin-card">
-            <div class="btn-row" style="margin-bottom:12px;">
-                <button class="btn btn-outline btn-sm" onclick="loadExistingTenants()"><i class="fas fa-rotate"></i> Refresh</button>
-            </div>
-            <div id="tenantList"><div class="empty-state">Not loaded.</div></div>
-        </div>
-
-        <!-- ============ USER MANAGEMENT — CLEANUP ============ -->
-        <div class="section-title"><i class="fas fa-users-gear"></i> User Management — Cleanup</div>
-        <div class="admin-card">
-            <p class="card-sub">List tenant users and purge test accounts. Requires SUPER_ADMIN + setup key. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every deletion is audit-logged.</p>
-            <div class="btn-row" style="margin-bottom:12px;">
-                <select id="userTenantFilter" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;min-width:160px;" onchange="renderUserTable()"><option value="">All tenants</option></select>
-                <input type="text" id="userSearch" placeholder="Filter by email…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
-                <button class="btn btn-outline btn-sm" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
-            </div>
-            <div id="userList"><div class="empty-state">Not loaded. Click Refresh to load users.</div></div>
+        <!-- ================================================================== -->
+        <!-- CATEGORY B: AUDIT & MONITORING (Step 4)                            -->
+        <!-- ================================================================== -->
+        <div class="category-header" style="margin: 24px 0 16px; padding: 12px 16px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #64748b;">
+            <h2 style="margin: 0; font-size: 1.1rem; color: #0f172a;">
+                <i class="fas fa-clipboard-list" style="color: #64748b;"></i> Category B: Audit &amp; Monitoring
+            </h2>
+            <p style="margin: 4px 0 0; color: #64748b; font-size: .85rem;">View audit trail of all administrative actions.</p>
         </div>
 
         <!-- ============ STEP 4 — AUDIT LOG ============ -->
@@ -269,6 +297,16 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
                 </div>
                 <div id="auditArea" style="overflow-x:auto;"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading audit log...</div></div>
             </div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- CATEGORY C: DATA SEEDING & GRANULAR PURGE (Steps 5-7)              -->
+        <!-- ================================================================== -->
+        <div class="category-header" style="margin: 24px 0 16px; padding: 12px 16px; background: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b;">
+            <h2 style="margin: 0; font-size: 1.1rem; color: #0f172a;">
+                <i class="fas fa-database" style="color: #f59e0b;"></i> Category C: Data Seeding &amp; Granular Purge
+            </h2>
+            <p style="margin: 4px 0 0; color: #64748b; font-size: .85rem;">Seed demo data or purge specific categories individually.</p>
         </div>
 
         <!-- ============ STEP 5 — DUMMY DATA ============ -->
@@ -332,6 +370,7 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             </div>
             <div class="btn-row">
                 <button class="btn btn-primary" onclick="seedPsoe()"><i class="fas fa-clipboard-check"></i> Seed PSOE Baselines</button>
+                <button type="button" class="btn btn-danger" onclick="purgePsoeDemo()"><i class="fas fa-broom"></i> Purge Demo PSOE</button>
                 <button type="button" class="btn btn-outline btn-sm" onclick="loadSeedTenants('psoeTenant')"><i class="fas fa-rotate"></i> Refresh list</button>
             </div>
             <div id="psoeArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
@@ -342,14 +381,27 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             <div class="card-head"><span class="step-badge">Step 7</span></div>
             <h2>State Risk Register Reference</h2>
             <p class="card-sub">Write the ICAO top-risk reference categories that the state-level SSP risk register measures against. Global reference data &mdash; not tied to any specific tenant.</p>
-            <button class="btn btn-primary" onclick="seedStateRisk()"><i class="fas fa-shield-halved"></i> Seed State Risk Reference</button>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="seedStateRisk()"><i class="fas fa-shield-halved"></i> Seed State Risk Reference</button>
+                <button type="button" class="btn btn-danger" onclick="purgeStateRiskDemo()"><i class="fas fa-broom"></i> Purge Demo State Risk</button>
+            </div>
             <div id="stateRiskArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
+        </div>
+
+        <!-- ================================================================== -->
+        <!-- CATEGORY D: DATA PURGING & TENANT DELETION (Steps 8-9)             -->
+        <!-- ================================================================== -->
+        <div class="category-header" style="margin: 24px 0 16px; padding: 12px 16px; background: #fef2f2; border-radius: 8px; border-left: 4px solid #ef4444;">
+            <h2 style="margin: 0; font-size: 1.1rem; color: #0f172a;">
+                <i class="fas fa-trash-can" style="color: #ef4444;"></i> Category D: Data Purging &amp; Tenant Deletion
+            </h2>
+            <p style="margin: 4px 0 0; color: #64748b; font-size: .85rem;">Unified purge of ALL demo data or delete entire tenants.</p>
         </div>
 
         <!-- ============ STEP 8 — UNIFIED PURGE (SUPABASE + FIRESTORE) ============ -->
         <div class="admin-card" style="border-color:#e2b8b8;">
             <div class="card-head"><span class="step-badge">Step 8</span></div>
-            <h2><i class="fas fa-database" style="color:#b91c1c;"></i> Unified Purge Demo Data</h2>
+            <h2><i class="fas fa-database" style="color:#b91c1c;"></i> Purge All Demo Data</h2>
             <p class="card-sub">Delete <strong>ALL</strong> demo data from <strong>BOTH</strong> Supabase AND Firestore &mdash; Postgres rows (<code>is_demo = true</code>): hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows &mdash; plus the Firestore <code>audit_logs</code>, <code>psoe_assessments</code> baselines and <code>state</code> SSP reference tree &mdash; across all tenants. Tenants, regulators, users and the PSOE question bank are preserved.</p>
             <p style="margin:0 0 12px;color:#b91c1c;font-weight:600;">⚠️ This is irreversible!</p>
             <div style="border-top:1px dashed #e5deae;margin:0 0 16px;padding-top:14px;">
@@ -375,14 +427,14 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
                 </div>
                 <div id="exportPurgeStatus"></div>
             </div>
-            <button id="purgeUnifiedBtn" class="btn btn-danger" onclick="purgeUnifiedDemo()"><i class="fas fa-trash-can"></i> Purge All Demo Data (Unified)</button>
+            <button id="purgeUnifiedBtn" class="btn btn-danger" onclick="purgeUnifiedDemo()"><i class="fas fa-trash-can"></i> Purge All Demo Data</button>
             <div id="purgeUnifiedResult" style="margin-top: 12px;"></div>
         </div>
 
         <!-- ============ STEP 9 — DELETE TENANTS ============ -->
         <div class="admin-card" style="border-color:#e2b8b8;">
             <div class="card-head"><span class="step-badge">Step 9</span></div>
-            <h2><i class="fas fa-trash-can" style="color:#b91c1c;"></i> Delete Tenants</h2>
+            <h2><i class="fas fa-trash-can" style="color:#b91c1c;"></i> Delete Demo Tenants</h2>
             <p class="card-sub">
                 Permanently delete demo operators (<code>is_demo = true</code> / <code>is_beta_sandbox</code> / <code>CANCELLED</code> status) from <strong>BOTH</strong> Supabase AND Firestore &mdash; every Postgres row for the tenant plus its Firestore doc including subcollections.
                 <strong>Sita Air and Sourya Air</strong> are currently in <strong>CANCELLED</strong> state and can be deleted.
@@ -946,11 +998,14 @@ function demoData(action) {
         }).join(', ');
     }
 
+    var warning = verb === 'Unseed'
+        ? '<br><br><span style="color:#b91c1c;font-weight:700;">⚠️ This will UNSEED dummy data (is_demo = true). Real data is untouched.</span>'
+        : '';
     openConfirm(
         'Confirm ' + verb,
         '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + quantLabel + '</strong>' +
         (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
-        ' per tenant. Unseed removes only the documents created by this seeder — real data is untouched.',
+        ' per tenant.' + warning,
         { type: 'demo', body: body }
     );
 }
@@ -1046,13 +1101,76 @@ async function execStateRisk(body) {
 }
 
 // ============================================================================
+// STEP 6B — PURGE DEMO PSOE (granular, is_demo = true)
+// ============================================================================
+
+function purgePsoeDemo() {
+    openConfirm(
+        '⚠️ Purge Demo PSOE',
+        '<strong>Purge all PSOE demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>psoe_assessments</code> + <code>psoe_findings</code>) and the Firestore production-setup baseline assessments.<br><br>' +
+        '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE all PSOE demo data (is_demo = true).</span> Real PSOE assessments are untouched.',
+        { type: 'purgePsoeDemo', body: {} }
+    );
+}
+
+async function execPurgePsoeDemo(body) {
+    var area = document.getElementById('psoeArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging PSOE demo data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/psoe/purge', body);
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'PSOE purge request failed');
+
+        var pg = resp.details || {};
+        var html = '<div class="status-box success"><strong>✅ PSOE demo data purged &mdash; ' + esc(resp.deleted_count) + ' Postgres rows, ' + esc(resp.firestore_deleted || 0) + ' Firestore baselines removed.</strong></div>';
+        html += '<div style="overflow-x:auto;margin-top:10px;"><table class="admin-table"><thead><tr><th style="text-align:left;">Table</th><th>Deleted</th></tr></thead><tbody>';
+        Object.keys(pg).forEach(function (k) { html += '<tr><td><code>' + esc(k) + '</code></td><td>' + esc(pg[k]) + '</td></tr>'; });
+        html += '</tbody></table></div>';
+        if (area) area.innerHTML = html;
+        toast('PSOE demo data purged.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">❌ Purge Demo PSOE failed: ' + esc(err.message) + '</div>';
+        toast('Purge Demo PSOE failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// STEP 7B — PURGE DEMO STATE RISK (granular, is_demo = true)
+// ============================================================================
+
+function purgeStateRiskDemo() {
+    openConfirm(
+        '⚠️ Purge Demo State Risk',
+        '<strong>Purge all State Risk demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>state_risk_register</code>). The Firestore ICAO reference taxonomy is global reference data and is preserved.<br><br>' +
+        '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE all State Risk demo data (is_demo = true).</span>',
+        { type: 'purgeStateRiskDemo', body: {} }
+    );
+}
+
+async function execPurgeStateRiskDemo(body) {
+    var area = document.getElementById('stateRiskArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging State Risk demo data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk/purge', body);
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'State Risk purge request failed');
+        if (area) area.innerHTML = '<div class="status-box success"><strong>✅ State Risk demo data purged &mdash; ' + esc(resp.deleted_count) + ' Postgres rows removed.</strong></div>';
+        toast('State Risk demo data purged.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">❌ Purge Demo State Risk failed: ' + esc(err.message) + '</div>';
+        toast('Purge Demo State Risk failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
 // STEP 8 — UNIFIED PURGE (Supabase + Firestore)
 // ============================================================================
 
 function purgeUnifiedDemo() {
     openConfirm(
-        '⚠️ Purge ALL Demo Data (Unified)',
-        'This will permanently delete <strong>ALL demo data</strong> from <strong>BOTH</strong> Supabase AND Firestore: Postgres rows with <code>is_demo = true</code> (hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows) plus the Firestore <code>audit_logs</code>, <code>psoe_assessments</code> baselines and <code>state</code> SSP reference tree.<br><br>' +
+        '⚠️ Purge All Demo Data',
+        '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE ALL demo data (is_demo = true) from Supabase AND Firestore.</span><br><br>' +
+        'Postgres rows (hazards, reports, CAN/CAP, surveys, PSOE assessments, bow-tie, registers and their child rows) plus the Firestore <code>audit_logs</code>, <code>psoe_assessments</code> baselines and <code>state</code> SSP reference tree.<br><br>' +
         '<span style="color:#b91c1c;font-weight:700;">This is IRREVERSIBLE.</span> Tenants, regulators, users and the PSOE question bank are preserved.',
         { type: 'purgeUnified', body: {} }
     );
@@ -1110,8 +1228,9 @@ async function deleteDemoTenants() {
     if (el) el.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading demo tenants…</div>';
 
     openConfirm(
-        '⚠️ Delete ALL Demo Tenants',
-        '<strong>Delete all demo operator tenants</strong> flagged <code>is_demo</code> / <code>is_beta_sandbox</code> / <code>CANCELLED</code> (status). This removes every Postgres row for the tenant plus its Firestore doc (incl. subcollections).<br><br>' +
+        '⚠️ Delete Demo Tenants',
+        '<span style="color:#b91c1c;font-weight:700;">⚠️ This will DELETE all demo tenants (is_demo = true OR status = CANCELLED).</span><br><br>' +
+        'Removes every <code>is_demo</code> / <code>is_beta_sandbox</code> / <code>CANCELLED</code> operator tenant: every Postgres row for the tenant plus its Firestore doc (incl. subcollections).<br><br>' +
         '<span style="color:#b91c1c;font-weight:700;">This is IRREVERSIBLE.</span> Regulators, auth users and the PSOE question bank are preserved.',
         { type: 'deleteDemoTenants', body: {} }
     );
@@ -1228,7 +1347,7 @@ function openConfirm(title, html, action) {
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmText').innerHTML = html;
     // Show setup-key field for destructive actions — prompt inside the warning modal
-    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'deleteDemoTenants' || action.type === 'deleteUser');
+    var needsKey = action && (action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'purgePsoeDemo' || action.type === 'purgeStateRiskDemo' || action.type === 'deleteDemoTenants' || action.type === 'deleteUser');
     var wrap = document.getElementById('confirmSetupKeyWrap');
     var input = document.getElementById('confirmSetupKey');
     var errEl = document.getElementById('confirmSetupKeyError');
@@ -1254,7 +1373,7 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     var action = pendingConfirm;
     if (!action) return;
     // For destructive actions, require setup key from the modal input
-    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'deleteDemoTenants' || action.type === 'deleteUser';
+    var needsKey = action.type === 'demo' || action.type === 'psoe' || action.type === 'stateRisk' || action.type === 'purgeUnified' || action.type === 'purgePsoeDemo' || action.type === 'purgeStateRiskDemo' || action.type === 'deleteDemoTenants' || action.type === 'deleteUser';
     var setupKey = '';
     if (needsKey) {
         var input = document.getElementById('confirmSetupKey');
@@ -1282,6 +1401,8 @@ document.getElementById('confirmOkBtn').addEventListener('click', function () {
     else if (action.type === 'psoe') execPsoe(action.body);
     else if (action.type === 'stateRisk') execStateRisk(action.body);
     else if (action.type === 'purgeUnified') execPurgeUnified(action.body);
+    else if (action.type === 'purgePsoeDemo') execPurgePsoeDemo(action.body);
+    else if (action.type === 'purgeStateRiskDemo') execPurgeStateRiskDemo(action.body);
     else if (action.type === 'deleteDemoTenants') execDeleteDemoTenants(action.body);
     else if (action.type === 'deleteUser') execDeleteUser(action.email, action.uid, action.setup_key);
 });

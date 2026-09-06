@@ -950,6 +950,47 @@ async def admin_delete_demo_tenants(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/psoe/purge", status_code=status.HTTP_200_OK)
+async def admin_purge_psoe_demo(
+    req: PurgeUnifiedRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Purge ONLY the PSOE demo data (is_demo = true).
+
+    Removes Postgres `psoe_assessments` demo rows (+ their `psoe_findings`
+    children) and the Firestore production-setup baseline assessments. Other
+    demo tables and real data are untouched.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import purge_psoe_demo_data
+
+    try:
+        return await purge_psoe_demo_data(user)
+    except Exception as e:
+        logger.error(f"PSOE demo purge failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/state-risk/purge", status_code=status.HTTP_200_OK)
+async def admin_purge_state_risk_demo(
+    req: PurgeUnifiedRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Purge ONLY the State Risk demo data (is_demo = true).
+
+    Removes Postgres `state_risk_register` demo rows. The Firestore ICAO
+    reference taxonomy (global reference data) is preserved.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.admin_data_service import purge_state_risk_demo_data
+
+    try:
+        return await purge_state_risk_demo_data(user)
+    except Exception as e:
+        logger.error(f"State Risk demo purge failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # SUPER_ADMIN data export endpoints — read-only CSV dumps (downloads)
 # ============================================================================
