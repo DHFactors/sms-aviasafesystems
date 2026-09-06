@@ -388,6 +388,10 @@ class TenantCreate(BaseModel):
     users: Optional[List[Dict[str, Any]]] = None
     status: Optional[str] = "active"
     is_demo: bool = True
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_title: Optional[str] = None
 
 
 class TenantBulkRequest(BaseModel):

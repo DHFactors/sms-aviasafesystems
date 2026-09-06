@@ -153,6 +153,18 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
     survey_config = data.get("survey_config")
     if isinstance(survey_config, dict) and survey_config:
         doc["survey_config"] = survey_config
+    for field in ("contact_name", "contact_email", "contact_phone", "contact_title"):
+        if data.get(field):
+            val = str(data.get(field)).strip()
+            if val:
+                doc[field] = val
+    # Also handle nested contact dict for legacy
+    contact = data.get("contact")
+    if isinstance(contact, dict) and contact:
+        for k in ("name", "email", "phone", "title"):
+            field = f"contact_{k}"
+            if contact.get(k) and field not in doc:
+                doc[field] = str(contact.get(k)).strip()
 
     pg.upsert(Tenant, "slug", tid, doc)
     try:

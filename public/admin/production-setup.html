@@ -239,6 +239,31 @@ AUTHOR: AviaSAFE Systems
                             <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
                         </div>
                     </div>
+                    <!-- Contact Person Section -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Person Name</label>
+                            <input type="text" id="tenantContactName" placeholder="e.g., Rajesh Thapa">
+                            <small style="color:#94a3b8;font-size:.72rem;">Safety Manager / Accountable Manager</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email</label>
+                            <input type="email" id="tenantContactEmail" placeholder="e.g., safety@airline.com">
+                            <small style="color:#94a3b8;font-size:.72rem;">Primary safety contact email</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Phone</label>
+                            <input type="tel" id="tenantContactPhone" placeholder="e.g., +977 9841 234567">
+                            <small style="color:#94a3b8;font-size:.72rem;">Primary safety contact phone</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Title</label>
+                            <input type="text" id="tenantContactTitle" placeholder="e.g., Safety Manager">
+                            <small style="color:#94a3b8;font-size:.72rem;">Job title of the contact person</small>
+                        </div>
+                    </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>
                         <button type="button" class="btn btn-outline" onclick="bulkImport()"><i class="fas fa-file-import"></i> Bulk Import</button>
@@ -630,7 +655,11 @@ async function createTenant(e) {
             icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
             country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
             regulator_id: document.getElementById('tenantRegulator').value.trim() || null,
-            is_demo: document.getElementById('tenantIsDemo').checked
+            is_demo: document.getElementById('tenantIsDemo').checked,
+            contact_name: document.getElementById('tenantContactName').value.trim(),
+            contact_email: document.getElementById('tenantContactEmail').value.trim(),
+            contact_phone: document.getElementById('tenantContactPhone').value.trim(),
+            contact_title: document.getElementById('tenantContactTitle').value.trim()
         }
     };
     try {
@@ -706,7 +735,7 @@ async function loadExistingTenants() {
         try { populateUserTenantFilter(); } catch (e) {}
         if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Status</th><th>Payment</th><th>Contract</th>' +
+            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Contact Person</th><th>Contact Email</th><th>Status</th><th>Payment</th><th>Contract</th>' +
             '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Manage</th></tr></thead><tbody>' +
             tenants.map(buildTenantRow).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
@@ -738,9 +767,14 @@ function buildTenantRow(t) {
     var st = t.status || (t.active === false ? 'INACTIVE' : 'ACTIVE');
     var fromD = t.from_date || (t.contract && (t.contract.from_date || t.contract.start_date)) || '';
     var toD = t.to_date || (t.contract && (t.contract.to_date || t.contract.end_date)) || '';
+    var contactName = t.contact_name || (t.data && t.data.contact_name) || (t.contact && t.contact.name) || '—';
+    var contactEmailRaw = t.contact_email || (t.data && t.data.contact_email) || (t.contact && t.contact.email) || '—';
+    var contactEmail = contactEmailRaw !== '—' ? '<a href="mailto:' + esc(contactEmailRaw) + '">' + esc(contactEmailRaw) + '</a>' : '—';
     return '<tr><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
         '<td>' + reg + '</td>' +
         '<td>' + esc(t.country || '—') + '</td>' +
+        '<td>' + esc(contactName) + '</td>' +
+        '<td>' + contactEmail + '</td>' +
         '<td>' + statusBadge(st) + '</td>' +
         '<td>' + paymentBadge(t.payment_status) + '</td>' +
         '<td style="white-space:nowrap;">' + contract + '</td>' +

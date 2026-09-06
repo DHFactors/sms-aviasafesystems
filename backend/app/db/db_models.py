@@ -1401,6 +1401,10 @@ class Tenant(Base):
     active: Mapped[object] = mapped_column(Boolean, nullable=True, default=True)
     auto_expire_days: Mapped[object] = mapped_column(Integer, nullable=True)
     safety_manager: Mapped[object] = mapped_column(JSONB, nullable=True)
+    contact_name: Mapped[object] = mapped_column(Text, nullable=True)
+    contact_email: Mapped[object] = mapped_column(Text, nullable=True)
+    contact_phone: Mapped[object] = mapped_column(Text, nullable=True)
+    contact_title: Mapped[object] = mapped_column(Text, nullable=True)
     data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
