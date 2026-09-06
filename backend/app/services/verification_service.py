@@ -1,11 +1,14 @@
+import uuid as _uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.db import pg
+from app.db.db_models import Can, Cap, Closure, Hazard, Verification
+from app.db.ids import tenant_uuid
 from app.services.hazard_service import HazardService
-from app.services.can_cap_service import CanCapService, CAN_COLLECTION, CAP_SUBCOLLECTION
+from app.services.can_cap_service import CanCapService
 
 
 HAZARD_COLLECTION = "hazards"
@@ -16,51 +19,61 @@ CLOSURE_SUBCOLLECTION = "closure"
 class VerificationService:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
+        self._tid_uuid = tenant_uuid(tenant_id)
 
-    def _hazard_ref(self, hazard_doc_id: str):
-        return get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).document(hazard_doc_id)
-
-    def _verifications_ref(self, hazard_doc_id: str):
-        return self._hazard_ref(hazard_doc_id).collection(VERIFICATION_SUBCOLLECTION)
-
-    def _closure_ref(self, hazard_doc_id: str):
-        return self._hazard_ref(hazard_doc_id).collection(CLOSURE_SUBCOLLECTION)
-
-    def _resolve_hazard_doc_id(self, hazard_id: str) -> Optional[str]:
-        docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
-        for doc in docs:
-            data = doc.to_dict()
-            if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                return doc.id
+    def _resolve_hazard(self, hazard_id: str) -> Optional[Dict[str, Any]]:
+        for row in pg.fetch_all(Hazard, where=[Hazard.tenant_id == self._tid_uuid]):
+            if row.get("id") == hazard_id or row.get("hazard_id") == hazard_id:
+                return row
         return None
 
-    def _resolve_cap_doc(self, cap_id: str) -> Optional[tuple]:
-        cans = get_tenant_collection(self.tenant_id, CAN_COLLECTION).get()
-        for can_doc in cans:
-            caps = can_doc.reference.collection(CAP_SUBCOLLECTION).get()
-            for cap in caps:
-                if cap.id == cap_id:
-                    return cap, can_doc
-        return None, None
+    def _resolve_cap(self, cap_id: str) -> Optional[Dict[str, Any]]:
+        for row in pg.fetch_all(Cap, where=[Cap.tenant_id == self._tid_uuid]):
+            if (
+                row.get("id") == cap_id
+                or row.get("cap_reference") == cap_id
+                or row.get("finding_number") == cap_id
+            ):
+                return row
+        return None
+
+    def _verifications(self, hazard_uuid: str) -> List[Dict[str, Any]]:
+        return pg.fetch_all(
+            Verification,
+            where=[
+                Verification.tenant_id == self._tid_uuid,
+                Verification.hazard_id == hazard_uuid,
+            ],
+        )
+
+    def _closures(self, hazard_uuid: str) -> List[Dict[str, Any]]:
+        return pg.fetch_all(
+            Closure,
+            where=[
+                Closure.tenant_id == self._tid_uuid,
+                Closure.hazard_id == hazard_uuid,
+            ],
+        )
 
     def create_verification(self, hazard_id: str, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
-        hazard_doc_id = self._resolve_hazard_doc_id(hazard_id)
-        if not hazard_doc_id:
+        haz_row = self._resolve_hazard(hazard_id)
+        if not haz_row:
             raise ValueError("Hazard not found")
+        haz_uuid = str(haz_row["id"])
 
-        haz_ref = self._hazard_ref(hazard_doc_id)
-        haz_data = haz_ref.get().to_dict()
-        if haz_data.get("status") not in ("Under Review", "Pending Closure"):
+        if haz_row.get("status") not in ("Under Review", "Pending Closure"):
             raise ValueError("Hazard must be Under Review or Pending Closure")
 
-        cap_doc, _ = self._resolve_cap_doc(payload["cap_id"])
-        if not cap_doc:
+        cap_row = self._resolve_cap(payload["cap_id"])
+        if not cap_row:
             raise ValueError("CAP not found")
+        cap_uuid = str(cap_row["id"])
 
         outcome = payload["outcome"]
 
         doc_data = {
+            "id": str(_uuid.uuid4()),
             "hazard_id": hazard_id,
             "cap_id": payload["cap_id"],
             "outcome": outcome,
@@ -75,9 +88,11 @@ class VerificationService:
             "updated_at": now,
         }
 
-        ref = self._verifications_ref(hazard_doc_id).add(doc_data)
-        doc_id = ref[1].id
-        doc_data["id"] = doc_id
+        stored = dict(doc_data)
+        stored["tenant_id"] = self._tid_uuid
+        stored["hazard_id"] = haz_uuid
+        stored["cap_id"] = cap_uuid
+        pg.upsert(Verification, "id", doc_data["id"], stored)
 
         svc_user = {"uid": user["uid"], "role": "AIRLINE_ADMIN", "tenant_id": self.tenant_id}
 
@@ -87,8 +102,7 @@ class VerificationService:
 
         elif outcome == "Revision Required":
             can_cap_svc = CanCapService(self.tenant_id)
-            cap_ref = cap_doc.reference
-            cap_ref.update({
+            pg.update(Cap, "id", cap_uuid, {
                 "status": "Revision Required",
                 "reviewed_by": user.get("email", user["uid"]),
                 "reviewed_by_uid": user["uid"],
@@ -106,69 +120,57 @@ class VerificationService:
             logger.info(f"Hazard {hazard_id} → Reopened (CAP ineffective)")
 
         elif outcome == "Overdue":
-            haz_ref.update({"overdue": True, "updated_at": now})
+            pg.update(Hazard, "id", haz_uuid, {"overdue": True, "updated_at": now})
             logger.warning(f"Hazard {hazard_id} marked overdue (escalation)")
 
         return doc_data
 
     def list_verifications(self, hazard_id: str, user: dict) -> List[dict]:
-        if user.get("role") in settings.CROSS_TENANT_ROLES:
-            docs = get_cross_tenant_collection(HAZARD_COLLECTION).get()
-        else:
-            docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
-
+        haz_row = self._resolve_hazard(hazard_id)
+        if not haz_row:
+            return []
+        haz_uuid = str(haz_row["id"])
         results = []
-        for doc in docs:
-            data = doc.to_dict()
-            if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                verifications = doc.reference.collection(VERIFICATION_SUBCOLLECTION).get()
-                for v in verifications:
-                    vd = v.to_dict()
-                    vd["id"] = v.id
-                    self._serialize_timestamps(vd)
-                    results.append(vd)
-                break
+        for vd in self._verifications(haz_uuid):
+            vd = dict(vd)
+            vd["hazard_id"] = hazard_id
+            vd["id"] = str(vd.get("id") or "")
+            self._serialize_timestamps(vd)
+            results.append(vd)
 
         results.sort(key=lambda r: r.get("created_at", datetime.min), reverse=True)
         return results
 
     def get_verification(self, verification_id: str, user: dict) -> Optional[dict]:
-        if user.get("role") in settings.CROSS_TENANT_ROLES:
-            haz_docs = get_cross_tenant_collection(HAZARD_COLLECTION).get()
-        else:
-            haz_docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
-
-        for haz_doc in haz_docs:
-            v_docs = haz_doc.reference.collection(VERIFICATION_SUBCOLLECTION).get()
-            for v in v_docs:
-                if v.id == verification_id:
-                    vd = v.to_dict()
-                    vd["id"] = v.id
-                    self._serialize_timestamps(vd)
-                    return vd
+        for vd in pg.fetch_all(Verification, where=[Verification.tenant_id == self._tid_uuid]):
+            if str(vd.get("id") or "") == verification_id:
+                vd = dict(vd)
+                vd["id"] = str(vd.get("id") or "")
+                self._serialize_timestamps(vd)
+                return vd
         return None
 
     def create_closure(self, hazard_id: str, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
-        hazard_doc_id = self._resolve_hazard_doc_id(hazard_id)
-        if not hazard_doc_id:
+        haz_row = self._resolve_hazard(hazard_id)
+        if not haz_row:
             raise ValueError("Hazard not found")
+        haz_uuid = str(haz_row["id"])
 
-        haz_ref = self._hazard_ref(hazard_doc_id)
-        haz_data = haz_ref.get().to_dict()
-
-        if haz_data.get("status") != "Pending Closure":
+        if haz_row.get("status") != "Pending Closure":
             raise ValueError("Hazard must be in Pending Closure status")
 
-        verifications = list(self._verifications_ref(hazard_doc_id).get())
+        verifications = self._verifications(haz_uuid)
         if not verifications:
             raise ValueError("No verification record found for this hazard")
 
-        latest_v = verifications[-1].to_dict()
+        latest_v = verifications[-1]
         if latest_v.get("outcome") != "Accepted":
             raise ValueError("Latest verification outcome must be Accepted")
 
+        closure_id = str(_uuid.uuid4())
         doc_data = {
+            "id": closure_id,
             "hazard_id": hazard_id,
             "lessons_learned": payload.get("lessons_learned"),
             "recommendations": payload.get("recommendations"),
@@ -180,49 +182,44 @@ class VerificationService:
             "updated_at": now,
         }
 
-        ref = self._closure_ref(hazard_doc_id).add(doc_data)
+        stored = dict(doc_data)
+        stored["tenant_id"] = self._tid_uuid
+        stored["hazard_id"] = haz_uuid
+        pg.upsert(Closure, "id", closure_id, stored)
 
-        haz_ref.update({
+        pg.update(Hazard, "id", haz_uuid, {
             "status": "Closed",
             "closed_at": now,
             "closed_by": user["uid"],
-            "closure_id": ref[1].id,
+            "closure_id": closure_id,
             "archived": True,
             "updated_at": now,
         })
 
-        doc_data["id"] = ref[1].id
         logger.info(f"Hazard {hazard_id} closed and archived by {user['uid']}")
 
         return doc_data
 
     def get_closure(self, hazard_id: str, user: dict) -> Optional[dict]:
-        if user.get("role") in settings.CROSS_TENANT_ROLES:
-            docs = get_cross_tenant_collection(HAZARD_COLLECTION).get()
-        else:
-            docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
-
-        for doc in docs:
-            data = doc.to_dict()
-            if doc.id == hazard_id or data.get("hazard_id") == hazard_id:
-                closures = doc.reference.collection(CLOSURE_SUBCOLLECTION).get()
-                for c in closures:
-                    cd = c.to_dict()
-                    cd["id"] = c.id
-                    self._serialize_timestamps(cd)
-                    return cd
-                break
-        return None
+        haz_row = self._resolve_hazard(hazard_id)
+        if not haz_row:
+            return None
+        closures = self._closures(str(haz_row["id"]))
+        if not closures:
+            return None
+        cd = dict(closures[0])
+        cd["hazard_id"] = hazard_id
+        cd["id"] = str(cd.get("id") or "")
+        self._serialize_timestamps(cd)
+        return cd
 
     def reopen_hazard(self, hazard_id: str, reason: str, user: dict) -> Optional[dict]:
         svc_user = {"uid": user["uid"], "role": "AIRLINE_ADMIN", "tenant_id": self.tenant_id}
         logger.info(f"Hazard {hazard_id} reopened: {reason}")
         updated = HazardService(self.tenant_id).update_status(hazard_id, "Reopened", svc_user)
-        # A hazard archived on closure must be fully reactivated on reopen, so
-        # clear the Firestore archived flag to keep the document consistent.
-        hazard_doc_id = self._resolve_hazard_doc_id(hazard_id)
-        if hazard_doc_id:
-            self._hazard_ref(hazard_doc_id).update({
+        haz_row = self._resolve_hazard(hazard_id)
+        if haz_row:
+            pg.update(Hazard, "id", str(haz_row["id"]), {
                 "archived": False,
                 "updated_at": datetime.now(timezone.utc),
             })
@@ -230,10 +227,15 @@ class VerificationService:
 
     def get_verification_stats(self, user: dict) -> Dict[str, Any]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(HAZARD_COLLECTION).get()
-            else:
-                docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
+            haz_rows = pg.fetch_all(Hazard, where=[Hazard.tenant_id == self._tid_uuid])
+            verifications = pg.fetch_all(Verification, where=[Verification.tenant_id == self._tid_uuid])
+            closures = pg.fetch_all(Closure, where=[Closure.tenant_id == self._tid_uuid])
+
+            v_by_hazard: Dict[str, int] = {}
+            for v in verifications:
+                key = str(v.get("hazard_id") or "")
+                v_by_hazard[key] = v_by_hazard.get(key, 0) + 1
+            closed_hazard_ids = {str(c.get("hazard_id") or "") for c in closures}
 
             stats = {
                 "pending_verification": 0,
@@ -244,14 +246,14 @@ class VerificationService:
                 "reopened": 0,
             }
 
-            for doc in docs:
-                data = doc.to_dict()
-                status = data.get("status", "Open")
-                verifications = list(doc.reference.collection(VERIFICATION_SUBCOLLECTION).get())
-                has_closure = len(list(doc.reference.collection(CLOSURE_SUBCOLLECTION).get())) > 0
+            for doc in haz_rows:
+                haz_uuid = str(doc.get("id") or "")
+                status = doc.get("status", "Open")
+                v_count = v_by_hazard.get(haz_uuid, 0)
+                has_closure = haz_uuid in closed_hazard_ids
 
                 if status == "Under Review":
-                    if len(verifications) == 0:
+                    if v_count == 0:
                         stats["pending_verification"] += 1
                     else:
                         stats["under_verification"] += 1

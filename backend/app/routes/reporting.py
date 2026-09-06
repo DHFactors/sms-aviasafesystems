@@ -8,8 +8,11 @@ from app.models.reporting import ReportResponse, ReportListItem, ReportType, Rep
 from app.middleware.auth import get_current_user, get_tenant_user
 from app.services.report_generator import ReportGenerator
 from app.services.pdf_generator import generate_report_pdf
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.firebase import get_db, get_tenant_collection
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import CaanReport, RegulatoryReport, Tenant
+from app.db.ids import tenant_uuid, uuid5
 
 router = APIRouter()
 REPORT_COLLECTION = "reporting"
@@ -19,10 +22,9 @@ TENANT_COLLECTION = "tenants"
 
 def _get_tenant_name(tenant_id: str) -> Optional[str]:
     try:
-        from app.firebase import get_db
-        doc = get_db().collection(TENANT_COLLECTION).document(tenant_id).get()
-        if doc.exists:
-            return doc.to_dict().get("name") or doc.to_dict().get("icao") or tenant_id
+        doc = pg.fetch_by(Tenant, "slug", tenant_id)
+        if doc:
+            return doc.get("name") or doc.get("icao") or tenant_id
     except Exception:
         pass
     return tenant_id
@@ -38,6 +40,135 @@ def _effective_tenant(user: Dict[str, Any], tenant_id: Optional[str] = None) -> 
     if user.get("role") in settings.CROSS_TENANT_ROLES:
         return tenant_id
     return tenant_id or user.get("tenant_id")
+
+
+def _report_id(effective_tenant: Optional[str], report_type: str, year: int, quarter: Optional[int]) -> str:
+    parts = (report_type, str(year), str(quarter or 0))
+    if effective_tenant:
+        return uuid5("reg-report", effective_tenant, *parts)
+    return uuid5("caan-report", *parts)
+
+
+def _save_report(doc_data: Dict[str, Any], effective_tenant: Optional[str]) -> Dict[str, Any]:
+    rid = _report_id(effective_tenant, doc_data["report_type"], doc_data.get("year"), doc_data.get("quarter"))
+    doc_data["id"] = rid
+    try:
+        if effective_tenant:
+            stored = dict(doc_data)
+            stored["tenant_id"] = tenant_uuid(effective_tenant)
+            pg.upsert(RegulatoryReport, "id", rid, stored)
+            try:
+                get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(rid).set(dict(doc_data))
+            except Exception as mirror_e:
+                logger.warning(f"Report mirror write failed ({rid}): {mirror_e}")
+        else:
+            stored = dict(doc_data)
+            stored["report_id"] = rid
+            pg.upsert(CaanReport, "report_id", rid, stored)
+            try:
+                get_db().collection("caan_reports").document(rid).set(dict(doc_data))
+            except Exception as mirror_e:
+                logger.warning(f"CAAN report mirror write failed ({rid}): {mirror_e}")
+    except Exception as e:
+        logger.error(f"Failed to save report: {e}")
+        raise HTTPException(500, "Failed to save report")
+    return doc_data
+
+
+def _fetch_report(effective_tenant: Optional[str], report_id: str) -> Optional[Dict[str, Any]]:
+    if effective_tenant:
+        doc = pg.fetch_by(RegulatoryReport, "id", report_id)
+        if doc is None:
+            return None
+        doc["id"] = report_id
+        return doc
+    doc = pg.fetch_by(CaanReport, "report_id", report_id)
+    if doc is None:
+        return None
+    doc.setdefault("id", doc.get("report_id"))
+    return doc
+
+
+def _list_reports(
+    effective_tenant: Optional[str],
+    report_type: str,
+    year: Optional[int],
+    user: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    results = []
+    try:
+        if effective_tenant:
+            tid_uuid = tenant_uuid(effective_tenant)
+            rows = pg.fetch_all(
+                RegulatoryReport,
+                where=[
+                    RegulatoryReport.tenant_id == tid_uuid,
+                    RegulatoryReport.report_type == report_type,
+                ],
+            )
+            for data in rows:
+                if year and data.get("year") != year:
+                    continue
+                results.append({
+                    "id": _report_id(effective_tenant, report_type, data.get("year"), data.get("quarter")),
+                    "report_type": report_type,
+                    "period": data.get("period", ""),
+                    "year": data.get("year"),
+                    "quarter": data.get("quarter"),
+                    "status": data.get("status", "completed"),
+                    "generated_at": data.get("generated_at"),
+                    "generated_by": data.get("generated_by"),
+                })
+        else:
+            if user.get("role") in ("CAAN_SMD", "SUPER_ADMIN"):
+                rows = pg.fetch_all(
+                    CaanReport,
+                    where=[CaanReport.data["report_type"].astext == report_type],
+                )
+                for data in rows:
+                    if year and data.get("year") != year:
+                        continue
+                    results.append({
+                        "id": data.get("id") or data.get("report_id"),
+                        "report_type": report_type,
+                        "period": data.get("period", ""),
+                        "year": data.get("year"),
+                        "quarter": data.get("quarter"),
+                        "status": data.get("status", "completed"),
+                        "generated_at": data.get("generated_at"),
+                        "generated_by": data.get("generated_by"),
+                    })
+    except Exception as e:
+        logger.error(f"Failed to list {report_type} reports: {e}")
+        raise HTTPException(500, "Failed to list reports")
+
+    if report_type == "quarterly":
+        results.sort(key=lambda r: (r.get("year") or 0, r.get("quarter") or 0), reverse=True)
+    else:
+        results.sort(key=lambda r: r.get("year") or 0, reverse=True)
+    return results
+
+
+def _export_report_pdf(
+    effective_tenant: Optional[str],
+    report_type: str,
+    report_id: str,
+):
+    data = _fetch_report(effective_tenant, report_id)
+    if data is None:
+        raise HTTPException(404, "Report not found")
+    report_data = {"summary": data.get("summary", {}), "data": data.get("data", {})}
+    period = data.get("period", "")
+    tenant_name = _get_tenant_name(effective_tenant) if effective_tenant else None
+
+    pdf_bytes = generate_report_pdf(report_data, report_type, period, tenant_name)
+    filename = f"{report_type}_report_{data.get('period', report_id).replace(' ', '_')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )
 
 
 # ── Generate Quarterly Report ──
@@ -75,18 +206,7 @@ async def generate_quarterly_report(
         "updated_at": now,
     }
 
-    try:
-        if effective_tenant:
-            ref = get_tenant_collection(effective_tenant, REPORT_COLLECTION).add(doc_data)
-        else:
-            from app.firebase import get_db
-            ref = get_db().collection("caan_reports").add(doc_data)
-        doc_id = ref[1].id
-        doc_data["id"] = doc_id
-    except Exception as e:
-        logger.error(f"Failed to save report: {e}")
-        raise HTTPException(500, "Failed to save report")
-
+    doc_data = _save_report(doc_data, effective_tenant)
     return _to_report_response(doc_data)
 
 
@@ -99,39 +219,7 @@ async def list_quarterly_reports(
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
     effective_tenant = _effective_tenant(user, tenant_id)
-
-    try:
-        if effective_tenant:
-            docs = get_tenant_collection(effective_tenant, REPORT_COLLECTION) \
-                .where("report_type", "==", "quarterly").get()
-        else:
-            from app.firebase import get_db
-            if user.get("role") in ("CAAN_SMD", "SUPER_ADMIN"):
-                docs = get_db().collection("caan_reports") \
-                    .where("report_type", "==", "quarterly").get()
-            else:
-                docs = []
-    except Exception as e:
-        logger.error(f"Failed to list quarterly reports: {e}")
-        raise HTTPException(500, "Failed to list reports")
-
-    results = []
-    for doc in docs:
-        data = doc.to_dict()
-        if year and data.get("year") != year:
-            continue
-        results.append({
-            "id": doc.id,
-            "report_type": "quarterly",
-            "period": data.get("period", ""),
-            "year": data.get("year"),
-            "quarter": data.get("quarter"),
-            "status": data.get("status", "completed"),
-            "generated_at": data.get("generated_at"),
-            "generated_by": data.get("generated_by"),
-        })
-    results.sort(key=lambda r: (r.get("year") or 0, r.get("quarter") or 0), reverse=True)
-    return results
+    return _list_reports(effective_tenant, "quarterly", year, user)
 
 
 @router.get("/quarterly/{report_id}", response_model=dict)
@@ -140,18 +228,10 @@ async def get_quarterly_report(
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     effective_tenant = _effective_tenant(user)
-
     try:
-        if effective_tenant:
-            doc = get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(report_id).get()
-        else:
-            from app.firebase import get_db
-            doc = get_db().collection("caan_reports").document(report_id).get()
-
-        if not doc.exists:
+        data = _fetch_report(effective_tenant, report_id)
+        if data is None:
             raise HTTPException(404, "Report not found")
-        data = doc.to_dict()
-        data["id"] = doc.id
         return _to_report_response(data)
     except HTTPException:
         raise
@@ -166,30 +246,8 @@ async def export_quarterly_report(
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     effective_tenant = _effective_tenant(user)
-
     try:
-        if effective_tenant:
-            doc = get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(report_id).get()
-        else:
-            from app.firebase import get_db
-            doc = get_db().collection("caan_reports").document(report_id).get()
-
-        if not doc.exists:
-            raise HTTPException(404, "Report not found")
-
-        data = doc.to_dict()
-        report_data = {"summary": data.get("summary", {}), "data": data.get("data", {})}
-        period = data.get("period", "")
-        tenant_name = _get_tenant_name(effective_tenant) if effective_tenant else None
-
-        pdf_bytes = generate_report_pdf(report_data, "quarterly", period, tenant_name)
-        filename = f"quarterly_report_{data.get('period', report_id).replace(' ', '_')}.pdf"
-
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
-        )
+        return _export_report_pdf(effective_tenant, "quarterly", report_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -231,18 +289,7 @@ async def generate_annual_report(
         "updated_at": now,
     }
 
-    try:
-        if effective_tenant:
-            ref = get_tenant_collection(effective_tenant, REPORT_COLLECTION).add(doc_data)
-        else:
-            from app.firebase import get_db
-            ref = get_db().collection("caan_reports").add(doc_data)
-        doc_id = ref[1].id
-        doc_data["id"] = doc_id
-    except Exception as e:
-        logger.error(f"Failed to save annual report: {e}")
-        raise HTTPException(500, "Failed to save report")
-
+    doc_data = _save_report(doc_data, effective_tenant)
     return _to_report_response(doc_data)
 
 
@@ -255,39 +302,7 @@ async def list_annual_reports(
     if user.get("role") not in settings.CROSS_TENANT_ROLES:
         tenant_id = None
     effective_tenant = _effective_tenant(user, tenant_id)
-
-    try:
-        if effective_tenant:
-            docs = get_tenant_collection(effective_tenant, REPORT_COLLECTION) \
-                .where("report_type", "==", "annual").get()
-        else:
-            from app.firebase import get_db
-            if user.get("role") in ("CAAN_SMD", "SUPER_ADMIN"):
-                docs = get_db().collection("caan_reports") \
-                    .where("report_type", "==", "annual").get()
-            else:
-                docs = []
-    except Exception as e:
-        logger.error(f"Failed to list annual reports: {e}")
-        raise HTTPException(500, "Failed to list reports")
-
-    results = []
-    for doc in docs:
-        data = doc.to_dict()
-        if year and data.get("year") != year:
-            continue
-        results.append({
-            "id": doc.id,
-            "report_type": "annual",
-            "period": data.get("period", ""),
-            "year": data.get("year"),
-            "quarter": None,
-            "status": data.get("status", "completed"),
-            "generated_at": data.get("generated_at"),
-            "generated_by": data.get("generated_by"),
-        })
-    results.sort(key=lambda r: r.get("year") or 0, reverse=True)
-    return results
+    return _list_reports(effective_tenant, "annual", year, user)
 
 
 @router.get("/annual/{report_id}", response_model=dict)
@@ -296,18 +311,10 @@ async def get_annual_report(
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     effective_tenant = _effective_tenant(user)
-
     try:
-        if effective_tenant:
-            doc = get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(report_id).get()
-        else:
-            from app.firebase import get_db
-            doc = get_db().collection("caan_reports").document(report_id).get()
-
-        if not doc.exists:
+        data = _fetch_report(effective_tenant, report_id)
+        if data is None:
             raise HTTPException(404, "Report not found")
-        data = doc.to_dict()
-        data["id"] = doc.id
         return _to_report_response(data)
     except HTTPException:
         raise
@@ -322,34 +329,12 @@ async def export_annual_report(
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     effective_tenant = _effective_tenant(user)
-
     try:
-        if effective_tenant:
-            doc = get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(report_id).get()
-        else:
-            from app.firebase import get_db
-            doc = get_db().collection("caan_reports").document(report_id).get()
-
-        if not doc.exists:
-            raise HTTPException(404, "Report not found")
-
-        data = doc.to_dict()
-        report_data = {"summary": data.get("summary", {}), "data": data.get("data", {})}
-        period = data.get("period", "")
-        tenant_name = _get_tenant_name(effective_tenant) if effective_tenant else None
-
-        pdf_bytes = generate_report_pdf(report_data, "annual", period, tenant_name)
-        filename = f"annual_report_{data.get('period', report_id).replace(' ', '_')}.pdf"
-
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
-        )
+        return _export_report_pdf(effective_tenant, "annual", report_id)
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to export annual report {report_id}: {e}")
+        logger.error(f"Failed to export report {report_id}: {e}")
         raise HTTPException(500, "Failed to export report")
 
 

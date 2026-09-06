@@ -23,6 +23,8 @@ from app.db.runner import run
 from app.db.session import get_session_factory
 
 # Default Firestore-facing id column per model (the string key Firestore used).
+# UUID-keyed domain tables list the PK column itself so `row_to_doc` exposes
+# the row id as the document ``id`` (as Firestore documents carried one).
 _ID_COLUMNS: Dict[str, str] = {
     "tenants": "slug",
     "regulators": "slug",
@@ -32,6 +34,32 @@ _ID_COLUMNS: Dict[str, str] = {
     "state_risk_categories": "slug",
     "dead_letter_queue": "key",
     "audit_dispatches": "audit_id",
+    "hazards": "id",
+    "reports": "id",
+    "cans": "id",
+    "caps": "id",
+    "surveys": "id",
+    "survey_responses": "id",
+    "verifications": "id",
+    "closures": "id",
+    "corrective_actions": "id",
+    "safety_deficiencies": "id",
+    "flight_diversions": "id",
+    "psoe_assessments": "id",
+    "psoe_findings": "id",
+    "psoe_questions": "id",
+    "state_risk_register": "id",
+    "regulatory_reports": "id",
+    "hazard_rca_entries": "id",
+    "hazard_rca_factors": "id",
+    "hazard_assessments": "id",
+    "hazard_capas": "id",
+    "bow_tie_analyses": "id",
+    "bow_tie_threats": "id",
+    "bow_tie_consequences": "id",
+    "bow_tie_controls": "id",
+    "risk_register": "id",
+    "barrier_register": "id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 

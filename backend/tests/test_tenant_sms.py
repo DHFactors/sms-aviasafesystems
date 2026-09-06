@@ -367,11 +367,26 @@ class _FakeDocSnap:
 
 
 class _FakeDocRef:
-    def __init__(self, data):
-        self._data = data
+    def __init__(self, data_map, doc_id):
+        self._map = data_map
+        self._id = doc_id
 
     def get(self):
-        return _FakeDocSnap(self._data)
+        exists = self._id in self._map
+        return _FakeDocSnap(self._map.get(self._id, {}), exists=exists)
+
+    def set(self, data, merge=False, **kwargs):
+        data = dict(data)
+        if merge is not False:
+            existing = dict(self._map.get(self._id, {}))
+            existing.update(data)
+            data = existing
+        self._map[self._id] = data
+
+    def update(self, data):
+        existing = dict(self._map.get(self._id, {}))
+        existing.update(data)
+        self._map[self._id] = existing
 
 
 class _FakeCollection:
@@ -379,10 +394,13 @@ class _FakeCollection:
         self._data_map = data_map
 
     def document(self, doc_id):
-        return _FakeDocRef(self._data_map.get(doc_id, {}))
+        return _FakeDocRef(self._data_map, doc_id)
 
     def stream(self):
-        return [_FakeDocSnap(d) for d in self._data_map.values()]
+        return [_FakeDocSnap(d, exists=True) for d in self._data_map.values()]
+
+    def get(self):
+        return [_FakeDocSnap(d, exists=True) for d in self._data_map.values()]
 
     def where(self, *a, **kw):
         return self
@@ -398,17 +416,17 @@ def _make_fake_db(tenant_data=None, hazards=None, reports=None, cans=None):
     hazards = hazards or []
     reports = reports or []
     cans = cans or []
-    tenant_data = tenant_data or {"operator_name": "Fishtail Air", "aoc_number": "NPL-001"}
+    tenant_data = tenant_data or {"slug": "fishtail-air", "operator_name": "Fishtail Air", "aoc_number": "NPL-001"}
 
     class FakeDB:
         def collection(self, path):
-            if path == "tenants":
+            if path == "tenants" or path.endswith("/" + "tenants"):
                 return _FakeCollection({"fishtail-air": tenant_data})
-            elif path.endswith("/hazards"):
+            elif path == "hazards" or path.endswith("/hazards"):
                 return _FakeCollection({f"h{i}": d for i, d in enumerate(hazards)})
-            elif path.endswith("/reports"):
+            elif path == "reports" or path.endswith("/reports"):
                 return _FakeCollection({f"r{i}": d for i, d in enumerate(reports)})
-            elif path.endswith("/cans"):
+            elif path == "cans" or path.endswith("/cans"):
                 return _FakeCollection({f"c{i}": d for i, d in enumerate(cans)})
             return _FakeCollection({})
 
@@ -416,17 +434,15 @@ def _make_fake_db(tenant_data=None, hazards=None, reports=None, cans=None):
 
 
 class TestTenantMonthlySummaryEndpoint:
-    @patch("app.api.v1.tenant_reports.get_db")
-    @patch("app.api.v1.tenant_reports.get_tenant_user", new_callable=lambda: _fake_tenant_deps)
-    def test_monthly_summary_returns_report(self, mock_user, mock_get_db):
-        mock_get_db.return_value = _make_fake_db(
+    def test_monthly_summary_returns_report(self, monkeypatch):
+        patch_pg_through(monkeypatch, lambda: _make_fake_db(
             hazards=[
                 {"status": "OPEN", "risk_level": "High"},
                 {"status": "CLOSED", "risk_level": "Low"},
             ],
             reports=[{"type": "voluntary"}],
             cans=[{"status": "OPEN", "can_number": "CAN-001", "description": "Fix X", "responsible": "CP", "due_date": "2026-09-30", "priority": "HIGH"}],
-        )
+        ))
         app.dependency_overrides[get_tenant_user] = _fake_tenant_deps
         client = TestClient(app)
         resp = client.get("/api/v1/tenants/sms/monthly-summary?year=2026&month=8")
@@ -440,9 +456,8 @@ class TestTenantMonthlySummaryEndpoint:
         assert report["safety_reports_submitted"] == 1
         assert len(report["open_capas"]) == 1
 
-    @patch("app.api.v1.tenant_reports.get_db")
-    @patch("app.api.v1.tenant_reports.get_tenant_user", new_callable=lambda: _fake_tenant_deps)
-    def test_monthly_summary_validates_query_params(self, mock_user, mock_get_db):
+    def test_monthly_summary_validates_query_params(self, monkeypatch):
+        patch_pg_through(monkeypatch, lambda: _make_fake_db())
         app.dependency_overrides[get_tenant_user] = _fake_tenant_deps
         client = TestClient(app)
         resp = client.get("/api/v1/tenants/sms/monthly-summary?year=1999&month=13")
@@ -450,10 +465,8 @@ class TestTenantMonthlySummaryEndpoint:
 
 
 class TestTenantExportPdfEndpoint:
-    @patch("app.api.v1.tenant_reports.get_db")
-    @patch("app.api.v1.tenant_reports.get_tenant_user", new_callable=lambda: _fake_tenant_deps)
-    def test_export_pdf_returns_pdf_content_type(self, mock_user, mock_get_db):
-        mock_get_db.return_value = _make_fake_db()
+    def test_export_pdf_returns_pdf_content_type(self, monkeypatch):
+        patch_pg_through(monkeypatch, lambda: _make_fake_db())
         app.dependency_overrides[get_tenant_user] = _fake_tenant_deps
         client = TestClient(app)
         resp = client.get("/api/v1/tenants/sms/export-pdf?year=2026&month=8")
@@ -461,10 +474,8 @@ class TestTenantExportPdfEndpoint:
         assert resp.headers["content-type"] == "application/pdf"
         assert resp.content[:5] == b"%PDF-"
 
-    @patch("app.api.v1.tenant_reports.get_db")
-    @patch("app.api.v1.tenant_reports.get_tenant_user", new_callable=lambda: _fake_tenant_deps)
-    def test_export_pdf_includes_content_disposition(self, mock_user, mock_get_db):
-        mock_get_db.return_value = _make_fake_db()
+    def test_export_pdf_includes_content_disposition(self, monkeypatch):
+        patch_pg_through(monkeypatch, lambda: _make_fake_db())
         app.dependency_overrides[get_tenant_user] = _fake_tenant_deps
         client = TestClient(app)
         resp = client.get("/api/v1/tenants/sms/export-pdf?year=2026&month=8")
@@ -473,10 +484,8 @@ class TestTenantExportPdfEndpoint:
 
 
 class TestTenantDispatchSrbEndpoint:
-    @patch("app.api.v1.tenant_reports.get_db")
-    @patch("app.api.v1.tenant_reports.get_tenant_user", new_callable=lambda: _fake_tenant_deps)
-    def test_dispatch_returns_queued(self, mock_user, mock_get_db):
-        mock_get_db.return_value = _make_fake_db()
+    def test_dispatch_returns_queued(self, monkeypatch):
+        patch_pg_through(monkeypatch, lambda: _make_fake_db())
         app.dependency_overrides[get_tenant_user] = _fake_tenant_deps
         client = TestClient(app)
         resp = client.post("/api/v1/tenants/sms/dispatch-srb?year=2026&month=8&recipient=safety@fly.com.np")

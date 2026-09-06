@@ -206,9 +206,10 @@ class ReportRepository:
             # this repository reads Firestore. If Firestore returned 0, try Postgres.
             if len(results) == 0:
                 try:
+                    from app.db import pg
                     from app.db.ids import register_tenant
                     from app.db.session import session_scope
-                    from app.db.db_models import Report as PgReport
+                    from app.db.db_models import Report as PgReport, Tenant as PgTenant
                     from sqlalchemy import select
                     import uuid as _uuid
                     pg_results = []
@@ -235,14 +236,13 @@ class ReportRepository:
                                     # Include demo data: seeder uses is_demo=True, match both
                                     # Prefer is_demo=True for demo tenants to avoid mixing prod
                                     try:
-                                        # Check if tenant is_demo (Firestore tenant doc)
-                                        from app.firebase import get_db as _get_db
-                                        tdoc = _get_db().collection("tenants").document(filter.tenant_id).get() if filter.tenant_id else None
+                                        # Check if tenant is_demo (tenants table)
+                                        tdoc = pg.fetch_by(PgTenant, "slug", filter.tenant_id) if filter.tenant_id else None
                                         is_demo_tenant = False
-                                        if tdoc and tdoc.exists:
-                                            is_demo_tenant = bool((tdoc.to_dict() or {}).get("is_demo"))
-                                        if is_demo_tenant:
-                                            stmt = stmt.where(PgReport.is_demo == True)
+                                        if tdoc:
+                                            is_demo_tenant = bool(tdoc.get("is_demo"))
+                                            if is_demo_tenant:
+                                                stmt = stmt.where(PgReport.is_demo == True)
                                     except Exception:
                                         pass
                                 if filter.report_type:

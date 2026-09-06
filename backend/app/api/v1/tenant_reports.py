@@ -11,20 +11,27 @@ from loguru import logger
 from app.middleware.auth import get_tenant_user
 from app.repositories.audit_repo import list_tenant_dispatches
 from app.services.tenant_pdf_generator import TenantPdfGenerator
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Can, Hazard, Report, Tenant
+from app.db.ids import tenant_uuid
 
 router = APIRouter(prefix="/sms", tags=["Tenant SMS Reporting"])
 
 
 def _compile_tenant_monthly_report(tenant_id: str, year: int, month: int) -> Dict[str, Any]:
-    """Compile the TenantMonthlySmsReport payload from Firestore data."""
-    db = get_db()
-    tenant_doc = db.collection("tenants").document(tenant_id).get()
-    tenant_data = tenant_doc.to_dict() if tenant_doc.exists else {}
+    """Compile the TenantMonthlySmsReport payload from Postgres data."""
+    tenant_data = pg.fetch_by(Tenant, "slug", tenant_id) or {}
+    tid_uuid = tenant_uuid(tenant_id)
 
     def _count(subcol: str) -> list:
         try:
-            return [d.to_dict() for d in db.collection(f"tenants/{tenant_id}/{subcol}").stream()]
+            if subcol == "hazards":
+                return pg.fetch_all(Hazard, where=[Hazard.tenant_id == tid_uuid])
+            if subcol == "reports":
+                return pg.fetch_all(Report, where=[Report.tenant_id == tid_uuid])
+            if subcol in ("cans", "can_cap"):
+                return pg.fetch_all(Can, where=[Can.tenant_id == tid_uuid])
+            return []
         except Exception:
             return []
 

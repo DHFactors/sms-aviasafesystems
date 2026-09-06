@@ -26,7 +26,7 @@ from loguru import logger
 from sqlalchemy import or_, select
 
 from app.core.config import settings
-from app.db.db_models import Can, Cap, Hazard
+from app.db.db_models import Can, Cap, Hazard, Tenant
 from app.db.ids import register_tenant, tenant_slug
 from app.db.isolation import demo_scope
 from app.db.runner import run
@@ -243,11 +243,11 @@ class CanCapService:
         tenant document or email is unavailable (email is then skipped, never
         raising into the workflow)."""
         try:
-            from app.firebase import get_db
-            doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).get()
-            if not doc.exists:
+            from app.db import pg
+            doc = pg.fetch_by(Tenant, "slug", self.tenant_id)
+            if doc is None:
                 return None
-            sm = (doc.to_dict() or {}).get("safety_manager") or {}
+            sm = doc.get("safety_manager") or {}
             return sm.get("email") or None
         except Exception as e:
             logger.warning(f"Failed to resolve Safety Manager email for {self.tenant_id}: {e}")

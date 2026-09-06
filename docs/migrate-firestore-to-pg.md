@@ -47,12 +47,18 @@ Context facts
 - B2 Ops/admin layer — `audit_service.py`, admin audit list/purge, feedback,
   dlq, caan_reports, sms_maturity, `admin_data_service.py` (tenants/regulators/
   users/audit purge/export/delete-demo-tenants), `routes/admin.py`.
-  ✅ committed `95034e5` + pushed. Remaining B2: purge_firestore_demo_data,
-  admin export/purge/delete-demo firestore surfaces, tenant_credentials,
-  repositories/audit_repo (export path).
+  ✅ committed `95034e5` (audit_service, feedback submit+list, dlq_service,
+  production_seed, admin_data_service tenant lifecycle + demo scope, admin
+  governance/users/status) + `1fb0e6d` (tenant_credentials.py, audit dispatch
+  repo → new `audit_dispatches` table). Deferred to B3: purge_firestore_demo_data
+  + delete_demo_tenants/regulator detach/user cleanup psoe/state purge surfaces
+  (depend on domain reads).
 - B3 Domain residual reads — can_cap, dashboard, hazard/report/survey paths,
   repository/search, verification_service, master_register, report_generator,
   escalation_service (point at existing PG, drop Firestore subcollections).
+  Also finishes the admin purge/delete-demo Firestore surfaces keyed on
+  psoe/state/domain data. ~80 remaining Firestore call sites after B2.
+  🔄 upcoming.
 - B4 Workers, copilots, legacy — workers/scheduler, tenant_scheduler,
   escalation_worker, ai_copilot/groq_copilot guard, psoe/state_risk/
   seed_surfaces reference data, `firestore_repository.py` removal,

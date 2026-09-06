@@ -309,7 +309,7 @@ def build_master_register(
             try:
                 from app.db.ids import register_tenant as _reg_tenant
                 from app.db.session import session_scope as _session_scope
-                from app.db.db_models import Hazard as _PgHazard
+                from app.db.db_models import Hazard as _PgHazard, Tenant as _PgTenant
                 from sqlalchemy import select as _select
                 import uuid as _uuid
                 # Resolve tenant slug -> UUID for Postgres
@@ -322,10 +322,10 @@ def build_master_register(
                 # Determine is_demo for demo tenants (fixedwing/rotarywing/demoairport)
                 _is_demo_tenant = False
                 try:
-                    from app.firebase import get_db as _get_db
-                    _tdoc = _get_db().collection("tenants").document(tenant_id).get() if tenant_id else None
-                    if _tdoc and _tdoc.exists:
-                        _is_demo_tenant = bool((_tdoc.to_dict() or {}).get("is_demo"))
+                    from app.db import pg as _pg
+                    _tdoc = _pg.fetch_by(_PgTenant, "slug", tenant_id) if tenant_id else None
+                    if _tdoc:
+                        _is_demo_tenant = bool(_tdoc.get("is_demo"))
                 except Exception:
                     pass
                 def _run_pg_hazards():
@@ -472,7 +472,7 @@ def build_master_register(
             try:
                 from app.db.ids import register_tenant as _reg_tenant2
                 from app.db.session import session_scope as _session_scope2
-                from app.db.db_models import Can as _PgCan
+                from app.db.db_models import Can as _PgCan, Tenant as _PgTenant2
                 from sqlalchemy import select as _select2
                 import uuid as _uuid2
                 _can_tenant_uuid = None
@@ -483,10 +483,10 @@ def build_master_register(
                         pass
                 _is_demo_tenant2 = False
                 try:
-                    from app.firebase import get_db as _get_db2
-                    _tdoc2 = _get_db2().collection("tenants").document(tenant_id).get() if tenant_id else None
-                    if _tdoc2 and _tdoc2.exists:
-                        _is_demo_tenant2 = bool((_tdoc2.to_dict() or {}).get("is_demo"))
+                    from app.db import pg as _pg2
+                    _tdoc2 = _pg2.fetch_by(_PgTenant2, "slug", tenant_id) if tenant_id else None
+                    if _tdoc2:
+                        _is_demo_tenant2 = bool(_tdoc2.get("is_demo"))
                 except Exception:
                     pass
                 def _run_pg_cans():

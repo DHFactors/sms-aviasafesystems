@@ -16,11 +16,11 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_db
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import rate_limit
 from app.services.audit_service import log_audit, request_context
-from app.db.db_models import Survey, SurveyResponse
+from app.db import pg
+from app.db.db_models import Survey, SurveyResponse, Tenant
 from app.db.ids import register_tenant
 from app.db.isolation import demo_scope
 from app.db.runner import run
@@ -179,21 +179,14 @@ async def submit_survey(
         audit_user = payload.respondentId or "anonymous"
 
     # Validate the tenant exists.
-    try:
-        tenant_snap = (
-            get_db().collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .document(tenant_id).get()
-        )
-    except Exception as e:
-        logger.warning(f"Survey tenant lookup failed for {tenant_id}: {e}")
-        raise HTTPException(status_code=500, detail="Survey storage unavailable")
-    if not tenant_snap.exists:
+    tenant_doc = pg.fetch_by(Tenant, "slug", tenant_id)
+    if tenant_doc is None:
         raise HTTPException(status_code=400, detail=f"Unknown tenant: {tenant_id}")
 
     # Enforce the survey open/close window server-side. The client-side checks
     # can be bypassed by a crafted request, so a submission outside the window
     # (or with the survey explicitly disabled) must be rejected here.
-    tenant_data = tenant_snap.to_dict() or {}
+    tenant_data = tenant_doc
     config_map = dict(tenant_data.get("config") or {})
     survey_cfg = dict(tenant_data.get("surveyConfig") or {})
 

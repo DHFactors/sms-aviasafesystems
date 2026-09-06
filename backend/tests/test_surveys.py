@@ -17,6 +17,7 @@ from app.db.ids import register_tenant
 from app.db.session import session_scope
 from app.main import app
 from app.services import survey_scoring as sc
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -189,8 +190,8 @@ class _FakeTenantProxy:
 
 
 def _patch_db(monkeypatch, db):
-    monkeypatch.setattr("app.routes.surveys.get_db", lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 def _patch_user(monkeypatch, user):
