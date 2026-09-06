@@ -52,26 +52,34 @@ def test_feedback_rejects_empty_message(client):
 def test_feedback_stores_with_role_and_tenant(client):
     _override_current_user(_user(role="AIRLINE_ADMIN", tenant_id="test_airline"))
     captured = {}
-
-    class FakeDocRef:
-        id = "feedback_123"
+    pg_captured = {}
 
     class FakeWriteBatch:
         def add(self, data):
             captured["data"] = data
-            return (None, FakeDocRef())
+            return (None, None)
 
     class FakeCollection:
         def add(self, data):
             captured["data"] = data
-            return (None, FakeDocRef())
+            return (None, None)
+
+    def _fake_add(data):
+        captured["data"] = data
+        return (None, None)
 
     class FakeDB:
         def collection(self, name):
             captured["collection"] = name
             return FakeCollection()
 
-    with patch("app.routes.feedback.get_db", return_value=FakeDB()):
+    def _fake_pg_insert(model, doc):
+        pg_captured["model"] = model
+        pg_captured["doc"] = doc
+
+    with patch("app.routes.feedback.get_db", return_value=FakeDB()), patch(
+        "app.db.pg.insert", side_effect=_fake_pg_insert
+    ):
         try:
             resp = client.post(
                 "/api/v1/feedback",
@@ -86,7 +94,7 @@ def test_feedback_stores_with_role_and_tenant(client):
             body = resp.json()
             assert body["status"] == "success"
             assert body["data"]["ok"] is True
-            assert body["data"]["id"] == "feedback_123"
+            assert body["data"]["id"].startswith("fb-")
         finally:
             _clear_overrides()
 
@@ -98,3 +106,5 @@ def test_feedback_stores_with_role_and_tenant(client):
     assert data["page"] == "/safety.html"
     assert data["status"] == "new"
     assert "email" in data
+    assert pg_captured["doc"]["role"] == "AIRLINE_ADMIN"
+    assert pg_captured["doc"]["tenant_id"] == "test_airline"

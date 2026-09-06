@@ -17,6 +17,8 @@ from loguru import logger
 from datetime import datetime, timezone
 
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import Feedback, Tenant, UserProfile
 from app.firebase import get_auth, get_db, verify_firebase_token
 from app.middleware.auth import get_current_user, get_safety_manager, get_admin_user
 from app.services.risk_matrix import (
@@ -1121,14 +1123,14 @@ async def list_feedback(
         )
 
     try:
-        db = get_db()
-        query = db.collection("feedback")
-        if status_filter:
-            query = query.where("status", "==", status_filter)
-        docs = sorted(
-            query.limit(limit).stream(),
-            key=lambda d: (d.to_dict() or {}).get("created_at"),
-            reverse=True,
+        where = (
+            [Feedback.data["status"].astext == status_filter] if status_filter else None
+        )
+        rows = pg.fetch_all(
+            Feedback,
+            where=where,
+            order_by=Feedback.created_at.desc(),
+            limit=limit,
         )
     except Exception as e:
         logger.error(f"Failed to list feedback for {user.get('email')}: {e}")
@@ -1138,12 +1140,11 @@ async def list_feedback(
         )
 
     items = []
-    for d in docs:
-        x = d.to_dict() or {}
+    for x in rows:
         ts = x.get("created_at")
         items.append(
             {
-                "id": d.id,
+                "id": x.get("feedback_id") or x.get("id"),
                 "uid": x.get("uid"),
                 "email": x.get("email"),
                 "role": x.get("role"),
@@ -1193,14 +1194,15 @@ class TenantGovernanceStatusRequest(BaseModel):
 
 def _governance_row(snap: Any) -> Dict[str, Any]:
     """Normalize one tenant document into the governance list row shape."""
-    x = snap.to_dict() or {}
+    x = dict(snap.to_dict() if hasattr(snap, "to_dict") else snap)
     raw_status = str(x.get("status") or "ACTIVE").strip().upper()
     if raw_status not in GOVERNANCE_STATUSES:
         raw_status = "ACTIVE"
     created_at = x.get("created_at")
+    tid = x.get("tenant_id") or x.get("slug") or (getattr(snap, "id", None))
     return {
-        "tenant_id": x.get("tenant_id") or snap.id,
-        "name": x.get("name") or x.get("tenant_name") or snap.id,
+        "tenant_id": tid,
+        "name": x.get("name") or x.get("tenant_name") or tid,
         "classification": x.get("classification") or x.get("tenant_type") or "",
         "admin_email": (x.get("safety_manager") or {}).get("email") or "",
         "status": raw_status,
@@ -1221,7 +1223,7 @@ async def admin_list_tenant_governance(
     status (default ACTIVE when unset), created_at and is_beta_sandbox.
     """
     try:
-        docs = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).get()
+        docs = pg.fetch_all(Tenant)
     except Exception as e:
         logger.error(f"Failed to list tenant governance for {user.get('email')}: {e}")
         raise HTTPException(
@@ -1253,17 +1255,15 @@ async def admin_update_tenant_governance_status(
             detail=f"status must be one of: {sorted(GOVERNANCE_STATUSES)}",
         )
 
-    db = get_db()
-    ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
     try:
-        doc = ref.get()
+        doc = pg.fetch_by(Tenant, "slug", tenant_id)
     except Exception as e:
         logger.error(f"Failed to read tenant {tenant_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not read the tenant at this time.",
         )
-    if doc is None or not doc.exists:
+    if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Tenant '{tenant_id}' not found",
@@ -1278,7 +1278,14 @@ async def admin_update_tenant_governance_status(
         "updated_at": now,
     }
     try:
-        ref.update(updates)
+        pg.update(Tenant, "slug", tenant_id, dict(updates))
+        try:
+            db = get_db()
+            db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(
+                tenant_id
+            ).update(dict(updates))
+        except Exception as mirror_e:
+            logger.warning(f"Tenant governance mirror update failed ({tenant_id}): {mirror_e}")
     except Exception as e:
         logger.error(f"Failed to update tenant {tenant_id} status: {e}")
         raise HTTPException(
@@ -1469,7 +1476,11 @@ async def admin_delete_user(
         logger.error(f"Failed to delete Auth user {target_email} ({target_uid}): {e}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not delete user at this time.")
 
-    # Best-effort Firestore cleanup: users/{uid}
+    # Best-effort data cleanup: users/{uid} in Postgres + Firestore mirror
+    try:
+        pg.delete(UserProfile, "uid", target_uid)
+    except Exception as e:
+        logger.warning(f"PG user doc delete failed for {target_uid}: {e}")
     try:
         db.collection(settings.FIREBASE_COLLECTION_USERS).document(target_uid).delete()
     except Exception as e:
@@ -1574,6 +1585,10 @@ async def admin_delete_user_post(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found: {target_email or target_uid}")
         logger.error(f"Failed to delete Auth user {target_email} ({target_uid}): {e}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not delete user at this time.")
+    try:
+        pg.delete(UserProfile, "uid", target_uid)
+    except Exception as e:
+        logger.warning(f"PG user doc delete failed for {target_uid}: {e}")
     try:
         db.collection(settings.FIREBASE_COLLECTION_USERS).document(target_uid).delete()
     except Exception as e:

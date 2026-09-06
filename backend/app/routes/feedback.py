@@ -9,6 +9,7 @@
 # AUTHOR: AviaSAFE Systems
 # ============================================================================
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -16,6 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from loguru import logger
 
+from app.db import pg
+from app.db.db_models import Feedback
 from app.middleware.auth import get_current_user
 from app.firebase import get_db
 
@@ -51,7 +54,9 @@ async def submit_feedback(
     Firestore `feedback` collection or a future admin endpoint.
     """
     now = datetime.now(timezone.utc)
+    feedback_id = f"fb-{uuid.uuid4().hex[:12]}"
     doc = {
+        "feedback_id": feedback_id,
         "uid": user.get("uid"),
         "email": user.get("email"),
         "role": user.get("role"),
@@ -65,8 +70,7 @@ async def submit_feedback(
     }
 
     try:
-        db = get_db()
-        _, ref = db.collection(FEEDBACK_COLLECTION).add(doc)
+        pg.insert(Feedback, doc)
     except Exception as e:
         logger.error(f"Failed to store feedback from {user.get('email')}: {e}")
         raise HTTPException(
@@ -74,5 +78,10 @@ async def submit_feedback(
             detail="We could not store your feedback right now. Please try again later.",
         )
 
+    try:
+        get_db().collection(FEEDBACK_COLLECTION).add(dict(doc))
+    except Exception:
+        logger.warning(f"Feedback mirror write failed for {user.get('email')}")
+
     logger.info(f"Feedback received from {user.get('email')} (role={user.get('role')})")
-    return _envelope({"id": ref.id, "ok": True})
+    return _envelope({"id": feedback_id, "ok": True})

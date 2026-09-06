@@ -12,6 +12,8 @@
 #     patch_pg_through(monkeypatch, lambda: db)   # or db / () -> db
 # ============================================================================
 
+import uuid
+
 from sqlalchemy.sql.elements import BinaryExpression
 
 from app.db import pg as pg_mod
@@ -56,6 +58,14 @@ def _simple_eq(expr):
     return _col_name(getattr(expr, "left", None)), value
 
 
+def _snaps(query):
+    if hasattr(query, "stream"):
+        return list(query.stream())
+    if hasattr(query, "get"):
+        return list(query.get())
+    return []
+
+
 def _fetch_all(db, model, *, where=None, order_by=None, limit=None):
     coll = db.collection(model.__tablename__)
     conds = []
@@ -71,16 +81,16 @@ def _fetch_all(db, model, *, where=None, order_by=None, limit=None):
         if limit and hasattr(q, "limit"):
             q = q.limit(limit)
         rows = []
-        for snap in q.get():
+        for snap in _snaps(q):
             data = dict(snap.to_dict())
             data.setdefault("id", getattr(snap, "id", None))
             rows.append(data)
         return rows
 
-    if not hasattr(coll, "get"):
+    if not hasattr(coll, "get") and not hasattr(coll, "stream"):
         return []  # cannot enumerate the collection on the fake
     docs = []
-    for snap in coll.get():
+    for snap in _snaps(coll):
         data = dict(snap.to_dict())
         data.setdefault("id", getattr(snap, "id", None))
         if all(field is None or data.get(field) == value for field, value in conds):
@@ -124,6 +134,8 @@ def _upsert(db, model, col, value, data):
 def _insert(db, model, data):
     id_col = pg_mod._ID_COLUMNS.get(model.__tablename__) or "id"
     id_value = (data or {}).get(id_col)
+    if not id_value:
+        id_value = f"auto-{uuid.uuid4().hex[:12]}"
     _upsert(db, model, id_col, str(id_value), data)
 
 

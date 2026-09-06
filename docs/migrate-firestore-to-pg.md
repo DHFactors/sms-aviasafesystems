@@ -32,9 +32,11 @@ Context facts
 
 - B0 Foundation — config cleanup (drop `FIREBASE_DATABASE_ID`, keep Auth),
   new SQLAlchemy models + idempotent DDL + runner, session foundations + tests.
+  ✅ committed `ce9a322`.
 - B1 Identity layer — `middleware/auth.py`, `users.py`, `invites.py`,
   `tenants.py` route, `tenant_registration.py`, `onboarding_service.py`,
   `regulator_service.py` + admin regulator endpoints.
+  ✅ committed `32b74ec` (reads) + `c041eeb` (registration/writes).
 - B2 Ops/admin layer — `audit_service.py`, admin audit list/purge, feedback,
   dlq, caan_reports, sms_maturity, `admin_data_service.py` (tenants/regulators/
   users/audit purge/export/delete-demo-tenants), `routes/admin.py`.

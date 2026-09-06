@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.middleware.auth import get_current_user
+from pg_bridge import patch_pg_through
 
 
 class _Snap:
@@ -72,6 +73,7 @@ def _patch(monkeypatch, db):
 
     monkeypatch.setattr(admin_mod.get_db, "__wrapped__", None, raising=False)
     monkeypatch.setattr("app.routes.admin.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 def _user(role="SUPER_ADMIN"):

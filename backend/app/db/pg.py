@@ -30,6 +30,7 @@ _ID_COLUMNS: Dict[str, str] = {
     "invites": "code",
     "caan_reports": "report_id",
     "state_risk_categories": "slug",
+    "dead_letter_queue": "key",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 
@@ -65,7 +66,10 @@ def row_to_doc(row: Any) -> Dict[str, Any]:
 
 
 def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Route Firestore-shaped fields into typed columns vs the JSONB bag."""
+    """Route Firestore-shaped fields into typed columns vs the JSONB bag.
+
+    Models without a JSONB ``data`` column drop the unrecognized extras.
+    """
     table = model.__table__
     typed: Dict[str, Any] = {}
     extras: Dict[str, Any] = {}
@@ -74,9 +78,9 @@ def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if key in table.columns:
             typed[key] = value
-        else:
+        elif "data" in table.columns:
             extras[key] = value
-    if extras:
+    if extras and "data" in table.columns:
         typed["data"] = extras
     return typed
 

@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.middleware.auth import get_admin_user, get_current_user
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -218,6 +219,7 @@ def _patch_db(monkeypatch, db=None):
     monkeypatch.setattr("app.services.production_seed.get_db", lambda: db)
     monkeypatch.setattr("app.services.admin_data_service.get_db", lambda: db)
     monkeypatch.setattr("app.services.seed_surfaces.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
     return db
 
 
@@ -318,13 +320,18 @@ def test_list_audit_logs(monkeypatch):
     assert logs[0]["action"] == "SEED_PREVIEW"
 
 
-def test_list_tenants_admin_counts(monkeypatch):
+def test_list_tenants_admin(monkeypatch):
     db = _patch_db(monkeypatch)
     db._stores["tenants"]["tara-air"] = {"tenant_id": "tara-air", "name": "Tara Air"}
-    db._subs[("tara-air", "surveys")] = [{"x": 1}, {"x": 2}]
+    db._stores["tenants"]["demostate"] = {"tenant_id": "demostate", "name": "CAAN State Regulator"}
+    db._stores["tenants"]["caan-tenant"] = {"tenant_id": "caan-tenant", "name": "CAAN Tenant", "regulator_id": "caan"}
     from app.services.production_seed import list_tenants_admin
     rows = list_tenants_admin()
-    assert rows[0]["counts"]["surveys"] == 2
+    tids = [r["id"] for r in rows]
+    assert "tara-air" in tids
+    assert "caan-tenant" in tids
+    assert "demostate" not in tids
+    assert all(r["counts"] == {} for r in rows)
 
 
 # ============================================================================

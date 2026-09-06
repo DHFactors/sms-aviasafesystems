@@ -95,6 +95,7 @@ def _patch_admin_db(monkeypatch, db):
     import app.routes.admin as admin_mod
     monkeypatch.setattr(admin_mod.get_db, "__wrapped__", None, raising=False)
     monkeypatch.setattr("app.routes.admin.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 def _user(role="SUPER_ADMIN", email="super-admin@aviasafesystems.com", tenant_id=None):

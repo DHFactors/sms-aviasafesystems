@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import AuditLog, Regulator, Tenant
 from app.db.ids import tenant_uuid
 from app.firebase import get_db
 
@@ -32,39 +34,35 @@ ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 def _audit(action: str, actor: Dict[str, Any], target: str, detail: str,
            result: str = "success") -> None:
-    """Persist one audit entry under the top-level `audit_logs` collection."""
+    """Persist one audit entry to Postgres (`audit_logs`)."""
     try:
         now = datetime.now(timezone.utc)
-        db = get_db()
-        db.collection(settings.FIREBASE_COLLECTION_AUDIT_LOGS).add({
+        doc = {
             "action": action,
-            "actor": {
-                "uid": actor.get("uid"),
-                "email": actor.get("email"),
-            },
+            "user": (actor or {}).get("uid"),
             "target": target,
+            "target_type": None,
+            "target_id": target,
+            "actor": (actor or {}).get("uid"),
             "detail": detail,
             "result": result,
             "timestamp": now.isoformat(),
             "created_at": now,
-        })
+        }
+        pg.insert(AuditLog, doc)
     except Exception as e:
-        logger.error(f"Audit log write failed ({action}): {e}")
+        logger.error(f"Audit log pg write failed ({action}): {e}")
 
 
 def list_audit_logs(limit: int = 50) -> List[Dict[str, Any]]:
     """Most recent seeding/admin audit entries (newest first)."""
     limit = max(1, min(int(limit or 50), 200))
     try:
-        docs = (
-            get_db().collection(settings.FIREBASE_COLLECTION_AUDIT_LOGS)
-            .order_by("timestamp", direction="DESCENDING").limit(limit).get()
+        rows = pg.fetch_all(
+            AuditLog,
+            order_by=AuditLog.created_at.desc(),
+            limit=limit,
         )
-        rows = []
-        for d in docs:
-            data = d.to_dict() or {}
-            data["id"] = d.id
-            rows.append(data)
         return rows
     except Exception as e:
         logger.warning(f"Failed to list audit logs: {e}")
@@ -89,8 +87,7 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
     if not name:
         raise ValueError("regulator name is required")
 
-    db = get_db()
-    if db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).get().exists:
+    if pg.fetch_by(Regulator, "slug", rid) is not None:
         raise ValueError(f"regulator already exists: {rid}")
 
     now = datetime.now(timezone.utc)
@@ -107,7 +104,11 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
         "created_at": now,
         "updated_at": now,
     }
-    db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).set(doc)
+    pg.upsert(Regulator, "slug", rid, doc)
+    try:
+        get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).set(dict(doc))
+    except Exception as e:
+        logger.warning(f"Regulator mirror write failed ({rid}): {e}")
 
     _audit("REGULATOR_CREATED", actor, rid,
            f"Created State Regulator '{name}' ({data.get('country_name') or data.get('country') or ''})")
@@ -122,8 +123,7 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
     if not name:
         raise ValueError("tenant name is required")
 
-    db = get_db()
-    if db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get().exists:
+    if pg.fetch_by(Tenant, "slug", tid) is not None:
         raise ValueError(f"tenant already exists: {tid}")
 
     regulator_id = (data.get("regulator_id") or "").strip() or None
@@ -152,7 +152,11 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
     if isinstance(survey_config, dict) and survey_config:
         doc["survey_config"] = survey_config
 
-    db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(doc)
+    pg.upsert(Tenant, "slug", tid, doc)
+    try:
+        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(dict(doc))
+    except Exception as e:
+        logger.warning(f"Tenant mirror write failed ({tid}): {e}")
 
     if regulator_id:
         # Keep the regulator link bidirectional: append this tenant to the
@@ -206,23 +210,29 @@ def _is_regulator_doc(data: Dict[str, Any]) -> bool:
 def _link_tenant_to_regulator(tid: str, regulator_id: str) -> None:
     """Idempotently add `tid` to the regulator's operator_tenant_ids."""
     try:
-        db = get_db()
-        reg_ref = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(regulator_id)
-        reg_doc = reg_ref.get()
-        if not reg_doc.exists:
+        reg = pg.fetch_by(Regulator, "slug", regulator_id)
+        if reg is None:
             return
-        ops = list((reg_doc.to_dict() or {}).get("operator_tenant_ids") or [])
+        ops = list(reg.get("operator_tenant_ids") or [])
         if tid not in ops:
             ops.append(tid)
+            pg.update(Regulator, "slug", regulator_id, {"operator_tenant_ids": ops})
+        try:
+            db = get_db()
+            reg_ref = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(regulator_id)
             reg_ref.set({"operator_tenant_ids": ops}, merge=True)
+        except Exception as e:
+            logger.warning(f"Failed to mirror regulator link {tid}: {e}")
     except Exception as e:
         logger.warning(f"Failed to link tenant {tid} to regulator {regulator_id}: {e}")
 
 
 def list_regulators_admin() -> List[Dict[str, Any]]:
     try:
-        docs = get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
-        return [dict(d.to_dict() or {}, id=d.id) for d in docs]
+        rows = pg.fetch_all(Regulator)
+        for row in rows:
+            row.setdefault("id", row.get("slug") or row.get("regulator_id"))
+        return rows
     except Exception as e:
         logger.warning(f"Failed to list regulators (admin): {e}")
         return []
@@ -230,26 +240,18 @@ def list_regulators_admin() -> List[Dict[str, Any]]:
 
 def list_tenants_admin() -> List[Dict[str, Any]]:
     try:
-        db = get_db()
-        # Operators overseen by a State Regulator (regulators collection). Any
-        # tenants-collection doc that is actually a regulator (legacy demo seed
-        # writes, e.g. tenants/demostate) must be excluded from operator lists.
         regulator_ids = {
-            snap.id for snap in db.collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
+            r.get("slug") for r in pg.fetch_all(Regulator) if r.get("slug")
         }
-        tenants = db.collection(settings.FIREBASE_COLLECTION_TENANTS).get()
+        tenants = pg.fetch_all(Tenant)
         rows = []
-        for t in tenants:
-            td = dict(t.to_dict() or {})
-            td["id"] = t.id
-            if t.id in regulator_ids or _is_regulator_doc(td):
+        for td in tenants:
+            td = dict(td)
+            tid = td.get("slug") or td.get("tenant_id") or td.get("id")
+            td["id"] = tid
+            if tid in regulator_ids or _is_regulator_doc(td):
                 continue
             td["counts"] = {}
-            for sub in ("surveys", "hazards", "reports", "can_cap"):
-                try:
-                    td["counts"][sub if sub != "can_cap" else "cans"] = len(list(t.reference.collection(sub).limit(500).get()))
-                except Exception:
-                    td["counts"]["cans" if sub == "can_cap" else sub] = 0
             rows.append(td)
         rows.sort(key=lambda r: (r.get("name") or r.get("id") or "").lower())
         return rows
@@ -313,9 +315,8 @@ async def list_tenants_admin_pg() -> List[Dict[str, Any]]:
 
     regs = {}
     try:
-        db = get_db()
-        for snap in db.collection(settings.FIREBASE_COLLECTION_REGULATORS).stream():
-            regs[snap.id] = snap.to_dict() or {}
+        for snap in pg.fetch_all(Regulator):
+            regs[snap.get("slug") or ""] = snap
     except Exception as e:
         logger.warning(f"Failed to list regulators for tenant enrichment: {e}")
 

@@ -28,6 +28,7 @@ from app.firebase import get_auth, get_db
 from app.models.hazard import revalue_taxonomy
 from app.services.hazard_service import generate_hazard_id, resolve_function_code
 from app.db.ids import register_tenant, tenant_uuid
+from app.db import pg
 from app.db.session import session_scope
 from app.db.db_models import (
     BarrierRegisterEntry,
@@ -87,15 +88,21 @@ _ICAO_TO_TAXONOMY = {
 DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 3, "survey": 12}
 
 
-def _tenant_ref(tenant_id: str):
-    return get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
-
-
 def _get_tenant(tenant_id: str) -> Dict[str, Any]:
-    snap = _tenant_ref(tenant_id).get()
-    if not snap.exists:
+    doc = pg.fetch_by(Tenant, "slug", tenant_id)
+    if doc is None:
         raise ValueError(f"tenant not found: {tenant_id}")
-    return snap.to_dict() or {}
+    return doc
+
+
+def _set_tenant(tenant_id: str, updates: Dict[str, Any]) -> None:
+    pg.update(Tenant, "slug", tenant_id, dict(updates))
+    try:
+        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(
+            tenant_id
+        ).set(dict(updates), merge=True)
+    except Exception as e:
+        logger.warning(f"Tenant mirror update failed ({tenant_id}): {e}")
 
 
 # ============================================================================
@@ -243,7 +250,7 @@ def update_tenant_status(tenant_id: str, actor: Dict[str, Any],
     elif contract_end_date:
         updates["to_date"] = contract_end_date.strip()
 
-    _tenant_ref(tid).set(updates, merge=True)
+    _set_tenant(tid, updates)
 
     merged = dict(doc)
     merged.update(updates)
@@ -285,7 +292,7 @@ def update_tenant_modules(tenant_id: str, actor: Dict[str, Any],
         "modules_updated_by": actor.get("uid"),
         "updated_at": now,
     }
-    _tenant_ref(tid).set(updates, merge=True)
+    _set_tenant(tid, updates)
 
     merged = dict(doc)
     merged.update(updates)
@@ -623,7 +630,10 @@ def demo_data_scope(tenant_ids: Optional[List[str]] = None, all_tenants: bool = 
         return [_validate_id(t, "tenant id") for t in tenant_ids]
     if all_tenants:
         try:
-            return [d.id for d in get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).get()]
+            return [
+                d.get("slug") or d.get("tenant_id") or d.get("id")
+                for d in pg.fetch_all(Tenant)
+            ]
         except Exception as e:
             logger.error(f"Failed to list tenants for demo-data scope: {e}")
             return []

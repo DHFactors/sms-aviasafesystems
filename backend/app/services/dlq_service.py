@@ -8,6 +8,8 @@ from typing import Any, Dict, Optional
 import httpx
 from loguru import logger
 
+from app.db import pg
+from app.db.db_models import DeadLetterEntry
 from app.firebase import get_db
 
 COLLECTION_PATH = "dead_letter_queue"
@@ -20,11 +22,24 @@ def _collection():
 
 
 class DlqService:
-    """Persist dead-letter records to Firestore and dispatch webhook alerts."""
+    """Persist dead-letter records (Postgres primary + Firestore mirror) and
+    dispatch webhook alerts."""
 
     def __init__(self, slack_webhook: Optional[str] = None, teams_webhook: Optional[str] = None):
         self.slack_webhook = slack_webhook
         self.teams_webhook = teams_webhook
+
+    def _mirror_set(self, dlq_id: str, record: Dict[str, Any]) -> None:
+        try:
+            _collection().document(dlq_id).set(dict(record))
+        except Exception as e:
+            logger.warning(f"DLQ mirror write failed for {dlq_id}: {e}")
+
+    def _mirror_update(self, dlq_id: str, fields: Dict[str, Any]) -> None:
+        try:
+            _collection().document(dlq_id).update(dict(fields))
+        except Exception as e:
+            logger.warning(f"DLQ mirror update failed for {dlq_id}: {e}")
 
     # ------------------------------------------------------------------
     # Write path
@@ -49,6 +64,7 @@ class DlqService:
             "attempt_count": 0,
             "max_attempts": max_attempts,
             "resolution_status": "unresolved",
+            "status": "unresolved",
             "resolution_note": None,
             "resolved_by": None,
             "resolved_at": None,
@@ -56,71 +72,90 @@ class DlqService:
             "updated_at": now,
         }
         try:
-            _collection().document(dlq_id).set(record)
+            pg.upsert(DeadLetterEntry, "key", dlq_id, record)
             logger.warning(f"Dead letter quarantined: {dlq_id} op={original_operation}")
         except Exception as e:
             logger.error(f"Failed to write DLQ record {dlq_id}: {e}")
             raise
 
+        self._mirror_set(dlq_id, record)
         self._alert_webhooks(dlq_id, original_operation, error_message)
         return dlq_id
 
     def mark_investigating(self, dlq_id: str, user: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc)
-        _collection().document(dlq_id).update({
+        fields = {
             "resolution_status": "investigating",
+            "status": "investigating",
             "updated_at": now,
-        })
+        }
+        pg.update(DeadLetterEntry, "key", dlq_id, fields)
+        self._mirror_update(dlq_id, fields)
 
     def mark_replayed(self, dlq_id: str, user: Optional[str] = None, note: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc)
-        _collection().document(dlq_id).update({
+        fields = {
             "resolution_status": "replayed",
+            "status": "replayed",
             "resolved_by": user,
             "resolved_at": now,
             "resolution_note": note,
             "updated_at": now,
-        })
+        }
+        pg.update(DeadLetterEntry, "key", dlq_id, fields)
+        self._mirror_update(dlq_id, fields)
         logger.info(f"DLQ record {dlq_id} marked as replayed by {user}")
 
     def mark_discarded(self, dlq_id: str, user: Optional[str] = None, note: Optional[str] = None) -> None:
         now = datetime.now(timezone.utc)
-        _collection().document(dlq_id).update({
+        fields = {
             "resolution_status": "discarded",
+            "status": "discarded",
             "resolved_by": user,
             "resolved_at": now,
             "resolution_note": note,
             "updated_at": now,
-        })
+        }
+        pg.update(DeadLetterEntry, "key", dlq_id, fields)
+        self._mirror_update(dlq_id, fields)
         logger.info(f"DLQ record {dlq_id} marked as discarded by {user}")
 
     def get_record(self, dlq_id: str) -> Optional[Dict[str, Any]]:
         try:
-            doc = _collection().document(dlq_id).get()
-            if not doc.exists:
+            data = pg.fetch_by(DeadLetterEntry, "key", dlq_id)
+            if data is None:
+                data = self._read_mirror(dlq_id)
+            if data is None:
                 return None
-            data = doc.to_dict()
-            data["id"] = doc.id
+            data.setdefault("id", dlq_id)
             return data
         except Exception as e:
             logger.error(f"Failed to get DLQ record {dlq_id}: {e}")
             return None
 
+    def _read_mirror(self, dlq_id: str) -> Optional[Dict[str, Any]]:
+        try:
+            doc = _collection().document(dlq_id).get()
+            if getattr(doc, "exists", True):
+                data = doc.to_dict() or {}
+                if data:
+                    return data
+            return None
+        except Exception as e:
+            logger.error(f"Failed to read DLQ mirror record {dlq_id}: {e}")
+            return None
+
     def list_unresolved(self, limit: int = 50) -> list:
         try:
-            docs = (
-                _collection()
-                .where("resolution_status", "==", "unresolved")
-                .order_by("created_at", direction="DESCENDING")
-                .limit(limit)
-                .get()
+            rows = pg.fetch_all(
+                DeadLetterEntry,
+                where=[DeadLetterEntry.status == "unresolved"],
+                order_by=DeadLetterEntry.created_at.desc(),
+                limit=limit,
             )
-            results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                results.append(data)
-            return results
+            for row in rows:
+                row.setdefault("id", row.get("dlq_id") or row.get("key"))
+            return rows
         except Exception as e:
             logger.error(f"Failed to list unresolved DLQ records: {e}")
             return []
