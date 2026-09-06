@@ -16,6 +16,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; color: #0b2a42; min-height: 100vh; }
@@ -155,6 +156,12 @@
                 <span id="surveySaveStatus" style="margin-left:0.75rem;font-size:0.85rem;display:none;"></span>
             </div>
 
+            <!-- ============ SURVEY SHARE ============ -->
+            <div id="surveyShareSection" style="margin-top:24px; padding-top:20px; border-top:2px solid #e2e8f0;">
+                <!-- This div will be dynamically populated by JavaScript -->
+                <div id="surveyShareContent"></div>
+            </div>
+
             <div id="surveyDistributionSection" style="display:none;margin-top:1.5rem;border-top:2px solid #34a853;padding-top:1.25rem;">
                 <div class="section-title" style="font-size:1.05rem;margin-top:0;"><i class="fas fa-bullhorn"></i> Survey Distribution &amp; Launch Controls</div>
                 <p style="font-size:0.85rem;color:#64748b;margin-bottom:1rem;">
@@ -250,7 +257,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { setupRiskMatrixForm(); } catch (e) { console.error('Risk matrix setup failed:', e); }
         try { await loadSurveyManagement(session); } catch (e) { console.error('Survey load failed:', e); }
         try { setupSurveyManagementForm(session); } catch (e) { console.error('Survey setup failed:', e); }
+        try { await loadSurveyShare(session.tenantId); } catch (e) { console.error('Survey share load failed:', e); }
         try { generateSurveyQrCode(session); } catch (e) { console.error('QR generation failed:', e); }
+        // Hide legacy distribution section — replaced by surveyShareSection with date validation
+        const legacyDistro = document.getElementById('surveyDistributionSection');
+        if (legacyDistro) legacyDistro.style.display = 'none';
     } catch (err) {
         console.error('Administration init failed:', err);
         const pageContent = document.getElementById('pageContent');
@@ -444,7 +455,16 @@ function setSurveySaveStatus(text, type) {
 }
 
 function setupSurveyManagementForm(session) {
-    document.getElementById('surveyActiveToggle').addEventListener('change', updateSurveyStatusLabel);
+    document.getElementById('surveyActiveToggle').addEventListener('change', function() {
+        updateSurveyStatusLabel();
+        const tenantId = session.tenantId;
+        const active = document.getElementById('surveyActiveToggle').checked;
+        if (active) {
+            loadSurveyShare(tenantId);
+        } else {
+            toggleSurvey('closed', tenantId);
+        }
+    });
 
     document.getElementById('surveySaveBtn').addEventListener('click', async function () {
         const btn = document.getElementById('surveySaveBtn');
@@ -470,6 +490,8 @@ function setupSurveyManagementForm(session) {
         try {
             await ApiClient.put('/api/v1/tenants/' + encodeURIComponent(session.tenantId) + '/config', body);
             setSurveySaveStatus('Survey settings saved.', 'success');
+            // Refresh share section after saving
+            loadSurveyShare(session.tenantId);
         } catch (error) {
             console.error('Error saving survey settings:', error);
             setSurveySaveStatus('Error: ' + error.message, 'error');
@@ -479,6 +501,312 @@ function setupSurveyManagementForm(session) {
         }
     });
 }
+
+// ============================================================================
+// SURVEY SHARE FUNCTIONS WITH DATE VALIDATION
+// ============================================================================
+
+// Load survey share based on availability
+async function loadSurveyShare(tenantId) {
+    const container = document.getElementById('surveyShareContent');
+    if (!container) return;
+    
+    // Fetch survey configuration
+    const config = await getSurveyConfig(tenantId);
+    const now = new Date();
+    // Normalize date fields (support both new and legacy naming)
+    const startDateRaw = config.open_date || config.survey_open_date || config.openDate || null;
+    const endDateRaw = config.close_date || config.survey_close_date || config.closeDate || null;
+    const startDate = startDateRaw ? new Date(startDateRaw) : null;
+    const endDate = endDateRaw ? new Date(endDateRaw) : null;
+    const isActive = config.is_active === true || config.is_survey_active === true;
+    
+    // Check if survey is actually open
+    const isOpen = isActive === true && 
+                   startDate && !isNaN(startDate) && now >= startDate && 
+                   endDate && !isNaN(endDate) && now <= endDate;
+    
+    if (!isOpen) {
+        // Show message instead of link/QR code
+        let message = '';
+        if (isActive === false || isActive === undefined && config.is_survey_active === false) {
+            message = '⚠️ Survey is currently closed.';
+        } else if (startDate && !isNaN(startDate) && now < startDate) {
+            message = `📅 Survey is scheduled to open on ${startDate.toLocaleDateString()}. Link and QR code will be available when the survey opens.`;
+        } else if (endDate && !isNaN(endDate) && now > endDate) {
+            message = `📅 Survey closed on ${endDate.toLocaleDateString()}. Thank you for your participation.`;
+        } else if (!startDate || !endDate) {
+            message = '⚠️ Survey is not available at this time.';
+        } else {
+            message = '⚠️ Survey is not available at this time.';
+        }
+        
+        // More precise closed check
+        if (isActive === false) {
+            message = '⚠️ Survey is currently closed.';
+        }
+        
+        container.innerHTML = `
+            <div style="padding:16px; background:#fef3c7; border-radius:8px; border:1px solid #f59e0b; color:#92400e;">
+                <i class="fas fa-clock" style="color:#f59e0b;"></i> ${message}
+            </div>
+        `;
+        return;
+    }
+    
+    // Survey is open — show link and QR code
+    const surveyLink = `https://sms.aviasafesystems.com/survey/index.html?tenant=${tenantId}`;
+    
+    container.innerHTML = `
+        <h3><i class="fas fa-share-alt" style="color:#0ea5e9;"></i> Share Survey</h3>
+        <p style="color:#64748b; font-size:.85rem;">Copy the link below or scan the QR code to share the survey with employees.</p>
+        
+        <!-- Survey Link -->
+        <div class="form-group" style="margin-top:12px;">
+            <label style="font-weight:600; font-size:.85rem;">Survey Link</label>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="surveyLink" readonly 
+                       style="flex:1; padding:10px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:.85rem; cursor:pointer;" 
+                       value="${surveyLink}" onclick="this.select();">
+                <button class="btn btn-primary btn-sm" onclick="copySurveyLink()" style="white-space:nowrap;">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <small style="color:#94a3b8; font-size:.75rem;">Click the link to select all, then copy.</small>
+        </div>
+        
+        <!-- QR Code -->
+        <div class="form-group" style="margin-top:16px; text-align:center; padding:20px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+            <label style="font-weight:600; font-size:.85rem; display:block; margin-bottom:12px;">QR Code</label>
+            <div id="qrCodeContainer" style="display:flex; justify-content:center; padding:8px;">
+                <img id="qrCodeImage" src="" alt="QR Code" 
+                     style="max-width:200px; height:auto; border:1px solid #e2e8f0; border-radius:8px; padding:12px; background:#fff; display:none;">
+                <div id="qrCodeLoading" style="color:#94a3b8; font-size:.85rem; padding:20px;">
+                    <i class="fas fa-spinner fa-spin"></i> Generating QR code...
+                </div>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" onclick="printQRCode()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="downloadQRCode()">
+                    <i class="fas fa-download"></i> Download PNG
+                </button>
+            </div>
+            <small style="color:#94a3b8; font-size:.75rem; display:block; margin-top:8px;">Scan the QR code with your phone camera to open the survey.</small>
+        </div>
+    `;
+    
+    // Generate QR code
+    generateQRCode(surveyLink);
+}
+
+// Get survey configuration
+async function getSurveyConfig(tenantId) {
+    try {
+        const response = await ApiClient.get('/api/v1/tenants/' + encodeURIComponent(tenantId) + '/config');
+        const data = response || {};
+        // Support multiple response shapes
+        const cfg = data.config || data.surveyConfig || data || {};
+        // Also check top-level for legacy
+        if (data.config) return data.config;
+        if (data.surveyConfig) return data.surveyConfig;
+        return cfg;
+    } catch (error) {
+        console.error('Failed to load survey config:', error);
+        return {};
+    }
+}
+
+// Generate QR Code with QRCode.js
+function generateQRCode(text) {
+    const container = document.getElementById('qrCodeContainer');
+    const loading = document.getElementById('qrCodeLoading');
+    const img = document.getElementById('qrCodeImage');
+    
+    // Use QRCode.js library
+    if (typeof QRCode !== 'undefined') {
+        // Remove existing QR code if any
+        const existing = document.getElementById('qrcode');
+        if (existing) existing.remove();
+        
+        const qrDiv = document.createElement('div');
+        qrDiv.id = 'qrcode';
+        container.appendChild(qrDiv);
+        
+        new QRCode(qrDiv, {
+            text: text,
+            width: 200,
+            height: 200,
+            colorDark: "#1a237e",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+        if (loading) loading.style.display = 'none';
+        if (img) img.style.display = 'none';
+    } else {
+        // Fallback: use API to generate QR code
+        fetchQRCodeFromAPI(text);
+    }
+}
+
+function fetchQRCodeFromAPI(text) {
+    const img = document.getElementById('qrCodeImage');
+    const loading = document.getElementById('qrCodeLoading');
+    if (!img) return;
+    const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(text)}`;
+    img.src = apiUrl;
+    img.style.display = 'block';
+    if (loading) loading.style.display = 'none';
+    img.onload = function() { if (loading) loading.style.display = 'none'; };
+}
+
+// Copy survey link
+function copySurveyLink() {
+    const linkInput = document.getElementById('surveyLink');
+    if (!linkInput) return;
+    
+    linkInput.select();
+    try {
+        document.execCommand('copy');
+        toast('Survey link copied to clipboard!', 'success');
+    } catch (err) {
+        navigator.clipboard.writeText(linkInput.value)
+            .then(() => toast('Survey link copied to clipboard!', 'success'))
+            .catch(() => toast('Failed to copy link. Please select and copy manually.', 'error'));
+    }
+}
+
+// Print QR Code
+function printQRCode() {
+    const qrImage = document.getElementById('qrCodeImage');
+    const qrDiv = document.getElementById('qrcode');
+    
+    let src = '';
+    if (qrImage && qrImage.src) {
+        src = qrImage.src;
+    } else if (qrDiv) {
+        const qImg = qrDiv.querySelector('img');
+        if (qImg) src = qImg.src;
+        // Also check for canvas
+        if (!src) {
+            const canvas = qrDiv.querySelector('canvas');
+            if (canvas) src = canvas.toDataURL('image/png');
+        }
+    }
+    
+    if (!src) {
+        toast('No QR code to print.', 'error');
+        return;
+    }
+    
+    const win = window.open('', '_blank');
+    win.document.write(`
+        <html><head><title>Survey QR Code</title>
+        <style>body{display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#fff;}
+        img{max-width:400px;border:1px solid #e2e8f0;border-radius:8px;padding:16px;}</style>
+        </head><body>
+        <img src="${src}" alt="Survey QR Code">
+        <script>window.onload=function(){window.print();}<\/script>
+        </body></html>
+    `);
+    win.document.close();
+}
+
+// Download QR Code as PNG
+function downloadQRCode() {
+    const qrImage = document.getElementById('qrCodeImage');
+    const qrDiv = document.getElementById('qrcode');
+    
+    let src = '';
+    if (qrImage && qrImage.src) {
+        src = qrImage.src;
+    } else if (qrDiv) {
+        const qImg = qrDiv.querySelector('img');
+        if (qImg) src = qImg.src;
+        if (!src) {
+            const canvas = qrDiv.querySelector('canvas');
+            if (canvas) src = canvas.toDataURL('image/png');
+        }
+    }
+    
+    if (!src) {
+        toast('No QR code to download.', 'error');
+        return;
+    }
+    
+    const link = document.createElement('a');
+    link.download = `survey-qr-${getTenantId()}.png`;
+    link.href = src;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('QR Code downloaded!', 'success');
+}
+
+// Helper: Get tenant ID
+function getTenantId() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tenant = urlParams.get('tenant');
+    if (tenant) return tenant;
+    
+    // Fallback: get from survey active context or global session
+    const activeInput = document.getElementById('surveyLink');
+    if (activeInput && activeInput.value) {
+        try {
+            const u = new URL(activeInput.value);
+            const t = u.searchParams.get('tenant');
+            if (t) return t;
+        } catch(e) {}
+    }
+    // Fallback: get from user context
+    const userEmailEl = document.getElementById('userEmail');
+    const userEmail = userEmailEl ? userEmailEl.textContent : '';
+    if (userEmail.includes('@')) {
+        const domain = userEmail.split('@')[1];
+        return domain.split('.')[0] || 'fixedwing';
+    }
+    return 'fixedwing';
+}
+
+// Helper: Toast notification
+function toast(message, type) {
+    const toastDiv = document.getElementById('toastContainer') || createToastContainer();
+    const el = document.createElement('div');
+    el.style.cssText = 'padding:10px 14px; border-radius:6px; font-size:0.85rem; color:#fff; background:' + (type === 'success' ? '#16a34a' : type === 'error' ? '#dc2626' : '#334155') + '; box-shadow:0 2px 8px rgba(0,0,0,0.15);';
+    el.textContent = message;
+    toastDiv.appendChild(el);
+    setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.3s';
+        setTimeout(() => el.remove(), 300);
+    }, 3000);
+}
+
+function createToastContainer() {
+    const div = document.createElement('div');
+    div.id = 'toastContainer';
+    div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+    document.body.appendChild(div);
+    return div;
+}
+
+// Load survey share when survey is toggled open
+function toggleSurvey(status, tenantId) {
+    if (status === 'open') {
+        loadSurveyShare(tenantId);
+    } else {
+        const container = document.getElementById('surveyShareContent');
+        if (container) {
+            container.innerHTML = `
+                <div style="padding:16px; background:#fef3c7; border-radius:8px; border:1px solid #f59e0b; color:#92400e;">
+                    <i class="fas fa-clock" style="color:#f59e0b;"></i> Survey is currently closed. Link and QR code are not available.
+                </div>
+            `;
+        }
+    }
+}
+
 function generateSurveyQrCode(session) {
     const tenantId = session.tenantId;
     if (!tenantId) return;
