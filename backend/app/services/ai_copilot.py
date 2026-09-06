@@ -12,6 +12,8 @@
 
 from typing import Any, Dict, List, Optional
 
+from app.db import pg
+from app.db.db_models import Tenant
 from app.firebase import get_db
 
 
@@ -132,6 +134,13 @@ def get_tenant_classification_readonly(tenant_id: Optional[str]) -> Optional[str
     """Read-only tenant classification lookup used by the Copilot."""
     if not tenant_id:
         return None
+    try:
+        row = pg.fetch_by(Tenant, "slug", tenant_id)
+        if row:
+            data = row.get("data") or {}
+            return row.get("tenant_type") or row.get("classification") or data.get("tenant_type") or data.get("classification") or data.get("type")
+    except Exception:
+        pass
     try:
         snap = readonly_db().collection("tenants").document(tenant_id).get()
         if getattr(snap, "exists", True):

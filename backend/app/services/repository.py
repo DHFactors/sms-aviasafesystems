@@ -4,7 +4,10 @@ from functools import lru_cache
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.db import pg
+from app.db.db_models import Report as PgReport
+from app.db.ids import tenant_uuid
+from app.db.isolation import demo_scope
 
 
 def coerce_utc_datetime(value) -> Optional[datetime]:
@@ -109,34 +112,34 @@ class ReportRepository:
 
     def query_reports(self, filter: ReportFilter) -> Dict[str, Any]:
         try:
-            base = self._build_collection(filter)
-            query = self._apply_filters(base, filter)
-            query = query.order_by(
-                filter.sort_by, direction=self._sort_order(filter.sort_order)
-            )
-
-            total = self._count_total(query.count().get())
-
+            all_items = self.get_all_in_range(filter, limit=settings.REPO_QUERY_LIMIT)
+            # Apply cursor offset if present (cursor is sort_by value)
+            start = 0
             if filter.cursor:
                 parsed = self._parse_cursor(filter.cursor, filter)
                 if parsed is not None:
-                    query = query.start_after(parsed)
-
-            query = query.limit(filter.page_size)
-
-            docs = query.get()
-            items = []
-            last_doc = None
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                self._serialize_timestamps(data)
-                items.append(data)
-                last_doc = doc
-
-            next_cursor = self._encode_cursor(last_doc, filter) if last_doc else None
+                    # Find index after cursor value
+                    for idx, item in enumerate(all_items):
+                        val = coerce_utc_datetime(item.get(filter.sort_by))
+                        if val is not None and parsed is not None:
+                            if filter.sort_order == "desc" and val < parsed:
+                                start = idx
+                                break
+                            if filter.sort_order == "asc" and val > parsed:
+                                start = idx
+                                break
+            total = len(all_items)
+            # Pagination slice
+            offset = (filter.page - 1) * filter.page_size
+            # If cursor provided, ignore page offset and start from cursor
+            if filter.cursor and start:
+                offset = start
+            items = all_items[offset: offset + filter.page_size]
+            next_cursor = None
+            if offset + filter.page_size < total:
+                last = items[-1] if items else None
+                next_cursor = self._encode_cursor(last, filter) if last else None
             total_pages = max((total + filter.page_size - 1) // filter.page_size, 1)
-
             return {
                 "items": items,
                 "total": total,
@@ -144,7 +147,7 @@ class ReportRepository:
                 "page_size": filter.page_size,
                 "total_pages": total_pages,
                 "has_next": bool(next_cursor),
-                "has_prev": filter.page > 1,
+                "has_prev": filter.page > 1 or bool(filter.cursor),
                 "next_cursor": next_cursor,
             }
         except Exception as e:
@@ -164,127 +167,49 @@ class ReportRepository:
             return cached[1]
 
         try:
-            base = self._build_collection(filter)
-            logger.debug(f"Firestore query: collection_group={filter.cross_tenant}, tenant_id={filter.tenant_id}, path='tenants/{filter.tenant_id}/{self.COLLECTION}', date_from={filter.date_from}, date_to={filter.date_to}")
-
-            query = self._apply_filters(base, filter)
-            query = query.order_by(
-                filter.sort_by, direction=self._sort_order(filter.sort_order)
-            ).limit(limit)
-
-            docs = query.get()
-            results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                self._serialize_timestamps(data)
-                results.append(data)
-
-            # Fallback for ISO-string timestamps: only if filtered query returned 0 but date filter was applied
-            if len(results) == 0 and (filter.date_from or filter.date_to):
-                # Lazy unfiltered fetch for fallback (bounded to limit)
+            where = [PgReport.is_demo == demo_scope()]
+            if not filter.cross_tenant and filter.tenant_id:
                 try:
-                    raw_docs = list(base.limit(limit).get())
-                    if raw_docs:
-                        logger.warning(f"Date filter ({filter.date_from} to {filter.date_to}) returned 0 results but {len(raw_docs)} docs exist unfiltered. Retrying with timezone-safe in-memory filter.")
-                        unfiltered = []
-                        for doc in raw_docs:
-                            data = doc.to_dict()
-                            data["id"] = doc.id
-                            self._serialize_timestamps(data)
-                            unfiltered.append(data)
-                        fallback = [
-                            d for d in unfiltered
-                            if self._doc_in_date_range(d.get(filter.sort_by), filter.date_from, filter.date_to)
-                        ]
-                        if fallback:
-                            results = fallback
-                except Exception as fe:
-                    logger.warning(f"Fallback unfiltered fetch failed: {fe}")
+                    where.append(PgReport.tenant_id == tenant_uuid(filter.tenant_id))
+                except Exception:
+                    pass
+            if filter.report_type:
+                where.append(PgReport.report_type == filter.report_type)
+            if filter.status:
+                where.append(PgReport.status == filter.status)
+            if filter.severity:
+                where.append(PgReport.severity == filter.severity)
+            if filter.occurrence_type:
+                where.append(PgReport.occurrence_type == filter.occurrence_type)
 
-            # Postgres fallback: seeder writes to Postgres (is_demo=True) while
-            # this repository reads Firestore. If Firestore returned 0, try Postgres.
-            if len(results) == 0:
-                try:
-                    from app.db import pg
-                    from app.db.ids import register_tenant
-                    from app.db.session import session_scope
-                    from app.db.db_models import Report as PgReport, Tenant as PgTenant
-                    from sqlalchemy import select
-                    import uuid as _uuid
-                    pg_results = []
-                    # Determine tenant UUID for Postgres lookup
-                    tenant_uuid = None
-                    if filter.tenant_id and not filter.cross_tenant:
-                        try:
-                            tenant_uuid = register_tenant(filter.tenant_id)
-                        except Exception:
-                            tenant_uuid = None
-                    # Only fallback for demo tenants or when Firestore is empty
-                    # Query Postgres reports table directly
-                    def _run_pg():
-                        import asyncio
-                        from app.db.runner import run
-                        async def _query():
-                            async with session_scope() as session:
-                                stmt = select(PgReport)
-                                if tenant_uuid and not filter.cross_tenant:
-                                    try:
-                                        stmt = stmt.where(PgReport.tenant_id == _uuid.UUID(tenant_uuid))
-                                    except Exception:
-                                        pass
-                                    # Include demo data: seeder uses is_demo=True, match both
-                                    # Prefer is_demo=True for demo tenants to avoid mixing prod
-                                    try:
-                                        # Check if tenant is_demo (tenants table)
-                                        tdoc = pg.fetch_by(PgTenant, "slug", filter.tenant_id) if filter.tenant_id else None
-                                        is_demo_tenant = False
-                                        if tdoc:
-                                            is_demo_tenant = bool(tdoc.get("is_demo"))
-                                            if is_demo_tenant:
-                                                stmt = stmt.where(PgReport.is_demo == True)
-                                    except Exception:
-                                        pass
-                                if filter.report_type:
-                                    stmt = stmt.where(PgReport.report_type == filter.report_type)
-                                if filter.status:
-                                    stmt = stmt.where(PgReport.status == filter.status)
-                                stmt = stmt.order_by(PgReport.created_at.desc()).limit(limit)
-                                rows = (await session.execute(stmt)).scalars().all()
-                                out = []
-                                for r in rows:
-                                    d = {
-                                        "id": str(r.id),
-                                        "tenant_id": str(r.tenant_id),
-                                        "report_type": r.report_type,
-                                        "status": r.status,
-                                        "narrative": r.narrative,
-                                        "location": r.location,
-                                        "occurrence_date": r.occurrence_date.isoformat() if hasattr(r.occurrence_date, "isoformat") else str(r.occurrence_date),
-                                        "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
-                                        "risk_level": r.risk_level,
-                                        "risk_index": r.risk_index,
-                                        "is_demo": r.is_demo,
-                                    }
-                                    # Apply date range in-memory for Postgres fallback
-                                    if filter.date_from or filter.date_to:
-                                        from app.services.repository import coerce_utc_datetime as _coerce
-                                        dt = _coerce(d.get("created_at")) or _coerce(d.get("occurrence_date"))
-                                        if not self._doc_in_date_range(dt, filter.date_from, filter.date_to):
-                                            continue
-                                    out.append(d)
-                                return out
-                        return run(_query())
-                    pg_results = _run_pg()
-                    if pg_results:
-                        logger.info(f"Postgres fallback: Firestore returned 0 but Postgres has {len(pg_results)} reports for tenant {filter.tenant_id} (is_demo handling). Using Postgres results.")
-                        results = pg_results
-                except Exception as pg_e:
-                    logger.debug(f"Postgres fallback for reports failed (non-fatal): {pg_e}")
+            rows = pg.fetch_all(PgReport, where=where)
+            results: List[Dict[str, Any]] = []
+            for r in rows:
+                d = dict(r)
+                self._serialize_timestamps(d)
+                # Date range filtering (applies to sort_by field)
+                if filter.date_from or filter.date_to:
+                    dt = coerce_utc_datetime(d.get(filter.sort_by))
+                    if dt is None:
+                        # fallback to occurrence_date/created_at
+                        dt = coerce_utc_datetime(d.get("created_at")) or coerce_utc_datetime(d.get("occurrence_date"))
+                    if not self._doc_in_date_range(dt, filter.date_from, filter.date_to):
+                        continue
+                results.append(d)
+
+            # Sorting
+            reverse = filter.sort_order == "desc"
+            def _sort_key(x):
+                v = coerce_utc_datetime(x.get(filter.sort_by)) or coerce_utc_datetime(x.get("created_at"))
+                return v or datetime.min.replace(tzinfo=timezone.utc)
+            results.sort(key=_sort_key, reverse=reverse)
+
+            if limit:
+                results = results[:limit]
 
             self._cache[cache_key] = (now, results)
             if len(results) == 0:
-                logger.warning(f"Firestore query returned 0 results for tenant_id={filter.tenant_id}, cross_tenant={filter.cross_tenant}, date_from={filter.date_from}, date_to={filter.date_to}")
+                logger.warning(f"Report query returned 0 results for tenant_id={filter.tenant_id}, cross_tenant={filter.cross_tenant}, date_from={filter.date_from}, date_to={filter.date_to}")
             logger.debug(f"Cached {len(results)} results for {cache_key}")
             return results
         except Exception as e:
@@ -300,50 +225,31 @@ class ReportRepository:
 
     def get_by_id(self, report_id: str, filter: ReportFilter) -> Optional[Dict[str, Any]]:
         try:
-            if filter.cross_tenant:
-                docs = get_cross_tenant_collection(self.COLLECTION).where(
-                    "__name__", "==", report_id
-                ).get()
-                if not docs:
+            row = pg.fetch_by(PgReport, "id", report_id)
+            if row is None:
+                return None
+            # Enforce tenant isolation when not cross-tenant
+            if not filter.cross_tenant and filter.tenant_id:
+                tid = tenant_uuid(filter.tenant_id)
+                if str(row.get("tenant_id") or "") != str(tid):
                     return None
-                data = docs[0].to_dict()
-                data["id"] = docs[0].id
-            else:
-                doc = (
-                    get_tenant_collection(filter.tenant_id, self.COLLECTION)
-                    .document(report_id)
-                    .get()
-                )
-                if not doc.exists:
-                    return None
-                data = doc.to_dict()
-                data["id"] = doc.id
-
-            self._serialize_timestamps(data)
-            return data
+            self._serialize_timestamps(row)
+            return row
         except Exception as e:
             logger.error(f"ReportRepository.get_by_id({report_id}) failed: {e}")
             raise
 
     def count_by_status(self, filter: ReportFilter) -> Dict[str, int]:
-        base = self._build_collection(filter)
-        query = self._apply_filters(base, filter)
-        return {"total": self._count_total(query.count().get())}
+        items = self.get_all_in_range(filter)
+        return {"total": len(items)}
 
     def count_by_severity(self, filter: ReportFilter) -> Dict[str, int]:
-        base = self._build_collection(filter)
-        query = self._apply_filters(base, filter)
-        return {"total": self._count_total(query.count().get())}
+        items = self.get_all_in_range(filter)
+        return {"total": len(items)}
 
     @staticmethod
     def _count_total(count_result) -> int:
-        """Parse the Firestore count() aggregation result across SDK versions.
-
-        google-cloud-firestore historically returned [AggregationResult], but
-        newer releases return a query-results list wrapping another list,
-        i.e. [[AggregationResult]]. Read both shapes defensively so a version
-        bump can never turn the Recent Reports endpoint into an empty payload.
-        """
+        """Parse the Firestore count() aggregation result across SDK versions."""
         if not count_result:
             return 0
         try:
@@ -357,48 +263,34 @@ class ReportRepository:
         return 0
 
     def _build_collection(self, filter: ReportFilter):
-        if filter.cross_tenant:
-            return get_cross_tenant_collection(self.COLLECTION)
-        return get_tenant_collection(filter.tenant_id, self.COLLECTION)
+        # Kept for compatibility; no longer used (PG primary)
+        return None
 
     def _apply_filters(self, collection, filter: ReportFilter):
-        query = collection
-        if filter.date_from:
-            query = query.where(filter.sort_by, ">=", filter.date_from)
-        if filter.date_to:
-            query = query.where(filter.sort_by, "<=", filter.date_to)
-        if filter.report_type:
-            query = query.where("report_type", "==", filter.report_type)
-        if filter.status:
-            query = query.where("status", "==", filter.status)
-        if filter.severity:
-            query = query.where("severity", "==", filter.severity)
-        if filter.occurrence_type:
-            query = query.where("occurrence_type", "==", filter.occurrence_type)
-        return query
+        return collection
 
     @staticmethod
     def _sort_order(order: str):
-        from google.cloud.firestore import Query
-        return Query.DESCENDING if order == "desc" else Query.ASCENDING
+        # Kept for compatibility
+        return order
 
     @staticmethod
     def _encode_cursor(doc, filter: ReportFilter) -> Optional[str]:
         if doc is None:
             return None
-        sort_val = doc.get(filter.sort_by)
+        sort_val = doc.get(filter.sort_by) if isinstance(doc, dict) else doc.get(filter.sort_by) if hasattr(doc, "get") else None
         if sort_val is None:
             return None
         if hasattr(sort_val, "isoformat"):
             sort_val = sort_val.isoformat()
-        return sort_val
+        return str(sort_val)
 
     @staticmethod
     def _parse_cursor(cursor: str, filter: ReportFilter):
         target = cursor
         if filter.sort_by == "created_at" or filter.sort_by == "occurrence_date":
             try:
-                return datetime.fromisoformat(target)
+                return datetime.fromisoformat(target.replace("Z", "+00:00"))
             except (ValueError, TypeError):
                 return None
         return target
@@ -423,11 +315,6 @@ class ReportRepository:
     def _doc_in_date_range(
         value, date_from: Optional[datetime], date_to: Optional[datetime]
     ) -> bool:
-        """Timezone-safe inclusive range check used by the in-memory fallback.
-
-        The value may be an ISO string, naive/aware datetime or a Timestamp-like
-        object; coerce_utc_datetime normalizes everything to UTC before comparing.
-        """
         if not date_from and not date_to:
             return True
         dt = coerce_utc_datetime(value)

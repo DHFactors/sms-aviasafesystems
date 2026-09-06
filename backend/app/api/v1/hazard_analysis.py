@@ -13,13 +13,12 @@ from app.schemas.hazard_rca import (
     CAPACreate,
 )
 from app.services.hazard_service import HazardService
-from app.firebase import get_firestore_db
 
 router = APIRouter(prefix="/hazards", tags=["Hazard & RCA Analysis"])
 
 
-def get_hazard_service(db=Depends(get_firestore_db)) -> HazardService:
-    return HazardService(db=db)
+def get_hazard_service() -> HazardService:
+    return HazardService()
 
 
 @router.post("", response_model=dict, status_code=status.HTTP_201_CREATED)

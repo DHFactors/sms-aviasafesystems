@@ -27,6 +27,8 @@ from loguru import logger
 
 from app.core.config import settings
 from app.core.perf import timed as _perf_timed
+from app.db import pg
+from app.db.db_models import Tenant
 from app.firebase import get_db
 
 # Explicit Groq model identifier. Kept as a named constant so deployments can
@@ -303,14 +305,21 @@ def enforce_safety_boundary(
 
 
 def get_tenant_classification(tenant_id: Optional[str]) -> Optional[str]:
-    """Resolve the tenant's formal operational classification from Firestore.
+    """Resolve the tenant's formal operational classification from Postgres.
 
-    Uses the strictly READ-ONLY handle (AviaSAFE-SMS audit §1.2): the Copilot
-    context cannot create, set, update or delete documents."""
-    from app.services.ai_copilot import ReadOnlyFirestoreClient
-
+    Uses PG primary; falls back to the READ-ONLY Firestore handle for legacy data."""
     if not tenant_id:
         return None
+    try:
+        row = pg.fetch_by(Tenant, "slug", tenant_id)
+        if row:
+            data = row.get("data") or {}
+            val = row.get("tenant_type") or row.get("classification") or data.get("tenant_type") or data.get("classification") or data.get("type")
+            if val:
+                return val
+    except Exception as e:
+        logger.warning(f"Copilot PG tenant classification lookup failed for {tenant_id}: {e}")
+    from app.services.ai_copilot import ReadOnlyFirestoreClient
     try:
         doc = (ReadOnlyFirestoreClient(get_db())
                .collection("tenants").document(tenant_id).get())

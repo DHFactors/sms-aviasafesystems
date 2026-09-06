@@ -2,6 +2,8 @@ from typing import Optional, Dict, Any
 from loguru import logger
 
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import Tenant
 from app.firebase import get_db, get_tenant_collection
 
 RISK_MATRIX_DOC_PATH = "risk_matrix"
@@ -146,6 +148,15 @@ def risk_outcome_by_index(risk_index: int, thresholds: Optional[dict] = None) ->
 
 def get_risk_matrix_config(tenant_id: str) -> dict:
     try:
+        row = pg.fetch_by(Tenant, "slug", tenant_id)
+        if row:
+            data = row.get("data") or {}
+            cfg = data.get("risk_matrix_config") or data.get("risk_matrix") or row.get("risk_matrix_config")
+            if isinstance(cfg, dict) and cfg:
+                return cfg
+    except Exception as e:
+        logger.warning(f"Failed to load risk matrix PG for {tenant_id}: {e}")
+    try:
         doc_ref = (
             get_tenant_collection(tenant_id, settings.FIREBASE_COLLECTION_METADATA)
             .document(RISK_MATRIX_DOC_PATH)
@@ -154,7 +165,7 @@ def get_risk_matrix_config(tenant_id: str) -> dict:
         if doc.exists:
             return doc.to_dict()
     except Exception as e:
-        logger.warning(f"Failed to load risk matrix for {tenant_id}: {e}")
+        logger.warning(f"Failed to load risk matrix Firestore for {tenant_id}: {e}")
 
     return _default_matrix_config()
 
@@ -166,6 +177,21 @@ def set_risk_matrix_config(tenant_id: str, config: dict, updated_by: str) -> dic
     base.update(config)
     base["updated_by"] = updated_by
     base["updated_at"] = datetime.now(timezone.utc)
+
+    try:
+        row = pg.fetch_by(Tenant, "slug", tenant_id)
+        if row:
+            data = dict(row.get("data") or {})
+            data["risk_matrix_config"] = dict(base)
+            pg.update(Tenant, "slug", tenant_id, {"data": data, "updated_at": datetime.now(timezone.utc)})
+            # best-effort Firestore mirror
+            try:
+                get_tenant_collection(tenant_id, settings.FIREBASE_COLLECTION_METADATA).document(RISK_MATRIX_DOC_PATH).set(dict(base))
+            except Exception:
+                pass
+            return base
+    except Exception as e:
+        logger.warning(f"Failed to write risk matrix PG for {tenant_id}: {e}")
 
     doc_ref = (
         get_tenant_collection(tenant_id, settings.FIREBASE_COLLECTION_METADATA)

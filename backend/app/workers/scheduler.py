@@ -6,7 +6,8 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Regulator
 from app.repositories.audit_repo import record_dispatch_intent, update_dispatch_status
 from app.services.dlq_service import DlqService
 from app.services.email_service import send_regulatory_report
@@ -19,7 +20,7 @@ class ScheduledReportWorker:
     dispatches them to regulator recipients on a weekly schedule."""
 
     def __init__(self):
-        self.db = get_db()
+        self.db = None  # Firestore removed; PG via pg.*
 
     def run_weekly_ssp_dispatch(self) -> Dict[str, Any]:
         """Main entry point invoked by APScheduler or Cloud Scheduler.
@@ -149,11 +150,15 @@ class ScheduledReportWorker:
 
     def _get_regulator_authorities(self) -> List[Dict[str, Any]]:
         try:
-            docs = self.db.collection("regulators").stream()
+            rows = pg.fetch_all(Regulator)
             authorities = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
+            for row in rows:
+                data = dict(row)
+                # regulators keyed by slug; expose as id for caller compatibility
+                data.setdefault("id", row.get("slug") or row.get("id"))
+                # notification_emails may be in data bag
+                if "notification_emails" not in data:
+                    data["notification_emails"] = (row.get("data") or {}).get("notification_emails", [])
                 authorities.append(data)
             return authorities
         except Exception as e:

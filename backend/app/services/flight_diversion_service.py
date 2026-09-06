@@ -2,9 +2,13 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from collections import Counter, defaultdict
 from loguru import logger
+import uuid as _uuid
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.db import pg
+from app.db.db_models import FlightDiversion
+from app.db.ids import tenant_uuid
+from app.db.isolation import demo_scope
 
 
 DIVERSION_COLLECTION = "flight_diversions"
@@ -13,16 +17,39 @@ DIVERSION_COLLECTION = "flight_diversions"
 class FlightDiversionService:
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
+        self._tid = tenant_uuid(tenant_id) if tenant_id else None
 
-    def _collection(self):
-        return get_tenant_collection(self.tenant_id, DIVERSION_COLLECTION)
+    def _fetch_all_for_scope(self, user: dict) -> List[Dict[str, Any]]:
+        is_cross = user.get("role") in settings.CROSS_TENANT_ROLES
+        if is_cross:
+            rows = pg.fetch_all(FlightDiversion)
+        else:
+            if not self._tid:
+                return []
+            rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == self._tid])
+        return [dict(r) for r in rows]
+
+    def _resolve_doc_id(self, diversion_id: str, user: dict) -> Optional[str]:
+        rows = self._fetch_all_for_scope(user)
+        for r in rows:
+            if str(r.get("id") or "") == diversion_id or r.get("diversion_id") == diversion_id:
+                return str(r.get("id"))
+        # Also try tenant-scoped fetch if cross search missed
+        if user.get("role") in settings.CROSS_TENANT_ROLES:
+            try:
+                rows2 = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == self._tid]) if self._tid else []
+                for r in rows2:
+                    if str(r.get("id") or "") == diversion_id or r.get("diversion_id") == diversion_id:
+                        return str(r.get("id"))
+            except Exception:
+                pass
+        return None
 
     def _get_next_sequence(self, year: int) -> int:
         try:
-            docs = self._collection().get()
+            rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == self._tid]) if self._tid else []
             max_seq = 0
-            for doc in docs:
-                data = doc.to_dict()
+            for data in rows:
                 did = data.get("diversion_id", "")
                 if did.startswith(f"DIV-{year}-"):
                     try:
@@ -43,7 +70,8 @@ class FlightDiversionService:
         diversion_id = f"DIV-{year}-{sequence:03d}"
 
         doc_data = {
-            "tenant_id": self.tenant_id,
+            "id": str(_uuid.uuid4()),
+            "tenant_id": self._tid,
             "diversion_id": diversion_id,
             "date": payload["date"],
             "flight_number": payload["flight_number"],
@@ -73,9 +101,7 @@ class FlightDiversionService:
         doc_data = {k: v for k, v in doc_data.items() if v is not None}
 
         try:
-            ref = self._collection().add(doc_data)
-            doc_id = ref[1].id
-            doc_data["id"] = doc_id
+            pg.upsert(FlightDiversion, "id", doc_data["id"], doc_data)
             logger.info(f"Diversion {diversion_id} created for tenant {self.tenant_id}")
             return doc_data
         except Exception as e:
@@ -84,15 +110,9 @@ class FlightDiversionService:
 
     def get_diversion(self, diversion_id: str, user: dict) -> Optional[dict]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(DIVERSION_COLLECTION).get()
-            else:
-                docs = self._collection().get()
-
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    data["id"] = doc.id
+            rows = self._fetch_all_for_scope(user)
+            for data in rows:
+                if str(data.get("id") or "") == diversion_id or data.get("diversion_id") == diversion_id:
                     self._serialize_timestamps(data)
                     return data
             return None
@@ -102,15 +122,9 @@ class FlightDiversionService:
 
     def list_diversions(self, user: dict, filters: dict = None) -> List[dict]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(DIVERSION_COLLECTION).get()
-            else:
-                docs = self._collection().get()
-
+            rows = self._fetch_all_for_scope(user)
             results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
+            for data in rows:
                 self._serialize_timestamps(data)
 
                 if filters:
@@ -129,7 +143,7 @@ class FlightDiversionService:
 
                 results.append(data)
 
-            results.sort(key=lambda r: r.get("date", datetime.min), reverse=True)
+            results.sort(key=lambda r: r.get("date", datetime.min) if isinstance(r.get("date"), datetime) else datetime.min, reverse=True)
             return results
         except Exception as e:
             logger.error(f"Failed to list diversions: {e}")
@@ -137,42 +151,42 @@ class FlightDiversionService:
 
     def update_diversion(self, diversion_id: str, payload: dict, user: dict) -> Optional[dict]:
         try:
-            docs = self._collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    target_id = doc.id
-                    break
-
+            target_id = self._resolve_doc_id(diversion_id, user)
+            if not target_id:
+                # fallback to tenant-scoped search
+                rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == self._tid]) if self._tid else []
+                for data in rows:
+                    if str(data.get("id") or "") == diversion_id or data.get("diversion_id") == diversion_id:
+                        target_id = str(data.get("id"))
+                        break
             if not target_id:
                 return None
 
-            ref = self._collection().document(target_id)
             payload["updated_at"] = datetime.now(timezone.utc)
             payload["updated_by"] = user.get("uid")
-            ref.update(payload)
+            pg.update(FlightDiversion, "id", target_id, payload)
 
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
-            return updated
+            updated = pg.fetch_by(FlightDiversion, "id", target_id)
+            if updated:
+                self._serialize_timestamps(updated)
+                return updated
+            return None
         except Exception as e:
             logger.error(f"Failed to update diversion {diversion_id}: {e}")
             raise
 
     def delete_diversion(self, diversion_id: str) -> bool:
         try:
-            docs = self._collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    target_id = doc.id
-                    break
+            target_id = self._resolve_doc_id(diversion_id, {"role": ""})
+            if not target_id and self._tid:
+                rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == self._tid])
+                for data in rows:
+                    if str(data.get("id") or "") == diversion_id or data.get("diversion_id") == diversion_id:
+                        target_id = str(data.get("id"))
+                        break
             if not target_id:
                 return False
-            self._collection().document(target_id).delete()
+            pg.delete(FlightDiversion, "id", target_id)
             logger.info(f"Diversion {diversion_id} deleted")
             return True
         except Exception as e:
@@ -181,28 +195,19 @@ class FlightDiversionService:
 
     def set_hazard_link(self, diversion_id: str, hazard_id: str, hazard_link_url: str, user: dict) -> Optional[dict]:
         try:
-            docs = self._collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    target_id = doc.id
-                    break
+            target_id = self._resolve_doc_id(diversion_id, user)
             if not target_id:
                 return None
-
-            ref = self._collection().document(target_id)
             now = datetime.now(timezone.utc)
-            ref.update({
+            pg.update(FlightDiversion, "id", target_id, {
                 "hazard_id": hazard_id,
                 "hazard_link_url": hazard_link_url,
                 "updated_at": now,
                 "updated_by": user.get("uid"),
             })
-
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
+            updated = pg.fetch_by(FlightDiversion, "id", target_id)
+            if updated:
+                self._serialize_timestamps(updated)
             return updated
         except Exception as e:
             logger.error(f"Failed to set hazard link for diversion {diversion_id}: {e}")
@@ -210,28 +215,19 @@ class FlightDiversionService:
 
     def link_to_hazard(self, diversion_id: str, hazard_id: str, user: dict) -> Optional[dict]:
         try:
-            docs = self._collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    target_id = doc.id
-                    break
+            target_id = self._resolve_doc_id(diversion_id, user)
             if not target_id:
                 return None
-
-            ref = self._collection().document(target_id)
             now = datetime.now(timezone.utc)
-            ref.update({
+            pg.update(FlightDiversion, "id", target_id, {
                 "hazard_id": hazard_id,
                 "status": "Linked to Hazard",
                 "updated_at": now,
                 "updated_by": user.get("uid"),
             })
-
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
+            updated = pg.fetch_by(FlightDiversion, "id", target_id)
+            if updated:
+                self._serialize_timestamps(updated)
             return updated
         except Exception as e:
             logger.error(f"Failed to link diversion {diversion_id} to hazard {hazard_id}: {e}")
@@ -239,29 +235,20 @@ class FlightDiversionService:
 
     def unlink_from_hazard(self, diversion_id: str, user: dict) -> Optional[dict]:
         try:
-            docs = self._collection().get()
-            target_id = None
-            for doc in docs:
-                data = doc.to_dict()
-                if doc.id == diversion_id or data.get("diversion_id") == diversion_id:
-                    target_id = doc.id
-                    break
+            target_id = self._resolve_doc_id(diversion_id, user)
             if not target_id:
                 return None
-
-            ref = self._collection().document(target_id)
             now = datetime.now(timezone.utc)
-            ref.update({
+            pg.update(FlightDiversion, "id", target_id, {
                 "hazard_id": None,
                 "hazard_link_url": None,
                 "status": "Reviewed",
                 "updated_at": now,
                 "updated_by": user.get("uid"),
             })
-
-            updated = ref.get().to_dict()
-            updated["id"] = target_id
-            self._serialize_timestamps(updated)
+            updated = pg.fetch_by(FlightDiversion, "id", target_id)
+            if updated:
+                self._serialize_timestamps(updated)
             return updated
         except Exception as e:
             logger.error(f"Failed to unlink diversion {diversion_id}: {e}")
@@ -269,12 +256,8 @@ class FlightDiversionService:
 
     def get_stats(self, user: dict) -> Dict[str, Any]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES:
-                docs = get_cross_tenant_collection(DIVERSION_COLLECTION).get()
-            else:
-                docs = self._collection().get()
-
-            diversions = [doc.to_dict() for doc in docs]
+            rows = self._fetch_all_for_scope(user)
+            diversions = rows
             total = len(diversions)
             reason_counts = Counter()
             airport_counts = Counter()
@@ -292,7 +275,10 @@ class FlightDiversionService:
                 dt = d.get("date")
                 if dt:
                     if hasattr(dt, "strftime"):
-                        month_counts[dt.strftime("%Y-%m")] += 1
+                        try:
+                            month_counts[dt.strftime("%Y-%m")] += 1
+                        except Exception:
+                            pass
                     elif isinstance(dt, str):
                         month_counts[dt[:7]] += 1
 

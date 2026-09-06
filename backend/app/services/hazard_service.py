@@ -55,7 +55,10 @@ from app.services.risk_matrix import (
 )
 from app.services.users import get_user_department
 from app.db.abstract_repository import AbstractRepository
-from app.db.firestore_repository import FirestoreRepository
+try:
+    from app.db.firestore_repository import FirestoreRepository
+except ImportError:
+    FirestoreRepository = None  # Firestore removed — PG is primary
 
 # ICAO Doc 9859 Standard Risk Tolerability Lookups
 TOLERABILITY_MATRIX = {
@@ -225,9 +228,13 @@ class HazardService:
         # `db` is accepted for backward compatibility with the unmounted
         # hazard_analysis router; all persistence is now PostgreSQL-backed.
         self.db = db
-        # Migration-ready DAL: inject repository (defaults to Firestore for legacy
-        # collections). All queries are tenant-isolated via tenant_id.
-        self.repository: AbstractRepository = repository or FirestoreRepository()
+        # Migration-ready DAL: inject repository (Firestore removed, PG primary)
+        if repository is not None:
+            self.repository: AbstractRepository = repository
+        elif FirestoreRepository is not None:
+            self.repository: AbstractRepository = FirestoreRepository()
+        else:
+            self.repository = None  # No Firestore — PG is used directly
 
     # ==========================================================================
     # create_hazard dispatcher
