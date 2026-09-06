@@ -15,8 +15,10 @@
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, EmailStr
+from datetime import datetime, timezone
+from loguru import logger
 
 from app.middleware.auth import get_current_user
 from demo import analytics, session_manager
@@ -165,6 +167,96 @@ async def track_analytics_batch(body: AnalyticsBatch, user: Dict[str, Any] = Dep
         [e.model_dump() for e in body.events],
     )
     return {"ok": True, "written": written}
+
+
+# ============================================================================
+# DEMO CONTRACT ACCEPTANCE — User Acceptance Agreement (public/demo-contract.html)
+# ============================================================================
+
+class DemoAcceptance(BaseModel):
+    full_name: str
+    organization: str
+    email: EmailStr
+    accepted_at: str
+    user_agent: Optional[str] = None
+
+
+@router.post("/accept")
+async def accept_demo(data: DemoAcceptance, request: Request):
+    """Record demo acceptance agreement — private, after agreement reached.
+
+    Stores acceptance in audit log and, if available, in Supabase
+    `demo_contract_acceptances` table. Always returns success so the
+    frontend can redirect to the demo dashboard.
+    """
+    try:
+        from app.services.audit_service import log_audit, request_context
+        ip, request_id = request_context(request)
+        # Primary store: audit log (always available)
+        log_audit(
+            action="DEMO_CONTRACT_ACCEPTED",
+            user=data.email,
+            tenant_id=data.organization,
+            target_type="demo_contract",
+            target_id=data.email,
+            ip=ip,
+            request_id=request_id,
+            metadata={
+                "full_name": data.full_name,
+                "organization": data.organization,
+                "accepted_at": data.accepted_at,
+                "user_agent": data.user_agent,
+            },
+        )
+        # Best-effort Supabase store if table exists
+        try:
+            from app.db import pg
+            from app.db.db_models import AuditLog
+            # Also try dedicated table if present (optional)
+            from sqlalchemy import text
+            from app.db.session import get_session_factory
+            factory = get_session_factory()
+            if factory is not None:
+                async with factory() as session:
+                    await session.execute(
+                        text("""
+                            CREATE TABLE IF NOT EXISTS demo_contract_acceptances (
+                                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                                full_name TEXT NOT NULL,
+                                organization TEXT NOT NULL,
+                                email TEXT NOT NULL,
+                                accepted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                                user_agent TEXT,
+                                ip_address TEXT,
+                                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                            )
+                        """)
+                    )
+                    await session.commit()
+                    await session.execute(
+                        text("""
+                            INSERT INTO demo_contract_acceptances
+                            (full_name, organization, email, accepted_at, user_agent, ip_address)
+                            VALUES (:full_name, :organization, :email, :accepted_at, :user_agent, :ip)
+                        """),
+                        {
+                            "full_name": data.full_name,
+                            "organization": data.organization,
+                            "email": data.email,
+                            "accepted_at": data.accepted_at,
+                            "user_agent": data.user_agent,
+                            "ip": ip,
+                        },
+                    )
+                    await session.commit()
+        except Exception as e:
+            logger.debug(f"Demo contract Supabase store skipped: {e}")
+
+        logger.info(f"Demo contract accepted: {data.email} ({data.organization})")
+        return {"success": True, "message": "Acceptance recorded"}
+    except Exception as e:
+        logger.error(f"Demo contract acceptance failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
