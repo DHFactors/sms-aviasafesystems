@@ -17,8 +17,9 @@ from loguru import logger
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.db.db_models import Survey, SurveyResponse
-from app.db.ids import register_tenant, tenant_slug
+from app.db import pg
+from app.db.db_models import FlightDiversion, Hazard, Report, SmsMaturity, StateRiskRegisterEntry, Survey, SurveyResponse, Tenant
+from app.db.ids import register_tenant, tenant_slug, tenant_uuid, uuid5
 from app.db.isolation import demo_scope
 from app.db.runner import run
 from app.db.session import session_scope
@@ -278,12 +279,13 @@ class DashboardService:
 
     def _tenant_name(self, tenant_id: str) -> str:
         try:
-            from app.firebase import get_db
-            snap = get_db().collection("tenants").document(tenant_id).get()
-            if snap.exists:
-                name = snap.to_dict().get("name")
+            row = pg.fetch_by(Tenant, "slug", tenant_id)
+            if row:
+                name = row.get("name") or (row.get("data") or {}).get("name")
                 if name:
                     return name
+                # fallback to slug-based registry
+                register_tenant(tenant_id)
         except Exception as e:
             logger.warning(f"Failed to read tenant name for {tenant_id}: {e}")
         return tenant_id
@@ -364,10 +366,10 @@ class DashboardService:
         if not self.tenant_id:
             return None
         try:
-            from app.firebase import get_db
-            doc = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).get()
-            if doc.exists:
-                return (doc.to_dict() or {}).get("type")
+            row = pg.fetch_by(Tenant, "slug", self.tenant_id)
+            if row:
+                data = row.get("data") or {}
+                return row.get("type") or data.get("type")
         except Exception as e:
             logger.warning(f"Failed to resolve tenant type for {self.tenant_id}: {e}")
         return None
@@ -382,17 +384,17 @@ class DashboardService:
         if not self.tenant_id or not days:
             return
         try:
-            from app.firebase import get_db
-            db = get_db()
             cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-            docs = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(self.tenant_id).collection(DIVERSION_COLLECTION).get()
+            tid = tenant_uuid(self.tenant_id)
+            rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == tid])
+            docs = [{"date": r.get("date")} for r in rows]
         except Exception as e:
             logger.warning(f"Failed to load diversion trends for {self.tenant_id}: {e}")
             return
 
         month_counts = defaultdict(int)
         for doc in docs:
-            raw = (doc.to_dict() or {}).get("date")
+            raw = (doc.get("date") if isinstance(doc, dict) else (doc.to_dict() or {}).get("date"))
             if not raw:
                 continue
             if isinstance(raw, str):
@@ -536,35 +538,61 @@ class DashboardService:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days) if days else None
 
         # ---- Tenants (operator profiles) ----
-        from app.firebase import get_db
         tenant_ids = None
         if regulator_id:
             from app.services.regulator_service import operator_tenant_ids_for_regulator
             tenant_ids = set(operator_tenant_ids_for_regulator(regulator_id))
         tenant_map: Dict[str, Dict[str, Any]] = {}
         try:
-            tenants = list(get_db().collection("tenants").stream())
-            for snap in tenants:
-                d = snap.to_dict() or {}
-                if tenant_ids is not None and snap.id not in tenant_ids:
+            for row in pg.fetch_all(Tenant):
+                slug = row.get("slug") or ""
+                if not slug:
                     continue
-                tenant_map[snap.id] = {
-                    "tenant_id": snap.id,
-                    "name": d.get("name") or snap.id,
-                    "icao": d.get("icao") or "",
-                    "country": d.get("country") or "",
-                    "active": d.get("active", True),
+                register_tenant(slug)
+                if tenant_ids is not None and slug not in tenant_ids:
+                    continue
+                data = row.get("data") or {}
+                tenant_map[slug] = {
+                    "tenant_id": slug,
+                    "name": row.get("name") or data.get("name") or slug,
+                    "icao": row.get("icao") or data.get("icao") or "",
+                    "country": row.get("country") or data.get("country") or "",
+                    "active": row.get("active", True) if row.get("active") is not None else data.get("active", True),
                 }
         except Exception as e:
             logger.warning(f"CAAN state tenants query failed: {e}")
 
+        def _tid_to_slug(tid_val: Any) -> Optional[str]:
+            if not tid_val:
+                return None
+            s = str(tid_val)
+            # Already a slug?
+            if s in tenant_map:
+                return s
+            slug = tenant_slug(s)
+            if slug != "default":
+                return slug
+            # Fallback: try to reverse via known tenants
+            try:
+                for t in pg.fetch_all(Tenant):
+                    if str(tenant_uuid(t.get("slug") or "")) == s:
+                        return t.get("slug")
+            except Exception:
+                pass
+            return s
+
         # ---- Cross-tenant hazards ----
         hazards: List[Dict[str, Any]] = []
         try:
-            for snap in get_db().collection_group("hazards").stream():
-                d = snap.to_dict() or {}
-                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
+            for d in pg.fetch_all(Hazard):
+                raw_tid = d.get("tenant_id")
+                slug_tid = _tid_to_slug(raw_tid)
+                if tenant_ids is not None and (slug_tid or None) not in tenant_ids:
                     continue
+                # normalize tenant_id to slug for downstream aggregation
+                if slug_tid:
+                    d = dict(d)
+                    d["tenant_id"] = slug_tid
                 t = _to_dt(_doc_time(d))
                 if cutoff and (t is None or t < cutoff):
                     continue
@@ -582,14 +610,20 @@ class DashboardService:
         # ---- Cross-tenant reports (MORs + SPI trend) ----
         reports: List[Dict[str, Any]] = []
         try:
-            from app.firebase import get_cross_tenant_collection
-            for snap in get_cross_tenant_collection("reports").limit(5000).stream():
-                d = snap.to_dict() or {}
-                if tenant_ids is not None and (d.get("tenant_id") or None) not in tenant_ids:
+            for d in pg.fetch_all(Report):
+                raw_tid = d.get("tenant_id")
+                slug_tid = _tid_to_slug(raw_tid)
+                if tenant_ids is not None and (slug_tid or None) not in tenant_ids:
                     continue
+                if slug_tid:
+                    d = dict(d)
+                    d["tenant_id"] = slug_tid
                 t = _to_dt(_doc_time(d))
                 if cutoff and (t is None or t < cutoff):
                     continue
+                # enforce limit 5000
+                if len(reports) >= 5000:
+                    break
                 d["created_at"] = t.isoformat() if isinstance(t, datetime) else d.get("created_at")
                 occ = d.get("occurrence_type") or d.get("occurrence_category")
                 d["occurrence_category"] = occ
@@ -756,14 +790,13 @@ class DashboardService:
             return []
 
     def _register_all_tenant_slugs(self) -> None:
-        """Populate the slug<->uuid tenant registry from Firestore so
-        tenant_slug() resolves every tenant's surveys even when only the
-        database row (uuid) is available. Survey data lives in Postgres, but
-        tenant slugs are still authored in Firestore."""
+        """Populate the slug<->uuid tenant registry from Postgres so
+        tenant_slug() resolves every tenant's surveys."""
         try:
-            from app.firebase import get_db
-            for snap in get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
-                register_tenant(snap.id)
+            for row in pg.fetch_all(Tenant):
+                slug = row.get("slug")
+                if slug:
+                    register_tenant(slug)
         except Exception as e:
             logger.warning(f"Failed to register tenant slugs for survey queries: {e}")
 
@@ -861,25 +894,25 @@ class DashboardService:
 
     def _read_sms_maturity(self, tenant_id: str, days: int) -> Optional[Dict[str, Any]]:
         try:
-            from app.firebase import get_db
-            ref = (
-                get_db().collection("tenants").document(tenant_id)
-                .collection("sms_maturity").document(f"days_{days}")
-            )
-            snap = ref.get()
-            return snap.to_dict() if snap.exists else None
+            rows = pg.fetch_all(SmsMaturity, where=[SmsMaturity.tenant_id == tenant_id, SmsMaturity.days == days])
+            if rows:
+                row = rows[0]
+                data = row.get("data") or {}
+                # Return data merged with top-level for compatibility
+                out = dict(data)
+                out.setdefault("generated_at", row.get("created_at"))
+                out.setdefault("recommendations", data.get("recommendations", []))
+                return out
+            return None
         except Exception as e:
             logger.warning(f"Failed to read sms_maturity cache for {tenant_id}: {e}")
             return None
 
     def _write_sms_maturity(self, tenant_id: str, days: int, data: Dict[str, Any]) -> None:
         try:
-            from app.firebase import get_db
-            ref = (
-                get_db().collection("tenants").document(tenant_id)
-                .collection("sms_maturity").document(f"days_{days}")
-            )
-            ref.set(data)
+            did = uuid5("sms-maturity", tenant_id, days)
+            doc = {"id": did, "tenant_id": tenant_id, "days": days, "data": dict(data)}
+            pg.upsert(SmsMaturity, "id", did, doc)
         except Exception as e:
             logger.warning(f"Failed to write sms_maturity cache for {tenant_id}: {e}")
 
@@ -904,8 +937,7 @@ class DashboardService:
         """Read the persisted state-level risk register for industry benchmark
         values. Falls back to None when the register is not yet seeded."""
         try:
-            from app.services.state_risk_service import _risk_collection
-            rows = list(_risk_collection().stream())
+            rows = pg.fetch_all(StateRiskRegisterEntry)
             if not rows:
                 return {
                     "industry_anon_rate": None,
@@ -914,7 +946,7 @@ class DashboardService:
                     "ssp_target_avg": None,
                     "ssp_actual_avg": None,
                 }
-            entries = [r.to_dict() for r in rows]
+            entries = [dict(r) for r in rows]
             top = sorted(
                 [e for e in entries if e.get("current_risk_index") is not None],
                 key=lambda e: e["current_risk_index"],
@@ -928,7 +960,7 @@ class DashboardService:
                     "top_state_risks": [
                         {
                             "category": e.get("icoc_category"),
-                            "name": e.get("name"),
+                            "name": e.get("name") or e.get("description"),
                             "current_risk_index": e.get("current_risk_index"),
                             "tolerability": e.get("tolerability"),
                             "trend": e.get("trend"),

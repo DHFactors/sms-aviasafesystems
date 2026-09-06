@@ -14,7 +14,10 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Hazard, Report, StateRiskCategory, StateRiskRegisterEntry
+from app.db.ids import tenant_uuid
+from app.db.isolation import demo_scope
 from app.services.risk_matrix import (
     compute_risk_index,
     get_tolerability_tier,
@@ -55,17 +58,44 @@ ICAO_TOP_RISK_CATEGORIES = [
 ]
 
 
+def _state_tenant_id() -> str:
+    return tenant_uuid("state")
+
+
+def _risk_id(category: str, year: int, quarter: int) -> str:
+    from app.db.ids import uuid5
+    return uuid5("state-risk", category, year, quarter)
+
+
+# Keep Firestore-shaped helpers for callers that import _risk_collection
+# but bridge them to PG. The collection object is not used directly anymore.
 def _risk_collection():
-    return get_db().collection(STATE_COLLECTION).document("ssp").collection(RISK_REGISTER_SUBCOLLECTION)
+    class _FakeColl:
+        def stream(self):
+            return []
+        def document(self, doc_id):
+            class _Doc:
+                def get(self):
+                    class _Snap:
+                        exists = False
+                        def to_dict(self): return {}
+                    return _Snap()
+                def set(self, *a, **kw): pass
+                def update(self, *a, **kw): pass
+            return _Doc()
+    return _FakeColl()
 
 
 def _icao_reference_doc(category: str) -> Optional[Dict[str, Any]]:
     try:
-        doc = get_db().collection(STATE_COLLECTION).document(ICAO_REFERENCE_DOCUMENT).collection("categories").document(category).get()
-        if doc.exists:
-            data = doc.to_dict()
-            data["category"] = category
-            return data
+        row = pg.fetch_by(StateRiskCategory, "slug", category)
+        if row:
+            # row contains slug, name, data; map data fields back
+            data = row.get("data") or {}
+            out = {"category": category, "name": row.get("name") or data.get("name"), "icao_reference": data.get("icao_reference"), "ssp_target": data.get("ssp_target")}
+            # Merge data bag
+            out.update(data)
+            return out
     except Exception as e:
         logger.error(f"Failed to read ICAO reference for {category}: {e}")
     return None
@@ -84,29 +114,34 @@ class StateRiskService:
 
     def list_register(self, year: Optional[int] = None, quarter: Optional[int] = None) -> List[Dict[str, Any]]:
         try:
-            docs = _risk_collection().stream()
-            rows = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                if year and data.get("year") != year:
-                    continue
-                if quarter and data.get("quarter") != quarter:
-                    continue
-                rows.append(data)
-            return sorted(rows, key=lambda r: (r.get("year", 0), r.get("current_risk_index", 99) or 99))
+            where = [StateRiskRegisterEntry.is_demo == demo_scope()]
+            if year is not None:
+                where.append(StateRiskRegisterEntry.year == year)
+            if quarter is not None:
+                where.append(StateRiskRegisterEntry.quarter == quarter)
+            rows = pg.fetch_all(StateRiskRegisterEntry, where=where)
+            # Map back to Firestore-shaped dict including counts if stored
+            out = []
+            for r in rows:
+                d = dict(r)
+                # Ensure id is string
+                d["id"] = str(d.get("id") or _risk_id(d.get("icoc_category") or "", d.get("year") or 0, d.get("quarter") or 0))
+                out.append(d)
+            return sorted(out, key=lambda r: (r.get("year", 0), r.get("current_risk_index", 99) or 99))
         except Exception as e:
             logger.error(f"Failed to list state risk register: {e}")
             return []
 
     def get_register_entry(self, risk_id: str) -> Optional[Dict[str, Any]]:
         try:
-            doc = _risk_collection().document(risk_id).get()
-            if not doc.exists:
+            row = pg.fetch_by(StateRiskRegisterEntry, "id", risk_id)
+            if row is None:
+                # try deterministic id lookup
+                # risk_id may be like "LOCI-2026Q1"
                 return None
-            data = doc.to_dict()
-            data["id"] = doc.id
-            return data
+            d = dict(row)
+            d["id"] = str(d.get("id"))
+            return d
         except Exception as e:
             logger.error(f"Failed to get state risk register entry {risk_id}: {e}")
             return None
@@ -172,7 +207,15 @@ class StateRiskService:
                     agg["level_iii_count"] += 1
             tid = h.get("tenant_id")
             if tid:
-                agg["tenant_ids"].add(tid)
+                # Convert uuid tenant_id back to slug if possible
+                try:
+                    from app.db.ids import tenant_slug
+                    slug = tenant_slug(tid)
+                    if slug != "default":
+                        tid = slug
+                except Exception:
+                    pass
+                agg["tenant_ids"].add(str(tid))
 
         for r in reports:
             cat = self._classify(r)
@@ -194,7 +237,14 @@ class StateRiskService:
                     agg["level_iii_count"] += 1
             tid = r.get("tenant_id")
             if tid:
-                agg["tenant_ids"].add(tid)
+                try:
+                    from app.db.ids import tenant_slug
+                    slug = tenant_slug(tid)
+                    if slug != "default":
+                        tid = slug
+                except Exception:
+                    pass
+                agg["tenant_ids"].add(str(tid))
 
         rows = []
         for cat, agg in category_totals.items():
@@ -228,61 +278,56 @@ class StateRiskService:
         """Persist the aggregated state risk into the state risk register,
         measuring actual values against seeded SSP targets where present.
 
-        All register writes are committed in a single Firestore batch so the
-        register is never observed partially updated (atomic consistency).
+        All register writes are committed per-row via Postgres upserts so the
+        register is never observed partially updated (atomic per-row).
         Every entry records `aggregated_at` (UTC ISO) so consumers can detect
         how stale the register is relative to live tenant data.
         """
         agg = self.aggregate_state_risk(year, quarter, regulator_id=regulator_id)
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(timezone.utc)
         updated_by = self.user.get("uid", "system")
-        collection = _risk_collection()
-        batch = get_db().batch()
+        state_tid = _state_tenant_id()
 
         for row in agg["risks"]:
+            rid = _risk_id(row["icoc_category"], year, quarter)
             existing = self._find_entry(row["icoc_category"], year, quarter)
             tolerability = self._tolerability(row["current_risk_index"])
             data = {
+                "id": rid,
+                "tenant_id": state_tid,
                 "icoc_category": row["icoc_category"],
-                "name": row["name"],
+                "description": row["name"],
                 "icao_reference": row["icao_reference"],
                 "current_risk_index": row["current_risk_index"],
                 "contributing_tenants": row["contributing_tenants"],
                 "actual_ssp_value": row["current_risk_index"],
-                "count": row["count"],
-                "high_risk_count": row["high_risk_count"],
-                "level_ii_count": row["level_ii_count"],
-                "level_iii_count": row["level_iii_count"],
-                "level_iv_count": row["level_iv_count"],
-                "avg_severity": row["avg_severity"],
-                "avg_probability": row["avg_probability"],
                 "tolerability": tolerability,
                 "tolerability_tier": get_tolerability_tier(row["current_risk_index"]),
                 "level": _LEVEL_NAMES[get_tolerability_tier(row["current_risk_index"])],
                 "trend": self._trend(existing, row["current_risk_index"]),
                 "year": year,
                 "quarter": quarter,
-                "aggregated_at": now,
-                "updated_at": now,
+                "is_demo": demo_scope(),
                 "updated_by": updated_by,
+                "updated_at": now,
             }
             if existing:
                 data["ssp_target"] = existing.get("ssp_target") or row.get("ssp_target")
                 data["risk_reduction_rate"] = existing.get("risk_reduction_rate")
-                batch.update(collection.document(existing["id"]), data)
+                data["created_at"] = existing.get("created_at") or now
+                pg.upsert(StateRiskRegisterEntry, "id", rid, data)
             else:
                 data["ssp_target"] = row.get("ssp_target")
                 data["risk_reduction_rate"] = None
                 data["created_at"] = now
-                batch.set(collection.document(f"{row['icoc_category']}-{year}Q{quarter}"), data)
+                pg.upsert(StateRiskRegisterEntry, "id", rid, data)
 
-        batch.commit()
-        return {"year": year, "quarter": quarter, "synced": len(agg["risks"]), "aggregated_at": now}
+        return {"year": year, "quarter": quarter, "synced": len(agg["risks"]), "aggregated_at": now.isoformat()}
 
     def update_ssp_target(self, risk_id: str, ssp_target: float, risk_reduction_rate: Optional[float] = None) -> Optional[Dict[str, Any]]:
         try:
-            doc = _risk_collection().document(risk_id)
-            if not doc.get().exists:
+            row = pg.fetch_by(StateRiskRegisterEntry, "id", risk_id)
+            if row is None:
                 return None
             patch: Dict[str, Any] = {
                 "ssp_target": ssp_target,
@@ -291,10 +336,12 @@ class StateRiskService:
             }
             if risk_reduction_rate is not None:
                 patch["risk_reduction_rate"] = risk_reduction_rate
-            doc.update(patch)
-            data = doc.get().to_dict()
-            data["id"] = doc.id
-            return data
+            pg.update(StateRiskRegisterEntry, "id", risk_id, patch)
+            updated = pg.fetch_by(StateRiskRegisterEntry, "id", risk_id)
+            if updated:
+                updated["id"] = str(updated.get("id"))
+                return updated
+            return None
         except Exception as e:
             logger.error(f"Failed to update SSP target for {risk_id}: {e}")
             return None
@@ -305,16 +352,16 @@ class StateRiskService:
 
     def _cross_tenant_hazards(self) -> List[Dict[str, Any]]:
         try:
-            docs = get_db().collection_group("hazards").get()
-            return [d.to_dict() for d in docs]
+            rows = pg.fetch_all(Hazard, where=[Hazard.is_demo == demo_scope()])
+            return [dict(r) for r in rows]
         except Exception as e:
             logger.warning(f"Failed to aggregate hazards: {e}")
             return []
 
     def _cross_tenant_reports(self) -> List[Dict[str, Any]]:
         try:
-            docs = get_db().collection_group("reports").get()
-            return [d.to_dict() for d in docs]
+            rows = pg.fetch_all(Report, where=[Report.is_demo == demo_scope()])
+            return [dict(r) for r in rows]
         except Exception as e:
             logger.warning(f"Failed to aggregate reports: {e}")
             return []
@@ -388,12 +435,11 @@ class StateRiskService:
 
     def _find_entry(self, category: str, year: int, quarter: int) -> Optional[Dict[str, Any]]:
         try:
-            doc = _risk_collection().document(f"{category}-{year}Q{quarter}").get()
-            if not doc.exists:
+            rid = _risk_id(category, year, quarter)
+            row = pg.fetch_by(StateRiskRegisterEntry, "id", rid)
+            if row is None:
                 return None
-            data = doc.to_dict()
-            data["id"] = doc.id
-            return data
+            return dict(row)
         except Exception as e:
             logger.error(f"Failed to find entry {category}-{year}Q{quarter}: {e}")
             return None

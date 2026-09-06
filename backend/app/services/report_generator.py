@@ -4,7 +4,10 @@ from collections import Counter
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection
+from app.db import pg
+from app.db.db_models import Can, Cap, Hazard, StateRiskRegisterEntry
+from app.db.ids import tenant_uuid
+from app.db.isolation import demo_scope
 from app.services.risk_matrix import normalize_tolerability
 
 
@@ -21,14 +24,14 @@ class ReportGenerator:
 
     def _get_hazards(self, user: dict) -> List[dict]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES and not self.tenant_id:
-                docs = get_cross_tenant_collection(HAZARD_COLLECTION).get()
-            else:
-                docs = get_tenant_collection(self.tenant_id, HAZARD_COLLECTION).get()
+            where = [Hazard.is_demo == demo_scope()]
+            if not (user.get("role") in settings.CROSS_TENANT_ROLES and not self.tenant_id):
+                if self.tenant_id:
+                    where.append(Hazard.tenant_id == tenant_uuid(self.tenant_id))
+            rows = pg.fetch_all(Hazard, where=where)
             results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
+            for data in rows:
+                data = dict(data)
                 self._serialize_timestamps(data)
                 results.append(data)
             return results
@@ -38,19 +41,31 @@ class ReportGenerator:
 
     def _get_cans(self, user: dict) -> List[dict]:
         try:
-            if user.get("role") in settings.CROSS_TENANT_ROLES and not self.tenant_id:
-                docs = get_cross_tenant_collection(CAN_COLLECTION).get()
-            else:
-                docs = get_tenant_collection(self.tenant_id, CAN_COLLECTION).get()
+            can_where = [Can.is_demo == demo_scope()]
+            cap_where = [Cap.is_demo == demo_scope()] if hasattr(Cap, "is_demo") else []
+            is_cross = user.get("role") in settings.CROSS_TENANT_ROLES and not self.tenant_id
+            if not is_cross and self.tenant_id:
+                tid = tenant_uuid(self.tenant_id)
+                can_where.append(Can.tenant_id == tid)
+                if cap_where is not []:
+                    cap_where.append(Cap.tenant_id == tid)
+            cans = pg.fetch_all(Can, where=can_where)
+            # Batch caps for the same scope to avoid N+1
+            try:
+                all_caps = pg.fetch_all(Cap, where=cap_where) if cap_where else pg.fetch_all(Cap)
+            except Exception:
+                all_caps = []
+            caps_by_can: dict = {}
+            for cd in all_caps:
+                caps_by_can.setdefault(str(cd.get("can_id") or ""), []).append(cd)
             results = []
-            for doc in docs:
-                data = doc.to_dict()
-                data["id"] = doc.id
-                caps = list(doc.reference.collection(CAP_SUBCOLLECTION).get())
+            for data in cans:
+                data = dict(data)
+                cid = str(data.get("id") or "")
+                caps = caps_by_can.get(cid, [])
                 data["caps"] = []
                 for cap in caps:
-                    cd = cap.to_dict()
-                    cd["id"] = cap.id
+                    cd = dict(cap)
                     self._serialize_timestamps(cd)
                     data["caps"].append(cd)
                 self._serialize_timestamps(data)
@@ -284,12 +299,10 @@ class ReportGenerator:
         # instead of a hardcoded placeholder.
         state_metrics = {}
         try:
-            from app.services.state_risk_service import StateRiskService
-            from app.services.state_risk_service import _risk_collection
-            rows = list(_risk_collection().stream())
+            rows = pg.fetch_all(StateRiskRegisterEntry)
             if rows:
-                latest = max(rows, key=lambda r: (r.to_dict().get("year", 0), r.to_dict().get("quarter", 0)))
-                d = latest.to_dict()
+                latest = max(rows, key=lambda r: (r.get("year", 0), r.get("quarter", 0)))
+                d = latest
                 reduction = d.get("risk_reduction_rate")
                 state_metrics = {
                     "risk_reduction_rate": round(float(reduction), 1) if reduction is not None else 0.0,
@@ -313,12 +326,12 @@ class ReportGenerator:
 
     @staticmethod
     def _avg_ssp_target(rows) -> Optional[float]:
-        vals = [r.to_dict().get("ssp_target") for r in rows if r.to_dict().get("ssp_target") is not None]
+        vals = [r.get("ssp_target") for r in rows if r.get("ssp_target") is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
     @staticmethod
     def _avg_ssp_actual(rows) -> Optional[float]:
-        vals = [r.to_dict().get("actual_ssp_value") for r in rows if r.to_dict().get("actual_ssp_value") is not None]
+        vals = [r.get("actual_ssp_value") for r in rows if r.get("actual_ssp_value") is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
     def _generate_insights(self, risk_dist: dict, can_cap_status: dict, top_risks: list) -> List[str]:

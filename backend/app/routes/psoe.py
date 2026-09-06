@@ -4,11 +4,12 @@
 # PURPOSE: PSOE Audit & Surveillance endpoints (Phase 3 Step 2A/2C). Serves the
 #          CAAN SMS Procedure Manual Appendix 10 checklist template and manages
 #          tenant-scoped surveillance assessments. Assessments are stored in
-#          the top-level ``psoe_assessments`` collection (each doc carries
-#          ``tenant_id``) so CAAN_SMD can review assessments across operators.
+#          the Postgres `psoe_assessments` table (each row carries
+#          ``tenant_id`` UUID) so CAAN_SMD can review assessments across operators.
 #          Step 2C adds the export endpoint for PDF/HTML audit reports.
 # ============================================================================
 
+import uuid as _uuid
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
@@ -23,7 +24,10 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import PsoeAssessment as PgAssessment, Tenant
+from app.db.ids import tenant_uuid, tenant_slug, register_tenant
+from app.db.isolation import demo_scope
 from app.middleware.auth import get_current_user, get_safety_manager
 from app.models.psoe import (
     PSOEAnswer,
@@ -45,16 +49,45 @@ router = APIRouter()
 PSOE_COLLECTION = "psoe_assessments"
 
 
-def _coll():
-    return get_db().collection(PSOE_COLLECTION)
+def _ensure_tenant_registry() -> None:
+    try:
+        from app.db.ids import _slug_by_uuid
+        if _slug_by_uuid:
+            return
+        for row in pg.fetch_all(Tenant):
+            slug = row.get("slug")
+            if slug:
+                register_tenant(slug)
+    except Exception:
+        pass
 
 
-def _doc_to_assessment(snap) -> PSOEAssessment:
-    data = dict(snap.to_dict() or {})
-    data["id"] = data.get("id") or snap.id
-    responses = data.get("responses") or []
-    data["responses"] = [PSOEAnswer.model_validate(r) if isinstance(r, dict) else r for r in responses]
-    return PSOEAssessment.model_validate(data)
+def _row_to_assessment(row: Dict[str, Any]) -> PSOEAssessment:
+    # Convert uuid tenant_id back to slug for the API contract
+    tid = row.get("tenant_id")
+    if tid is not None:
+        _ensure_tenant_registry()
+        slug = tenant_slug(tid)
+        if slug != "default":
+            row = dict(row)
+            row["tenant_id"] = slug
+        else:
+            # fallback: if uuid not in registry, try to resolve via slug search
+            try:
+                for t in pg.fetch_all(Tenant):
+                    if str(tenant_uuid(t.get("slug") or "")) == str(tid):
+                        row = dict(row)
+                        row["tenant_id"] = t.get("slug")
+                        break
+            except Exception:
+                pass
+    # Ensure id field present (PG stores as uuid)
+    row = dict(row)
+    row.setdefault("id", str(row.get("id") or ""))
+    # Normalize datetime fields that may be stored as strings
+    responses = row.get("responses") or []
+    row["responses"] = [PSOEAnswer.model_validate(r) if isinstance(r, dict) else r for r in responses]
+    return PSOEAssessment.model_validate(row)
 
 
 def _effective_tenant(user: Dict[str, Any], requested: Optional[str]) -> str:
@@ -100,31 +133,44 @@ async def list_assessments(
     if archetypeId and str(archetypeId).strip().startswith("demo-"):
         effective = str(archetypeId).strip()
     try:
-        docs = _coll().get()
+        where = [PgAssessment.is_demo == demo_scope()]
+        if effective:
+            where.append(PgAssessment.tenant_id == tenant_uuid(effective))
+        rows = pg.fetch_all(PgAssessment, where=where)
     except Exception as e:
         logger.error(f"Failed to list PSOE assessments: {e}")
         raise HTTPException(status_code=500, detail="Assessment storage unavailable")
 
     items = []
-    for snap in docs:
-        data = snap.to_dict() or {}
-        if effective and data.get("tenant_id") != effective:
+    _ensure_tenant_registry()
+    for row in rows:
+        if status and row.get("status") != status:
             continue
-        if status and data.get("status") != status:
-            continue
+        # Map row tenant uuid back to slug for filtering already done via where
+        tid_slug = tenant_slug(row.get("tenant_id")) if row.get("tenant_id") else ""
+        if tid_slug == "default":
+            # fallback lookup
+            tid_slug = row.get("tenant_id") or ""
+            try:
+                for t in pg.fetch_all(Tenant):
+                    if str(tenant_uuid(t.get("slug") or "")) == str(row.get("tenant_id")):
+                        tid_slug = t.get("slug")
+                        break
+            except Exception:
+                pass
         items.append(PSOEAssessmentListItem(
-            id=data.get("id") or snap.id,
-            tenant_id=data.get("tenant_id", ""),
-            title=data.get("title", ""),
-            status=data.get("status", "draft"),
-            department=data.get("department"),
-            scope=data.get("scope"),
-            template_version=data.get("template_version"),
-            overall_score_pct=data.get("overall_score_pct"),
-            overall_level=data.get("overall_level"),
-            assessment_date=data.get("assessment_date"),
-            created_at=data.get("created_at"),
-            updated_at=data.get("updated_at"),
+            id=str(row.get("id") or ""),
+            tenant_id=tid_slug,
+            title=row.get("title", ""),
+            status=row.get("status", "draft"),
+            department=row.get("department"),
+            scope=row.get("scope"),
+            template_version=row.get("template_version"),
+            overall_score_pct=row.get("overall_score_pct"),
+            overall_level=row.get("overall_level"),
+            assessment_date=row.get("assessment_date"),
+            created_at=row.get("created_at"),
+            updated_at=row.get("updated_at"),
         ))
     items.sort(key=lambda i: i.created_at or datetime.min, reverse=True)
     return items
@@ -149,8 +195,10 @@ async def create_assessment(
 
     scores = score_assessment(payload.responses)
     now = datetime.now(timezone.utc)
+    doc_id = str(_uuid.uuid4())
     doc = {
-        "tenant_id": tenant_id,
+        "id": doc_id,
+        "tenant_id": tenant_uuid(tenant_id),
         "title": payload.title,
         "status": "draft",
         "department": payload.department,
@@ -167,14 +215,13 @@ async def create_assessment(
         "created_by_uid": user.get("uid"),
         "created_at": now,
         "updated_at": now,
+        "is_demo": demo_scope(),
         "notes": payload.notes,
     }
 
     try:
-        result = _coll().add(doc)
-        doc_id = result[1].id if isinstance(result, tuple) else result.id
-        doc["id"] = doc_id
-        _coll().document(doc_id).update({"id": doc_id})
+        register_tenant(tenant_id)
+        pg.upsert(PgAssessment, "id", doc_id, doc)
     except Exception as e:
         logger.error(f"Failed to persist PSOE assessment: {e}")
         raise HTTPException(status_code=500, detail="Failed to persist assessment")
@@ -188,6 +235,10 @@ async def create_assessment(
         metadata={"title": payload.title, "status": "draft", "overall_score_pct": scores["overall_score_pct"]},
     )
 
+    # Return with slug tenant_id for API contract
+    doc["tenant_id"] = tenant_id
+    responses = doc.get("responses") or []
+    doc["responses"] = [PSOEAnswer.model_validate(r) if isinstance(r, dict) else r for r in responses]
     return PSOEAssessment.model_validate(doc)
 
 
@@ -200,17 +251,29 @@ async def get_assessment(
     """Return a single PSOE assessment with its responses and scores."""
     effective = _effective_tenant(user, tenant_id)
     try:
-        snap = _coll().document(assessment_id).get()
+        row = pg.fetch_by(PgAssessment, "id", assessment_id)
     except Exception as e:
         logger.error(f"Failed to read PSOE assessment {assessment_id}: {e}")
         raise HTTPException(status_code=500, detail="Assessment storage unavailable")
-    if snap is None or not snap.exists:
+    if row is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
 
-    data = snap.to_dict() or {}
-    if effective and data.get("tenant_id") != effective:
+    # Re-hydrate slug for access check
+    _ensure_tenant_registry()
+    row_tenant_slug = tenant_slug(row.get("tenant_id"))
+    if row_tenant_slug == "default":
+        try:
+            for t in pg.fetch_all(Tenant):
+                if str(tenant_uuid(t.get("slug") or "")) == str(row.get("tenant_id")):
+                    row_tenant_slug = t.get("slug")
+                    break
+        except Exception:
+            pass
+        if row_tenant_slug == "default":
+            row_tenant_slug = str(row.get("tenant_id") or "")
+    if effective and row_tenant_slug != effective:
         raise HTTPException(status_code=403, detail="Cannot access another tenant's assessment")
-    return _doc_to_assessment(snap)
+    return _row_to_assessment(row)
 
 
 @router.patch("/assessments/{assessment_id}", response_model=PSOEAssessment)
@@ -223,15 +286,26 @@ async def update_assessment(
     """Update an existing PSOE assessment (TENANT_ADMIN / AIRLINE_ADMIN / CAAN_SMD)."""
     effective = _effective_tenant(user, tenant_id)
     try:
-        snap = _coll().document(assessment_id).get()
+        row = pg.fetch_by(PgAssessment, "id", assessment_id)
     except Exception as e:
         logger.error(f"Failed to read PSOE assessment {assessment_id}: {e}")
         raise HTTPException(status_code=500, detail="Assessment storage unavailable")
-    if snap is None or not snap.exists:
+    if row is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
 
-    data = snap.to_dict() or {}
-    if effective and data.get("tenant_id") != effective:
+    _ensure_tenant_registry()
+    row_tenant_slug = tenant_slug(row.get("tenant_id"))
+    if row_tenant_slug == "default":
+        try:
+            for t in pg.fetch_all(Tenant):
+                if str(tenant_uuid(t.get("slug") or "")) == str(row.get("tenant_id")):
+                    row_tenant_slug = t.get("slug")
+                    break
+        except Exception:
+            pass
+        if row_tenant_slug == "default":
+            row_tenant_slug = str(row.get("tenant_id") or "")
+    if effective and row_tenant_slug != effective:
         raise HTTPException(status_code=403, detail="Cannot access another tenant's assessment")
 
     updates: Dict[str, Any] = {}
@@ -249,7 +323,7 @@ async def update_assessment(
 
     updates["updated_at"] = datetime.now(timezone.utc)
     try:
-        _coll().document(assessment_id).update(updates)
+        pg.update(PgAssessment, "id", assessment_id, updates)
     except Exception as e:
         logger.error(f"Failed to update PSOE assessment {assessment_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to update assessment")
@@ -257,18 +331,16 @@ async def update_assessment(
     log_audit(
         action="PSOE_ASSESSMENT_UPDATED",
         user=user.get("email"),
-        tenant_id=data.get("tenant_id", ""),
+        tenant_id=row_tenant_slug,
         target_type="psoe_assessment",
         target_id=assessment_id,
         metadata={"updated_fields": sorted(updates.keys())},
     )
 
-    merged = dict(data)
+    merged = dict(row)
     merged.update(updates)
     merged["id"] = assessment_id
-    responses = merged.get("responses") or []
-    merged["responses"] = [PSOEAnswer.model_validate(r) if isinstance(r, dict) else r for r in responses]
-    return PSOEAssessment.model_validate(merged)
+    return _row_to_assessment(merged)
 
 
 # ── Step 2C: Export PDF/HTML Report ─────────────────────────────────────────
@@ -584,18 +656,29 @@ async def export_assessment_report(
     """
     effective = _effective_tenant(user, tenant_id)
     try:
-        snap = _coll().document(assessment_id).get()
+        row = pg.fetch_by(PgAssessment, "id", assessment_id)
     except Exception as e:
         logger.error(f"Failed to read PSOE assessment {assessment_id}: {e}")
         raise HTTPException(status_code=500, detail="Assessment storage unavailable")
-    if snap is None or not snap.exists:
+    if row is None:
         raise HTTPException(status_code=404, detail="Assessment not found")
 
-    data = snap.to_dict() or {}
-    if effective and data.get("tenant_id") != effective:
+    _ensure_tenant_registry()
+    row_tenant_slug = tenant_slug(row.get("tenant_id"))
+    if row_tenant_slug == "default":
+        try:
+            for t in pg.fetch_all(Tenant):
+                if str(tenant_uuid(t.get("slug") or "")) == str(row.get("tenant_id")):
+                    row_tenant_slug = t.get("slug")
+                    break
+        except Exception:
+            pass
+        if row_tenant_slug == "default":
+            row_tenant_slug = str(row.get("tenant_id") or "")
+    if effective and row_tenant_slug != effective:
         raise HTTPException(status_code=403, detail="Cannot access another tenant's assessment")
 
-    assessment = _doc_to_assessment(snap)
+    assessment = _row_to_assessment(row)
     template = await load_template()
 
     # Determine format from Accept header or query param
@@ -617,7 +700,7 @@ async def export_assessment_report(
     log_audit(
         action="PSOE_REPORT_EXPORTED",
         user=user.get("email"),
-        tenant_id=data.get("tenant_id", ""),
+        tenant_id=row_tenant_slug,
         target_type="psoe_assessment",
         target_id=assessment_id,
         metadata={"format": "pdf", "assessment_title": assessment.title},

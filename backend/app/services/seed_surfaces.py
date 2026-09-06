@@ -7,7 +7,7 @@
 #               tenant that was created at Step 2 — never a hardcoded list.
 #             * The ICAO state-risk reference register (global reference data,
 #               seeded from the shared taxonomy, not from any tenant list).
-#          Both write an audit row and are keyed off existing Firestore
+#          Both write an audit row and are keyed off existing Postgres
 #          tenants/regulators so there are no hardcoded tenants anywhere.
 # ============================================================================
 
@@ -17,7 +17,10 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import PsoeAssessment as PgAssessment, StateRiskCategory, Tenant
+from app.db.ids import tenant_uuid, register_tenant
+from app.db.isolation import demo_scope
 from app.models.psoe import PSOEAnswer
 from app.services.psoe_service import load_template, score_assessment
 from app.services.production_seed import _audit, _validate_id
@@ -61,8 +64,7 @@ _PLAN_DRAFT = {
 
 
 def _tenant_exists(tid: str) -> bool:
-    snap = get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get()
-    return bool(snap.exists)
+    return pg.fetch_by(Tenant, "slug", tid) is not None
 
 
 def _pane(code: str) -> str:
@@ -99,8 +101,6 @@ async def seed_psoe_tenant(tenant_id: str, actor: Dict[str, Any],
         raise ValueError(f"tenant not found: {tid}")
 
     template = load_template()
-    db = get_db()
-    coll = db.collection("psoe_assessments")
     now = datetime.now(timezone.utc)
 
     variations = (
@@ -114,22 +114,25 @@ async def seed_psoe_tenant(tenant_id: str, actor: Dict[str, Any],
     written = []
     for suffix, status, title_head, scope, plan, days_ago, pane_code in variations:
         doc_id = f"{tid}-{suffix}"
-        if not force and coll.document(doc_id).get().exists:
+        # Use deterministic uuid for PG id column
+        from app.db.ids import uuid5
+        pg_id = uuid5("psoe", tid, suffix)
+        existing = pg.fetch_by(PgAssessment, "id", pg_id)
+        if not force and existing is not None:
             written.append({"id": doc_id, "status": status, "skipped": True})
             continue
 
         responses = _responses_from_plan(template, plan)
         scores = score_assessment(responses)
         doc = {
-            "id": doc_id,
-            "tenant_id": tid,
+            "id": pg_id,
+            "tenant_id": tenant_uuid(tid),
             "title": f"{title_head} — {tid}",
             "status": status,
             "department": "Safety",
             "scope": scope,
             "auditor_name": "Super-Admin Baseline",
             "assessor_email": f"admin@{tid}.com",
-            "pane": _pane(pane_code),
             "assessment_date": (now - timedelta(days=days_ago)).date().isoformat(),
             "template_version": template.version,
             "responses": [r.model_dump() for r in responses],
@@ -139,9 +142,11 @@ async def seed_psoe_tenant(tenant_id: str, actor: Dict[str, Any],
             "created_by": "production-setup",
             "created_at": now,
             "updated_at": now,
-            "seed_version": "production-setup-1",
+            "is_demo": demo_scope(),
+            "notes": f"pane:{_pane(pane_code)} seed_version:production-setup-1",
         }
-        coll.document(doc_id).set(doc)
+        register_tenant(tid)
+        pg.upsert(PgAssessment, "id", pg_id, doc)
         written.append({"id": doc_id, "status": status, "skipped": False})
 
     written_detail = ", ".join(f"{w['id']}({w['status']})" for w in written)
@@ -175,13 +180,14 @@ async def seed_state_risk_reference(actor: Dict[str, Any]) -> Dict[str, Any]:
     This is global reference taxonomy (regulator-facing). Tenants are not
     involved, so nothing is hardcoded to any operator.
     """
-    coll = (
-        get_db().collection(STATE_COLLECTION)
-        .document(ICAO_REFERENCE_DOCUMENT).collection("categories")
-    )
     written = 0
     for cat_def in ICAO_TOP_RISK_CATEGORIES:
-        coll.document(cat_def["category"]).set(cat_def)
+        doc = {
+            "slug": cat_def["category"],
+            "name": cat_def["name"],
+            "data": dict(cat_def),
+        }
+        pg.upsert(StateRiskCategory, "slug", cat_def["category"], doc)
         written += 1
     _audit("STATE_RISK_REFERENCE_SEEDED", actor, ICAO_REFERENCE_DOCUMENT,
            f"Seeded {written} ICAO top-risk reference categories")
