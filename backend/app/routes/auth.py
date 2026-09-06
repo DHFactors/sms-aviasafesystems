@@ -317,6 +317,7 @@ class JoinTeamRequest(BaseModel):
     tenant_id: Optional[str] = None
     full_name: str = Field(..., min_length=1)
     email: str = Field(..., description="Email address (validated on the client and via corporate email service)")
+    phone: Optional[str] = Field(None, max_length=30, description="Phone number for SMS notifications")
     password: str
     confirm_password: str
     department: str = Field(..., min_length=1)
@@ -403,6 +404,7 @@ async def join_team_endpoint(
             tenant_id=body.tenant_id,
             full_name=body.full_name,
             email=body.email,
+            phone=body.phone,
             password=body.password,
             department=body.department,
             operational_role=body.operational_role,

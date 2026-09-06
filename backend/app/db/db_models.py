@@ -1445,6 +1445,8 @@ class UserProfile(Base):
     role: Mapped[object] = mapped_column(Text, nullable=True)
     tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
     department: Mapped[object] = mapped_column(Text, nullable=True)
+    phone: Mapped[object] = mapped_column(Text, nullable=True)
+    phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     claims: Mapped[object] = mapped_column(JSONB, nullable=True)
     data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
     created_at: Mapped[datetime] = mapped_column(

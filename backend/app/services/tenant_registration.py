@@ -528,6 +528,7 @@ def join_team(
     tenant_id: Optional[str] = None,
     full_name: str,
     email: str,
+    phone: Optional[str] = None,
     password: str,
     department: str,
     operational_role: Optional[str] = None,
@@ -609,6 +610,8 @@ def join_team(
         "tenant_id": tid,
         "department": label,
         "status": "ACTIVE",
+        "phone": phone.strip() if phone and phone.strip() else None,
+        "phone_verified": False,
         "created_at": now,
         "updated_at": now,
     }

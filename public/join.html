@@ -125,6 +125,14 @@
                            placeholder="you@yourorganization.com" required>
                 </div>
 
+                <!-- Phone Number Field -->
+                <div class="form-group">
+                    <label for="phone">Phone Number <span style="font-weight:400;color:#64748b;">(Optional)</span></label>
+                    <input type="tel" id="phone" class="form-control"
+                           placeholder="e.g., +977 9841 234567">
+                    <p class="form-hint">Used for SMS notifications and account recovery.</p>
+                </div>
+
                 <div class="form-group">
                     <label for="department">Department / Division</label>
                     <select id="department" class="form-control" disabled required>
@@ -389,6 +397,7 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     var inviteCode = document.getElementById('inviteCode').value.trim().toUpperCase();
     var fullName = document.getElementById('fullName').value.trim();
     var email = document.getElementById('email').value.trim();
+    var phone = document.getElementById('phone') ? document.getElementById('phone').value.trim() : '';
     var deptSelect = document.getElementById('department');
     var department = deptSelect.value;
     var operationalRole = document.getElementById('operationalRole').value;
@@ -433,6 +442,7 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
         invite_code: inviteCode,
         full_name: fullName,
         email: email,
+        phone: phone || null,
         password: password,
         confirm_password: confirmPassword,
         department: department,

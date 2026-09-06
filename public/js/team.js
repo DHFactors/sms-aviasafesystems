@@ -135,13 +135,14 @@
     function renderUsers(users) {
         var tbody = document.getElementById('usersTableBody');
         if (!users || !users.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="empty">No team members found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="empty">No team members found.</td></tr>';
             return;
         }
         tbody.innerHTML = users.map(function (u) {
             return '<tr>' +
-                '<td>' + esc(u.displayName || '—') + '</td>' +
+                '<td>' + esc(u.displayName || u.display_name || '—') + '</td>' +
                 '<td>' + esc(u.email || '—') + '</td>' +
+                '<td>' + esc(u.phone || '—') + '</td>' +
                 '<td>' + roleBadge(u.role) + '</td>' +
                 '<td class="dept-tag">' + esc(u.department || '—') + '</td>' +
                 '</tr>';
