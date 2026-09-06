@@ -17,7 +17,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from app.core.config import settings
-from app.firebase import get_auth, get_db, verify_firebase_token, create_custom_claims
+from app.firebase import get_auth, verify_firebase_token, create_custom_claims
 from app.middleware.rate_limit import (
     rate_limit,
     enforce_login_rate_limit,
@@ -298,7 +298,7 @@ async def verify_invite_endpoint(
     unknown or inactive.
     """
     try:
-        result = verify_invite(get_db(), code)
+        result = verify_invite(code)
     except LookupError:
         return JSONResponse(
             status_code=404,
@@ -441,7 +441,7 @@ async def tenant_lookup_endpoint(
     must already know the invite code to get this far.
     """
     try:
-        tid, tenant_doc = resolve_tenant(get_db(), code, tenant_id)
+        tid, tenant_doc = resolve_tenant(code, tenant_id)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:

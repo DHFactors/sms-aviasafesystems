@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
 from app.middleware import rate_limit as rl
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -172,9 +173,8 @@ class _TenantRef:
 
 
 def _patch_db(monkeypatch, db):
-    monkeypatch.setattr("app.routes.tenants.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
-    monkeypatch.setattr("app.services.tenant_service.get_db", lambda: db)
 
 
 def _patch_user(monkeypatch, user):

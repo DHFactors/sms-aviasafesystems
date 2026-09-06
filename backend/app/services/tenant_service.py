@@ -21,7 +21,8 @@ from typing import Any, Dict, Optional, Set
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Tenant
 
 SURVEY_RATE_LIMIT_OPTIONS = (5, 10, 25, 50, 100)
 
@@ -202,10 +203,11 @@ def save_tenant_config(
         fields, existing_config, existing_survey_config
     )
 
-    db = get_db()
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
     try:
-        tenant_ref.update({"config": updated, "surveyConfig": survey_config})
+        pg.update(
+            Tenant, "slug", tenant_id,
+            {"config": updated, "surveyConfig": survey_config},
+        )
     except Exception as e:
         logger.error(f"Failed to persist config for tenant {tenant_id}: {e}")
         raise RuntimeError("Failed to persist tenant config")

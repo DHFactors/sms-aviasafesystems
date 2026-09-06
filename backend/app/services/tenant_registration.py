@@ -30,6 +30,8 @@ from loguru import logger
 from firebase_admin import auth as firebase_auth
 
 from app.core.config import settings
+from app.db import pg
+from app.db.db_models import Tenant
 from app.firebase import get_db, get_auth
 from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
@@ -203,38 +205,36 @@ def slugify_organization(name: str) -> str:
     return slug or "organization"
 
 
-def _invite_code_taken(db: Any, code: str) -> bool:
+def _invite_code_taken(code: str) -> bool:
     try:
-        docs = (
-            db.collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .where("team_invite_code", "==", code)
-            .limit(1)
-            .get()
+        rows = pg.fetch_all(
+            Tenant,
+            where=[Tenant.data["team_invite_code"].astext == code],
+            limit=1,
         )
-        return len(docs) > 0
+        return len(rows) > 0
     except Exception as e:
         logger.warning(f"Invite-code uniqueness check failed: {e}")
         return False
 
 
-def generate_invite_code(db: Any) -> str:
+def generate_invite_code() -> str:
     """Return a unique 6-character alphanumeric team invite code."""
     for _ in range(25):
         code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(INVITE_CODE_LENGTH))
-        if not _invite_code_taken(db, code):
+        if not _invite_code_taken(code):
             return code
     raise RuntimeError("Unable to generate a unique team invite code")
 
 
-def _unique_tenant_id(db: Any, organization_name: str) -> str:
-    """Slugify the organization name and guarantee Firestore-document uniqueness."""
+def _unique_tenant_id(organization_name: str) -> str:
+    """Slugify the organization name and guarantee tenant-slug uniqueness."""
     base = slugify_organization(organization_name)
     candidate = base
     suffix = 2
     while True:
-        ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(candidate)
         try:
-            exists = ref.get().exists
+            exists = pg.fetch_by(Tenant, "slug", candidate) is not None
         except Exception as e:
             logger.warning(f"Tenant-id existence check failed for {candidate}: {e}")
             exists = False
@@ -326,7 +326,7 @@ def register_tenant(
     db = get_db()
     auth = get_auth()
     now = datetime.now(timezone.utc)
-    tid = _unique_tenant_id(db, organization_name)
+    tid = _unique_tenant_id(organization_name)
 
     user = _create_user(
         auth,
@@ -341,7 +341,7 @@ def register_tenant(
 
     operates_flights = scope.operates_flights
     applicable_departments = list(scope.departments)
-    invite_code = generate_invite_code(db)
+    invite_code = generate_invite_code()
 
     tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid)
     sandbox_tags = {}
@@ -349,29 +349,29 @@ def register_tenant(
         # Beta sandbox marker: self-service tenants created on the beta portal
         # are flagged for periodic cleanup / evaluation.
         sandbox_tags = {"is_beta_sandbox": True, "auto_expire_days": 30}
-    tenant_ref.set(
-        {
-            "tenant_id": tid,
-            "name": organization_name,
-            "tenant_type": scope.value,
-            "classification": scope.value,
-            "operates_flights": operates_flights,
-            "applicable_departments": applicable_departments,
-            "team_invite_code": invite_code,
-            "active": True,
-            "status": "Active",
-            "safety_manager": {
-                "email": email,
-                "name": admin_full_name,
-                "title": admin_title,
-                "uid": user.uid,
-            },
-            "config": {"survey_rate_limit": settings.SURVEY_RATE_LIMIT},
-            "created_at": now,
-            "updated_at": now,
-            **sandbox_tags,
-        }
-    )
+    tenant_doc = {
+        "tenant_id": tid,
+        "name": organization_name,
+        "tenant_type": scope.value,
+        "classification": scope.value,
+        "operates_flights": operates_flights,
+        "applicable_departments": applicable_departments,
+        "team_invite_code": invite_code,
+        "active": True,
+        "status": "Active",
+        "safety_manager": {
+            "email": email,
+            "name": admin_full_name,
+            "title": admin_title,
+            "uid": user.uid,
+        },
+        "config": {"survey_rate_limit": settings.SURVEY_RATE_LIMIT},
+        "created_at": now,
+        "updated_at": now,
+        **sandbox_tags,
+    }
+    tenant_ref.set(dict(tenant_doc))
+    pg.upsert(Tenant, "slug", tid, dict(tenant_doc))
 
     tenant_ref.collection("profile").document("operational").set(
         {
@@ -436,7 +436,6 @@ def register_tenant(
 
 
 def resolve_tenant(
-    db: Any,
     invite_code: Optional[str] = None,
     tenant_id: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
@@ -447,30 +446,31 @@ def resolve_tenant(
     """
     if tenant_id:
         tid = tenant_id.strip()
-        snap = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get()
-        if not snap.exists:
+        try:
+            data = pg.fetch_by(Tenant, "slug", tid)
+        except Exception:
             raise LookupError(f"Unknown tenant: {tid}")
-        data = snap.to_dict() or {}
+        if data is None:
+            raise LookupError(f"Unknown tenant: {tid}")
         if invite_code and invite_code.strip().upper() != str(data.get("team_invite_code") or "").upper():
             raise LookupError(f"Invite code does not match tenant {tid}")
         return tid, data
 
     if invite_code:
         code = invite_code.strip().upper()
-        docs = (
-            db.collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .where("team_invite_code", "==", code)
-            .limit(1)
-            .get()
+        rows = pg.fetch_all(
+            Tenant,
+            where=[Tenant.data["team_invite_code"].astext == code],
+            limit=1,
         )
-        for snap in docs:
-            return snap.id, snap.to_dict() or {}
+        for row in rows:
+            return row.get("slug") or row.get("id") or code, row
         raise LookupError(f"No tenant matches invite code: {code}")
 
     raise ValueError("An invite code or tenant id is required")
 
 
-def verify_invite(db: Any, code: Optional[str]) -> Dict[str, Any]:
+def verify_invite(code: Optional[str]) -> Dict[str, Any]:
     """Real-time invite-code verification for /join.html.
 
     Resolves the tenant by invite code and confirms it is active. Accepts both
@@ -486,12 +486,12 @@ def verify_invite(db: Any, code: Optional[str]) -> Dict[str, Any]:
     from app.services.invites import resolve_invite, department_label
 
     raw = code.strip()
-    invite = resolve_invite(db, raw)
+    invite = resolve_invite(raw)
     if invite:
         tid = invite.get("tenant_id")
         if not tid:
             raise LookupError("Invalid or expired invite code")
-        tid, tenant_doc = resolve_tenant(db, None, tid)
+        tid, tenant_doc = resolve_tenant(None, tid)
         active = tenant_doc.get("active")
         status = str(tenant_doc.get("status") or "").lower()
         if active is False or status == "inactive":
@@ -507,7 +507,7 @@ def verify_invite(db: Any, code: Optional[str]) -> Dict[str, Any]:
             "role": invite.get("role", settings.ROLE_DEFAULT),
         }
 
-    tid, tenant_doc = resolve_tenant(db, raw, None)
+    tid, tenant_doc = resolve_tenant(raw, None)
 
     active = tenant_doc.get("active")
     status = str(tenant_doc.get("status") or "").lower()
@@ -542,7 +542,6 @@ def join_team(
     _validate_password(password)
     validate_corporate_email(email)
 
-    db = get_db()
     auth = get_auth()
     now = datetime.now(timezone.utc)
 
@@ -556,7 +555,7 @@ def join_team(
     department_code: Optional[str] = None
 
     if invite_code and invite_code.strip():
-        invite = resolve_invite(db, invite_code.strip())
+        invite = resolve_invite(invite_code.strip())
         if invite:
             if str(invite.get("status") or "ACTIVE").strip().upper() != "ACTIVE":
                 raise LookupError("Invalid or expired invite code")
@@ -564,7 +563,7 @@ def join_team(
             if not tid:
                 raise LookupError("Invalid or expired invite code")
             try:
-                tid, tenant_doc = resolve_tenant(db, None, tid)
+                tid, tenant_doc = resolve_tenant(None, tid)
             except LookupError:
                 raise
             department_code = invite.get("department") or department.strip()
@@ -572,7 +571,7 @@ def join_team(
 
     if department_code is None:
         try:
-            tid, tenant_doc = resolve_tenant(db, invite_code, tenant_id)
+            tid, tenant_doc = resolve_tenant(invite_code, tenant_id)
         except LookupError:
             raise
         except Exception as e:

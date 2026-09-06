@@ -163,7 +163,6 @@ class _FakeDB:
 
 
 def _patch_db(monkeypatch, db):
-    monkeypatch.setattr("app.routes.tenants.get_db", lambda: db)
     patch_pg_through(monkeypatch, lambda: db)
 
 

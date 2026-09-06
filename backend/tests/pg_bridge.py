@@ -109,13 +109,20 @@ def _fetch_by(db, model, col, value):
     return None
 
 
+def _set_ref(ref, data, merge=True):
+    try:
+        ref.set(dict(data), merge=merge)
+    except TypeError:
+        ref.set(dict(data))
+
+
 def _upsert(db, model, col, value, data):
     coll = db.collection(model.__tablename__)
-    coll.document(value).set(dict(data), merge=True)
+    _set_ref(coll.document(value), data)
 
 
 def _insert(db, model, data):
-    id_col = pg_mod._ID_COLUMNS.get(model.__name__) or "id"
+    id_col = pg_mod._ID_COLUMNS.get(model.__tablename__) or "id"
     id_value = (data or {}).get(id_col)
     _upsert(db, model, id_col, str(id_value), data)
 
@@ -129,7 +136,7 @@ def _update(db, model, col, value, doc):
     snap = ref.get()
     merged = dict(snap.to_dict()) if getattr(snap, "exists", True) else {}
     merged.update(dict(doc))
-    ref.set(merged, merge=True)
+    _set_ref(ref, merged)
 
 
 def patch_pg_through(monkeypatch, db_or_getter):

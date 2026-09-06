@@ -30,7 +30,8 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Invite, Tenant
 from app.services.audit_service import log_audit, request_context
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
@@ -83,35 +84,31 @@ def department_to_code(value: Optional[str]) -> str:
     return v or ""
 
 
-def _invite_code_taken(db: Any, code: str) -> bool:
+def _invite_code_taken(code: str) -> bool:
     """True when the code is already used by a tenant's team invite or an
     admin-issued department-scoped invite."""
     try:
-        docs = (
-            db.collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .where("team_invite_code", "==", code)
-            .limit(1)
-            .get()
+        rows = pg.fetch_all(
+            Tenant, where=[Tenant.data["team_invite_code"].astext == code], limit=1
         )
-        if len(docs) > 0:
+        if rows:
             return True
-        snap = db.collection("invites").document(code).get()
-        return snap is not None and getattr(snap, "exists", False)
+        return pg.fetch_by(Invite, "code", code) is not None
     except Exception as e:
         logger.warning(f"Invite-code uniqueness check failed: {e}")
         return False
 
 
-def generate_invite_code(db: Any) -> str:
+def generate_invite_code() -> str:
     """Return a unique 6-character department-scoped invite code."""
     for _ in range(25):
         code = "".join(secrets.choice(INVITE_ALPHABET) for _ in range(INVITE_CODE_LENGTH))
-        if not _invite_code_taken(db, code):
+        if not _invite_code_taken(code):
             return code
     raise RuntimeError("Unable to generate a unique invite code")
 
 
-def resolve_invite(db: Any, code: Optional[str]) -> Optional[Dict[str, Any]]:
+def resolve_invite(code: Optional[str]) -> Optional[Dict[str, Any]]:
     """Look up a department-scoped invite document by its code.
 
     Returns None when the code is unknown. Callers decide whether to fall back
@@ -120,13 +117,13 @@ def resolve_invite(db: Any, code: Optional[str]) -> Optional[Dict[str, Any]]:
     if not code or not code.strip():
         return None
     try:
-        snap = db.collection("invites").document(code.strip().upper()).get()
+        data = pg.fetch_by(Invite, "code", code.strip().upper())
     except Exception as e:
         logger.warning(f"Invite lookup failed for code {code}: {e}")
         return None
-    if snap is None or not getattr(snap, "exists", False):
+    if data is None:
         return None
-    return snap.to_dict() or {}
+    return data
 
 
 def create_invite(
@@ -144,7 +141,6 @@ def create_invite(
       - DEPT_ADMIN: target department MUST equal the caller's department and
         the role MUST be STAFF (no cross-department invites, no escalation).
     """
-    db = get_db()
     tid = caller.get("tenant_id")
     if not tid:
         raise PermissionError("An authenticated tenant is required to issue invites")
@@ -157,15 +153,13 @@ def create_invite(
     dept_code = department_to_code(department)
     dept_label = department_label(dept_code)
 
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid)
     try:
-        tenant_snap = tenant_ref.get()
+        tenant_doc = pg.fetch_by(Tenant, "slug", tid)
     except Exception as e:
         logger.warning(f"Tenant lookup failed for invite ({tid}): {e}")
         raise RuntimeError("Tenant storage unavailable")
-    if tenant_snap is None or not getattr(tenant_snap, "exists", False):
+    if tenant_doc is None:
         raise LookupError(f"Unknown tenant: {tid}")
-    tenant_doc = tenant_snap.to_dict() or {}
     applicable = tenant_doc.get("applicable_departments") or []
 
     if caller_role in ("SUPER_ADMIN",) or caller_role in settings.TENANT_ADMIN_ROLES:
@@ -199,7 +193,7 @@ def create_invite(
             f"Allowed: {', '.join(applicable) or 'none'}"
         )
 
-    code = generate_invite_code(db)
+    code = generate_invite_code()
     now = datetime.now(timezone.utc)
     doc = {
         "code": code,
@@ -213,7 +207,7 @@ def create_invite(
         "status": "ACTIVE",
     }
     try:
-        db.collection("invites").document(code).set(doc)
+        pg.insert(Invite, doc)
     except Exception as e:
         logger.error(f"Failed to persist invite {code} for tenant {tid}: {e}")
         raise RuntimeError("Failed to persist the invite")
@@ -258,11 +252,8 @@ def list_invites(
     tid = caller.get("tenant_id")
     if not tid:
         raise PermissionError("An authenticated tenant is required to list invites")
-    db = get_db()
     try:
-        snapshots = (
-            db.collection("invites").where("tenant_id", "==", tid).get()
-        )
+        docs = pg.fetch_all(Invite, where=[Invite.tenant_id == tid])
     except Exception as e:
         logger.warning(f"Failed to list invites for tenant {tid}: {e}")
         raise RuntimeError("Failed to list invites")
@@ -272,14 +263,13 @@ def list_invites(
         caller_code = department_to_code(caller.get("department"))
 
     rows = []
-    for snap in snapshots:
-        data = snap.to_dict() or {}
+    for data in docs:
         dept = data.get("department") or department_to_code(data.get("department_label"))
         if caller_code and department_to_code(dept) != caller_code:
             continue
         rows.append(
             {
-                "code": data.get("code") or snap.id,
+                "code": data.get("code") or data.get("id"),
                 "tenant_id": data.get("tenant_id"),
                 "department": dept,
                 "department_label": department_label(dept),

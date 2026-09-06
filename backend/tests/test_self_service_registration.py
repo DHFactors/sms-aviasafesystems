@@ -203,7 +203,6 @@ class _FakeAuth:
 
 def _patch(monkeypatch, db, auth=None):
     monkeypatch.setattr("app.firebase.get_db", lambda: db)
-    monkeypatch.setattr("app.routes.auth.get_db", lambda: db)
     monkeypatch.setattr("app.services.tenant_registration.get_db", lambda: db)
     patch_pg_through(monkeypatch, lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)

@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Tenant
 from app.middleware.auth import get_current_user
 from app.services.audit_service import log_audit, request_context
 from app.services.tenant_service import (
@@ -107,17 +108,14 @@ async def get_tenant_config(
     tenants. The config map is returned as stored (missing fields omitted).
     """
     tenant_id = tenant_id.strip()
-    db = get_db()
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
     try:
-        tenant_snap = tenant_ref.get()
+        tenant_data = pg.fetch_by(Tenant, "slug", tenant_id)
     except Exception as e:
         logger.warning(f"Tenant config lookup failed for {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail="Tenant storage unavailable")
-    if not tenant_snap.exists:
+    if tenant_data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown tenant: {tenant_id}")
 
-    tenant_data = tenant_snap.to_dict() or {}
     config = tenant_data.get("config") or {}
     survey_config = dict(tenant_data.get("surveyConfig") or {})
     # Fall back to the canonical config map so dates/active set via PUT are
@@ -192,17 +190,14 @@ async def update_tenant_config(
             detail=f"survey_rate_limit must be one of {', '.join(str(o) for o in SURVEY_RATE_LIMIT_OPTIONS)}",
         )
 
-    db = get_db()
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id)
     try:
-        tenant_snap = tenant_ref.get()
+        tenant_data = pg.fetch_by(Tenant, "slug", tenant_id)
     except Exception as e:
         logger.warning(f"Tenant config lookup failed for {tenant_id}: {e}")
         raise HTTPException(status_code=500, detail="Tenant storage unavailable")
-    if not tenant_snap.exists:
+    if tenant_data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown tenant: {tenant_id}")
 
-    tenant_data = tenant_snap.to_dict() or {}
     existing_config = tenant_data.get("config") or {}
     existing_survey_config = tenant_data.get("surveyConfig") or {}
 
