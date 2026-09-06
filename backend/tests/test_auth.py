@@ -14,6 +14,7 @@ inactive: it returns {valid: false, error} with 404 / 400.
 from fastapi.testclient import TestClient
 
 from app.main import app
+from pg_bridge import patch_pg_through
 from app.core.config import settings
 
 
@@ -153,7 +154,7 @@ def _patch(monkeypatch, db, auth=None):
     monkeypatch.setattr("app.firebase.get_db", lambda: db)
     monkeypatch.setattr("app.routes.auth.get_db", lambda: db)
     monkeypatch.setattr("app.services.tenant_registration.get_db", lambda: db)
-    monkeypatch.setattr("app.services.users.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
     if auth is not None:
         monkeypatch.setattr("app.firebase.get_auth", lambda: auth)

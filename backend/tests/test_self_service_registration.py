@@ -23,6 +23,7 @@ from app.services.tenant_registration import (
     slugify_organization,
     MIN_PASSWORD_LENGTH,
 )
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -204,7 +205,7 @@ def _patch(monkeypatch, db, auth=None):
     monkeypatch.setattr("app.firebase.get_db", lambda: db)
     monkeypatch.setattr("app.routes.auth.get_db", lambda: db)
     monkeypatch.setattr("app.services.tenant_registration.get_db", lambda: db)
-    monkeypatch.setattr("app.services.users.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
     if auth is not None:
         monkeypatch.setattr("app.firebase.get_auth", lambda: auth)

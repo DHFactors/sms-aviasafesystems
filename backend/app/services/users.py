@@ -1,8 +1,8 @@
 # ============================================================================
 # FILE: users.py
 # PATH: backend/app/services/users.py
-# PURPOSE: Mirror Firebase Auth users into a Firestore `users` collection so
-#          tenant-scoped queries are cheap and indexable. The collection is
+# PURPOSE: Mirror Firebase Auth users into the Postgres `users` table so
+#          tenant-scoped queries are cheap and indexable. The table is
 #          backfilled from Auth, maintained on register/claims updates, and
 #          consumed by GET /api/v1/tenants/{tenantId}/users.
 # ============================================================================
@@ -12,8 +12,9 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from app.core.config import settings
-from app.firebase import get_db, get_auth
+from app.db import pg
+from app.db.db_models import UserProfile
+from app.firebase import get_auth
 
 
 def _parse_ms_timestamp(value: Any) -> Optional[datetime]:
@@ -61,19 +62,17 @@ def user_doc_from_auth_record(record: Any) -> Dict[str, Any]:
 
 
 def upsert_user_doc(uid: str, data: Dict[str, Any]) -> None:
-    """Best-effort write/merge of a user doc. Never breaks the caller."""
+    """Best-effort write/merge of a user row. Never breaks the caller."""
     try:
-        get_db().collection(settings.FIREBASE_COLLECTION_USERS).document(uid).set(
-            data, merge=True
-        )
+        pg.upsert(UserProfile, "uid", uid, data)
     except Exception as e:
-        logger.warning(f"Failed to upsert user doc {uid}: {e}")
+        logger.warning(f"Failed to upsert user row {uid}: {e}")
 
 
 def backfill_users_from_auth(max_pages: Optional[int] = None) -> int:
-    """Paginate Firebase Auth and upsert every user into the users collection.
+    """Paginate Firebase Auth and upsert every user into the users table.
 
-    Returns the number of user docs written. `max_pages` limits the scan (for
+    Returns the number of user rows written. `max_pages` limits the scan (for
     sanity checks on large directories); by default all users are synced.
     """
     auth = get_auth()
@@ -93,26 +92,33 @@ def backfill_users_from_auth(max_pages: Optional[int] = None) -> int:
     return written
 
 
+def _iso(value: Any) -> Optional[str]:
+    """Render a stored timestamp (datetime or ISO string) back to ISO text."""
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
 def list_tenant_users(tenant_id: str) -> List[Dict[str, Any]]:
-    """Query the users collection for all users assigned to a tenant."""
-    snapshots = (
-        get_db()
-        .collection(settings.FIREBASE_COLLECTION_USERS)
-        .where("tenant_id", "==", tenant_id)
-        .get()
-    )
+    """Query the users table for all users assigned to a tenant."""
+    try:
+        docs = pg.fetch_all(UserProfile, where=[UserProfile.tenant_id == tenant_id])
+    except Exception as e:
+        logger.warning(f"Failed to list users for tenant {tenant_id}: {e}")
+        return []
     results = []
-    for snap in snapshots:
-        data = snap.to_dict() or {}
+    for data in docs:
         results.append(
             {
-                "uid": data.get("uid") or snap.id,
+                "uid": data.get("uid"),
                 "email": data.get("email"),
                 "displayName": data.get("display_name"),
                 "role": data.get("role"),
                 "department": data.get("department") or "",
-                "createdAt": data.get("created_at").isoformat() if data.get("created_at") else None,
-                "lastLogin": data.get("last_login").isoformat() if data.get("last_login") else None,
+                "createdAt": _iso(data.get("created_at")),
+                "lastLogin": _iso(data.get("last_login")),
             }
         )
     results.sort(key=lambda u: (u["createdAt"] or "", u["email"] or ""))
@@ -120,26 +126,20 @@ def list_tenant_users(tenant_id: str) -> List[Dict[str, Any]]:
 
 
 def get_user_department(uid: Optional[str] = None, email: Optional[str] = None) -> str:
-    """Resolve a user's department from the mirrored users collection.
+    """Resolve a user's department from the mirrored users table.
 
     Checks by uid first, then falls back to an email match. Returns an empty
     string when the user cannot be found or has no department assigned.
     """
     try:
-        db = get_db()
         if uid:
-            snap = db.collection(settings.FIREBASE_COLLECTION_USERS).document(uid).get()
-            if snap.exists:
-                return (snap.to_dict() or {}).get("department") or ""
+            doc = pg.fetch_by(UserProfile, "uid", uid)
+            if doc:
+                return doc.get("department") or ""
         if email:
-            docs = (
-                db.collection(settings.FIREBASE_COLLECTION_USERS)
-                .where("email", "==", email)
-                .limit(1)
-                .get()
-            )
-            for d in docs:
-                return (d.to_dict() or {}).get("department") or ""
+            doc = pg.fetch_by(UserProfile, "email", email)
+            if doc:
+                return doc.get("department") or ""
     except Exception as e:
         logger.warning(f"Failed to resolve department for uid={uid} email={email}: {e}")
     return ""

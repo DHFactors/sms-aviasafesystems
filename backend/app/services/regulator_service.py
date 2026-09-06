@@ -4,7 +4,7 @@
 # PURPOSE: State Regulator model. A State Regulator (e.g. CAAN for Nepal,
 #          DGCA for India) is the state civil-aviation authority that
 #          oversees a set of operator tenants. Regulators live in the
-#          `regulators` collection and each operator tenant carries a
+#          `regulators` table and each operator tenant carries a
 #          `regulator_id` + `country` tag. This service enumerates regulators
 #          and their operators, and provides the flat operator-tenant list used
 #          to scope cross-tenant aggregations (SMS maturity, state risk).
@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from app.core.config import settings
-from app.firebase import get_db
+from app.db import pg
+from app.db.db_models import Regulator, Tenant
 
 REGULATOR_STATUSES = {"demo", "trial", "active", "suspended", "retired", "cancelled", "inactive", "retired/cancelled"}
 REGULATOR_STATUS_ALIASES = {"retired_cancelled": "retired", "canceled": "cancelled"}
@@ -47,9 +47,9 @@ def _parse_regulator_date(value: Optional[str]) -> Optional[str]:
         raise ValueError(f"invalid date '{value}' (expected YYYY-MM-DD)") from e
 
 
-def _serialize_regulator(doc: Any) -> Dict[str, Any]:
-    data = doc.to_dict() or {}
-    data["id"] = doc.id
+def _serialize_regulator(data: Dict[str, Any]) -> Dict[str, Any]:
+    data = dict(data or {})
+    data["id"] = data.get("id") or data.get("slug")
     data["operator_count"] = len(list(data.get("operator_tenant_ids") or []))
     data["status"] = _normalize_status(data)
     return data
@@ -58,7 +58,7 @@ def _serialize_regulator(doc: Any) -> Dict[str, Any]:
 def list_regulators() -> List[Dict[str, Any]]:
     """All State Regulators in the system, enriched with operator_count/status."""
     try:
-        docs = get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).get()
+        docs = pg.fetch_all(Regulator)
         return [_serialize_regulator(d) for d in docs]
     except Exception as e:
         logger.warning(f"Failed to list regulators: {e}")
@@ -66,19 +66,16 @@ def list_regulators() -> List[Dict[str, Any]]:
 
 
 def get_regulator(regulator_id: str) -> Optional[Dict[str, Any]]:
-    """One regulator document enriched with its operator list."""
+    """One regulator row enriched with its operator list."""
     regulator_id = (regulator_id or "").strip()
     try:
-        doc = (
-            get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS)
-            .document(regulator_id).get()
-        )
+        data = pg.fetch_by(Regulator, "slug", regulator_id)
     except Exception as e:
         logger.warning(f"Regulator lookup failed for {regulator_id}: {e}")
         return None
-    if not doc.exists:
+    if data is None:
         return None
-    data = _serialize_regulator(doc)
+    data = _serialize_regulator(data)
     data["operators"] = list_regulator_operators(regulator_id, data)
     return data
 
@@ -88,31 +85,32 @@ def list_regulator_operators(
 ) -> List[Dict[str, Any]]:
     """Operators overseen by a regulator.
 
-    The regulator doc may declare `operator_tenant_ids` explicitly. When it
-    does not, operators are derived from the tenants collection (any tenant
-    doc tagged with `regulator_id == <id>`).
+    The regulator row may declare `operator_tenant_ids` explicitly. When it
+    does not, operators are derived from the tenants table (any tenant row
+    tagged with `regulator_id == <id>`).
     """
     reg = regulator or {}
     operator_ids = list(reg.get("operator_tenant_ids") or [])
     try:
-        db = get_db()
-        tenants = db.collection(settings.FIREBASE_COLLECTION_TENANTS)
         if not operator_ids:
-            snaps = tenants.where("regulator_id", "==", regulator_id).get()
-            operator_ids = [s.id for s in snaps]
+            snaps = pg.fetch_all(
+                Tenant, where=[Tenant.data["regulator_id"].astext == regulator_id]
+            )
+            operator_ids = [s.get("slug") or s.get("id") for s in snaps]
 
         operators = []
         for tid in operator_ids:
+            if not tid:
+                continue
             try:
-                snap = tenants.document(tid).get()
+                td = pg.fetch_by(Tenant, "slug", tid)
             except Exception as e:
                 logger.warning(f"Failed to read operator tenant {tid}: {e}")
                 continue
-            if not snap.exists:
+            if not td:
                 continue
-            td = snap.to_dict() or {}
             operators.append({
-                "tenant_id": tid,
+                "tenant_id": td.get("tenant_id") or td.get("slug") or tid,
                 "name": td.get("name") or tid,
                 "country": td.get("country"),
                 "regulator_id": td.get("regulator_id") or regulator_id,
@@ -176,12 +174,10 @@ def update_regulator_status(
     if contract_end_date:
         _parse_regulator_date(contract_end_date)
 
-    db = get_db()
-    ref = db.collection(settings.FIREBASE_COLLECTION_REGULATORS).document(regulator_id)
-    snap = ref.get()
-    if not snap.exists:
+    data = pg.fetch_by(Regulator, "slug", regulator_id)
+    if data is None:
         raise ValueError(f"regulator not found: {regulator_id}")
-    data = snap.to_dict() or {}
+    data = dict(data)
     contract = dict(data.get("contract") or {})
     if contract_start_date:
         contract["start_date"] = contract_start_date.strip()
@@ -215,7 +211,7 @@ def update_regulator_status(
     elif contract_end_date:
         updates["to_date"] = contract_end_date.strip()
 
-    ref.set(updates, merge=True)
+    pg.update(Regulator, "slug", regulator_id, updates)
     # Return merged view
     merged = dict(data)
     merged.update(updates)

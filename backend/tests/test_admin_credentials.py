@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.middleware.auth import get_admin_user, get_current_user
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -165,7 +166,7 @@ def _patch_all(monkeypatch, db=None, auth=None, email_provider="none"):
     monkeypatch.setattr("app.services.production_seed.get_db", lambda: db)
     monkeypatch.setattr("app.services.tenant_credentials.get_db", lambda: db)
     monkeypatch.setattr("app.services.tenant_credentials.get_auth", lambda: auth)
-    monkeypatch.setattr("app.services.users.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
     monkeypatch.setattr("app.services.email_service.settings.EMAIL_PROVIDER", email_provider)
     from app.core.config import settings
     monkeypatch.setattr(settings, "SETUP_SECRET", "test-setup-key", raising=False)

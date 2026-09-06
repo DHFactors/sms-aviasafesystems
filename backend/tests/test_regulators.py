@@ -18,6 +18,7 @@ from app.services.regulator_service import (
     list_regulator_operators,
     operator_tenant_ids_for_regulator,
 )
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -102,7 +103,7 @@ def _regulator_db(regulators=None, tenants=None):
 
 
 def _patch_reg_db(monkeypatch, db):
-    monkeypatch.setattr("app.services.regulator_service.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 def _sample_regulators(tenants=None):

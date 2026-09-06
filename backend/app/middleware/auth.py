@@ -16,27 +16,30 @@ from typing import Dict, Any, Optional
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import verify_firebase_token, get_db
+from app.db import pg
+from app.db.db_models import Tenant
+from app.firebase import verify_firebase_token
 
 security = HTTPBearer()
 
 
 def _lookup_tenant_by_email(email: str) -> Optional[Dict[str, Any]]:
-    """Search all tenant documents for a safety_manager with matching email.
+    """Search all tenant rows for a safety_manager with matching email.
 
     This is a fallback when Firebase Auth custom claims are not available
-    in the ID token (known Firebase propagation issue).
+    in the ID token (known Firebase propagation issue). Sourced from the
+    Postgres tenants table (safety_manager JSONB column).
     """
     try:
-        db = get_db()
-        tenants = db.collection(settings.FIREBASE_COLLECTION_TENANTS).get()
-        for t in tenants:
-            td = t.to_dict()
-            if not td:
-                continue
+        docs = pg.fetch_all(
+            Tenant,
+            where=[Tenant.safety_manager["email"].astext == email],
+            limit=50,
+        )
+        for td in docs:
             sm = td.get("safety_manager")
             if sm and sm.get("email") == email:
-                return {"tenant_id": td.get("tenant_id") or t.id, "role": "AIRLINE_ADMIN"}
+                return {"tenant_id": td.get("tenant_id") or td.get("slug") or td.get("id"), "role": "AIRLINE_ADMIN"}
             # Also check for CAAN_SMD emails in a separate config
         return None
     except Exception as e:
@@ -45,8 +48,8 @@ def _lookup_tenant_by_email(email: str) -> Optional[Dict[str, Any]]:
 
 
 def resolve_user_context(email: str, role: str, tenant_id: Optional[str]) -> Dict[str, Any]:
-    """Normalize tenant_id and fall back to a Firestore email lookup when the
-    ID token carries no custom claims (e.g. freshly-linked Google sign-ins)."""
+    """Normalize tenant_id and fall back to a tenants-table email lookup when
+    the ID token carries no custom claims (e.g. freshly-linked Google sign-ins)."""
     if tenant_id:
         normalized = tenant_id.replace('_', '-')
         if normalized != tenant_id:
@@ -58,7 +61,7 @@ def resolve_user_context(email: str, role: str, tenant_id: Optional[str]) -> Dic
         if tenant_info:
             role = tenant_info["role"]
             tenant_id = tenant_info["tenant_id"]
-            logger.info(f"Claims resolved via Firestore fallback for {email}: role={role}, tenant={tenant_id}")
+            logger.info(f"Claims resolved via tenants-table fallback for {email}: role={role}, tenant={tenant_id}")
 
     return {"role": role, "tenant_id": tenant_id}
 
@@ -70,22 +73,17 @@ SUSPENDED_TENANT_DETAIL = (
 
 
 def _tenant_is_suspended(tenant_id: str) -> bool:
-    """True when the tenant document's governance status is SUSPENDED.
+    """True when the tenants-table governance status is SUSPENDED.
 
-    Fail-open by design: a missing doc, missing status or a database error
+    Fail-open by design: a missing row, missing status or a database error
     must never lock a user out of the platform — only an explicit
     ``status == "SUSPENDED"`` blocks access.
     """
     try:
-        db = get_db()
-        doc = (
-            db.collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .document(tenant_id)
-            .get()
-        )
-        if doc is None or not doc.exists:
+        td = pg.fetch_by(Tenant, "slug", tenant_id)
+        if td is None:
             return False
-        return (doc.to_dict() or {}).get("status") == "SUSPENDED"
+        return (td.get("status") or "") == "SUSPENDED"
     except Exception as e:
         logger.warning(f"Tenant status check failed for {tenant_id}: {e}")
         return False

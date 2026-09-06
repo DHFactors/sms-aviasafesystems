@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import users
+from pg_bridge import patch_pg_through
 
 
 # ============================================================================
@@ -115,7 +116,7 @@ def _dt(day):
 
 
 def test_list_tenant_users_filters_and_sorts(monkeypatch):
-    monkeypatch.setattr("app.services.users.get_db", lambda: _UsersDB())
+    patch_pg_through(monkeypatch, lambda: _UsersDB())
     rows = users.list_tenant_users("tara-air")
     assert len(rows) == 2
     # sorted by createdAt then email
@@ -163,7 +164,7 @@ class _FakeDB:
 
 def _patch_db(monkeypatch, db):
     monkeypatch.setattr("app.routes.tenants.get_db", lambda: db)
-    monkeypatch.setattr("app.services.users.get_db", lambda: db)
+    patch_pg_through(monkeypatch, lambda: db)
 
 
 def _patch_user(monkeypatch, user):
