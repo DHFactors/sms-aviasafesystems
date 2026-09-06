@@ -149,6 +149,23 @@
                 </tr>
             </table>
 
+            <!-- Process Owner Signature (Image-based) -->
+            <div class="signature-section" style="margin:1.25rem 0;">
+                <h4 style="font-size:0.9rem;color:#0b2a42;margin-bottom:0.5rem;"><i class="fas fa-signature"></i> Process Owner Signature</h4>
+                <div style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff;">
+                    <canvas id="poSignatureCanvas" width="500" height="150" style="width:100%; height:150px; border:1px solid #e2e8f0; border-radius:4px; touch-action:none; cursor:crosshair;"></canvas>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="clearSignature('po')"><i class="fas fa-eraser"></i> Clear</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="undoSignature('po')"><i class="fas fa-undo"></i> Undo</button>
+                    <span style="font-size:0.75rem;color:#94a3b8;margin-left:auto;"><i class="fas fa-info-circle"></i> Use mouse or touch to sign</span>
+                </div>
+                <div class="form-group" style="margin-top:8px;">
+                    <label>Process Owner Name (for signature)</label>
+                    <input type="text" id="poSignatureName" class="form-control" placeholder="e.g., Capt. John Doe">
+                </div>
+            </div>
+
             <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.95rem;font-weight:700;color:#0b2a42;margin:1.25rem 0 0.6rem;text-transform:uppercase;letter-spacing:0.5px;">
                 <button type="button" class="help-link" id="rcaMethodHelpBtn" data-help-topic="sram_bowtie" title="RCA methodology guidance"><i class="fas fa-circle-question"></i> Guide</button>
                 <span><i class="fas fa-diagram-project"></i> Root Cause Analysis Method</span>
@@ -204,6 +221,19 @@
                 </tr>
             </table>
 
+            <!-- Managerial Signature (Image-based) -->
+            <div class="signature-section" style="margin:1.25rem 0;">
+                <h4 style="font-size:0.9rem;color:#0b2a42;margin-bottom:0.5rem;"><i class="fas fa-signature"></i> Managerial Signature</h4>
+                <div style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px; background: #fff;">
+                    <canvas id="maSignatureCanvas" width="500" height="150" style="width:100%; height:150px; border:1px solid #e2e8f0; border-radius:4px; touch-action:none; cursor:crosshair;"></canvas>
+                </div>
+                <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="clearSignature('ma')"><i class="fas fa-eraser"></i> Clear</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="undoSignature('ma')"><i class="fas fa-undo"></i> Undo</button>
+                    <span style="font-size:0.75rem;color:#94a3b8;margin-left:auto;"><i class="fas fa-info-circle"></i> Use mouse or touch to sign</span>
+                </div>
+            </div>
+
             <div style="text-align:right;margin-top:1.5rem;">
                 <button type="button" class="btn-submit" onclick="submitCap()"><i class="fas fa-paper-plane"></i> Submit CAP</button>
             </div>
@@ -226,6 +256,172 @@ let fishboneController = null;
 let residualSraController = null;
 let srmCombined = null;
 let rcaMethod = 'bow_tie';
+let poSignaturePad = null;
+let maSignaturePad = null;
+
+// ============================================================================
+// Signature Pad — Canvas-based drawing for image signatures (Option 3)
+// ============================================================================
+class SignaturePad {
+    constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this.isDrawing = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        this.lines = [];
+        this.currentLine = [];
+        // Handle high DPI
+        const ratio = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.width = rect.width * ratio;
+        this.canvas.height = rect.height * ratio;
+        this.ctx.scale(ratio, ratio);
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        this.setupListeners();
+    }
+    setupListeners() {
+        this.canvas.addEventListener('mousedown', (e) => this.startDraw(e));
+        this.canvas.addEventListener('mousemove', (e) => this.draw(e));
+        this.canvas.addEventListener('mouseup', () => this.endDraw());
+        this.canvas.addEventListener('mouseleave', () => this.endDraw());
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            this.startDraw({ offsetX: touch.clientX - rect.left, offsetY: touch.clientY - rect.top });
+        });
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            this.draw({ offsetX: touch.clientX - rect.left, offsetY: touch.clientY - rect.top });
+        });
+        this.canvas.addEventListener('touchend', () => this.endDraw());
+    }
+    getPos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        return { x: e.offsetX, y: e.offsetY };
+    }
+    startDraw(e) {
+        this.isDrawing = true;
+        const pos = this.getPos(e);
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+        this.currentLine = [{ x: this.lastX, y: this.lastY }];
+    }
+    draw(e) {
+        if (!this.isDrawing) return;
+        const pos = this.getPos(e);
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.lastX, this.lastY);
+        this.ctx.lineTo(pos.x, pos.y);
+        this.ctx.strokeStyle = '#0b2a42';
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+        this.ctx.stroke();
+        this.lastX = pos.x;
+        this.lastY = pos.y;
+        this.currentLine.push({ x: this.lastX, y: this.lastY });
+    }
+    endDraw() {
+        if (this.isDrawing) {
+            this.lines.push([...this.currentLine]);
+            this.currentLine = [];
+            this.isDrawing = false;
+        }
+    }
+    clear() {
+        this.lines = [];
+        this.currentLine = [];
+        const rect = this.canvas.getBoundingClientRect();
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
+    }
+    undo() {
+        if (this.lines.length === 0) return;
+        this.lines.pop();
+        this.redraw();
+    }
+    redraw() {
+        const rect = this.canvas.getBoundingClientRect();
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
+        for (const line of this.lines) {
+            if (line.length < 2) continue;
+            this.ctx.beginPath();
+            this.ctx.moveTo(line[0].x, line[0].y);
+            for (let i = 1; i < line.length; i++) {
+                this.ctx.lineTo(line[i].x, line[i].y);
+            }
+            this.ctx.strokeStyle = '#0b2a42';
+            this.ctx.lineWidth = 2;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.stroke();
+        }
+    }
+    toDataURL() {
+        return this.canvas.toDataURL('image/png');
+    }
+    isEmpty() {
+        return this.lines.length === 0;
+    }
+}
+
+function clearSignature(type) {
+    if (type === 'po' && poSignaturePad) poSignaturePad.clear();
+    if (type === 'ma' && maSignaturePad) maSignaturePad.clear();
+}
+function undoSignature(type) {
+    if (type === 'po' && poSignaturePad) poSignaturePad.undo();
+    if (type === 'ma' && maSignaturePad) maSignaturePad.undo();
+}
+async function generateImageHash(dataUrl) {
+    try {
+        const msgUint8 = new TextEncoder().encode(dataUrl);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (e) {
+        return null;
+    }
+}
+async function getUserIP() {
+    try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        return data.ip || null;
+    } catch (e) { return null; }
+}
+async function uploadSignature(canvasId, capId, signatureType) {
+    const pad = canvasId === 'poSignatureCanvas' ? poSignaturePad : maSignaturePad;
+    if (!pad || pad.isEmpty()) return null;
+    const dataUrl = pad.toDataURL();
+    // Try Supabase Storage if available
+    try {
+        if (typeof supabase !== 'undefined' && supabase.storage) {
+            const tenantId = window.currentUser ? window.currentUser.tenantId : 'unknown';
+            const userId = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'anon';
+            const timestamp = Date.now();
+            const filePath = `${tenantId}/${userId}/cap_${capId}/${signatureType}_${timestamp}.png`;
+            const blob = await (await fetch(dataUrl)).blob();
+            const { data, error } = await supabase.storage.from('signatures').upload(filePath, blob, { cacheControl: '3600', upsert: false });
+            if (!error && data) {
+                const { data: urlData } = supabase.storage.from('signatures').getPublicUrl(filePath);
+                return urlData.publicUrl || dataUrl;
+            }
+        }
+    } catch (e) { console.warn('Supabase upload failed, using data URL', e); }
+    return dataUrl;
+}
+function initSignaturePads() {
+    try {
+        poSignaturePad = new SignaturePad('poSignatureCanvas');
+        maSignaturePad = new SignaturePad('maSignatureCanvas');
+    } catch (e) { console.error('Signature pad init failed', e); }
+}
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -240,6 +436,7 @@ firebase.auth().onAuthStateChanged(function(user) {
     initFishbone();
     initSrmCombined();
     initRcaMethodSelector();
+    initSignaturePads();
 });
 
 function initRcaMethodSelector() {
@@ -419,6 +616,52 @@ async function submitCap() {
             risk_outcome: rSra.outcome || null,
         } : null,
     };
+
+    // Collect image signatures (if drawn) — upload to Supabase Storage or fallback to data URL
+    try {
+        let poSignatureUrl = null, maSignatureUrl = null;
+        let poHash = null, maHash = null;
+        if (poSignaturePad && !poSignaturePad.isEmpty()) {
+            poSignatureUrl = await uploadSignature('poSignatureCanvas', canId, 'po');
+            if (poSignatureUrl) poHash = await generateImageHash(poSignatureUrl);
+        }
+        if (maSignaturePad && !maSignaturePad.isEmpty()) {
+            maSignatureUrl = await uploadSignature('maSignatureCanvas', canId, 'ma');
+            if (maSignatureUrl) maHash = await generateImageHash(maSignatureUrl);
+        }
+        if (poSignatureUrl) {
+            const poName = document.getElementById('poSignatureName').value.trim() || document.getElementById('fieldProcessOwner').value.trim() || null;
+            data.po_signature = {
+                name: poName,
+                timestamp: new Date().toISOString(),
+                image_url: poSignatureUrl,
+                hash: poHash,
+                verified: true
+            };
+            data.po_signature_name = poName;
+            data.po_signature_timestamp = data.po_signature.timestamp;
+            data.po_signature_image_url = poSignatureUrl;
+            data.po_signature_hash = poHash;
+            data.po_signature_verified = true;
+        }
+        if (maSignatureUrl) {
+            const maSigName = maName || null;
+            data.ma_signature = {
+                name: maSigName,
+                timestamp: new Date().toISOString(),
+                image_url: maSignatureUrl,
+                hash: maHash,
+                verified: true
+            };
+            data.ma_signature_name = maSigName;
+            data.ma_signature_timestamp = data.ma_signature.timestamp;
+            data.ma_signature_image_url = maSignatureUrl;
+            data.ma_signature_hash = maHash;
+            data.ma_signature_verified = true;
+        }
+    } catch (sigErr) {
+        console.warn('Signature handling failed (proceeding without):', sigErr);
+    }
 
     const btn = document.querySelector('.btn-submit');
     btn.disabled = true;

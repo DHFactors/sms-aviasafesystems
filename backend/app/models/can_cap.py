@@ -167,6 +167,22 @@ class CAPFormFields(BaseModel):
     closed_by: Optional[str] = None
     closed_at: Optional[datetime] = None
     closed_signature: Optional[str] = None
+    # ── Image-based digital signatures (Option 3) ──
+    po_signature: Optional[dict] = None
+    ma_signature: Optional[dict] = None
+    po_signature_name: Optional[str] = None
+    po_signature_timestamp: Optional[datetime] = None
+    po_signature_image_url: Optional[str] = None
+    po_signature_hash: Optional[str] = None
+    po_signature_verified: Optional[bool] = None
+    ma_signature_name: Optional[str] = None
+    ma_signature_timestamp: Optional[datetime] = None
+    ma_signature_image_url: Optional[str] = None
+    ma_signature_hash: Optional[str] = None
+    ma_signature_verified: Optional[bool] = None
+    ae_signature_name: Optional[str] = None
+    ae_signature_image_url: Optional[str] = None
+    ae_signature_hash: Optional[str] = None
 
 
 # ─── CAN ───

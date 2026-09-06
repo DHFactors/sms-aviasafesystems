@@ -440,6 +440,19 @@ class Cap(Base):
     closed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     closed_signature: Mapped[object] = mapped_column(Text, nullable=True)
 
+    po_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
+    po_signature_name: Mapped[object] = mapped_column(Text, nullable=True)
+    po_signature_timestamp: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    po_signature_image_url: Mapped[object] = mapped_column(Text, nullable=True)
+    po_signature_hash: Mapped[object] = mapped_column(Text, nullable=True)
+    po_signature_verified: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    ma_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
+    ma_signature_name: Mapped[object] = mapped_column(Text, nullable=True)
+    ma_signature_timestamp: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    ma_signature_image_url: Mapped[object] = mapped_column(Text, nullable=True)
+    ma_signature_hash: Mapped[object] = mapped_column(Text, nullable=True)
+    ma_signature_verified: Mapped[bool] = mapped_column(Boolean, nullable=True)
+
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(

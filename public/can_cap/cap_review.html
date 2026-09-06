@@ -201,6 +201,33 @@
             <div id="fishboneView">-</div>
         </div>
 
+        <!-- Signatures (Image-based) -->
+        <div class="card" id="signaturesCard" style="display:none;">
+            <h2><i class="fas fa-signature"></i> Signatures</h2>
+            <div id="poSignatureDisplay" style="display:none; margin-bottom:1.25rem;">
+                <h4 style="font-size:0.9rem;color:#0b2a42;margin-bottom:0.5rem;">Process Owner</h4>
+                <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px; background:#fff; display:inline-block;">
+                    <img id="poSignatureImage" src="" alt="Process Owner Signature" style="max-width:300px; max-height:80px; display:block;">
+                </div>
+                <div style="font-size:0.85rem;color:#475569;margin-top:0.5rem;">
+                    <span><strong>Signed By:</strong> <span id="poSignatureName"></span></span> &nbsp;|&nbsp;
+                    <span><strong>Date:</strong> <span id="poSignatureDate"></span></span>
+                    <span id="poVerifiedBadge" style="margin-left:0.5rem; display:none;"><i class="fas fa-check-circle" style="color:#2e7d32;"></i> Verified <small id="poSignatureHash" style="color:#94a3b8;"></small></span>
+                </div>
+            </div>
+            <div id="maSignatureDisplay" style="display:none;">
+                <h4 style="font-size:0.9rem;color:#0b2a42;margin-bottom:0.5rem;">Managerial Approval</h4>
+                <div style="border:1px solid #e2e8f0; border-radius:6px; padding:8px; background:#fff; display:inline-block;">
+                    <img id="maSignatureImage" src="" alt="Managerial Signature" style="max-width:300px; max-height:80px; display:block;">
+                </div>
+                <div style="font-size:0.85rem;color:#475569;margin-top:0.5rem;">
+                    <span><strong>Signed By:</strong> <span id="maSignatureName"></span></span> &nbsp;|&nbsp;
+                    <span><strong>Date:</strong> <span id="maSignatureDate"></span></span>
+                    <span id="maVerifiedBadge" style="margin-left:0.5rem; display:none;"><i class="fas fa-check-circle" style="color:#2e7d32;"></i> Verified <small id="maSignatureHash" style="color:#94a3b8;"></small></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Review Section -->
         <div class="card" id="reviewSection">
             <h2><i class="fas fa-check-double"></i> Safety Manager Review</h2>
@@ -414,6 +441,35 @@ function renderCap() {
     }
 
     renderCapSraViews(c);
+    renderSignatures(c);
+}
+
+function renderSignatures(cap) {
+    const card = document.getElementById('signaturesCard');
+    let hasSig = false;
+    // PO
+    const poSig = cap.po_signature || (cap.po_signature_image_url ? { image_url: cap.po_signature_image_url, name: cap.po_signature_name, timestamp: cap.po_signature_timestamp, hash: cap.po_signature_hash, verified: cap.po_signature_verified } : null);
+    if (poSig && poSig.image_url) {
+        document.getElementById('poSignatureImage').src = poSig.image_url;
+        document.getElementById('poSignatureName').textContent = poSig.name || '-';
+        document.getElementById('poSignatureDate').textContent = poSig.timestamp ? new Date(poSig.timestamp).toLocaleString() : '-';
+        if (poSig.hash) document.getElementById('poSignatureHash').textContent = '(' + poSig.hash.substring(0,8) + '...)';
+        document.getElementById('poVerifiedBadge').style.display = poSig.verified ? 'inline' : 'none';
+        document.getElementById('poSignatureDisplay').style.display = 'block';
+        hasSig = true;
+    }
+    // MA
+    const maSig = cap.ma_signature || (cap.ma_signature_image_url ? { image_url: cap.ma_signature_image_url, name: cap.ma_signature_name, timestamp: cap.ma_signature_timestamp, hash: cap.ma_signature_hash, verified: cap.ma_signature_verified } : null);
+    if (maSig && maSig.image_url) {
+        document.getElementById('maSignatureImage').src = maSig.image_url;
+        document.getElementById('maSignatureName').textContent = maSig.name || '-';
+        document.getElementById('maSignatureDate').textContent = maSig.timestamp ? new Date(maSig.timestamp).toLocaleString() : '-';
+        if (maSig.hash) document.getElementById('maSignatureHash').textContent = '(' + maSig.hash.substring(0,8) + '...)';
+        document.getElementById('maVerifiedBadge').style.display = maSig.verified ? 'inline' : 'none';
+        document.getElementById('maSignatureDisplay').style.display = 'block';
+        hasSig = true;
+    }
+    if (hasSig) card.style.display = 'block';
 }
 
 async function renderCapSraViews(c) {
