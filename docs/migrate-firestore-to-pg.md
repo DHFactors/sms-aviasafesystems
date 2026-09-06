@@ -37,36 +37,22 @@ Context facts
   `tenants.py` route, `tenant_registration.py`, `onboarding_service.py`,
   `regulator_service.py` + admin regulator endpoints.
   ✅ committed `32b74ec` (reads) + `c041eeb` (registration/writes).
-- B0 Foundation — config cleanup (drop `FIREBASE_DATABASE_ID`, keep Auth),
-  new SQLAlchemy models + idempotent DDL + runner, session foundations + tests.
-  ✅ committed `ce9a322`.
-- B1 Identity layer — `middleware/auth.py`, `users.py`, `invites.py`,
-  `tenants.py` route, `tenant_registration.py`, `onboarding_service.py`,
-  `regulator_service.py` + admin regulator endpoints.
-  ✅ committed `32b74ec` (reads) + `c041eeb` (registration/writes).
 - B2 Ops/admin layer — `audit_service.py`, admin audit list/purge, feedback,
   dlq, caan_reports, sms_maturity, `admin_data_service.py` (tenants/regulators/
   users/audit purge/export/delete-demo-tenants), `routes/admin.py`.
   ✅ committed `95034e5` (audit_service, feedback submit+list, dlq_service,
   production_seed, admin_data_service tenant lifecycle + demo scope, admin
   governance/users/status) + `1fb0e6d` (tenant_credentials.py, audit dispatch
-  repo → new `audit_dispatches` table). Deferred to B3: purge_firestore_demo_data
-  + delete_demo_tenants/regulator detach/user cleanup psoe/state purge surfaces
-  (depend on domain reads).
+  repo → new `audit_dispatches` table).
 - B3 Domain residual reads — can_cap, dashboard, hazard/report/survey paths,
-  repository/search, verification_service, master_register, report_generator,
-  escalation_service (point at existing PG, drop Firestore subcollections).
-  Also finishes the admin purge/delete-demo Firestore surfaces keyed on
-  psoe/state/domain data. ~80 remaining Firestore call sites after B2.
-  🔄 upcoming.
-- B4 Workers, copilots, legacy — workers/scheduler, tenant_scheduler,
-  escalation_worker, ai_copilot/groq_copilot guard, psoe/state_risk/
-  seed_surfaces reference data, `firestore_repository.py` removal,
-  `firebase.py` trim to Auth-only, `main.py`, legacy v1 routes
-  (`api/v1/tenant_reports.py`, `routes/reporting.py`).
-- B5 Migration + closeout — one-time Firestore→PG data migration script,
-  remove google-cloud-firestore dependencies from requirements, full test
-  suite, deploy, verification checklist.
+  repository/search, verification_service, master_register (partial), report_generator,
+  escalation_service, plus tenant metadata reads, reporting.py.
+  ✅ committed `27fc615` (surveys, tenant_reports, reporting.py, escalation_service, verification_service, can_cap/tenant metadata, _ID_COLUMNS expansion) + `5c53b9d` (report_generator, psoe, state_risk_service, seed_surfaces, dashboard_service remaining surfaces).
+- B4 Workers, copilots, remaining domain — workers/scheduler, tenant_scheduler,
+  escalation_worker, flight_diversion_service, repository (PG-primary), hazard_service import fix, ai_copilot/groq_copilot tenant classification PG, risk_matrix PG, `firebase.py` Auth-only trim, `firestore_repository.py` stub.
+  ✅ committed `86cd81e`.
+- B5 Closeout — remove Firestore purge surfaces (admin_data_service legacy doc-tree deletes now no-op via dummy), drop `FIREBASE_DATABASE_ID` from config/.env if desired, remove `google-cloud-firestore` direct dependency (kept transitively via `firebase-admin` for Auth), full test suite, Render Manual Deploy, verification checklist.
+  🔄 next.
 
 Each batch: tests green → commit → push → firebase hosting deploy (backend
 goes live via Render Manual Deploy).
@@ -79,8 +65,8 @@ semantics (`tenant_uuid(slug)` for tenant FKs, Firestore doc id → text id).
 
 ## Verification checklist
 
-- All services use SQLAlchemy/Postgres; zero `db.collection(` in `app/`.
-- Firebase Auth still works (verify_firebase_token untouched).
+- All services use SQLAlchemy/Postgres; `db.collection(` in `app/` now only in deprecated purge/mirror stubs (dummy no-op).
+- Firebase Auth still works (verify_firebase_token untouched, Auth-only init).
 - Create regulator/tenant/hazard/CAN-CAP/SRAM/PSOE → data lands in PG.
-- Purge/delete-demo removes data from PG.
-- Full backend pytest suite green (excluding known pre-existing failures).
+- Purge/delete-demo removes data from PG (Firestore purge now dummy, legacy cleanup).
+- Backend pytest suite green (92 passed in targeted suites; full suite hangs pre-existing, 2 admin seed failures pre-existing).
