@@ -14,7 +14,7 @@
 # ============================================================================
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -135,6 +135,62 @@ def _validate_id(value: str, label: str = "id") -> str:
     return value
 
 
+def _json_safe(value: Any) -> Any:
+    """Convert date/datetime values to ISO strings for JSONB storage."""
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+def _firestore_safe(value: Any) -> Any:
+    """Sanitize a doc for the Firestore mirror write.
+
+    Firestore natively accepts ``datetime`` (stored as a Timestamp) but rejects
+    plain ``date``; convert those to ISO strings while keeping ``datetime``.
+    """
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _firestore_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_firestore_safe(v) for v in value]
+    return value
+
+
+def _json_safe_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Mirror ``pg._split_doc`` routing but stringify date/datetime values
+    wherever they land in JSONB (typed JSONB columns or the ``data`` bag).
+
+    Typed ``Date``/``DateTime`` columns keep native values (asyncpg requires
+    them); only JSONB-bound values are converted so serialization never fails.
+    """
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    table = model.__table__
+    out: Dict[str, Any] = {}
+    extras: Dict[str, Any] = {}
+    has_data = "data" in table.columns
+    for key, value in doc.items():
+        if value is None:
+            continue
+        if key in table.columns:
+            if isinstance(table.columns[key].type, JSONB):
+                out[key] = _json_safe(value)
+            else:
+                out[key] = value
+        elif has_data:
+            extras[key] = _json_safe(value)
+        else:
+            extras[key] = value
+    if extras and has_data:
+        out["data"] = extras
+    return out
+
+
 def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
     """Create a State Regulator document. 409 when the id already exists."""
     rid = _validate_id(data.get("id"), "regulator id")
@@ -176,9 +232,9 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
     }
     # Clean None values from data
     doc["data"] = {k: v for k, v in doc["data"].items() if v is not None}
-    pg.upsert(Regulator, "slug", rid, doc)
+    pg.upsert(Regulator, "slug", rid, _json_safe_doc(Regulator, doc))
     try:
-        get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).set(dict(doc))
+        get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).set(_firestore_safe(dict(doc)))
     except Exception as e:
         logger.warning(f"Regulator mirror write failed ({rid}): {e}")
 
@@ -253,9 +309,9 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
             if contact.get(k) and field not in doc:
                 doc[field] = str(contact.get(k)).strip()
 
-    pg.upsert(Tenant, "slug", tid, doc)
+    pg.upsert(Tenant, "slug", tid, _json_safe_doc(Tenant, doc))
     try:
-        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(dict(doc))
+        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(_firestore_safe(dict(doc)))
     except Exception as e:
         logger.warning(f"Tenant mirror write failed ({tid}): {e}")
 

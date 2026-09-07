@@ -273,6 +273,46 @@ def test_create_regulator_invalid_id(monkeypatch):
         assert "must be lowercase" in str(e)
 
 
+def test_create_regulator_date_serialization(monkeypatch):
+    from datetime import date
+    from app.db.db_models import Regulator
+    from app.services.production_seed import _json_safe_doc, _firestore_safe
+    doc = {
+        "subscription_start": date(2026, 1, 1),
+        "subscription_end": date(2026, 12, 31),
+        "data": {
+            "subscription_start": date(2026, 1, 1),
+            "subscription_end": date(2026, 12, 31),
+        },
+    }
+    # PG payload: typed Date columns stay native, JSONB bag becomes ISO strings
+    split = _json_safe_doc(Regulator, doc)
+    assert split["subscription_start"] == date(2026, 1, 1)
+    assert split["subscription_end"] == date(2026, 12, 31)
+    assert split["data"]["subscription_start"] == "2026-01-01"
+    assert split["data"]["subscription_end"] == "2026-12-31"
+    # Firestore mirror: plain dates stringified, datetimes preserved
+    fs = _firestore_safe(doc)
+    assert fs["data"]["subscription_start"] == "2026-01-01"
+
+
+def test_create_tenant_date_serialization(monkeypatch):
+    from datetime import date, datetime, timezone
+    from app.db.db_models import Tenant
+    from app.services.production_seed import _json_safe_doc
+    doc = {
+        "trial_expires_at": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "survey_config": {"window_start": date(2026, 1, 1)},
+        "oversight_effective_date": date(2026, 3, 1),
+    }
+    split = _json_safe_doc(Tenant, doc)
+    # No typed column for these -> routed to JSONB data bag as ISO strings
+    assert split["data"]["trial_expires_at"] == "2026-06-01T00:00:00+00:00"
+    assert split["data"]["survey_config"]["window_start"] == "2026-01-01"
+    # oversight_effective_date is a typed Date column -> stays native
+    assert split["oversight_effective_date"] == date(2026, 3, 1)
+
+
 def test_create_tenant_success(monkeypatch):
     db = _patch_db(monkeypatch)
     from app.services.production_seed import create_tenant
