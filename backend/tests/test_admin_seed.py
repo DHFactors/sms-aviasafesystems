@@ -218,7 +218,7 @@ def _patch_db(monkeypatch, db=None):
     db = db or _FakeDB()
     monkeypatch.setattr("app.services.production_seed.get_db", lambda: db)
     monkeypatch.setattr("app.services.admin_data_service.get_db", lambda: db)
-    monkeypatch.setattr("app.services.seed_surfaces.get_db", lambda: db)
+    monkeypatch.setattr("app.services.seed_surfaces.get_db", lambda: db, raising=False)
     patch_pg_through(monkeypatch, lambda: db)
     return db
 
@@ -283,7 +283,76 @@ def test_create_tenant_success(monkeypatch):
     stored = db._stores["tenants"]["ind-air1"]
     assert stored["regulator_id"] == "dgca"
     assert stored["name"] == "IndiAir"
+    assert stored["module_access"] == {
+        "module1": True, "module2": False, "module3": False, "module4": False,
+    }
+    assert stored["modules"] == stored["module_access"]
     assert any(l["action"] == "TENANT_CREATED" for l in db._stores["audit_logs"].values())
+
+
+def test_create_tenant_inherits_saas_regulator_modules(monkeypatch):
+    db = _patch_db(monkeypatch)
+    db._stores["regulators"]["caan"] = {
+        "slug": "caan", "name": "CAAN",
+        "is_saas_customer": True,
+        "module_access": {"module_1": True, "module_2": True, "module_3": True},
+    }
+    from app.services.production_seed import create_tenant
+    doc = create_tenant({
+        "tenant_id": "nep-air1", "name": "NepAir", "regulator_id": "caan",
+    }, _admin_user())
+    stored = db._stores["tenants"]["nep-air1"]
+    assert stored["module_access"] == {
+        "module1": True, "module2": True, "module3": True, "module4": False,
+    }
+
+
+def test_create_tenant_inherits_saas_regulator_data_module_access(monkeypatch):
+    # Module flags may live in the data bag (as the SaaS/Module-3 admin routes
+    # write) rather than on the top-level row.
+    db = _patch_db(monkeypatch)
+    db._stores["regulators"]["caan"] = {
+        "slug": "caan", "name": "CAAN",
+        "is_saas_customer": True,
+        "data": {"module_access": {"module_1": True, "module_2": True, "module_3": False}},
+    }
+    from app.services.production_seed import create_tenant
+    create_tenant({
+        "tenant_id": "nep-air2", "name": "NepAir", "regulator_id": "caan",
+    }, _admin_user())
+    stored = db._stores["tenants"]["nep-air2"]
+    assert stored["module_access"] == {
+        "module1": True, "module2": True, "module3": False, "module4": False,
+    }
+
+
+def test_create_tenant_non_saas_regulator_gets_defaults(monkeypatch):
+    db = _patch_db(monkeypatch)
+    db._stores["regulators"]["dgca"] = {
+        "slug": "dgca", "name": "DGCA",
+        "is_saas_customer": False,
+        "module_access": {"module_1": True, "module_2": True, "module_3": True},
+    }
+    from app.services.production_seed import create_tenant
+    create_tenant({
+        "tenant_id": "ind-air2", "name": "IndAir", "regulator_id": "dgca",
+    }, _admin_user())
+    stored = db._stores["tenants"]["ind-air2"]
+    assert stored["module_access"] == {
+        "module1": True, "module2": False, "module3": False, "module4": False,
+    }
+
+
+def test_create_tenant_unknown_regulator_gets_defaults(monkeypatch):
+    db = _patch_db(monkeypatch)
+    from app.services.production_seed import create_tenant
+    create_tenant({
+        "tenant_id": "xyz-air", "name": "XyzAir", "regulator_id": "does-not-exist",
+    }, _admin_user())
+    stored = db._stores["tenants"]["xyz-air"]
+    assert stored["module_access"] == {
+        "module1": True, "module2": False, "module3": False, "module4": False,
+    }
 
 
 def test_create_tenant_duplicate(monkeypatch):

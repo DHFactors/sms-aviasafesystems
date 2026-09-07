@@ -27,6 +27,61 @@ from app.firebase import get_db
 
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
+# Tenant modules are keyed module1..module4 (M1 SMS maturity, M2 hazard & risk,
+# M3 PSOE audit, M4 regulator dashboard). Defaults: M1 on, M2-M4 off.
+DEFAULT_TENANT_MODULES = {
+    "module1": True,
+    "module2": False,
+    "module3": False,
+    "module4": False,
+}
+
+
+def _regulator_module_flags(reg: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+    """Flatten a regulator's module flags (module1..module3 booleans).
+
+    Flags may live in ``module_access`` and/or ``modules`` (either on the row or
+    inside the ``data`` bag), keyed as ``module_1`` or ``module1``. Missing
+    flags are omitted so the caller's defaults win.
+    """
+    flags: Dict[str, bool] = {}
+    bags = []
+    for key in ("module_access", "modules"):
+        bag = reg.get(key) if reg else None
+        if isinstance(bag, dict):
+            bags.append(bag)
+    data = (reg or {}).get("data")
+    if isinstance(data, dict):
+        for key in ("module_access", "modules"):
+            bag = data.get(key)
+            if isinstance(bag, dict):
+                bags.append(bag)
+    for i in range(1, 4):
+        for bag in bags:
+            for key in (f"module_{i}", f"module{i}"):
+                if key in bag:
+                    flags[f"module{i}"] = bool(bag[key])
+                    break
+            if f"module{i}" in flags:
+                break
+    return flags
+
+
+def _tenant_modules_from_regulator(reg: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+    """Tenant module map (module1..module4) resolved for a regulator.
+
+    A SaaS regulator's module flags (M1-M3) are inherited; non-SaaS or missing
+    regulators get ``DEFAULT_TENANT_MODULES`` (M4 is never inherited).
+    """
+    modules = dict(DEFAULT_TENANT_MODULES)
+    if not reg:
+        return modules
+    is_saas = bool(reg.get("is_saas_customer") or (reg.get("data") or {}).get("is_saas_customer"))
+    if not is_saas:
+        return modules
+    modules.update(_regulator_module_flags(reg))
+    return modules
+
 
 # ============================================================================
 # Audit logging
@@ -168,6 +223,17 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
     }
     if regulator_id:
         doc["regulator_id"] = regulator_id
+        # Resolve the regulator so module access can be inherited (SaaS only).
+        try:
+            regulator = pg.fetch_by(Regulator, "slug", regulator_id)
+        except Exception as e:
+            logger.warning(f"Failed to resolve regulator {regulator_id} for module inheritance: {e}")
+            regulator = None
+    else:
+        regulator = None
+    doc["module_access"] = _tenant_modules_from_regulator(regulator)
+    # Keep the legacy/typed `modules` field in sync with module_access.
+    doc["modules"] = dict(doc["module_access"])
     sm = data.get("safety_manager")
     if isinstance(sm, dict) and sm:
         doc["safety_manager"] = sm
