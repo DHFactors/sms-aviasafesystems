@@ -950,6 +950,8 @@ function regulatorBadge(st) {
     if (st === 'suspended') return '<span class="badge badge-danger">suspended</span>';
     if (st === 'retired') return '<span class="badge" style="background:#fee2e2;color:#7f1d1d;">retired</span>';
     if (st === 'cancelled' || st === 'canceled') return '<span class="badge" style="background:#f1f5f9;color:#475569;">cancelled</span>';
+    return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
+}
 
 // ---- Merged from super-admin: stats, toggles, SaaS ----
 var STATUS_VALUES = ['demo', 'trial', 'active', 'suspended', 'retired', 'cancelled'];
@@ -1063,9 +1065,6 @@ async function activateModule3(regulatorId) {
         toast('Module 3 ' + (!isActive ? 'activated' : 'deactivated') + '.', 'success');
         loadExistingRegulators();
     } catch (err) { toast('Module 3 toggle failed: ' + err.message, 'error'); }
-}
-    if (st === 'inactive') return '<span class="badge badge-inactive">inactive</span>';
-    return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
 }
 
 // ============================================================================
