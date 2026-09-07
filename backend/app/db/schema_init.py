@@ -117,7 +117,7 @@ async def _ensure_v2_schema(engine: Optional[AsyncEngine] = None) -> None:
 _DOMAIN_DDL = [
     """
     CREATE TABLE IF NOT EXISTS tenants (
-        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        id                UUID PRIMARY KEY,  -- app writes uuid5('tenant:'||slug)
         tenant_id         TEXT,
         slug              TEXT NOT NULL UNIQUE,
         name              TEXT,

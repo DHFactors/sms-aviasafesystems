@@ -348,10 +348,26 @@ def _resolve_seed_counts(kinds: List[str], counts: Optional[Dict[str, Any]] = No
     return resolved
 
 
-def _tid(slug: str) -> str:
-    """Resolve a tenant slug to its deterministic Postgres uuid."""
+async def _resolve_tenant_uuid(session, slug: str) -> str:
+    """Canonical uuid5('tenant:'+slug) id for a tenant, verified against the
+    tenants row so dummy data is never written under an id with no record.
+
+    Raises ValueError when the tenant is missing or its stored id drifted from
+    the canonical value (repair with scripts/migrate_tenant_ids.py).
+    """
+    expected = tenant_uuid(slug)
     register_tenant(slug)
-    return tenant_uuid(slug)
+    row_id = (await session.execute(
+        select(Tenant.id).where(Tenant.slug == slug)
+    )).scalar_one_or_none()
+    if row_id is None:
+        raise ValueError(f"tenant not found: {slug}")
+    if str(row_id) != expected:
+        raise ValueError(
+            f"tenant '{slug}' id drift: stored {row_id} != canonical {expected}; "
+            "run scripts/migrate_tenant_ids.py"
+        )
+    return expected
 
 
 def _risk(sev, prob):
@@ -449,10 +465,10 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
 
     counts_total = {k: 0 for k in kinds}
     base = _now()
-    # Canonical UUID string for this tenant slug (e.g. "fixedwing" -> uuid5)
-    tuuid = _tid(tid)
 
     async with session_scope() as session:
+        # Canonical (and tenants-row-verified) UUID string for this slug.
+        tuuid = await _resolve_tenant_uuid(session, tid)
         if "vsr" in kinds:
             counts_total["vsr"] = await _seed_reports(session, tuuid, "voluntary", seed_counts.get("vsr", 0), base)
         if "mor" in kinds:
@@ -574,9 +590,9 @@ async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[
     kinds = _normalize_kinds(kinds)
 
     counts = {k: 0 for k in kinds}
-    tuuid = _tid(tid)
 
     async with session_scope() as session:
+        tuuid = await _resolve_tenant_uuid(session, tid)
         # Step 1: CAPs — child of CANs
         if "can" in kinds or "cap" in kinds:
             r = await session.execute(delete(Cap).where(

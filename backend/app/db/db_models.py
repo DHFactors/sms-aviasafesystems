@@ -1419,7 +1419,11 @@ DEFAULT_JSONB = text("'{}'::jsonb")
 class Tenant(Base):
     __tablename__ = "tenants"
 
-    id: Mapped[object] = _uuid_pk()
+    # Tenancy ids are the deterministic uuid5('tenant:'+slug) (see
+    # app/db/pg.py _deterministic_tenant_id), NOT gen_random_uuid(): every
+    # tenant-scoped table stores tenant_id as that same uuid5 value, so a
+    # random PK would orphan all of a tenant's rows from its tenants record.
+    id: Mapped[object] = mapped_column(Uuid(as_uuid=True), primary_key=True)
     tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
     slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     name: Mapped[object] = mapped_column(Text, nullable=True)

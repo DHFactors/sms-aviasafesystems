@@ -64,6 +64,24 @@ _ID_COLUMNS: Dict[str, str] = {
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 
 
+def _deterministic_tenant_id(kwargs: Dict[str, Any], fallback_slug: Any = None) -> None:
+    """Force a tenants row onto the canonical uuid5('tenant:'+slug) id.
+
+    Every tenant-scoped table stores ``tenant_id`` as this deterministic value
+    (app/db/ids.py tenant_uuid), so a random gen_random_uuid() PK silently
+    orphans all of a tenant's rows from its tenants record. Injected here so
+    ANY tenant write routed through pg.insert/pg.upsert stays consistent.
+    """
+    if "id" in kwargs:
+        return
+    slug = kwargs.get("slug") or fallback_slug
+    if not slug:
+        return
+    from app.db.ids import tenant_uuid
+
+    kwargs["id"] = tenant_uuid(str(slug))
+
+
 def row_to_doc(row: Any) -> Dict[str, Any]:
     """Project an ORM row into a Firestore-shaped document.
 
@@ -166,7 +184,9 @@ def insert(model: type, doc: Dict[str, Any]) -> None:
     """Insert a Firestore-shaped document (typed columns + JSONB bag)."""
 
     async def _go(session) -> None:
-        session.add(model(**_split_doc(model, doc)))
+        kwargs = _split_doc(model, dict(doc))
+        _deterministic_tenant_id(kwargs)
+        session.add(model(**kwargs))
         await session.commit()
 
     run(_go(get_session_factory()()))
@@ -182,6 +202,7 @@ def upsert(model: type, key_column: str, key_value: Any, doc: Dict[str, Any]) ->
             )
         ).scalar_one_or_none()
         kwargs = _split_doc(model, dict(doc))
+        _deterministic_tenant_id(kwargs, key_value if key_column == "slug" else None)
         if existing is None:
             kwargs[key_column] = key_value
             session.add(model(**kwargs))
