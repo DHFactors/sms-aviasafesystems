@@ -163,11 +163,12 @@ _DOMAIN_DDL = [
     "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS modules JSONB;",
     "UPDATE tenants SET tenant_id = slug WHERE tenant_id IS NULL;",
     "ALTER TABLE tenants ALTER COLUMN tenant_id DROP NOT NULL;",
-    # The live DB provisioned tenants.regulator_id as UUID, but the app stores
-    # the regulator *slug* (e.g. "caan") everywhere. Coerce to TEXT so future
-    # CREATE/INSERTs accept the slug value (idempotent for fresh DBs where it
-    # is already TEXT).
+    # The live DB provisioned tenants.regulator_id / contact_id as UUID, but the
+    # app stores string keys (regulator slug e.g. "caan", contact id) everywhere.
+    # Coerce to TEXT so future CREATE/INSERTs accept the string values
+    # (idempotent for fresh DBs where they are already TEXT).
     "ALTER TABLE tenants ALTER COLUMN regulator_id TYPE TEXT USING regulator_id::text;",
+    "ALTER TABLE tenants ALTER COLUMN contact_id TYPE TEXT USING contact_id::text;",
     """
     CREATE TABLE IF NOT EXISTS regulators (
         id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

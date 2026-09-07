@@ -49,16 +49,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Firebase initialization failed at startup: {e}. Lazy init will retry on first request.")
 
-    # Apply idempotent Postgres domain DDL (create-if-missing + column-type
-    # coercions such as tenants.regulator_id uuid -> text) on every boot so a
-    # deploy auto-heals schema drift on the live DB without manual psql.
-    if settings.DATABASE_URL:
-        try:
-            from app.db.schema_init import ensure_domain_schema_async
-            await ensure_domain_schema_async()
-        except Exception as e:
-            logger.warning(f"Domain schema init failed at startup (will retry on next deploy): {e}")
-
     # Start APScheduler background jobs (weekly SSP + monthly tenant dispatch + daily DLQ replay)
     from app.core.lifecycle import start_scheduler, stop_scheduler
     start_scheduler()
