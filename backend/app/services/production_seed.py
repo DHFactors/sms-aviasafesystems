@@ -127,6 +127,10 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
     except Exception as e:
         logger.warning(f"Regulator mirror write failed ({rid}): {e}")
 
+    row = pg.fetch_by(Regulator, "slug", rid)
+    if row is not None and row.get("id") is not None:
+        doc["id"] = row["id"]
+
     _audit("REGULATOR_CREATED", actor, rid,
            f"Created State Regulator '{name}' ({data.get('country_name') or data.get('country') or ''})")
     logger.info(f"Regulator {rid} created by {actor.get('uid')}")

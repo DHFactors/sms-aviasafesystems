@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, R
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from loguru import logger
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.core.config import settings
 from app.db import pg
@@ -372,6 +372,9 @@ class RegulatorCreate(BaseModel):
     operator_tenant_ids: Optional[List[str]] = None
     active: bool = True
     is_demo: bool = True
+    is_saas_customer: Optional[bool] = False
+    subscription_start: Optional[date] = None
+    subscription_end: Optional[date] = None
 
 
 class TenantCreate(BaseModel):

@@ -701,13 +701,14 @@ function markProgress() {
 async function createRegulator(e) {
     e.preventDefault();
     
+    var regId = document.getElementById('regId').value.trim().toLowerCase();
     var isDemo = document.getElementById('regIsDemo').checked;
     var isSaaSCustomer = document.getElementById('regIsSaaSCustomer').checked;
     
     var payload = {
         setup_key: AdminUI.ensureSetupKey(),
         regulator: {
-            id: document.getElementById('regId').value.trim().toLowerCase(),
+            id: regId,
             name: document.getElementById('regName').value.trim(),
             short_name: document.getElementById('regShort').value.trim(),
             country: document.getElementById('regCountry').value.trim().toUpperCase(),
@@ -723,7 +724,8 @@ async function createRegulator(e) {
     
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
-        toast('Regulator "' + resp.regulator.id + '" created. SaaS: ' + (isSaaSCustomer ? '✅' : '❌'), 'success');
+        var reg = resp.regulator || resp.data?.regulator || {};
+        toast('Regulator "' + (reg.slug || reg.id || regId) + '" created. SaaS: ' + (isSaaSCustomer ? '✅' : '❌'), 'success');
         e.target.reset();
         loadExistingRegulators();
         populateRegulatorDropdown();
