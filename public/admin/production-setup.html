@@ -238,6 +238,34 @@ AUTHOR: AviaSAFE Systems
                         <div class="form-group"><label>Domain</label><input type="text" id="regDomain" placeholder="ssp.caanepal.gov.np"></div>
                     </div>
                     <div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>
+                    
+                    <!-- SaaS Customer Checkbox -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="regIsSaaSCustomer">
+                                SaaS Customer <i class="fas fa-crown" style="color:#f59e0b;"></i>
+                            </label>
+                            <small style="color:#94a3b8;">
+                                Checked = Regulator purchases SaaS (Module 3 unlocked).<br>
+                                Unchecked = Reference data only (for marketing/audit purposes).
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <!-- Subscription Dates -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Subscription Start</label>
+                            <input type="date" id="regSubscriptionStart">
+                        </div>
+                        <div class="form-group">
+                            <label>Subscription End</label>
+                            <input type="date" id="regSubscriptionEnd">
+                        </div>
+                    </div>
+                    
+                    <!-- Demo Regulator Checkbox -->
                     <div class="form-row">
                         <div class="form-group">
                             <label>
@@ -246,17 +274,6 @@ AUTHOR: AviaSAFE Systems
                             </label>
                             <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
                         </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="regIsSaas">
-                                SaaS Customer
-                            </label>
-                            <small style="color:#94a3b8;">Checked = paying SaaS customer (Module 3 enabled).</small>
-                        </div>
-                        <div class="form-group"><label>Subscription Start</label><input type="date" id="regSubStart"></div>
-                        <div class="form-group"><label>Subscription End</label><input type="date" id="regSubEnd"></div>
                     </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
@@ -683,6 +700,10 @@ function markProgress() {
 
 async function createRegulator(e) {
     e.preventDefault();
+    
+    var isDemo = document.getElementById('regIsDemo').checked;
+    var isSaaSCustomer = document.getElementById('regIsSaaSCustomer').checked;
+    
     var payload = {
         setup_key: AdminUI.ensureSetupKey(),
         regulator: {
@@ -693,19 +714,22 @@ async function createRegulator(e) {
             country_name: document.getElementById('regCountryName').value.trim(),
             domain: document.getElementById('regDomain').value.trim(),
             operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
-            is_demo: document.getElementById('regIsDemo').checked,
-            is_saas_customer: document.getElementById('regIsSaas').checked,
-            subscription_start: document.getElementById('regSubStart').value || null,
-            subscription_end: document.getElementById('regSubEnd').value || null
+            is_demo: isDemo,
+            is_saas_customer: isSaaSCustomer,
+            subscription_start: document.getElementById('regSubscriptionStart').value || null,
+            subscription_end: document.getElementById('regSubscriptionEnd').value || null
         }
     };
+    
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
-        toast('Regulator "' + resp.regulator.id + '" created.', 'success');
+        toast('Regulator "' + resp.regulator.id + '" created. SaaS: ' + (isSaaSCustomer ? '✅' : '❌'), 'success');
         e.target.reset();
         loadExistingRegulators();
         populateRegulatorDropdown();
-    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+    } catch (err) {
+        toast('Create failed: ' + err.message, 'error');
+    }
 }
 
 // Populate the Step 2 Regulator dropdown from the regulators created in Step 1.
