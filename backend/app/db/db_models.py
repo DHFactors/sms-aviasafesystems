@@ -1406,18 +1406,28 @@ class Tenant(Base):
     __tablename__ = "tenants"
 
     id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
     slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     name: Mapped[object] = mapped_column(Text, nullable=True)
+    icao: Mapped[object] = mapped_column(Text, nullable=True)
+    country: Mapped[object] = mapped_column(Text, nullable=True)
+    regulator_id: Mapped[object] = mapped_column(Text, nullable=True)
     status: Mapped[object] = mapped_column(Text, nullable=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_beta_sandbox: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     active: Mapped[object] = mapped_column(Boolean, nullable=True, default=True)
     auto_expire_days: Mapped[object] = mapped_column(Integer, nullable=True)
     safety_manager: Mapped[object] = mapped_column(JSONB, nullable=True)
+    contact_id: Mapped[object] = mapped_column(Text, nullable=True)
     contact_name: Mapped[object] = mapped_column(Text, nullable=True)
     contact_email: Mapped[object] = mapped_column(Text, nullable=True)
     contact_phone: Mapped[object] = mapped_column(Text, nullable=True)
     contact_title: Mapped[object] = mapped_column(Text, nullable=True)
+    contact_created_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    oversight_level: Mapped[object] = mapped_column(Text, nullable=True)
+    oversight_effective_date: Mapped[object] = mapped_column(Date, nullable=True)
+    module_access: Mapped[object] = mapped_column(JSONB, nullable=True)
+    modules: Mapped[object] = mapped_column(JSONB, nullable=True)
     data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow

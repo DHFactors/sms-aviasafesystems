@@ -154,8 +154,9 @@ def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]
     now = datetime.now(timezone.utc)
     doc = {
         "tenant_id": tid,
+        "slug": tid,
         "name": name,
-        "icao": (data.get("icao") or "").strip(),
+        "icao": (data.get("icao") or "").strip() or None,
         "country": (data.get("country") or "Nepal").strip(),
         "category": (data.get("category") or "CONTRACTED").upper(),
         "status": (data.get("status") or "ACTIVE").upper(),
