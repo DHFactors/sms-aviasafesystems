@@ -840,6 +840,106 @@ async def admin_update_regulator_status(
     return {"success": True, "regulator": doc}
 
 
+class RegulatorSaasRequest(BaseModel):
+    setup_key: str
+    is_saas_customer: bool
+
+
+@router.post("/regulators/{regulator_id}/toggle-saas", status_code=status.HTTP_200_OK)
+async def admin_toggle_regulator_saas(
+    regulator_id: str,
+    req: RegulatorSaasRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Toggle regulator SaaS customer flag (SUPER_ADMIN + setup key)."""
+    _verify_admin_setup(req.setup_key)
+    from app.db import pg
+    from app.db.db_models import Regulator
+    try:
+        doc = pg.fetch_by(Regulator, "slug", regulator_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail=f"Regulator '{regulator_id}' not found")
+        # Update is_saas_customer and keep module_access in sync
+        is_saas = bool(req.is_saas_customer)
+        updates = {"is_saas_customer": is_saas, "updated_at": datetime.now(timezone.utc).isoformat()}
+        # Keep module_access JSONB in sync: M3 follows SaaS
+        try:
+            data = doc.get("data") or {}
+            mod = dict(data.get("module_access") or {})
+            mod["module_3"] = is_saas
+            # Also handle legacy modules field
+            data["module_access"] = mod
+            updates["data"] = data
+        except Exception:
+            pass
+        pg.update(Regulator, "slug", regulator_id, updates)
+        log_audit(
+            action="REGULATOR_SAAS_TOGGLED",
+            user=user.get("email"),
+            tenant_id=regulator_id,
+            target_type="regulator",
+            target_id=regulator_id,
+            metadata={"is_saas_customer": is_saas},
+        )
+        return {"success": True, "regulator_id": regulator_id, "is_saas_customer": is_saas}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle SaaS failed for {regulator_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RegulatorModule3Request(BaseModel):
+    setup_key: str
+    enabled: bool
+
+
+@router.post("/regulators/{regulator_id}/modules/module3", status_code=status.HTTP_200_OK)
+async def admin_toggle_regulator_module3(
+    regulator_id: str,
+    req: RegulatorModule3Request,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Activate/deactivate Module 3 for a regulator (SUPER_ADMIN + setup key).
+    Only SaaS customers may have Module 3 active; others are reference only.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.db import pg
+    from app.db.db_models import Regulator
+    try:
+        doc = pg.fetch_by(Regulator, "slug", regulator_id)
+        if doc is None:
+            raise HTTPException(status_code=404, detail=f"Regulator '{regulator_id}' not found")
+        is_saas = bool(doc.get("is_saas_customer") or (doc.get("data") or {}).get("is_saas_customer"))
+        # Also check legacy data bag
+        if not is_saas:
+            raise HTTPException(status_code=403, detail="Module 3 requires SaaS customer status")
+        enabled = bool(req.enabled)
+        # Update module_access JSONB
+        data = dict(doc.get("data") or {})
+        mod = dict(data.get("module_access") or {})
+        mod["module_3"] = enabled
+        data["module_access"] = mod
+        # Also update legacy modules if present
+        modules = dict(doc.get("modules") or {})
+        modules["module3"] = enabled
+        pg.update(Regulator, "slug", regulator_id, {"data": data, "modules": modules, "updated_at": datetime.now(timezone.utc).isoformat()})
+        log_audit(
+            action="REGULATOR_MODULE3_TOGGLED",
+            user=user.get("email"),
+            tenant_id=regulator_id,
+            target_type="regulator",
+            target_id=regulator_id,
+            metadata={"enabled": enabled},
+        )
+        return {"success": True, "regulator_id": regulator_id, "module3": enabled}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Module3 toggle failed for {regulator_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/demo-data", status_code=status.HTTP_200_OK)
 async def admin_demo_data(
     req: DemoDataRequest,

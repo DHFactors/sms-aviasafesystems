@@ -132,6 +132,31 @@ AUTHOR: AviaSAFE Systems
         .side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
         .side-foot i { color: #e2574c; }
 
+        /* ---- Stats grid (merged from super-admin) ------------------------- */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+        .stat-card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; }
+        .stat-card .stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; }
+        .stat-card .stat-value { font-size: 1.55rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+        .stat-card .stat-icon { float: right; font-size: 1.5rem; color: #cbd5e1; }
+        .admin-tile { background: #fff; border-radius: 14px; padding: 24px; text-decoration: none; display: block; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; transition: transform .12s, box-shadow .12s; color: inherit; }
+        .admin-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,23,42,.12); }
+        .admin-tile .tile-icon { font-size: 2rem; color: #0ea5e9; margin-bottom: .6rem; }
+        .admin-tile h2 { margin: 0 0 4px; font-size: 1.02rem; color: #0f172a; }
+        .admin-tile p { margin: 0; color: #64748b; font-size: .84rem; line-height: 1.5; }
+        .admin-tile .tile-go { margin-top: .8rem; font-weight: 700; font-size: .8rem; color: #0ea5e9; }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 22px; transition: .3s; }
+        .toggle-switch .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: .3s; }
+        .toggle-switch input:checked + .slider { background: #0ea5e9; }
+        .toggle-switch input:checked + .slider:before { transform: translateX(18px); }
+        .status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+        .dot-demo { background: #7c3aed; } .dot-trial { background: #f59e0b; } .dot-active { background: #22c55e; } .dot-suspended { background: #ef4444; } .dot-retired { background: #6b7280; } .dot-cancelled { background: #d1d5db; } .dot-inactive { background: #94a3b8; }
+        .status-select { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-size: .82rem; font-weight: 600; color: #1e293b; cursor: pointer; }
+        .dirty-row { border-left: 3px solid #f59e0b !important; background: #fffbeb !important; }
+        .saved-row { border-left: 3px solid #10b981 !important; }
+        .error-row { border-left: 3px solid #ef4444 !important; }
+
         @media (max-width: 720px) { .content-area { padding: 16px; } }
     </style>
 </head>
@@ -143,8 +168,11 @@ AUTHOR: AviaSAFE Systems
             <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
             <span class="page-title" style="font-weight:600;font-size:.9rem;color:#bcd6e3;">Production Setup</span>
         </div>
-        <div class="tb-actions">
-            <span class="nav-link" style="opacity:0.85; background:rgba(79,195,247,0.18); color:#fff; border-radius:8px; padding:6px 12px; font-size:.82rem;"><i class="fas fa-check" style="color:#4fc3f7;"></i> Production Setup — Active Admin</span>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link active" style="background:rgba(79,195,247,0.18); color:#fff; border-radius:8px; padding:6px 12px; font-size:.82rem;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <a href="/admin/audit-log.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-list"></i> Audit Log</a>
+            <a href="/admin/user-management.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-users-gear"></i> User Management</a>
             <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
             <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
         </div>
@@ -155,6 +183,19 @@ AUTHOR: AviaSAFE Systems
             <h1><i class="fas fa-cogs" style="color:var(--color-brand-600);"></i> Production Setup</h1>
             <div class="sub">Full rollout flow (Steps 1&ndash;9), fully data-driven. Mutations require the admin setup key.</div>
         </div>
+
+        <div class="section-title"><i class="fas fa-chart-simple"></i> Summary</div>
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><span class="stat-icon"><i class="fas fa-building"></i></span><div class="stat-label">Total Tenants</div><div class="stat-value" id="statTenants">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#22c55e;"><i class="fas fa-play-circle"></i></span><div class="stat-label">Active Tenants</div><div class="stat-value" id="statActive">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#7c3aed;"><i class="fas fa-flask"></i></span><div class="stat-label">Demo Tenants</div><div class="stat-value" id="statDemo">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#f59e0b;"><i class="fas fa-hourglass-half"></i></span><div class="stat-label">Trial Tenants</div><div class="stat-value" id="statTrial">–</div></div>
+            <div class="stat-card"><span class="stat-icon"><i class="fas fa-landmark"></i></span><div class="stat-label">Total Regulators</div><div class="stat-value" id="statRegulators">–</div></div>
+            <div class="stat-card"><span class="stat-icon" style="color:#0ea5e9;"><i class="fas fa-handshake"></i></span><div class="stat-label">SaaS Customers</div><div class="stat-value" id="statSaas">–</div></div>
+        </div>
+
+        <div class="section-title"><i class="fas fa-compass"></i> Quick Access</div>
+        <div class="grid" id="quickAccessGrid"></div>
 
         <div class="step-progress" id="stepProgress">
             <span class="sp-chip"><span class="sp-num">1</span> Regulator</span>
@@ -206,6 +247,17 @@ AUTHOR: AviaSAFE Systems
                             <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="regIsSaas">
+                                SaaS Customer
+                            </label>
+                            <small style="color:#94a3b8;">Checked = paying SaaS customer (Module 3 enabled).</small>
+                        </div>
+                        <div class="form-group"><label>Subscription Start</label><input type="date" id="regSubStart"></div>
+                        <div class="form-group"><label>Subscription End</label><input type="date" id="regSubEnd"></div>
+                    </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
                     </div>
@@ -228,7 +280,18 @@ AUTHOR: AviaSAFE Systems
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>
-                        <div class="form-group"><label>Regulator (State Regulator from Step 1)</label><select id="tenantRegulator"><option value="">— none —</option></select></div>
+                        <div class="form-group"><label>Regulator (State Regulator from Step 1) *</label><select id="tenantRegulator" required><option value="">— select regulator —</option></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Oversight Level *</label>
+                            <select id="tenantOversightLevel" required>
+                                <option value="full" selected>Full</option>
+                                <option value="limited">Limited</option>
+                                <option value="audit_only">Audit Only</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Oversight Effective Date</label><input type="date" id="tenantOversightDate"></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -568,6 +631,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
+    renderQuickAccess();
     loadExistingRegulators();
     populateRegulatorDropdown();
     loadExistingTenants();
@@ -575,7 +639,23 @@ document.addEventListener('DOMContentLoaded', async function () {
     loadAuditLog();
     loadDemoTenants();
     markProgress();
+    // Update stats after tenants load (also triggered in loadExistingTenants)
+    setTimeout(renderStats, 800);
 });
+
+function renderQuickAccess() {
+    var grid = document.getElementById('quickAccessGrid');
+    if (!grid) return;
+    var items = [
+        { label: 'Production Setup', path: '/admin/production-setup.html', icon: 'fa-cogs', desc: 'State regulator, operator tenants, audit log, dummy data and PSOE baselines.' },
+        { label: 'PSOE Audit', path: '/admin/psoe-audit.html', icon: 'fa-clipboard-check', desc: 'CAAN Appendix 10 surveillance assessments — questions, scoring, findings and reports.' },
+        { label: 'Audit Log', path: '/admin/audit-log.html', icon: 'fa-clipboard-list', desc: 'Platform audit trail of admin actions and data changes.' },
+        { label: 'User Management', path: '/admin/user-management.html', icon: 'fa-users-gear', desc: 'Tenant users, roles and account management.' }
+    ];
+    grid.innerHTML = items.map(function(n){
+        return '<a class="admin-tile" href="' + n.path + '"><div class="tile-icon"><i class="fas ' + n.icon + '"></i></div><h2>' + esc(n.label) + '</h2><p>' + esc(n.desc) + '</p><div class="tile-go">Open &nbsp;<i class="fas fa-arrow-right"></i></div></a>';
+    }).join('');
+}
 
 function renderAccessDenied() {
     var gate = document.createElement('div');
@@ -613,7 +693,10 @@ async function createRegulator(e) {
             country_name: document.getElementById('regCountryName').value.trim(),
             domain: document.getElementById('regDomain').value.trim(),
             operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
-            is_demo: document.getElementById('regIsDemo').checked
+            is_demo: document.getElementById('regIsDemo').checked,
+            is_saas_customer: document.getElementById('regIsSaas').checked,
+            subscription_start: document.getElementById('regSubStart').value || null,
+            subscription_end: document.getElementById('regSubEnd').value || null
         }
     };
     try {
@@ -633,7 +716,7 @@ async function populateRegulatorDropdown() {
         var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
         var regs = resp.regulators || [];
         var prev = sel.value;
-        sel.innerHTML = '<option value="">— none —</option>' +
+        sel.innerHTML = '<option value="">— select regulator —</option>' +
             regs.map(function (r) {
                 return '<option value="' + esc(r.id) + '">' + esc(r.name || r.id) + ' (' + esc(r.id) + ')</option>';
             }).join('');
@@ -647,6 +730,11 @@ async function populateRegulatorDropdown() {
 
 async function createTenant(e) {
     e.preventDefault();
+    var regulatorId = document.getElementById('tenantRegulator').value.trim();
+    if (!regulatorId) {
+        toast('Regulator is required. Please select a State Regulator from Step 1.', 'error');
+        return;
+    }
     var payload = {
         setup_key: AdminUI.ensureSetupKey(),
         tenant: {
@@ -654,8 +742,10 @@ async function createTenant(e) {
             name: document.getElementById('tenantName').value.trim(),
             icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
             country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
-            regulator_id: document.getElementById('tenantRegulator').value.trim() || null,
+            regulator_id: regulatorId,
             is_demo: document.getElementById('tenantIsDemo').checked,
+            oversight_level: document.getElementById('tenantOversightLevel').value,
+            oversight_effective_date: document.getElementById('tenantOversightDate').value || null,
             contact_name: document.getElementById('tenantContactName').value.trim(),
             contact_email: document.getElementById('tenantContactEmail').value.trim(),
             contact_phone: document.getElementById('tenantContactPhone').value.trim(),
@@ -707,19 +797,27 @@ async function loadExistingRegulators() {
         var regs = resp.regulators || [];
         if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>Regulator</th><th>Country</th><th>Status</th><th>Operators</th><th>Dates</th><th>Manage</th></tr></thead><tbody>' +
+            '<th>Regulator</th><th>Country</th><th>Status</th><th>SaaS Customer</th><th>Module 3</th><th>Operators</th><th>Dates</th><th>Manage</th></tr></thead><tbody>' +
             regs.map(function (r) {
                 var ops = r.operator_tenant_ids || [];
                 var fromD = r.from_date || (r.contract && (r.contract.from_date || r.contract.start_date)) || '';
                 var toD = r.to_date || (r.contract && (r.contract.to_date || r.contract.end_date)) || '';
                 var dates = (fromD || toD) ? esc((fromD || '?') + ' → ' + (toD || '?')) : '—';
                 var statusVal = (r.status || (r.active ? 'active' : 'inactive'));
+                var isSaas = r.is_saas_customer === true || r.is_saas_customer === 'true';
+                var saasBadge = isSaas ? '<span class="badge badge-success">Yes</span>' : '<span class="badge" style="background:#f1f5f9;color:#64748b;">No</span>';
+                var m3 = r.module_access ? r.module_access.module3 : (r.modules ? r.modules.module3 : false);
+                var m3Badge = m3 ? '<span class="badge badge-success">Active</span>' : '<span class="badge" style="background:#fee2e2;color:#991b1b;">Locked</span>';
+                var saasBtn = '<button class="btn btn-outline btn-sm" onclick="toggleSaaSCustomer(\'' + esc(r.id) + '\', ' + (!isSaas) + ')">' + (isSaas ? 'Disable SaaS' : 'Enable SaaS') + '</button>';
+                var m3Btn = isSaas ? '<button class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="activateModule3(\'' + esc(r.id) + '\')">' + (m3 ? 'Deactivate M3' : 'Activate M3') + '</button>' : '';
                 return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
                     '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
                     '<td>' + regulatorBadge(statusVal) + '</td>' +
+                    '<td>' + saasBadge + '</td>' +
+                    '<td>' + m3Badge + '</td>' +
                     '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td>' +
                     '<td style="white-space:nowrap;font-size:.78rem;">' + dates + '</td>' +
-                    '<td><button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'regulator\', \'' + esc(r.id).replace(/'/g, "\\'") + '\', \'' + esc(statusVal).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
+                    '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' + saasBtn + m3Btn + '<button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'regulator\', \'' + esc(r.id).replace(/'/g, "\\'") + '\', \'' + esc(statusVal).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></div></td></tr>';
             }).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
@@ -735,9 +833,15 @@ async function loadExistingTenants() {
         try { populateUserTenantFilter(); } catch (e) {}
         if (!tenants.length) { el.innerHTML = '<div class="empty-state">No tenants yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Contact Person</th><th>Contact Email</th><th>Status</th><th>Payment</th><th>Contract</th>' +
+            '<th>Tenant</th><th>Regulator</th><th>Country</th><th>Contact Person</th><th>Contact Email</th><th>Status</th>' +
+            '<th style="text-align:center;">M1<br><span style="font-weight:400;font-size:.7rem;">SMS</span></th>' +
+            '<th style="text-align:center;">M2<br><span style="font-weight:400;font-size:.7rem;">Risk</span></th>' +
+            '<th style="text-align:center;">M3<br><span style="font-weight:400;font-size:.7rem;">PSOE</span></th>' +
+            '<th style="text-align:center;">M4<br><span style="font-weight:400;font-size:.7rem;">Regulator</span></th>' +
+            '<th>Payment</th><th>Contract</th>' +
             '<th>Surveys</th><th>Hazards</th><th>Reports</th><th>CANs</th><th>Manage</th></tr></thead><tbody>' +
-            tenants.map(buildTenantRow).join('') + '</tbody></table></div>';
+            tenants.map(buildTenantRow).join('') + '</tbody></table></div>' +
+            '<div class="btn-row" style="margin-top:12px; justify-content:flex-end;"><button class="btn btn-primary btn-sm" onclick="saveAllTenants()"><i class="fas fa-save"></i> Save All Changes</button></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
 
@@ -770,16 +874,26 @@ function buildTenantRow(t) {
     var contactName = t.contact_name || (t.data && t.data.contact_name) || (t.contact && t.contact.name) || '—';
     var contactEmailRaw = t.contact_email || (t.data && t.data.contact_email) || (t.contact && t.contact.email) || '—';
     var contactEmail = contactEmailRaw !== '—' ? '<a href="mailto:' + esc(contactEmailRaw) + '">' + esc(contactEmailRaw) + '</a>' : '—';
-    return '<tr><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
+    var modules = t.modules || { module1: true, module2: false, module3: false, module4: false };
+    var m1 = toggleHtml(t.id, 'module1', !!modules.module1);
+    var m2 = toggleHtml(t.id, 'module2', !!modules.module2);
+    var m3 = toggleHtml(t.id, 'module3', !!modules.module3);
+    var m4 = toggleHtml(t.id, 'module4', !!modules.module4);
+    var dotClass = 'dot-' + (['demo','trial','active','suspended','retired','cancelled'].indexOf((st||'').toLowerCase()) >=0 ? (st||'').toLowerCase() : 'inactive');
+    return '<tr data-tenant="' + esc(t.id) + '"><td><strong>' + esc(t.name || t.id) + '</strong><br><code>' + esc(t.id) + '</code></td>' +
         '<td>' + reg + '</td>' +
         '<td>' + esc(t.country || '—') + '</td>' +
         '<td>' + esc(contactName) + '</td>' +
         '<td>' + contactEmail + '</td>' +
-        '<td>' + statusBadge(st) + '</td>' +
+        '<td><span class="status-dot ' + dotClass + '"></span><select class="status-select" data-tenant="' + esc(t.id) + '" onchange="onStatusChange(this)">' + statusOptions(t.id, st) + '</select></td>' +
+        '<td style="text-align:center;">' + m1 + '</td>' +
+        '<td style="text-align:center;">' + m2 + '</td>' +
+        '<td style="text-align:center;">' + m3 + '</td>' +
+        '<td style="text-align:center;">' + m4 + '</td>' +
         '<td>' + paymentBadge(t.payment_status) + '</td>' +
         '<td style="white-space:nowrap;">' + contract + '</td>' +
         '<td>' + (c.surveys || 0) + '</td><td>' + (c.hazards || 0) + '</td><td>' + (c.reports || 0) + '</td><td>' + (c.cans || 0) + '</td>' +
-        '<td><button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'tenant\', \'' + esc(t.id).replace(/'/g, "\\'") + '\', \'' + esc(st).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
+        '<td><button class="btn btn-primary btn-sm" onclick="saveSingleTenant(\'' + esc(t.id) + '\')"><i class="fas fa-save"></i> Save</button> <button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'tenant\', \'' + esc(t.id).replace(/'/g, "\\'") + '\', \'' + esc(st).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></td></tr>';
 }
 
 function statusBadge(st) {
@@ -810,6 +924,120 @@ function regulatorBadge(st) {
     if (st === 'suspended') return '<span class="badge badge-danger">suspended</span>';
     if (st === 'retired') return '<span class="badge" style="background:#fee2e2;color:#7f1d1d;">retired</span>';
     if (st === 'cancelled' || st === 'canceled') return '<span class="badge" style="background:#f1f5f9;color:#475569;">cancelled</span>';
+
+// ---- Merged from super-admin: stats, toggles, SaaS ----
+var STATUS_VALUES = ['demo', 'trial', 'active', 'suspended', 'retired', 'cancelled'];
+var MODULE_LABELS = { module1: 'SMS', module2: 'Risk', module3: 'PSOE', module4: 'Regulator' };
+var DEFAULT_MODULES = { module1: true, module2: false, module3: false, module4: false };
+
+function normStatus(s) { return String(s || 'demo').trim().toUpperCase(); }
+function statusOptions(tenantId, statusVal) {
+    return STATUS_VALUES.map(function (v) {
+        return '<option value="' + v + '"' + (normStatus(statusVal) === v.toUpperCase() ? ' selected' : '') + '>' + v.charAt(0).toUpperCase() + v.slice(1) + '</option>';
+    }).join('');
+}
+function toggleHtml(tenantId, moduleKey, isChecked) {
+    var checked = isChecked ? 'checked' : '';
+    return '<label class="toggle-switch" title="' + (MODULE_LABELS[moduleKey] || moduleKey) + '"><input type="checkbox" ' + checked + ' data-tenant="' + esc(tenantId) + '" data-module="' + esc(moduleKey) + '" onchange="markTenantDirty(this)"><span class="slider"></span></label>';
+}
+function markTenantDirty(cb) {
+    var row = cb.closest('tr');
+    if (row) { row.classList.add('dirty-row'); row.classList.remove('saved-row','error-row'); }
+}
+function onStatusChange(sel) {
+    var row = sel.closest('tr');
+    if (row) { row.classList.add('dirty-row'); row.classList.remove('saved-row','error-row'); }
+}
+function readModules(row) {
+    return {
+        module1: row.querySelector('input[data-module="module1"]').checked,
+        module2: row.querySelector('input[data-module="module2"]').checked,
+        module3: row.querySelector('input[data-module="module3"]').checked,
+        module4: row.querySelector('input[data-module="module4"]').checked
+    };
+}
+function updateStats(tenants, regulators) {
+    var by = { ACTIVE: 0, DEMO: 0, TRIAL: 0 };
+    (tenants || []).forEach(function (t) {
+        var s = normStatus(t.status || 'demo');
+        if (s in by) by[s]++;
+    });
+    function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
+    set('statTenants', (tenants || []).length);
+    set('statActive', by.ACTIVE);
+    set('statDemo', by.DEMO);
+    set('statTrial', by.TRIAL);
+    set('statRegulators', (regulators || []).length);
+    var saasCount = (regulators || []).filter(function(r){ return r.is_saas_customer === true || r.is_saas_customer === 'true'; }).length;
+    set('statSaas', saasCount);
+}
+function renderStats() {
+    // Fallback using cached tenants if regulators not yet loaded
+    updateStats(EXISTING_TENANTS || [], []);
+    // Try to fetch regulators for SaaS count
+    AdminUI.apiGet('/api/v1/admin/regulators').then(function(resp){
+        updateStats(EXISTING_TENANTS || [], resp.regulators || []);
+    }).catch(function(){});
+}
+async function saveSingleTenant(tenantId) {
+    var row = document.querySelector('tr[data-tenant="' + tenantId + '"]');
+    if (!row) return;
+    var cached = null;
+    for (var i = 0; i < (EXISTING_TENANTS||[]).length; i++) { if (EXISTING_TENANTS[i].id === tenantId) { cached = EXISTING_TENANTS[i]; break; } }
+    var status = row.querySelector('.status-select').value;
+    var modules = readModules(row);
+    var cachedModules = (cached && cached.modules) || DEFAULT_MODULES;
+    var statusChanged = normStatus(status) !== normStatus(cached ? cached.status : 'demo');
+    var modulesChanged = ['module1','module2','module3','module4'].some(function(k){ return !!cachedModules[k] !== !!modules[k]; });
+    if (!statusChanged && !modulesChanged) { toast('No changes to save for ' + tenantId + '.', 'info'); return; }
+    var setupKey;
+    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { row.classList.add('error-row'); toast('Setup key required.', 'error'); return; }
+    try {
+        if (statusChanged) {
+            await AdminUI.apiPost('/api/v1/admin/tenants/' + tenantId + '/status', { setup_key: setupKey, status: status });
+        }
+        if (modulesChanged) {
+            await AdminUI.apiPost('/api/v1/admin/tenants/' + tenantId + '/modules', { setup_key: setupKey, modules: modules });
+        }
+        if (cached) { cached.status = status; cached.modules = modules; }
+        row.classList.remove('dirty-row','error-row'); row.classList.add('saved-row');
+        renderStats();
+        toast('Tenant ' + tenantId + ' updated.', 'success');
+    } catch (err) {
+        row.classList.add('error-row'); toast('Update failed: ' + err.message, 'error');
+    }
+}
+async function saveAllTenants() {
+    var dirtyRows = document.querySelectorAll('tr.dirty-row');
+    if (!dirtyRows.length) { toast('No changes to save.', 'info'); return; }
+    for (var i = 0; i < dirtyRows.length; i++) {
+        var tid = dirtyRows[i].getAttribute('data-tenant');
+        await saveSingleTenant(tid);
+    }
+}
+async function toggleSaaSCustomer(regulatorId, newStatus) {
+    var setupKey;
+    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { toast('Setup key required.', 'error'); return; }
+    try {
+        await AdminUI.apiPost('/api/v1/admin/regulators/' + regulatorId + '/toggle-saas', { setup_key: setupKey, is_saas_customer: newStatus });
+        toast('Regulator SaaS status updated.', 'success');
+        loadExistingRegulators(); renderStats();
+    } catch (err) { toast('SaaS toggle failed: ' + err.message, 'error'); }
+}
+async function activateModule3(regulatorId) {
+    var setupKey;
+    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { toast('Setup key required.', 'error'); return; }
+    // Determine current state: if already active, deactivate
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+        var reg = (resp.regulators || []).find(function(r){ return r.id === regulatorId; });
+        var isActive = reg && reg.module_access && reg.module_access.module3;
+        var endpoint = '/api/v1/admin/regulators/' + regulatorId + '/modules/module3';
+        await AdminUI.apiPost(endpoint, { setup_key: setupKey, enabled: !isActive });
+        toast('Module 3 ' + (!isActive ? 'activated' : 'deactivated') + '.', 'success');
+        loadExistingRegulators();
+    } catch (err) { toast('Module 3 toggle failed: ' + err.message, 'error'); }
+}
     if (st === 'inactive') return '<span class="badge badge-inactive">inactive</span>';
     return '<span class="badge badge-info">' + esc(st || '—') + '</span>';
 }

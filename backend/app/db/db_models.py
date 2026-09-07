@@ -1444,6 +1444,11 @@ class Regulator(Base):
         JSONB, server_default=text("'[]'::jsonb")
     )
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_saas_customer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    module_access: Mapped[object] = mapped_column(JSONB, server_default=text("'{\"module_1\":false,\"module_2\":false,\"module_3\":false}'::jsonb"))
+    subscription_status: Mapped[object] = mapped_column(Text, nullable=True, default="inactive")
+    subscription_start: Mapped[object] = mapped_column(Date, nullable=True)
+    subscription_end: Mapped[object] = mapped_column(Date, nullable=True)
     data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
