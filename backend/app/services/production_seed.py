@@ -91,20 +91,36 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
         raise ValueError(f"regulator already exists: {rid}")
 
     now = datetime.now(timezone.utc)
+    # Correct mapping per instruction:
+    # - regulators.id = generated UUID (auto, not frontend regId)
+    # - regulators.slug = frontend regId (e.g., "caan")
+    # - regulators.data = regulator metadata
     doc = {
-        "id": rid,
-        "type": "state_regulator",
+        "slug": rid,
         "name": name,
-        "short_name": (data.get("short_name") or "").strip() or rid.upper(),
-        "country": (data.get("country") or "").strip(),
-        "country_name": (data.get("country_name") or "").strip(),
-        "domain": (data.get("domain") or "").strip() or None,
+        "display_name": (data.get("short_name") or "").strip() or rid.upper(),
         "operator_tenant_ids": list(data.get("operator_tenant_ids") or []),
-        "active": bool(data.get("active", True)),
         "is_demo": bool(data.get("is_demo", True)),
+        "is_saas_customer": bool(data.get("is_saas_customer", False)),
+        "subscription_start": data.get("subscription_start"),
+        "subscription_end": data.get("subscription_end"),
+        "data": {
+            "type": "state_regulator",
+            "short_name": (data.get("short_name") or "").strip() or rid.upper(),
+            "country": (data.get("country") or "").strip(),
+            "country_name": (data.get("country_name") or "").strip(),
+            "domain": (data.get("domain") or "").strip() or None,
+            "active": bool(data.get("active", True)),
+            "is_demo": bool(data.get("is_demo", True)),
+            "is_saas_customer": bool(data.get("is_saas_customer", False)),
+            "subscription_start": data.get("subscription_start"),
+            "subscription_end": data.get("subscription_end"),
+        },
         "created_at": now,
         "updated_at": now,
     }
+    # Clean None values from data
+    doc["data"] = {k: v for k, v in doc["data"].items() if v is not None}
     pg.upsert(Regulator, "slug", rid, doc)
     try:
         get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(rid).set(dict(doc))
