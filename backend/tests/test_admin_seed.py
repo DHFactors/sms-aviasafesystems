@@ -263,6 +263,30 @@ def test_create_regulator_duplicate(monkeypatch):
         assert "already exists" in str(e)
 
 
+def test_create_regulator_saas_sets_module_access(monkeypatch):
+    db = _patch_db(monkeypatch)
+    from app.services.production_seed import create_regulator
+    create_regulator({
+        "id": "caan2", "name": "CAAN", "is_saas_customer": True,
+    }, _admin_user())
+    stored = db._stores["regulators"]["caan2"]
+    assert stored["module_access"] == {
+        "module_1": True, "module_2": True, "module_3": True,
+    }
+
+
+def test_create_regulator_non_saas_module_access_false(monkeypatch):
+    db = _patch_db(monkeypatch)
+    from app.services.production_seed import create_regulator
+    create_regulator({
+        "id": "dgca2", "name": "DGCA", "is_demo": True, "is_saas_customer": False,
+    }, _admin_user())
+    stored = db._stores["regulators"]["dgca2"]
+    assert stored["module_access"] == {
+        "module_1": False, "module_2": False, "module_3": False,
+    }
+
+
 def test_create_regulator_invalid_id(monkeypatch):
     _patch_db(monkeypatch)
     from app.services.production_seed import create_regulator
@@ -363,6 +387,25 @@ def test_create_tenant_inherits_saas_regulator_data_module_access(monkeypatch):
     stored = db._stores["tenants"]["nep-air2"]
     assert stored["module_access"] == {
         "module1": True, "module2": True, "module3": False, "module4": False,
+    }
+
+
+def test_create_tenant_saas_regulator_legacy_all_false_inherits_m1_m3(monkeypatch):
+    # Regulators created before create_regulator wrote module_access carry the
+    # all-false server_default; SaaS customers are still entitled to M1-M3.
+    db = _patch_db(monkeypatch)
+    db._stores["regulators"]["caan"] = {
+        "slug": "caan", "name": "CAAN",
+        "is_saas_customer": True,
+        "module_access": {"module_1": False, "module_2": False, "module_3": False},
+    }
+    from app.services.production_seed import create_tenant
+    create_tenant({
+        "tenant_id": "nep-air3", "name": "NepAir", "regulator_id": "caan",
+    }, _admin_user())
+    stored = db._stores["tenants"]["nep-air3"]
+    assert stored["module_access"] == {
+        "module1": True, "module2": True, "module3": True, "module4": False,
     }
 
 

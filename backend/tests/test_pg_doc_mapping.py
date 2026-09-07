@@ -79,6 +79,18 @@ def test_split_doc_skips_none_values():
     assert kwargs["name"] == ""
 
 
+def test_split_doc_coerces_iso_strings_to_native_dates():
+    from datetime import date, datetime
+    from app.db.db_models import Regulator
+    kwargs = pg._split_doc(Regulator, {
+        "slug": "caan",
+        "subscription_start": "2026-01-01",
+        "created_at": "2026-09-07T11:10:43.567627+00:00",
+    })
+    assert kwargs["subscription_start"] == date(2026, 1, 1)
+    assert isinstance(kwargs["created_at"], datetime)
+
+
 def test_split_doc_user_extras_land_in_data():
     kwargs = pg._split_doc(
         UserProfile,

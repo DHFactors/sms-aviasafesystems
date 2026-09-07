@@ -79,7 +79,17 @@ def _tenant_modules_from_regulator(reg: Optional[Dict[str, Any]]) -> Dict[str, b
     is_saas = bool(reg.get("is_saas_customer") or (reg.get("data") or {}).get("is_saas_customer"))
     if not is_saas:
         return modules
-    modules.update(_regulator_module_flags(reg))
+    flags = _regulator_module_flags(reg)
+    # A SaaS regulator is entitled to M1-M3. Regulators created before this
+    # behavior carried the all-false server_default (or no flags at all);
+    # treat that as "unset" so tenants still inherit M1-M3 rather than defaults,
+    # while still honoring an explicit flag set (e.g. an admin module-3 disable).
+    unset = not flags or all(flags.get(k) is False for k in ("module1", "module2", "module3"))
+    if unset:
+        for k in ("module1", "module2", "module3"):
+            modules[k] = True
+    else:
+        modules.update(flags)
     return modules
 
 
@@ -206,13 +216,28 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
     # - regulators.id = generated UUID (auto, not frontend regId)
     # - regulators.slug = frontend regId (e.g., "caan")
     # - regulators.data = regulator metadata
+    is_saas_customer = bool(data.get("is_saas_customer", False))
+    # SaaS regulators are entitled to M1-M3; honor explicit flags if given.
+    raw_modules = data.get("module_access")
+    if isinstance(raw_modules, dict) and raw_modules:
+        module_access = {
+            f"module_{i}": bool(raw_modules.get(f"module_{i}", raw_modules.get(f"module{i}", False)))
+            for i in (1, 2, 3)
+        }
+    else:
+        module_access = {
+            "module_1": is_saas_customer,
+            "module_2": is_saas_customer,
+            "module_3": is_saas_customer,
+        }
     doc = {
         "slug": rid,
         "name": name,
         "display_name": (data.get("short_name") or "").strip() or rid.upper(),
         "operator_tenant_ids": list(data.get("operator_tenant_ids") or []),
         "is_demo": bool(data.get("is_demo", True)),
-        "is_saas_customer": bool(data.get("is_saas_customer", False)),
+        "is_saas_customer": is_saas_customer,
+        "module_access": module_access,
         "subscription_start": data.get("subscription_start"),
         "subscription_end": data.get("subscription_end"),
         "data": {
@@ -223,7 +248,8 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
             "domain": (data.get("domain") or "").strip() or None,
             "active": bool(data.get("active", True)),
             "is_demo": bool(data.get("is_demo", True)),
-            "is_saas_customer": bool(data.get("is_saas_customer", False)),
+            "is_saas_customer": is_saas_customer,
+            "module_access": module_access,
             "subscription_start": data.get("subscription_start"),
             "subscription_end": data.get("subscription_end"),
         },

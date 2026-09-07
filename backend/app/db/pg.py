@@ -99,6 +99,9 @@ def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
 
     Models without a JSONB ``data`` column drop the unrecognized extras.
     """
+    from datetime import date, datetime
+    from sqlalchemy import Date, DateTime
+
     table = model.__table__
     typed: Dict[str, Any] = {}
     extras: Dict[str, Any] = {}
@@ -106,6 +109,18 @@ def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
         if value is None:
             continue
         if key in table.columns:
+            coltype = table.columns[key].type
+            # row_to_doc flattens the JSONB bag over typed columns, so a typed
+            # Date/DateTime column can arrive here as an ISO string (or callers
+            # pass `.isoformat()` directly). Coerce back so asyncpg binds cleanly.
+            if isinstance(value, str) and isinstance(coltype, (Date, DateTime)):
+                try:
+                    if isinstance(coltype, DateTime):
+                        value = datetime.fromisoformat(value)
+                    else:
+                        value = date.fromisoformat(value)
+                except ValueError:
+                    pass
             typed[key] = value
         elif "data" in table.columns:
             extras[key] = value
@@ -194,6 +209,11 @@ def update(
     merged = dict(existing)
     merged.update(doc)
     key_col = _ID_COLUMNS.get(model.__tablename__, "id")
+    # fetch_by exposes the key column as a synthetic `id` (slug-as-id for
+    # regulator/tenant rows); drop it keying by a non-id column so it is not
+    # written into the real UUID `id` column.
+    if key_col != "id":
+        merged.pop("id", None)
     kwargs = _split_doc(model, merged)
     kwargs.pop(key_col, None)
     kwargs[key_col] = value
