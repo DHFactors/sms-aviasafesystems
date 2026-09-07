@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime, date, time
 from enum import Enum
 
@@ -151,8 +151,9 @@ class CAPFormFields(BaseModel):
     escalated_at: Optional[datetime] = None
     escalation_reason: Optional[str] = None
     # Formal AE risk-acceptance sign-off (Doc 9859 §4.5 / CAR-19):
-    # typed executive signature, decision timestamp and mandatory review date.
-    ae_signature: Optional[str] = Field(None, max_length=200)
+    # typed executive signature (legacy plain name OR {name, ...} block),
+    # decision timestamp and mandatory review date.
+    ae_signature: Optional[Union[str, dict, list]] = None
     ae_signed_at: Optional[datetime] = None
     ae_review_interval_days: Optional[int] = Field(None, ge=1, le=365)
     ae_review_date: Optional[datetime] = None
@@ -166,7 +167,7 @@ class CAPFormFields(BaseModel):
     closing_remarks: Optional[str] = None
     closed_by: Optional[str] = None
     closed_at: Optional[datetime] = None
-    closed_signature: Optional[str] = None
+    closed_signature: Optional[Union[str, dict, list]] = None
     # ── Image-based digital signatures (Option 3) ──
     po_signature: Optional[dict] = None
     ma_signature: Optional[dict] = None

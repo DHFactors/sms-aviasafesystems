@@ -160,6 +160,10 @@ CREATE TABLE reports (
     human_factors               JSONB,       -- List[str]
     contributing_factors        JSONB,       -- List[str]
     investigation_agency        TEXT,
+    immediate_cause             TEXT,
+    safety_recommendations      TEXT,
+    safety_suggestions          TEXT,
+    report_date                 DATE,
 
     reporter_name               TEXT,
     reporter_role               TEXT,
@@ -227,6 +231,14 @@ CREATE TABLE cans (
     initial_sra              JSONB,
     classification_type      TEXT,
     classification_level     TEXT,
+    psoe_assessment_id       TEXT,
+    issued_by_signature      JSONB,          -- {name, timestamp, image_url, hash, verified}
+    issued_by_signature_name TEXT,
+    issued_by_signature_timestamp TIMESTAMPTZ,
+    issued_by_signature_image_url TEXT,
+    issued_by_signature_hash TEXT,
+    issued_by_signature_verified BOOLEAN,
+    reviewed_by_signature    JSONB,          -- {name, timestamp, image_url, hash, verified}
 
     is_demo                  BOOLEAN NOT NULL DEFAULT FALSE,
 
@@ -309,7 +321,7 @@ CREATE TABLE caps (
     escalated_by            TEXT,
     escalated_at            TIMESTAMPTZ,
     escalation_reason       TEXT,
-    ae_signature            TEXT,
+    ae_signature            JSONB DEFAULT '{}'::jsonb,   -- {name, timestamp, image_url, hash, verified}
     ae_signed_at            TIMESTAMPTZ,
     ae_review_interval_days INT CHECK (ae_review_interval_days BETWEEN 1 AND 365),
     ae_review_date          TIMESTAMPTZ,
@@ -325,7 +337,7 @@ CREATE TABLE caps (
     closing_remarks         TEXT,
     closed_by               TEXT,
     closed_at               TIMESTAMPTZ,
-    closed_signature        TEXT,
+    closed_signature        JSONB DEFAULT '{}'::jsonb,   -- {name, timestamp, image_url, hash, verified}
 
     is_demo                 BOOLEAN NOT NULL DEFAULT FALSE,
 

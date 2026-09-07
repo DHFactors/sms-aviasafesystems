@@ -78,7 +78,11 @@ _CAP_JSONB_COLUMNS = {
     "managerial_approval", "caa_acceptance", "residual_sra", "root_causes",
     "action_items", "sram_data",
 }
+_CAP_SIGNATURE_COLUMNS = {
+    "ae_signature", "closed_signature", "po_signature", "ma_signature",
+}
 _CAN_JSONB_COLUMNS = {"initial_sra"}
+_CAN_SIGNATURE_COLUMNS = {"issued_by_signature", "reviewed_by_signature"}
 
 from sqlalchemy import DateTime
 
@@ -116,6 +120,24 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _signature_block(value: Any) -> Any:
+    """Normalise a signature value for a JSONB column.
+
+    Legacy forms send a plain signature-name string; the canvas-pad forms send
+    {name, timestamp, image_url, hash, verified} (see po_signature on caps).
+    Both are coerced to the object shape so the migration-era JSONB columns get
+    a consistent dict (asyncpg rejects a bare varchar bound to jsonb).
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        name = value.strip()
+        return None if not name else {"name": name}
+    if isinstance(value, dict):
+        return _json_safe(value)
+    return None
+
+
 def _can_to_dict(row: Can, hazard_id_ref: Optional[str] = None) -> dict:
     data = {}
     for col in Can.__table__.columns:
@@ -126,6 +148,9 @@ def _can_to_dict(row: Can, hazard_id_ref: Optional[str] = None) -> dict:
     data["tenant_id"] = tenant_slug(row.tenant_id)
     data["hazard_id"] = hazard_id_ref or str(row.hazard_id)
     _serialize_timestamps(data)
+    for key in ("issued_by_signature", "reviewed_by_signature"):
+        if isinstance(data.get(key), dict):
+            data[key] = data[key].get("name")
     return data
 
 
@@ -149,6 +174,11 @@ def _cap_to_dict(
         data["priority"] = can_row.priority
         data["hazard_id"] = hazard_id_ref or str(can_row.hazard_id)
     _serialize_timestamps(data)
+    # The AE/closure signatures are stored as {name, ...} blocks; the displays
+    # that render them directly expect a plain name string.
+    for key in ("ae_signature", "closed_signature"):
+        if isinstance(data.get(key), dict):
+            data[key] = data[key].get("name")
     return data
 
 
@@ -541,7 +571,9 @@ class CanCapService:
 
             for key, value in payload.items():
                 if key in _CAN_MUTABLE_COLUMNS:
-                    if key in _CAN_JSONB_COLUMNS:
+                    if key in _CAN_SIGNATURE_COLUMNS:
+                        value = _signature_block(value)
+                    elif key in _CAN_JSONB_COLUMNS:
                         value = _json_safe(value)
                     elif key in _CAN_DT_COLUMNS:
                         value = _dt(value)
@@ -846,7 +878,9 @@ class CanCapService:
                 return None
             for key, value in payload.items():
                 if key in _CAP_MUTABLE_COLUMNS:
-                    if key in _CAP_JSONB_COLUMNS:
+                    if key in _CAP_SIGNATURE_COLUMNS:
+                        value = _signature_block(value)
+                    elif key in _CAP_JSONB_COLUMNS:
                         value = _json_safe(value)
                     elif key in _CAP_DT_COLUMNS:
                         value = _dt(value)
@@ -899,7 +933,7 @@ class CanCapService:
                 "escalated_by": review.get("escalated_by"),
                 "escalation_reason": review.get("escalation_reason"),
                 # Formal AE risk-acceptance sign-off record
-                "ae_signature": review.get("ae_signature"),
+                "ae_signature": _signature_block(review.get("ae_signature")),
                 "ae_review_interval_days": review.get("ae_review_interval_days"),
             }
 
@@ -952,7 +986,7 @@ class CanCapService:
             if review["status"] == "Completed":
                 changes["closed_by"] = review.get("closed_by") or user.get("email", user["uid"])
                 changes["closed_at"] = _dt(review.get("closed_at")) or now
-                changes["closed_signature"] = review.get("closed_signature")
+                changes["closed_signature"] = _signature_block(review.get("closed_signature"))
 
             for key, value in changes.items():
                 if key in _CAP_MUTABLE_COLUMNS:

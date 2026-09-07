@@ -216,6 +216,10 @@ class Report(Base):
     human_factors: Mapped[object] = mapped_column(JSONB, nullable=True)
     contributing_factors: Mapped[object] = mapped_column(JSONB, nullable=True)
     investigation_agency: Mapped[object] = mapped_column(Text, nullable=True)
+    immediate_cause: Mapped[object] = mapped_column(Text, nullable=True)
+    safety_recommendations: Mapped[object] = mapped_column(Text, nullable=True)
+    safety_suggestions: Mapped[object] = mapped_column(Text, nullable=True)
+    report_date: Mapped[object] = mapped_column(Date, nullable=True)
 
     reporter_name: Mapped[object] = mapped_column(Text, nullable=True)
     reporter_role: Mapped[object] = mapped_column(Text, nullable=True)
@@ -314,6 +318,16 @@ class Can(Base):
     classification_type: Mapped[object] = mapped_column(Text, nullable=True)
     classification_level: Mapped[object] = mapped_column(Text, nullable=True)
     psoe_assessment_id: Mapped[object] = mapped_column(Text, nullable=True)
+
+    issued_by_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
+    issued_by_signature_name: Mapped[object] = mapped_column(Text, nullable=True)
+    issued_by_signature_timestamp: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    issued_by_signature_image_url: Mapped[object] = mapped_column(Text, nullable=True)
+    issued_by_signature_hash: Mapped[object] = mapped_column(Text, nullable=True)
+    issued_by_signature_verified: Mapped[bool] = mapped_column(Boolean, nullable=True)
+    reviewed_by_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
 
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
@@ -423,7 +437,7 @@ class Cap(Base):
     escalated_by: Mapped[object] = mapped_column(Text, nullable=True)
     escalated_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     escalation_reason: Mapped[object] = mapped_column(Text, nullable=True)
-    ae_signature: Mapped[object] = mapped_column(Text, nullable=True)
+    ae_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
     ae_signed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     ae_review_interval_days: Mapped[object] = mapped_column(Integer, nullable=True)
     ae_review_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -438,7 +452,7 @@ class Cap(Base):
     closing_remarks: Mapped[object] = mapped_column(Text, nullable=True)
     closed_by: Mapped[object] = mapped_column(Text, nullable=True)
     closed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
-    closed_signature: Mapped[object] = mapped_column(Text, nullable=True)
+    closed_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
 
     po_signature: Mapped[object] = mapped_column(JSONB, nullable=True)
     po_signature_name: Mapped[object] = mapped_column(Text, nullable=True)
