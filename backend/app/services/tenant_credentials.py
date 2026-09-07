@@ -189,6 +189,97 @@ def create_tenant_with_credentials(data: Dict[str, Any], actor: Dict[str, Any]) 
 
 
 # ============================================================================
+# Single-user creation for an existing tenant
+# ============================================================================
+
+def create_user_for_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Create one tenant-scoped Auth user on an existing operator tenant.
+
+    Applies the role/tenant/department claims to the Auth user, upserts the
+    Firestore `users/{uid}` doc, appends the user record to the tenant's
+    `users` list, best-effort dispatches a welcome email, and writes a
+    `USER_CREATED` audit entry. The generated password is returned exactly
+    once and never persisted. Raises `ValueError` when the tenant is missing,
+    the email is already stored on the tenant, or the Auth creation fails
+    (e.g. email already exists in Firebase Auth).
+    """
+    tid = (data.get("tenant_id") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    if not tid or not email:
+        raise ValueError("tenant_id and email are required")
+    _read_tenant(tid)  # raises ValueError when the tenant is missing
+
+    auth = get_auth()
+    result = _create_auth_user(auth, {
+        "email": email,
+        "role": data.get("role") or "AIRLINE_ADMIN",
+        "full_name": data.get("full_name") or "",
+        "department": data.get("department") or "",
+    }, tid)
+    if result.get("status") != "ok":
+        raise ValueError(result.get("detail") or "could not create user")
+
+    now = datetime.now(timezone.utc)
+    full_name = (data.get("full_name") or "").strip()
+    department = (data.get("department") or "").strip()
+    rec = {
+        "email": result["email"],
+        "role": result["role"],
+        "uid": result.get("uid"),
+        "full_name": full_name,
+        "department": department,
+        "status": "active",
+        "created_at": now.isoformat(),
+        "last_login": None,
+    }
+
+    doc = _read_tenant(tid)
+    users = list(doc.get("users") or [])
+    if any((u.get("email") or "").strip().lower() == email for u in users):
+        raise ValueError("email already exists on tenant")
+    users.append(rec)
+    prev_audit = doc.get("audit") or {}
+    _patch_tenant(tid, {
+        "users": users,
+        "audit": {
+            "created_by": prev_audit.get("created_by"),
+            "created_at": prev_audit.get("created_at"),
+            "last_modified_by": actor.get("email") or actor.get("uid"),
+            "last_modified_at": now.isoformat(),
+        },
+    })
+
+    contact = doc.get("contact") or {}
+    context = {
+        "contact_name": full_name or contact.get("name") or "Safety Team",
+        "tenant_name": doc.get("name") or tid,
+        "admin_email": email,
+        "password": result["password"],
+        "login_url": settings.APP_LOGIN_URL,
+        "support_email": settings.APP_SUPPORT_EMAIL,
+    }
+    try:
+        delivery = send_welcome_email(email, context)
+    except Exception as e:
+        logger.warning(f"Welcome email for {email} failed: {e}")
+        delivery = {"sent": False, "provider": "none", "to": email, "error": str(e)}
+
+    production_seed._audit(
+        "USER_CREATED", actor, tid,
+        f"Created user {email} (role={result['role']}, dept={department or 'n/a'})",
+    )
+    logger.info(f"User {email} created for tenant {tid} by {actor.get('uid')}")
+    return {
+        "tenant_id": tid,
+        "email": result["email"],
+        "uid": result.get("uid"),
+        "role": result["role"],
+        "password": result["password"],
+        "delivery": delivery,
+    }
+
+
+# ============================================================================
 # Credentials read / admin user resolution
 # ============================================================================
 

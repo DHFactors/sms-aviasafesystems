@@ -383,11 +383,13 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
             <!-- ============ USER MANAGEMENT — CLEANUP ============ -->
             <div class="section-title" style="margin-top:18px;"><i class="fas fa-users-gear"></i> User Management — Cleanup</div>
             <div class="admin-card">
-                <p class="card-sub">List tenant users and purge test accounts. Requires SUPER_ADMIN + setup key. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every deletion is audit-logged.</p>
+                <p class="card-sub">Create tenant users or purge test accounts. Requires SUPER_ADMIN + setup key. New users receive a generated password (shown once) and a welcome email. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every create/delete is audit-logged.</p>
                 <div class="btn-row" style="margin-bottom:12px;">
                     <select id="userTenantFilter" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;min-width:160px;" onchange="renderUserTable()"><option value="">All tenants</option></select>
                     <input type="text" id="userSearch" placeholder="Filter by email…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
+                    <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()"><i class="fas fa-user-plus"></i> Create User</button>
                     <button class="btn btn-outline btn-sm" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
+                    <small style="margin-left:2px;color:#94a3b8;font-size:.72rem;">Generated password shown once.</small>
                 </div>
                 <div id="userList"><div class="empty-state">Not loaded. Click Refresh to load users.</div></div>
             </div>
@@ -624,6 +626,53 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
         <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
             <button class="btn" onclick="closeLifecycleModal()">Cancel</button>
             <button class="btn btn-primary" onclick="saveLifecycleModal()"><i class="fas fa-check"></i> Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE USER MODAL — add a tenant-scoped Firebase Auth user -->
+<div id="createUserModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:24px;border-radius:12px;max-width:560px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);">
+        <h3 style="margin:0 0 4px;color:#0f172a;"><i class="fas fa-user-plus" style="color:var(--color-brand-600);"></i> Create User</h3>
+        <p style="margin:0 0 14px;color:#64748b;font-size:.85rem;">User is created on the selected tenant with a generated password (shown once) and gets a welcome email. Existing emails are rejected.</p>
+        <div class="form-group">
+            <label for="createUserEmail">Email *</label>
+            <input type="email" id="createUserEmail" placeholder="safety@operator.com" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+        </div>
+        <div class="form-row" style="margin-top:12px;">
+            <div class="form-group">
+                <label for="createUserTenant">Tenant *</label>
+                <select id="createUserTenant" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
+                    <option value="">— select tenant —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="createUserRole">Role *</label>
+                <select id="createUserRole" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
+                    <option value="AIRLINE_ADMIN">AIRLINE_ADMIN (Accountable Executive)</option>
+                    <option value="TENANT_ADMIN">TENANT_ADMIN (Safety Manager)</option>
+                    <option value="DEPT_ADMIN">DEPT_ADMIN (Department Admin)</option>
+                    <option value="SAFETY_OFFICER">SAFETY_OFFICER</option>
+                    <option value="STAFF">STAFF</option>
+                </select>
+                <small style="color:#94a3b8;">Role claim recognized by the app RBAC.</small>
+            </div>
+        </div>
+        <div class="form-row" style="margin-top:12px;">
+            <div class="form-group"><label for="createUserName">Full Name</label><input type="text" id="createUserName" placeholder="Full display name" autocomplete="off" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;"></div>
+            <div class="form-group"><label for="createUserDept">Department</label><input type="text" id="createUserDept" placeholder="e.g. Safety" autocomplete="off" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;"></div>
+        </div>
+        <div style="margin-top:14px;">
+            <label for="createUserSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="createUserSetupKey" placeholder="Enter setup key to authorize this change" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <div id="createUserError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
+        <div id="createUserResult" style="display:none;margin-top:14px;padding:12px 14px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;"></div>
+        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+            <button class="btn" onclick="closeCreateUserModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitCreateUser()"><i class="fas fa-user-plus"></i> Create User &amp; Invite</button>
         </div>
     </div>
 </div>
@@ -1137,6 +1186,88 @@ function filterUserTable(q) {
 document.addEventListener('DOMContentLoaded', function () {
     var sel = document.getElementById('userTenantFilter');
     if (sel) sel.addEventListener('change', renderUserTable);
+});
+
+// ============================================================================
+// USER MANAGEMENT — CREATE USER
+// ============================================================================
+
+function populateCreateUserTenants() {
+    var sel = document.getElementById('createUserTenant');
+    if (!sel) return;
+    var tenants = EXISTING_TENANTS || [];
+    sel.innerHTML = '<option value="">— select tenant —</option>' +
+        tenants.map(function (t) {
+            return '<option value="' + esc(t.id) + '">' + esc(t.name || t.id) + ' (' + esc(t.id) + ')</option>';
+        }).join('');
+}
+
+function openCreateUserModal() {
+    populateCreateUserTenants();
+    var errEl = document.getElementById('createUserError');
+    var resEl = document.getElementById('createUserResult');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
+    document.getElementById('createUserModal').style.display = 'flex';
+    var email = document.getElementById('createUserEmail');
+    if (email) setTimeout(function () { email.focus(); }, 50);
+}
+
+function closeCreateUserModal() {
+    document.getElementById('createUserModal').style.display = 'none';
+    var errEl = document.getElementById('createUserError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+}
+
+async function submitCreateUser() {
+    var errEl = document.getElementById('createUserError');
+    var resEl = document.getElementById('createUserResult');
+    function showErr(msg) {
+        if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
+        toast(msg, 'error');
+    }
+    try {
+        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+        if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
+        var email = (document.getElementById('createUserEmail') || {}).value || '';
+        var tenant_id = (document.getElementById('createUserTenant') || {}).value || '';
+        var role = (document.getElementById('createUserRole') || {}).value || 'AIRLINE_ADMIN';
+        var name = (document.getElementById('createUserName') || {}).value || '';
+        var department = (document.getElementById('createUserDept') || {}).value || '';
+        var setup_key = (document.getElementById('createUserSetupKey') || {}).value || '';
+        if (!email) { showErr('A valid email is required.'); return; }
+        if (!tenant_id) { showErr('Please select a tenant.'); return; }
+        if (!setup_key) {
+            try { setup_key = AdminUI.getSetupKey() || ''; } catch (e) { setup_key = ''; }
+        }
+        if (!setup_key) { showErr('Setup key is required.'); return; }
+        try { AdminUI.setSetupKey(setup_key); } catch (e) {}
+        var body = { setup_key: setup_key, email: email, tenant_id: tenant_id, role: role };
+        if (name) body.name = name;
+        if (department) body.department = department;
+        var resp = await AdminUI.apiPost('/api/v1/admin/users', body);
+        var delivery = resp.delivery || {};
+        var mailInfo = delivery.sent ? 'Welcome email sent (' + (delivery.provider || 'smtp') + ').'
+            : (delivery.provider === 'none' || delivery.reason ? 'Email provider not configured — welcome email skipped (password below).'
+                : 'Welcome email: ' + (delivery.reason || delivery.error || 'not sent') + '.');
+        if (resEl) {
+            resEl.style.display = 'block';
+            resEl.innerHTML = '<strong style="color:#065f46;">User created.</strong> Share the one-time password with the user — it will not be shown again.<br>' +
+                '<div style="margin-top:8px;font-size:.8rem;">Email: <code>' + esc(resp.email) + '</code><br>' +
+                'Role: <code>' + esc(resp.role) + '</code> &nbsp; Tenant: <code>' + esc(resp.tenant_id) + '</code><br>' +
+                'Password: <code style="user-select:all;">' + esc(resp.password) + '</code></div>' +
+                '<div style="margin-top:8px;color:#065f46;font-size:.78rem;">' + esc(mailInfo) + '</div>';
+        }
+        toast('User created for ' + esc(resp.email), 'success');
+        loadUsers();
+        loadAuditLog();
+    } catch (err) {
+        showErr(err.message || String(err));
+    }
+}
+
+document.getElementById('createUserModal').addEventListener('click', function (e) {
+    if (e.target === this) closeCreateUserModal();
 });
 
 function requestDeleteUser(email, uid) {

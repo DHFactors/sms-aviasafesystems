@@ -438,3 +438,145 @@ def test_create_tenant_route_without_users_still_works(monkeypatch):
         assert resp.json()["tenant"]["tenant_id"] == "plain-air"
     finally:
         _clear_overrides()
+
+
+# ============================================================================
+# Single-user creation (POST /api/v1/admin/users)
+# ============================================================================
+
+def _tenant_with_user(store, tid="new-air", email="admin@newair.com", role="AIRLINE_ADMIN"):
+    store["tenants"][tid] = {
+        "tenant_id": tid, "name": "New Air",
+        "contact": {"name": "Ram Sharma"},
+        "users": [{"email": email, "role": role, "full_name": "New Air Admin", "status": "active"}],
+    }
+
+
+def test_create_user_for_tenant(monkeypatch):
+    from app.services.tenant_credentials import create_user_for_tenant
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+
+    result = create_user_for_tenant(
+        {"tenant_id": "new-air", "email": "ops@newair.com", "role": "DEPT_ADMIN",
+         "full_name": "Ops Lead", "department": "Operations"},
+        _admin_user(),
+    )
+
+    assert result["email"] == "ops@newair.com"
+    assert result["role"] == "DEPT_ADMIN"
+    assert result["uid"]
+    assert result["password"] and len(result["password"]) >= 12
+    assert result["delivery"]["provider"] == "none"
+    # Auth user created with claims, doc upserted, tenant users appended
+    rec = auth.by_email["ops@newair.com"]
+    assert rec.custom_claims == {"role": "DEPT_ADMIN", "tenant_id": "new-air", "department": "Operations"}
+    assert db._stores["users"].get(result["uid"])
+    stored = db._stores["tenants"]["new-air"]
+    assert any(u["email"] == "ops@newair.com" for u in stored["users"])
+    assert "password" not in str(stored)
+    assert stored["audit"]["last_modified_by"] == "super-admin@aviasafesystems.com"
+    assert any(l["action"] == "USER_CREATED" for l in db._stores["audit_logs"].values())
+
+
+def test_create_user_for_tenant_missing_tenant(monkeypatch):
+    from app.services.tenant_credentials import create_user_for_tenant
+    _patch_all(monkeypatch)
+    try:
+        create_user_for_tenant({"tenant_id": "nope", "email": "x@y.com"}, _admin_user())
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "not found" in str(e)
+
+
+def test_create_user_for_tenant_duplicate_on_tenant(monkeypatch):
+    from app.services.tenant_credentials import create_user_for_tenant
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    try:
+        create_user_for_tenant({"tenant_id": "new-air", "email": "admin@newair.com"}, _admin_user())
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "already exists" in str(e)
+
+
+def test_create_user_for_tenant_duplicate_email_in_auth(monkeypatch):
+    from app.services.tenant_credentials import create_user_for_tenant
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    auth.create_user(email="taken@x.com", password="secret12345")
+    try:
+        create_user_for_tenant({"tenant_id": "new-air", "email": "taken@x.com"}, _admin_user())
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "already exists" in str(e)
+
+
+def test_create_user_route(monkeypatch):
+    db, _ = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "test-setup-key",
+            "email": "reviewer@newair.com",
+            "role": "SAFETY_OFFICER",
+            "tenant_id": "new-air",
+            "name": "R. Officer",
+            "department": "Safety",
+        })
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["email"] == "reviewer@newair.com"
+        assert body["role"] == "SAFETY_OFFICER"
+        assert body["password"]
+        assert body["delivery"]["provider"] == "none"
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_bad_role(monkeypatch):
+    _patch_all(monkeypatch)
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "test-setup-key",
+            "email": "x@y.com", "role": "GOD_MODE", "tenant_id": "new-air",
+        })
+        assert resp.status_code == 400
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_wrong_setup_key(monkeypatch):
+    _patch_all(monkeypatch)
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "wrong", "email": "x@y.com", "tenant_id": "new-air",
+        })
+        assert resp.status_code == 403
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_duplicate_email(monkeypatch):
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    auth.create_user(email="dup@newair.com", password="secret12345")
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "test-setup-key",
+            "email": "dup@newair.com", "tenant_id": "new-air",
+        })
+        assert resp.status_code == 409
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_requires_token():
+    try:
+        resp = TestClient(app).post("/api/v1/admin/users", json={
+            "setup_key": "x", "email": "x@y.com", "tenant_id": "new-air",
+        })
+        assert resp.status_code in (401, 403)
+    finally:
+        _clear_overrides()
