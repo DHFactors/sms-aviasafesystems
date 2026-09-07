@@ -69,7 +69,8 @@ def test_split_doc_routes_typed_vs_data():
     assert kwargs["slug"] == "fixedwing"
     assert kwargs["status"] == "DEMO"
     assert kwargs["is_demo"] is True
-    assert kwargs["data"] == {"contract": {"start_date": "2026-01-01"}, "regulator_id": "caan"}
+    assert kwargs["regulator_id"] == "caan"
+    assert kwargs["data"] == {"contract": {"start_date": "2026-01-01"}}
 
 
 def test_split_doc_skips_none_values():
