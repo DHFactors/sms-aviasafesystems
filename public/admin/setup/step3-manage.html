@@ -263,27 +263,23 @@ async function loadExistingRegulators() {
         var regs = resp.regulators || [];
         if (!regs.length) { el.innerHTML = '<div class="empty-state">No regulators yet.</div>'; return; }
         el.innerHTML = '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr>' +
-            '<th>Regulator</th><th>Country</th><th>Status</th><th>SaaS Customer</th><th>Module 3</th><th>Operators</th><th>Dates</th><th>Manage</th></tr></thead><tbody>' +
+            '<th>Regulator</th><th>Country</th><th>Status</th><th>Module 3</th><th>Operators</th><th>Dates</th><th>Manage</th></tr></thead><tbody>' +
             regs.map(function (r) {
                 var ops = r.operator_tenant_ids || [];
                 var fromD = r.from_date || (r.contract && (r.contract.from_date || r.contract.start_date)) || '';
                 var toD = r.to_date || (r.contract && (r.contract.to_date || r.contract.end_date)) || '';
                 var dates = (fromD || toD) ? esc((fromD || '?') + ' → ' + (toD || '?')) : '—';
                 var statusVal = (r.status || (r.active ? 'active' : 'inactive'));
-                var isSaas = r.is_saas_customer === true || r.is_saas_customer === 'true';
-                var saasBadge = isSaas ? '<span class="badge badge-success">Yes</span>' : '<span class="badge" style="background:#f1f5f9;color:#64748b;">No</span>';
                 var m3 = r.module_access ? r.module_access.module3 : (r.modules ? r.modules.module3 : false);
                 var m3Badge = m3 ? '<span class="badge badge-success">Active</span>' : '<span class="badge" style="background:#fee2e2;color:#991b1b;">Locked</span>';
-                var saasBtn = '<button class="btn btn-outline btn-sm" onclick="toggleSaaSCustomer(\'' + esc(r.id) + '\', ' + (!isSaas) + ')">' + (isSaas ? 'Disable SaaS' : 'Enable SaaS') + '</button>';
-                var m3Btn = isSaas ? '<button class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="activateModule3(\'' + esc(r.id) + '\')">' + (m3 ? 'Deactivate M3' : 'Activate M3') + '</button>' : '';
+                var m3Btn = '<button class="btn btn-outline btn-sm" onclick="activateModule3(\'' + esc(r.id) + '\')">' + (m3 ? 'Deactivate M3' : 'Activate M3') + '</button>';
                 return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
                     '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
                     '<td>' + regulatorBadge(statusVal) + '</td>' +
-                    '<td>' + saasBadge + '</td>' +
                     '<td>' + m3Badge + '</td>' +
                     '<td>' + (ops.length ? ops.map(esc).join(', ') : '—') + '</td>' +
                     '<td style="white-space:nowrap;font-size:.78rem;">' + dates + '</td>' +
-                    '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' + saasBtn + m3Btn + '<button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'regulator\', \'' + esc(r.id).replace(/'/g, "\\'") + '\', \'' + esc(statusVal).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></div></td></tr>';
+                    '<td><div style="display:flex;gap:6px;flex-wrap:wrap;">' + m3Btn + '<button class="btn btn-outline btn-sm" onclick="openLifecycleModal(\'regulator\', \'' + esc(r.id).replace(/'/g, "\\'") + '\', \'' + esc(statusVal).replace(/'/g, "\\'") + '\', \'' + esc(fromD).replace(/'/g, "\\'") + '\', \'' + esc(toD).replace(/'/g, "\\'") + '\')"><i class="fas fa-sliders"></i> Manage</button></div></td></tr>';
             }).join('') + '</tbody></table></div>';
     } catch (err) { el.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>'; }
 }
@@ -443,15 +439,6 @@ async function saveAllTenants() {
         var tid = dirtyRows[i].getAttribute('data-tenant');
         await saveSingleTenant(tid);
     }
-}
-async function toggleSaaSCustomer(regulatorId, newStatus) {
-    var setupKey;
-    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { toast('Setup key required.', 'error'); return; }
-    try {
-        await AdminUI.apiPost('/api/v1/admin/regulators/' + regulatorId + '/toggle-saas', { setup_key: setupKey, is_saas_customer: newStatus });
-        toast('Regulator SaaS status updated.', 'success');
-        loadExistingRegulators();
-    } catch (err) { toast('SaaS toggle failed: ' + err.message, 'error'); }
 }
 async function activateModule3(regulatorId) {
     var setupKey;
