@@ -26,6 +26,7 @@ from app.db.session import session_scope
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
 from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
+from app.services.pg_cache import get_or_set, set as pg_cache_set
 from app.services.risk_matrix import normalize_tolerability
 from seed.config import FLIGHT_OPERATOR_TYPES
 
@@ -279,7 +280,10 @@ class DashboardService:
 
     def _tenant_name(self, tenant_id: str) -> str:
         try:
-            row = pg.fetch_by(Tenant, "slug", tenant_id)
+            row = get_or_set(
+                f"tenant_row:{tenant_id}",
+                lambda: pg.fetch_by(Tenant, "slug", tenant_id),
+            )
             if row:
                 name = row.get("name") or (row.get("data") or {}).get("name")
                 if name:
@@ -366,7 +370,10 @@ class DashboardService:
         if not self.tenant_id:
             return None
         try:
-            row = pg.fetch_by(Tenant, "slug", self.tenant_id)
+            row = get_or_set(
+                f"tenant_row:{self.tenant_id}",
+                lambda: pg.fetch_by(Tenant, "slug", self.tenant_id),
+            )
             if row:
                 data = row.get("data") or {}
                 return row.get("type") or data.get("type")
@@ -386,7 +393,10 @@ class DashboardService:
         try:
             cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             tid = tenant_uuid(self.tenant_id)
-            rows = pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == tid])
+            rows = get_or_set(
+                f"flight_diversions:{self.tenant_id}",
+                lambda: pg.fetch_all(FlightDiversion, where=[FlightDiversion.tenant_id == tid]),
+            )
             docs = [{"date": r.get("date")} for r in rows]
         except Exception as e:
             logger.warning(f"Failed to load diversion trends for {self.tenant_id}: {e}")
@@ -793,7 +803,8 @@ class DashboardService:
         """Populate the slug<->uuid tenant registry from Postgres so
         tenant_slug() resolves every tenant's surveys."""
         try:
-            for row in pg.fetch_all(Tenant):
+            rows = get_or_set("tenant_slug_registry", lambda: list(pg.fetch_all(Tenant)))
+            for row in rows:
                 slug = row.get("slug")
                 if slug:
                     register_tenant(slug)

@@ -241,6 +241,8 @@ def _set_tenant(tenant_id: str, updates: Dict[str, Any]) -> None:
     # A status/module change must take effect immediately on the auth path.
     from app.middleware.tenant_status_cache import invalidate
     invalidate(tenant_id)
+    from app.services.pg_cache import clear_prefix
+    clear_prefix(f"tenant_row:{tenant_id}")
 
 
 # ============================================================================
