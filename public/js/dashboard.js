@@ -385,8 +385,13 @@ function renderRiskChart(data) {
 
     const counts = { Low: 0, High: 0, 'Very High': 0 };
     for (const d of data) {
-        const level = typeof normalizeRiskLevel === 'function' ? normalizeRiskLevel(d.risk_level) : d.risk_level;
-        if (counts.hasOwnProperty(level)) counts[level] = d.count;
+        // Skip null/Unspecified severity so unknown rows don't inflate a
+        // bucket, and aggregate with += so multiple API buckets that
+        // normalize to the same tier (e.g. Medium and High -> High) sum
+        // instead of overwriting.
+        if (!d.risk_level || String(d.risk_level).toUpperCase() === 'UNSPECIFIED') continue;
+        const level = normalizeRiskLevel(d.risk_level);
+        if (counts.hasOwnProperty(level)) counts[level] += d.count;
     }
     const labels = ICAO_RISK_LABELS;
     const vals = labels.map(l => counts[l] || 0);

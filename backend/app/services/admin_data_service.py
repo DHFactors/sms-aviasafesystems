@@ -85,6 +85,20 @@ _ICAO_TO_TAXONOMY = {
     "WX": "Environmental", "OTHER": "Organizational",
 }
 
+# Severity string vocabulary expected by dashboard metrics (Low/Medium/High/
+# Critical) derived from the ICAO 1-5 severity scale the seeder samples.
+_SEVERITY_STRING_BY_LEVEL = {1: "Low", 2: "Low", 3: "Medium", 4: "High", 5: "Critical"}
+
+# Realistic, human-readable occurrence types so the hazard-frequency chart and
+# top-hazards view show distinct hazard categories instead of a generic
+# "Report" bar.
+_OCCURRENCE_TYPE_LABELS = [
+    "Runway Excursion", "Runway Incursion", "Bird Strike",
+    "System/Component Failure", "Powerplant Failure", "Weather Encounter",
+    "Cabin Safety Event", "Procedural Deviation", "ATC Operational Incident",
+    "Abnormal Runway Contact", "Ground Collision", "Airborne Conflict",
+]
+
 DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 3, "survey": 12}
 
 
@@ -394,8 +408,14 @@ async def _seed_reports(session, tid: str, report_type: str, count: int, base: d
             ),
             location=random.choice(["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]),
             occurrence_date=created,
-            occurrence_type="Report",
+            # Vary the occurrence type across realistic ICAO hazards so the
+            # hazard-frequency chart / top-hazards dashboard show real
+            # categories rather than a single generic "Report" bar.
+            occurrence_type=random.choice(_OCCURRENCE_TYPE_LABELS),
             occurrence_category=random.choice(_ICAO_CATEGORIES),
+            # The severity string drives the risk distribution + high/critical
+            # KPI buckets; derive it from the numeric level that is also stored.
+            severity=_SEVERITY_STRING_BY_LEVEL[sev],
             severity_level=sev,
             probability_level=prob,
             risk_index=idx,
