@@ -24,6 +24,7 @@ import os
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import Any
 
 from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -70,6 +71,13 @@ def note_count(label: str, n: float = 1) -> None:
         timings[label] = timings.get(label, 0) + n
 
 
+def note_append(label: str, item: Any) -> None:
+    """Append `item` to a per-request list (e.g. slow-query traces)."""
+    timings = _timings_ctx.get()
+    if timings is not None:
+        timings.setdefault(label, []).append(item)
+
+
 @contextmanager
 def timed(label: str):
     """`with timed('firestore'): do_work()` records elapsed ms for the label."""
@@ -93,6 +101,7 @@ class PerfTimingMiddleware(BaseHTTPMiddleware):
 
         watch_key = f"{request.method} {request.url.path}"
         watched = watch_key in WATCHED_PATHS
+        reflect = request.headers.get("X-Perf", "").strip().lower() in ("1", "true", "yes", "on")
         token = _timings_ctx.set({})
         t0 = time.perf_counter()
         try:
@@ -102,8 +111,21 @@ class PerfTimingMiddleware(BaseHTTPMiddleware):
             components = _timings_ctx.get() or {}
             _timings_ctx.reset(token)
             uptime_s = int(time.time() - _PROCESS_START)
+            if reflect and hasattr(response, "headers"):
+                response.headers["X-Perf-Total-Ms"] = f"{total_ms:.0f}"
+                response.headers["X-Perf-Uptime-S"] = str(uptime_s)
+                if components.get("db_ms"):
+                    response.headers["X-Perf-Db-Ms"] = f"{components['db_ms']:.0f}"
+                if components.get("db_calls"):
+                    response.headers["X-Perf-Queries"] = str(components["db_calls"])
+                slow = components.get("slow_sql") or []
+                if slow:
+                    response.headers["X-Perf-Slow"] = ";".join(str(s) for s in slow[:8])
             if watched or total_ms >= _SLOW_MS or components.get("db_ms", 0) >= _SLOW_MS:
-                extra = "".join(f" {k}={v}ms" for k, v in components.items() if k != "db_calls")
+                extra = "".join(
+                    f" {k}={v}ms" for k, v in components.items()
+                    if k not in ("db_calls", "slow_sql") and not isinstance(v, (list, dict, tuple))
+                )
                 if components.get("db_calls"):
                     extra += f" queries={components['db_calls']}"
                 status = getattr(response, "status_code", "-")

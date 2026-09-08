@@ -85,7 +85,7 @@ def _record_db(op: str, model: type, fn: Callable[[], Any]) -> Any:
         return fn()
     finally:
         ms = (perf_counter() - t0) * 1000
-        from app.core.perf import note_count, note_current
+        from app.core.perf import note_append, note_count, note_current
 
         note_current("db_ms", ms)
         note_count("db_calls", 1)
@@ -94,6 +94,7 @@ def _record_db(op: str, model: type, fn: Callable[[], Any]) -> Any:
             logger.warning(
                 f"[PERF] slow_sql op={op} table={table} dur={ms:.0f}ms"
             )
+            note_append("slow_sql", f"{op}:{table}:{ms:.0f}ms")
 
 
 def _deterministic_tenant_id(kwargs: Dict[str, Any], fallback_slug: Any = None) -> None:
