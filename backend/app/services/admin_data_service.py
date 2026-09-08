@@ -110,6 +110,9 @@ _MONTHLY_VSR = [5, 6, 5, 7, 6, 7, 6, 7, 8, 7, 8, 8]
 _MONTHLY_MOR = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2]
 _MONTHLY_CAN = [1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2]
 _MONTHLY_CAP = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+# SMS-maturity surveys — ≈17/month so each tenant has 200+ responses for the
+# survey analysis / maturity dashboards.
+_MONTHLY_SURVEYS = [16, 17, 18, 17, 16, 18, 17, 17, 18, 17, 16, 17]
 
 # ICAO category distribution — bird-strike / powerplant / runway-excursion
 # heavy, as in a typical airline operation.
@@ -572,17 +575,25 @@ async def _seed_reports(session, tid: str, report_type: str, count: int, base: d
     return count
 
 
-async def _seed_surveys(session, tid: str, count: int, base: datetime) -> int:
+async def _seed_surveys(session, tid: str, count: int, base: datetime,
+                        progress: Optional[float] = None) -> int:
     for i in range(count):
-        policy = random.randint(3, 5)
-        srm = random.randint(3, 5)
-        assurance = random.randint(3, 5)
-        promotion = random.randint(3, 5)
+        # Optional maturity progression (0 → 1): later surveys score higher so
+        # the monthly SMS-maturity history shows a believable improvement trend.
+        lo_p = lo_s = lo_a = lo_m = 3
+        if progress is not None:
+            lo = min(5, 3 + round(2 * max(0.0, min(progress, 1.0))))
+            lo_p = lo_s = lo_a = lo_m = lo
+        policy = random.randint(lo_p, 5)
+        srm = random.randint(lo_s, 5)
+        assurance = random.randint(lo_a, 5)
+        promotion = random.randint(lo_m, 5)
         overall = round((policy + srm + assurance + promotion) / 4)
         scored = overall >= 3
+        submitted_at = base - timedelta(days=i)
         session.add(Survey(
             tenant_id=uuid.UUID(tid),
-            submitted_at=base - timedelta(days=i * 2),
+            submitted_at=submitted_at,
             respondent_id=f"demo-respondent-{i + 1}",
             department=random.choice(_DEPARTMENTS),
             employee_category=random.choice(["Pilot", "Cabin Crew", "Engineer", "Ground", "Admin"]),
@@ -610,7 +621,7 @@ async def _seed_surveys(session, tid: str, count: int, base: datetime) -> int:
                 employee_category="Pilot",
                 years_experience="11-20",
                 language_used="English",
-                submitted_at=base - timedelta(days=i * 2),
+                submitted_at=submitted_at,
                 survey_version="sms-maturity-v1",
                 is_demo=True,
             ))
@@ -760,16 +771,18 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
 async def generate_12_month_data(tenant_id: str, actor: Dict[str, Any]) -> Dict[str, Any]:
     """Replace a tenant's demo dataset with a realistic 12-month demo set.
 
-    Unseeds existing demo VSR/MOR/CAN/CAP rows, then seeds ~100 reports
-    (≈80 VSR / ~20 MOR), ≈16 CANs and ~12 CAPs spread across a randomly chosen
-    12-month window inside Jan 2026 – Sep 2027. ICAO categories and severities
-    are sampled from realistic weighted distributions so dashboard trends, KPIs
-    and regulatory reports have live-looking content.
+    Unseeds existing demo VSR/MOR/CAN/CAP/Survey rows, then seeds ~100 reports
+    (≈80 VSR / ~20 MOR), ≈16 CANs, ~12 CAPs and ~204 SMS-maturity surveys
+    (≈17/month, maturity improving across the window) spread across a randomly
+    chosen 12-month window inside Jan 2026 – Sep 2027. ICAO categories and
+    severities are sampled from realistic weighted distributions so dashboard
+    trends, KPIs and regulatory reports have live-looking content.
     """
     tid = _validate_id(tenant_id, "tenant id")
     tenant_doc = _get_tenant(tid)
 
-    removed = await unseed_tenant_demo_data(tid, ["vsr", "mor", "can", "cap"], actor)
+    removed = await unseed_tenant_demo_data(
+        tid, ["vsr", "mor", "can", "cap", "survey"], actor)
 
     # Per-tenant operational realism: Sita Air (fixed-wing) vs Annapurna
     # Helicopter (rotor-wing). Unknown tenants fall back to generic content.
@@ -783,7 +796,7 @@ async def generate_12_month_data(tenant_id: str, actor: Dict[str, Any]) -> Dict[
     # Oct 2026 (offset 9) so the last month never exceeds Sep 2027.
     start_y, start_m = (2026, 1 + random.randint(0, 9))
 
-    seeded = {"vsr": 0, "mor": 0, "can": 0, "cap": 0}
+    seeded = {"vsr": 0, "mor": 0, "can": 0, "cap": 0, "survey": 0}
     seq = 0
 
     async with session_scope() as session:
@@ -816,13 +829,19 @@ async def generate_12_month_data(tenant_id: str, actor: Dict[str, Any]) -> Dict[
             seq += _MONTHLY_CAN[idx]
             seeded["can"] += n_can_seeded
             seeded["cap"] += n_cap_seeded
+            # ~17 SMS-maturity surveys per month (scored 3→5, improving across
+            # the window). Base near month-end so even the last backdated
+            # response stays inside the month → clean monthly history buckets.
+            survey_base = datetime(y, m, 1, tzinfo=timezone.utc) + timedelta(days=random.randint(18, 24))
+            seeded["survey"] += await _seed_surveys(
+                session, tuuid, _MONTHLY_SURVEYS[idx], survey_base, progress=idx / 11.0)
 
     total_reports = seeded["vsr"] + seeded["mor"]
     removed_total = sum(removed.get("removed", {}).values())
     _audit("DEMO_DATA_SEED_12M", actor, tid,
            f"Seeded 12-month demo set {start_y:04d}-{start_m:02d}→{y:04d}-{m:02d}: "
-           f"{total_reports} reports, {seeded['can']} CANs, {seeded['cap']} CAPs "
-           f"(replaced {removed_total} demo rows)")
+           f"{total_reports} reports, {seeded['can']} CANs, {seeded['cap']} CAPs, "
+           f"{seeded['survey']} surveys (replaced {removed_total} demo rows)")
     logger.info(f"12-month demo data seeded for {tid}: {seeded}")
     return {
         "tenant_id": tid,

@@ -79,7 +79,7 @@ AUTHOR: AviaSAFE Systems
             </div>
             <div style="border-top:1px dashed #e2e8f0;margin:16px 0 12px;padding-top:14px;">
                 <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px;"><i class="fas fa-calendar-alt"></i> 12-Month Demo Dataset</div>
-                <p class="card-sub" style="margin-bottom:10px;">Replaces the demo rows with a realistic 12-month set (~80 VSR / ~20 MOR / ~16 CAN / ~12 CAP) across a random window in Jan 2026 – Sep 2027. Content is tenant-realistic: <strong>Sita Air</strong> gets fixed-wing only (DHC-6 / Do 228); <strong>Annapurna Helicopter</strong> gets helicopter-only (AS350 / H125 / Bell 407).</p>
+                <p class="card-sub" style="margin-bottom:10px;">Replaces the demo rows with a realistic 12-month set (~80 VSR / ~20 MOR / ~16 CAN / ~12 CAP / ~204 SMS-maturity surveys) across a random window in Jan 2026 – Sep 2027. Content is tenant-realistic: <strong>Sita Air</strong> gets fixed-wing only (DHC-6 / Do 228); <strong>Annapurna Helicopter</strong> gets helicopter-only (AS350 / H125 / Bell 407).</p>
                 <div class="btn-row">
                     <button class="btn btn-primary" onclick="demoData('seed12m')"><i class="fas fa-calendar-alt"></i> Seed 12-Month Demo Data</button>
                 </div>
@@ -189,7 +189,7 @@ function demoData(action) {
             'Seed 12-Month Demo Data',
             '<strong>Replace demo dataset with 12 months of realistic data</strong>' +
             (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
-            '.<br><br>Unseeds existing demo VSR/MOR/CAN/CAP rows, then seeds ~100 reports (≈80 VSR / ~20 MOR), ~16 CANs and ~12 CAPs across a random 12-month window (Jan 2026 – Sep 2027). Content is tenant-realistic: <strong>Sita Air</strong> → fixed-wing only; <strong>Annapurna Helicopter</strong> → helicopter only.<br><br><span style="color:#b91c1c;font-weight:700;">⚠️ Existing demo data will be replaced. Real data is untouched.</span>',
+            '.<br><br>Unseeds existing demo VSR/MOR/CAN/CAP/Survey rows, then seeds ~100 reports (≈80 VSR / ~20 MOR), ~16 CANs, ~12 CAPs and ~204 SMS-maturity surveys (≈17/month) across a random 12-month window (Jan 2026 – Sep 2027). Content is tenant-realistic: <strong>Sita Air</strong> → fixed-wing only; <strong>Annapurna Helicopter</strong> → helicopter only.<br><br><span style="color:#b91c1c;font-weight:700;">⚠️ Existing demo data will be replaced. Real data is untouched.</span>',
             { type: 'demo', body: body }
         );
         return;
