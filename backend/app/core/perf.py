@@ -1,18 +1,24 @@
-"""Task 02 latency instrumentation — temporary, measurement only.
+"""Task 02 latency instrumentation — endpoint + DB timing.
 
-Logs ONE structured "[PERF]" log line per watched user-facing endpoint:
+Logs structured "[PERF]" log lines:
 
-    [PERF] GET /api/v1/dashboard/caan/state status=200 total=1843ms uptime=52s firestore=1710ms
+    [PERF] GET /api/v1/dashboard/caan/state status=200 total=1843ms uptime=52s firestore=1710ms queries=14 db=412ms
 
-- `total`   = end-to-end server processing time for that request
-- `uptime`  = seconds since this backend process started. Low uptime on a slow
-              request is the signature of a cold start.
+- `total`   = end-to-end server processing time measured by the middleware
+- `uptime`  = seconds since this backend process started (cold-start signature)
+- `queries` = count of app/.db/pg.py calls made by this request
+- `db`      = cumulative wall time across those pg.py calls
 - component fields (`firestore=`, `gemini=`, `groq=`, `redis=`) are optional
   accumulators recorded by call sites via `note_current()` / `timed()`.
 
+Watched endpoints log on every request; every other endpoint logs only when it
+is slow (total or cumulative DB time >= AVIASAFE_PERF_SLOW_MS, default 1000),
+so unsupervised endpoints become visible when they cross the 1s budget. The
+pg.py timing wrapper records per-call durations, per-request totals and a
+separate slow-query log ([PERF] slow_sql).
+
 Removal: delete this file and remove PerfTimingMiddleware from app/main.py.
-Silence without removal: set env var AVIASAFE_PERF=off. Non-watched paths do
-one dict lookup per request and nothing else. No business logic is touched.
+Silence without removal: set env var AVIASAFE_PERF=off.
 """
 import os
 import time
@@ -25,21 +31,23 @@ from starlette.requests import Request
 
 _PROCESS_START = time.time()
 _PERF_OFF = lambda: os.getenv("AVIASAFE_PERF", "on").strip().lower() == "off"
+_SLOW_MS = float(os.getenv("AVIASAFE_PERF_SLOW_MS", "1000"))
 
 # The endpoints normal users hit most (dashboards, report intake, AI).
 # "METHOD path" pairs; legacy /api/* aliases intentionally excluded.
-WATCHED_PATHS = {
-    "GET /api/v1/dashboard/overview",
-    "GET /api/v1/dashboard/master-register",
-    "GET /api/v1/dashboard/caan/state",
-    "GET /api/v1/dashboard/caan/sms-maturity-assessment",
-    "GET /api/v1/reports",
-    "POST /api/v1/reports/vsr",
-    "POST /api/v1/reports/mor",
-    "GET /api/v1/hazards",
-    "POST /api/v1/surveys/",
+WATCHED_PATHS = set(os.getenv(
+    "AVIASAFE_PERF_PATHS",
+    "GET /api/v1/dashboard/overview|"
+    "GET /api/v1/dashboard/master-register|"
+    "GET /api/v1/dashboard/caan/state|"
+    "GET /api/v1/dashboard/caan/sms-maturity-assessment|"
+    "GET /api/v1/reports|"
+    "POST /api/v1/reports/vsr|"
+    "POST /api/v1/reports/mor|"
+    "GET /api/v1/hazards|"
+    "POST /api/v1/surveys/|"
     "POST /api/v1/copilot/chat",
-}
+).split("|"))
 
 _timings_ctx: ContextVar = ContextVar("aviasafe_perf_timings", default=None)
 
@@ -47,12 +55,19 @@ _timings_ctx: ContextVar = ContextVar("aviasafe_perf_timings", default=None)
 def note_current(label: str, ms: float) -> None:
     """Accumulate `ms` onto `label` for the request running in this context.
 
-    No-op when no watched request is active (the common case), so call sites
-    cost one function call outside instrumented flows.
+    No-op when no request is active (e.g. background tasks), so call sites
+    cost one function call outside instrumented requests.
     """
     timings = _timings_ctx.get()
     if timings is not None:
         timings[label] = round(timings.get(label, 0.0) + ms, 1)
+
+
+def note_count(label: str, n: float = 1) -> None:
+    """Increment an integer counter (`queries`, etc.) for this request."""
+    timings = _timings_ctx.get()
+    if timings is not None:
+        timings[label] = timings.get(label, 0) + n
 
 
 @contextmanager
@@ -66,13 +81,18 @@ def timed(label: str):
 
 
 class PerfTimingMiddleware(BaseHTTPMiddleware):
-    """Outermost middleware: measures total wall time for watched endpoints."""
+    """Outermost middleware: measures total wall time per request.
+
+    The timings context is installed for every request so the pg.py wrapper and
+    AI call sites can report query counts / DB time even on unwatched paths.
+    """
 
     async def dispatch(self, request: Request, call_next):
-        watch_key = f"{request.method} {request.url.path}"
-        if _PERF_OFF() or watch_key not in WATCHED_PATHS:
+        if _PERF_OFF():
             return await call_next(request)
 
+        watch_key = f"{request.method} {request.url.path}"
+        watched = watch_key in WATCHED_PATHS
         token = _timings_ctx.set({})
         t0 = time.perf_counter()
         try:
@@ -82,8 +102,13 @@ class PerfTimingMiddleware(BaseHTTPMiddleware):
             components = _timings_ctx.get() or {}
             _timings_ctx.reset(token)
             uptime_s = int(time.time() - _PROCESS_START)
-            extra = "".join(f" {k}={v}ms" for k, v in components.items())
-            logger.info(
-                f"[PERF] {watch_key} total={total_ms:.0f}ms uptime={uptime_s}s{extra}"
-            )
+            if watched or total_ms >= _SLOW_MS or components.get("db_ms", 0) >= _SLOW_MS:
+                extra = "".join(f" {k}={v}ms" for k, v in components.items() if k != "db_calls")
+                if components.get("db_calls"):
+                    extra += f" queries={components['db_calls']}"
+                status = getattr(response, "status_code", "-")
+                logger.info(
+                    f"[PERF] {watch_key} status={status} total={total_ms:.0f}ms "
+                    f"uptime={uptime_s}s{extra}"
+                )
         return response

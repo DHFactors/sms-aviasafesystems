@@ -190,6 +190,19 @@ class ReportRepository:
             if filter.occurrence_type:
                 where.append(PgReport.occurrence_type == filter.occurrence_type)
 
+            # Push the Python-side date range into SQL so tenant-scoped reads
+            # are bounded by the (tenant_id, created_at) index instead of
+            # pulling every tenant row and discarding out-of-window rows in
+            # Python. The typed sort columns are non-null so the predicate is
+            # equivalent to the Python coerce-UTC comparison below (inclusive).
+            if filter.date_from or filter.date_to:
+                if filter.sort_by in ("created_at", "occurrence_date", "updated_at"):
+                    date_col = getattr(PgReport, filter.sort_by)
+                    if filter.date_from:
+                        where.append(date_col >= filter.date_from)
+                    if filter.date_to:
+                        where.append(date_col <= filter.date_to)
+
             rows = pg.fetch_all(PgReport, where=where)
             results: List[Dict[str, Any]] = []
             for r in rows:

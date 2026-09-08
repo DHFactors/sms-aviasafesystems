@@ -105,3 +105,67 @@ def test_cors_exposes_rate_limit_headers(client):
     exposed = resp.headers.get("access-control-expose-headers") or ""
     for header in ("Retry-After", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"):
         assert header.lower() in exposed.lower(), f"header {header} not exposed"
+
+
+def test_repository_pushes_date_range_into_sql(monkeypatch):
+    """get_all_in_range must push the date range into the SQL WHERE clause so
+    tenant-scoped reads hit the (tenant_id, created_at) index instead of
+    full-scanning then date-filtering in Python."""
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import patch
+
+    from app.services.repository import ReportFilter, ReportRepository
+    from app.db import db_models
+
+    captured = {}
+
+    def _fake_fetch_all(model, *, where=None, order_by=None, limit=None):
+        captured["model"] = model
+        captured["where"] = list(where or [])
+        return []
+
+    now = datetime.now(timezone.utc)
+    date_from = now - timedelta(days=30)
+    date_to = now
+    with patch("app.services.repository.pg.fetch_all", _fake_fetch_all):
+        repo = ReportRepository()
+        repo.get_all_in_range(ReportFilter(tenant_id="sita-air", date_from=date_from, date_to=date_to))
+
+    assert captured["model"] is db_models.Report
+    rendered = " ".join(str(w) for w in captured["where"])
+    # tenant scoping + lower bound + upper bound on the typed created_at column
+    assert any(hasattr(w, "operator") and w.operator.__name__ == "ge" for w in captured["where"])
+    assert any(hasattr(w, "operator") and w.operator.__name__ == "le" for w in captured["where"])
+    assert "occurrence_date" in rendered or "created_at" in rendered
+
+
+def test_repository_date_pushdown_respects_sort_column(monkeypatch):
+    """Date predicates must follow sort_by: occurrence_date when requested,
+    and stay out of the WHERE clause for non-date sort columns."""
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import patch
+
+    from app.services.repository import ReportFilter, ReportRepository
+
+    captured = {}
+
+    def _fake_fetch_all(model, *, where=None, order_by=None, limit=None):
+        captured["where"] = list(where or [])
+        return []
+
+    now = datetime.now(timezone.utc)
+    with patch("app.services.repository.pg.fetch_all", _fake_fetch_all):
+        repo = ReportRepository()
+        repo.get_all_in_range(
+            ReportFilter(tenant_id="sita-air", date_from=now - timedelta(days=7), sort_by="occurrence_date")
+        )
+        ops = [w.operator.__name__ for w in captured["where"] if hasattr(w, "operator")]
+        assert "ge" in ops  # pushed on the occurrence_date column
+        assert all("created_at" not in str(w) for w in captured["where"])
+
+        # Non-date sort column -> no date predicate added (Python filter keeps it)
+        captured["where"] = []
+        repo.get_all_in_range(
+            ReportFilter(tenant_id="sita-air", date_from=now - timedelta(days=7), sort_by="occurrence_type")
+        )
+        assert all(not hasattr(w, "operator") or w.operator.__name__ not in ("ge", "le") for w in captured["where"])

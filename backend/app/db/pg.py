@@ -12,8 +12,10 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from loguru import logger
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import select as sa_select
 from sqlalchemy import update as sa_update
@@ -62,6 +64,36 @@ _ID_COLUMNS: Dict[str, str] = {
     "barrier_register": "id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
+
+_SLOW_SQL_MS = float(os.getenv("AVIASAFE_SLOW_SQL_MS", "250"))
+
+
+def _record_db(op: str, model: type, fn: Callable[[], Any]) -> Any:
+    """Execute a bridge-loop query and record its latency.
+
+    - Accumulates per-request totals (query count + cumulative DB ms) into the
+      perf context (app/core/perf.py) so the middleware can report them on the
+      "[PERF]" line of every request.
+    - Logs a `[PERF] slow_sql` line when a single query crosses
+      AVIASAFE_SLOW_SQL_MS (default 250ms) — the primitive that pinpoints
+      individual slow queries from production logs.
+    """
+    from time import perf_counter
+
+    t0 = perf_counter()
+    try:
+        return fn()
+    finally:
+        ms = (perf_counter() - t0) * 1000
+        from app.core.perf import note_count, note_current
+
+        note_current("db_ms", ms)
+        note_count("db_calls", 1)
+        if ms >= _SLOW_SQL_MS:
+            table = getattr(model, "__tablename__", "?")
+            logger.warning(
+                f"[PERF] slow_sql op={op} table={table} dur={ms:.0f}ms"
+            )
 
 
 def _deterministic_tenant_id(kwargs: Dict[str, Any], fallback_slug: Any = None) -> None:
@@ -192,7 +224,7 @@ def fetch_all(
 
     session = get_session_factory()()
     try:
-        rows = run(_go(session))
+        rows = _record_db("fetch_all", model, lambda: run(_go(session)))
         return [row_to_doc(r) for r in rows]
     finally:
         run(session.close())
@@ -212,7 +244,8 @@ def insert(model: type, doc: Dict[str, Any]) -> None:
         session.add(model(**kwargs))
         await session.commit()
 
-    run(_go(get_session_factory()()))
+    run_coro = _go(get_session_factory()())
+    _record_db("insert", model, lambda: run(run_coro))
 
 
 def upsert(model: type, key_column: str, key_value: Any, doc: Dict[str, Any]) -> None:
@@ -234,7 +267,8 @@ def upsert(model: type, key_column: str, key_value: Any, doc: Dict[str, Any]) ->
                 setattr(existing, k, v)
         await session.commit()
 
-    run(_go(get_session_factory()()))
+    run_coro = _go(get_session_factory()())
+    _record_db("upsert", model, lambda: run(run_coro))
 
 
 def update(
@@ -268,7 +302,8 @@ def update(
         )
         await session.commit()
 
-    run(_go(get_session_factory()()))
+    run_coro = _go(get_session_factory()())
+    _record_db("update", model, lambda: run(run_coro))
     return merged
 
 
@@ -282,4 +317,4 @@ def delete(model: type, column: str, value: Any) -> int:
         await session.commit()
         return result.rowcount or 0
 
-    return run(_go(get_session_factory()()))
+    return _record_db("delete", model, lambda: run(_go(get_session_factory()())))
