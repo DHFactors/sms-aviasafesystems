@@ -156,6 +156,25 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+async def ensure_bridge_session() -> AsyncSession:
+    """Awaitable variant of ``get_bridge_session`` for bridge-loop coroutines.
+
+    When a bridge-loop coroutine (e.g. an async service invoked via
+    ``runner.run``) needs a session it must be able to create the connection
+    inline with ``await`` — the synchronous ``get_bridge_session`` would call
+    ``run()`` from the bridge loop itself and deadlock. This function performs
+    the same lazy connection setup directly.
+    """
+    global _bridge_session, _bridge_conn
+    if _bridge_session is None:
+        conn = await get_engine().connect()
+        await conn.execute(text("SELECT 1"))
+        await conn.rollback()
+        _bridge_conn = conn
+        _bridge_session = AsyncSession(bind=conn, expire_on_commit=False, autoflush=False)
+    return _bridge_session
+
+
 def get_bridge_session() -> AsyncSession:
     """Return the single long-lived session used by the sync pg.py wrappers.
 
@@ -178,18 +197,10 @@ def get_bridge_session() -> AsyncSession:
     ``close_bridge_session()`` only when the connection is known to be stale
     (pg.py performs that on retry).
     """
-    global _bridge_session, _bridge_conn
     if _bridge_session is None:
         from app.db.runner import run
 
-        async def _open() -> AsyncSession:
-            conn = await get_engine().connect()
-            await conn.execute(text("SELECT 1"))
-            await conn.rollback()
-            _bridge_conn = conn
-            return AsyncSession(bind=conn, expire_on_commit=False, autoflush=False)
-
-        _bridge_session = run(_open())
+        run(ensure_bridge_session())
     return _bridge_session
 
 
@@ -225,7 +236,31 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 @asynccontextmanager
 async def session_scope() -> AsyncGenerator[AsyncSession, None]:
-    """Async context manager that commits on success, rolls back on error."""
+    """Async context manager that commits on success, rolls back on error.
+
+    When running on the bridge loop (the common case for ``runner.run``-
+    wrapped async services such as hazard/survey listing) the session reused is
+    the persistent bridge session, bound to the single kept-hot connection — so
+    those paths no longer open a fresh NullPool connection per request. Off the
+    bridge loop (direct async route handlers) a per-call session is used.
+    """
+    import asyncio
+
+    from app.db.runner import _bridge_loop
+
+    in_process_loop = asyncio.get_running_loop()
+    on_bridge = _bridge_loop() is not None and in_process_loop is _bridge_loop()
+    if on_bridge:
+        session = await ensure_bridge_session()
+        try:
+            yield session
+            await session.commit()
+        except BaseException:
+            if session.in_transaction():
+                await session.rollback()
+            raise
+        return
+
     session = get_session_factory()()
     try:
         yield session
