@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.services.report_service import ReportService
 from app.services.hazard_service import HazardService
 from app.services.risk_matrix import compute_risk_index, get_risk_level
+from app.services.severity_service import apply_auto_severity
 from app.services.audit_service import log_audit, request_context
 from app.middleware.rate_limit import rate_limit
 
