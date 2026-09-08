@@ -491,7 +491,12 @@
             nav.appendChild(homeLink);
         }
 
-        getVisibleNavItems().forEach(function (item) {
+        // Render ALL nav items (gated ones start hidden). Visibility is
+        // applied by applyNavVisibility() so items that become eligible later
+        // (plan/tenant-module claims resolve after first paint) can be shown
+        // without rebuilding the header — filtering here would permanently drop
+        // them from the DOM.
+        NAV_ITEMS.forEach(function (item) {
             nav.appendChild(buildNavItem(item));
         });
         header.appendChild(nav);
