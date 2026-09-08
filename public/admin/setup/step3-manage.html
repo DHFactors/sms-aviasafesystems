@@ -270,10 +270,11 @@ async function loadExistingRegulators() {
                 var toD = r.to_date || (r.contract && (r.contract.to_date || r.contract.end_date)) || '';
                 var dates = (fromD || toD) ? esc((fromD || '?') + ' → ' + (toD || '?')) : '—';
                 var statusVal = (r.status || (r.active ? 'active' : 'inactive'));
-                var m3 = r.module_access ? r.module_access.module3 : (r.modules ? r.modules.module3 : false);
-                var m3Badge = m3 ? '<span class="badge badge-success">Active</span>' : '<span class="badge" style="background:#fee2e2;color:#991b1b;">Locked</span>';
-                var m3Btn = '<button class="btn btn-outline btn-sm" onclick="activateModule3(\'' + esc(r.id) + '\')">' + (m3 ? 'Deactivate M3' : 'Activate M3') + '</button>';
-                return '<tr><td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
+                var ma = r.module_access || {};
+                var m3 = !!(ma.module3 || ma.module_3 || (r.modules && (r.modules.module3 || r.modules.module_3)));
+                var m3Badge = m3 ? '<span class="module3-badge badge badge-success">Active</span>' : '<span class="module3-badge badge" style="background:#fee2e2;color:#991b1b;">Locked</span>';
+                var m3Btn = '<button type="button" class="module3-btn btn btn-outline btn-sm" data-active="' + (m3 ? 'true' : 'false') + '" onclick="activateModule3(\'' + esc(r.id) + '\', ' + (m3 ? 'true' : 'false') + ')">' + (m3 ? 'Deactivate M3' : 'Activate M3') + '</button>';
+                return '<tr id="regulator-' + esc(r.id) + '">' + '<td><strong>' + esc(r.name || r.id) + '</strong><br><code>' + esc(r.id) + '</code></td>' +
                     '<td>' + esc(r.country_name || r.country || r.country_code || '—') + '</td>' +
                     '<td>' + regulatorBadge(statusVal) + '</td>' +
                     '<td>' + m3Badge + '</td>' +
@@ -440,19 +441,33 @@ async function saveAllTenants() {
         await saveSingleTenant(tid);
     }
 }
-async function activateModule3(regulatorId) {
+async function activateModule3(regulatorId, currentState) {
     var setupKey;
-    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { toast('Setup key required.', 'error'); return; }
-    // Determine current state: if already active, deactivate
+    try { setupKey = AdminUI.ensureSetupKey(); } catch (err) { toast('Module 3 toggle requires the setup key.', 'error'); return; }
+    var newState = !currentState;
     try {
-        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
-        var reg = (resp.regulators || []).find(function(r){ return r.id === regulatorId; });
-        var isActive = reg && reg.module_access && reg.module_access.module3;
-        var endpoint = '/api/v1/admin/regulators/' + regulatorId + '/modules/module3';
-        await AdminUI.apiPost(endpoint, { setup_key: setupKey, enabled: !isActive });
-        toast('Module 3 ' + (!isActive ? 'activated' : 'deactivated') + '.', 'success');
-        loadExistingRegulators();
+        var resp = await AdminUI.apiPost('/api/v1/admin/regulators/' + regulatorId + '/modules/module3', { setup_key: setupKey, enabled: newState });
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'Module 3 toggle failed');
+        applyM3State(regulatorId, newState);
+        toast('Module 3 ' + (newState ? 'Activated' : 'Deactivated') + '.', 'success');
+        setTimeout(function () { loadExistingRegulators(); }, 1000);
     } catch (err) { toast('Module 3 toggle failed: ' + err.message, 'error'); }
+}
+
+function applyM3State(regulatorId, active) {
+    var row = document.getElementById('regulator-' + regulatorId);
+    if (!row) return;
+    var btn = row.querySelector('.module3-btn');
+    if (btn) { btn.textContent = active ? 'Deactivate M3' : 'Activate M3'; btn.dataset.active = active ? 'true' : 'false'; }
+    var badge = row.querySelector('.module3-badge');
+    if (badge) {
+        badge.textContent = active ? 'Active' : 'Locked';
+        if (active) { badge.className = 'module3-badge badge badge-success'; badge.removeAttribute('style'); }
+        else { badge.className = 'module3-badge badge'; badge.style.background = '#fee2e2'; badge.style.color = '#991b1b'; }
+    }
+    row.classList.remove('row-flash');
+    void row.offsetWidth;
+    row.classList.add('row-flash');
 }
 
 // ============================================================================

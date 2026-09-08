@@ -534,6 +534,38 @@ def test_admin_create_regulator_wrong_key(monkeypatch):
     assert resp.status_code == 403
 
 
+def test_admin_toggle_regulator_module3(monkeypatch):
+    """Module 3 toggle persists to the canonical module_access column, the
+    data bag and legacy modules — and no longer requires is_saas_customer."""
+    db = _patch_db(monkeypatch)
+    _patch_secret(monkeypatch)
+    db._stores["regulators"]["caan"] = {
+        "slug": "caan", "id": "caan", "name": "CAAN",
+        "is_saas_customer": False,
+        "data": {"module_access": {"module_1": False, "module_2": False, "module_3": False}},
+        "module_access": {"module_1": False, "module_2": False, "module_3": False},
+        "modules": {"module1": False, "module2": False, "module3": False},
+    }
+    resp = _client().post("/api/v1/admin/regulators/caan/modules/module3", json={
+        "setup_key": "test-setup-key", "enabled": True,
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["module3"] is True
+    assert body["module_access"]["module_3"] is True
+    stored = db._stores["regulators"]["caan"]
+    assert stored["module_access"]["module_3"] is True   # canonical column updated
+    assert stored["data"]["module_access"]["module_3"] is True  # data bag updated
+    assert stored["modules"]["module3"] is True          # legacy modules updated
+    # Toggle back off
+    resp2 = _client().post("/api/v1/admin/regulators/caan/modules/module3", json={
+        "setup_key": "test-setup-key", "enabled": False,
+    })
+    assert resp2.status_code == 200
+    assert resp2.json()["module3"] is False
+    assert db._stores["regulators"]["caan"]["module_access"]["module_3"] is False
+
+
 def test_admin_seed_logs_route(monkeypatch):
     db = _patch_db(monkeypatch)
     from app.services.production_seed import _audit

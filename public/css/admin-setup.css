@@ -148,4 +148,8 @@ body { font-family: var(--font-family); background: var(--color-bg, #f1f5f9); co
 .saved-row { border-left: 3px solid #10b981 !important; }
 .error-row { border-left: 3px solid #ef4444 !important; }
 
+/* Brief highlight after an in-place Module 3 toggle */
+@keyframes rowFlash { 0% { background: #d1fae5; } 100% { background: transparent; } }
+tr.row-flash { animation: rowFlash 1.1s ease; }
+
 @media (max-width: 720px) { .content-area { padding: 16px; } }

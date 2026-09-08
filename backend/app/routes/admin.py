@@ -903,9 +903,7 @@ async def admin_toggle_regulator_module3(
     req: RegulatorModule3Request,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Activate/deactivate Module 3 for a regulator (SUPER_ADMIN + setup key).
-    Only SaaS customers may have Module 3 active; others are reference only.
-    """
+    """Activate/deactivate Module 3 for a regulator (SUPER_ADMIN + setup key)."""
     _verify_admin_setup(req.setup_key)
     from app.db import pg
     from app.db.db_models import Regulator
@@ -913,20 +911,28 @@ async def admin_toggle_regulator_module3(
         doc = pg.fetch_by(Regulator, "slug", regulator_id)
         if doc is None:
             raise HTTPException(status_code=404, detail=f"Regulator '{regulator_id}' not found")
-        is_saas = bool(doc.get("is_saas_customer") or (doc.get("data") or {}).get("is_saas_customer"))
-        # Also check legacy data bag
-        if not is_saas:
-            raise HTTPException(status_code=403, detail="Module 3 requires SaaS customer status")
         enabled = bool(req.enabled)
-        # Update module_access JSONB
+        # Update canonical module_access JSONB (module_3) + legacy aliases so
+        # every reader (regulator_service, tenant seeding, both UIs) sees the
+        # same value regardless of which key it looks for.
         data = dict(doc.get("data") or {})
         mod = dict(data.get("module_access") or {})
         mod["module_3"] = enabled
+        mod["module3"] = enabled
         data["module_access"] = mod
-        # Also update legacy modules if present
+        # Canonical top-level column (server default: {"module_1":..,"module_2":..,"module_3":..})
+        module_access = dict(doc.get("module_access") or {})
+        module_access["module_3"] = enabled
+        module_access["module3"] = enabled
+        # Also keep legacy modules in sync
         modules = dict(doc.get("modules") or {})
         modules["module3"] = enabled
-        pg.update(Regulator, "slug", regulator_id, {"data": data, "modules": modules, "updated_at": datetime.now(timezone.utc).isoformat()})
+        pg.update(Regulator, "slug", regulator_id, {
+            "data": data,
+            "module_access": module_access,
+            "modules": modules,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
         log_audit(
             action="REGULATOR_MODULE3_TOGGLED",
             user=user.get("email"),
@@ -935,7 +941,8 @@ async def admin_toggle_regulator_module3(
             target_id=regulator_id,
             metadata={"enabled": enabled},
         )
-        return {"success": True, "regulator_id": regulator_id, "module3": enabled}
+        return {"success": True, "regulator_id": regulator_id, "module3": enabled,
+                "module_access": module_access}
     except HTTPException:
         raise
     except Exception as e:
