@@ -89,12 +89,12 @@
         <div class="card hidden" data-step-panel="4">
             <h2><i class="fas fa-id-card"></i> Step 4 — Reporter Details</h2>
             <div id="reporterFields">
-                <div class="form-group" data-field="name"><label>Full Name *</label><input type="text" id="reporterName" placeholder="Your name"></div>
+                <div class="form-group" data-field="name"><label>Full Name</label><input type="text" id="reporterName" placeholder="Your name"></div>
                 <div class="form-group" data-field="email"><label>Email *</label><input type="email" id="reporterEmail" placeholder="you@org.com"></div>
                 <div class="form-group" data-field="phone"><label>Phone</label><input type="tel" id="reporterPhone" placeholder="+977..."></div>
                 <div class="form-group"><label>Organization</label><input type="text" id="reporterOrg" placeholder="Airline / Dept"></div>
             </div>
-            <p style="font-size:0.75rem;color:#94a3b8;">Confidential: leave name/email/phone blank. VSR: name required, email/phone optional. MOR: all required.</p>
+            <p style="font-size:0.75rem;color:#94a3b8;">Confidential: leave name/email/phone blank. VSR: name optional (leave blank to remain anonymous), email/phone optional. MOR: all required.</p>
         </div>
         <!-- Step 5 -->
         <div class="card hidden" data-step-panel="5">
@@ -155,7 +155,7 @@ function updateReporterFields() {
     const emailEl = document.querySelector('[data-field="email"]');
     const phoneEl = document.querySelector('[data-field="phone"]');
     if (type==='confidential') { nameEl.style.display='none'; emailEl.style.display='none'; phoneEl.style.display='none'; }
-    else if (type==='vsr') { nameEl.style.display='block'; emailEl.style.display='block'; phoneEl.style.display='block'; nameEl.querySelector('label').textContent='Full Name *'; emailEl.querySelector('label').textContent='Email'; phoneEl.querySelector('label').textContent='Phone'; }
+    else if (type==='vsr') { nameEl.style.display='block'; emailEl.style.display='block'; phoneEl.style.display='block'; nameEl.querySelector('label').textContent='Full Name (optional)'; emailEl.querySelector('label').textContent='Email'; phoneEl.querySelector('label').textContent='Phone'; }
     else { nameEl.style.display='block'; emailEl.style.display='block'; phoneEl.style.display='block'; nameEl.querySelector('label').textContent='Full Name *'; emailEl.querySelector('label').textContent='Email *'; phoneEl.querySelector('label').textContent='Phone *'; }
 }
 updateReporterFields();
@@ -193,7 +193,7 @@ document.getElementById('reportForm').addEventListener('submit', async function(
     };
     if (!payload.narrative || !document.getElementById('reportTitle').value.trim()) { showMsg('Title and description required','error'); return; }
     if (isMor && (!payload.reporterName || !payload.reporterEmail || !payload.reporterPhone)) { showMsg('MOR requires name, email and phone','error'); return; }
-    if (!isConf && !payload.reporterName) { showMsg('Name required','error'); return; }
+    if (type==='vsr' && !payload.reporterName) { payload.reporterName='Anonymous'; payload.isAnonymous=true; }
     if (!document.getElementById('justCultureCheck').checked) { showMsg('Please confirm Just Culture','error'); return; }
     const btn=document.getElementById('submitBtn'); btn.disabled=true; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Submitting...';
     try {

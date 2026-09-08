@@ -191,6 +191,10 @@ async def submit_vsr(
     payload = report.model_dump()
     apply_auto_severity(payload)
 
+    if not payload.get("reporter_name"):
+        payload["reporter_name"] = "Anonymous"
+        payload["is_anonymous"] = True
+
     sev = payload.get("severity_level")
     prob = payload.get("probability_level")
     risk_index = None
