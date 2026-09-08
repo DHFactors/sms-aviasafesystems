@@ -282,22 +282,9 @@
     };
 
     // Visibility filter over NAV_ITEMS driven by role + plan + tenant modules.
+    // TEST MODE: every menu item is always visible, regardless of role, plan,
+    // or subscribed modules — no gating restrictions.
     function navItemVisible(item) {
-        const userRole = getUserRole();
-        const tenantPlan = getTenantPlan();
-        const isRegulator = userRole === 'regulator';
-        const req = item.requires;
-        if (!req) return true;
-        if (req === 'admin') {
-            return userRole === 'admin' || userRole === 'super_admin' || isRegulator;
-        }
-        if (req === 'pro') {
-            return tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator;
-        }
-        if (req && req.plan === 'pro') {
-            if (tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator) return true;
-            return req.module ? moduleEnabled(getTenantModules(), req.module) : false;
-        }
         return true;
     }
 
