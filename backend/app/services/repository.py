@@ -167,12 +167,20 @@ class ReportRepository:
             return cached[1]
 
         try:
-            where = [PgReport.is_demo == demo_scope()]
+            where = []
             if not filter.cross_tenant and filter.tenant_id:
+                # Tenant-scoped reads surface every row the tenant owns (both
+                # demo and production scope) so admin-seeded dummy data stays
+                # visible on the operator dashboard — the same rule the hazard
+                # stats and master-register reads already apply. Strict
+                # demo_scope() isolation is preserved for cross-tenant /
+                # system-level reads so no demo data leaks between clusters.
                 try:
                     where.append(PgReport.tenant_id == tenant_uuid(filter.tenant_id))
                 except Exception:
-                    pass
+                    where.append(PgReport.is_demo == demo_scope())
+            else:
+                where.append(PgReport.is_demo == demo_scope())
             if filter.report_type:
                 where.append(PgReport.report_type == filter.report_type)
             if filter.status:

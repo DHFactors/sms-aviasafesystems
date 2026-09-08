@@ -257,6 +257,18 @@
     function buildWidget() {
         if (document.getElementById(HOST_ID)) return;
 
+        // The floating widget is the canonical feedback entry point. Remove the
+        // legacy yellow footer "💬 Send Feedback" button built by shell.js so
+        // only one feedback button is visible on the page. Modal buttons inside
+        // #feedbackModal are never removed.
+        document.querySelectorAll('button.feedback-btn').forEach(function (el) {
+            if (el.classList.contains('feedback-btn-submit') || el.classList.contains('feedback-btn-cancel')) return;
+            if (el.closest('#' + HOST_ID) || el.closest('#feedbackModal')) return;
+            if ((el.textContent || '').indexOf('Feedback') !== -1) {
+                el.remove();
+            }
+        });
+
         var host = document.createElement('div');
         host.id = HOST_ID;
 
