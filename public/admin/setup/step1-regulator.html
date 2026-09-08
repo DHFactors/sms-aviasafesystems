@@ -70,20 +70,6 @@ AUTHOR: AviaSAFE Systems
                     </div>
                     <div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>
 
-                    <!-- SaaS Customer Checkbox -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="regIsSaaSCustomer">
-                                SaaS Customer <i class="fas fa-crown" style="color:#f59e0b;"></i>
-                            </label>
-                            <small style="color:#94a3b8;">
-                                Checked = Regulator purchases SaaS (Module 3 unlocked).<br>
-                                Unchecked = Reference data only (for marketing/audit purposes).
-                            </small>
-                        </div>
-                    </div>
-
                     <!-- Subscription Dates -->
                     <div class="form-row">
                         <div class="form-group">
@@ -140,7 +126,6 @@ async function createRegulator(e) {
 
     var regId = document.getElementById('regId').value.trim().toLowerCase();
     var isDemo = document.getElementById('regIsDemo').checked;
-    var isSaaSCustomer = document.getElementById('regIsSaaSCustomer').checked;
 
     var payload = {
         setup_key: AdminUI.ensureSetupKey(),
@@ -153,7 +138,6 @@ async function createRegulator(e) {
             domain: document.getElementById('regDomain').value.trim(),
             operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
             is_demo: isDemo,
-            is_saas_customer: isSaaSCustomer,
             subscription_start: document.getElementById('regSubscriptionStart').value || null,
             subscription_end: document.getElementById('regSubscriptionEnd').value || null
         }
@@ -162,7 +146,7 @@ async function createRegulator(e) {
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
         var reg = resp.regulator || resp.data?.regulator || {};
-        toast('Regulator "' + (reg.slug || reg.id || regId) + '" created. SaaS: ' + (isSaaSCustomer ? '✅' : '❌'), 'success');
+        toast('Regulator "' + (reg.slug || reg.id || regId) + '" created.', 'success');
         e.target.reset();
     } catch (err) {
         toast('Create failed: ' + err.message, 'error');
