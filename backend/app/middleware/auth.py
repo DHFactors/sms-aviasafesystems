@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.db import pg
 from app.db.db_models import Tenant
 from app.firebase import verify_firebase_token
+from app.middleware.tenant_status_cache import get_status, set_status
 from app.services.tenant_service import get_tenant_slug_from_email
 
 security = HTTPBearer()
@@ -88,12 +89,20 @@ def _tenant_is_suspended(tenant_id: str) -> bool:
     Fail-open by design: a missing row, missing status or a database error
     must never lock a user out of the platform — only an explicit
     ``status == "SUSPENDED"`` blocks access.
+
+    The status read is served from a short-TTL in-memory cache
+    (middleware/tenant_status_cache) so the per-request auth check does not
+    query the tenants table on every request — that lookup was the single most
+    frequent slow statement in production profiling. Tenant status writes
+    invalidate the entry immediately.
     """
+    cached = get_status(tenant_id)
+    if cached is not None:
+        return cached == "SUSPENDED"
     try:
         td = pg.fetch_by(Tenant, "slug", tenant_id)
-        if td is None:
-            return False
-        return (td.get("status") or "") == "SUSPENDED"
+        set_status(tenant_id, ((td.get("status") or "") if td else ""))
+        return (td.get("status") or "") == "SUSPENDED" if td else False
     except Exception as e:
         logger.warning(f"Tenant status check failed for {tenant_id}: {e}")
         return False

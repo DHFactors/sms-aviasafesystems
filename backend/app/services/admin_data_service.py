@@ -238,6 +238,9 @@ def _set_tenant(tenant_id: str, updates: Dict[str, Any]) -> None:
         ).set(dict(updates), merge=True)
     except Exception as e:
         logger.warning(f"Tenant mirror update failed ({tenant_id}): {e}")
+    # A status/module change must take effect immediately on the auth path.
+    from app.middleware.tenant_status_cache import invalidate
+    invalidate(tenant_id)
 
 
 # ============================================================================
