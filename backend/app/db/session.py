@@ -13,6 +13,12 @@
 #          own connection. Peak connections therefore track only the number of
 #          queries in flight, which stays far under Supabase free-tier limits
 #          even against the TRANSACTION pooler (port 6543) used on Render.
+#
+#          The lone exception is the sync pg.py bridge path, which reuses ONE
+#          long-lived session (get_bridge_session below); all of its queries
+#          serialize on the dedicated bridge loop (app/db/runner.py), so a
+#          single kept-alive connection is loop-safe there and avoids paying the
+#          TCP/TLS handshake on every query.
 # ============================================================================
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+_bridge_session: Optional[AsyncSession] = None
 
 
 def _unique_prepared_stmt_name() -> str:
@@ -145,6 +152,41 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
             autoflush=False,
         )
     return _session_factory
+
+
+def get_bridge_session() -> AsyncSession:
+    """Return the single long-lived session used by the sync pg.py wrappers.
+
+    Every pg.py query is dispatched onto the dedicated bridge loop
+    (app/db/runner.py), which executes one coroutine at a time, so a single
+    session is exclusively touched from that loop — it is both thread-safe and
+    event-loop-safe there. The connection is established lazily on the first
+    awaited operation (i.e. inside the bridge loop) and then kept hot across
+    calls, removing the ~1.5-3 s TCP/TLS handshake Supabase's pooler charges per
+    fresh connection. Each operation runs inside its own
+    ``session.begin()``/commit, so the connection never idles inside a
+    transaction across requests.
+
+    Note: unlike ``get_session_factory`` sessions this one is intentionally
+    NOT closed by callers; drop it with ``close_bridge_session()`` only when
+    the connection is known to be stale (pg.py performs that on retry).
+    """
+    global _bridge_session
+    if _bridge_session is None:
+        _bridge_session = get_session_factory()()
+    return _bridge_session
+
+
+async def close_bridge_session() -> None:
+    """Close the shared bridge session, clearing the module-level reference.
+
+    Must be run on the bridge loop (the session's connection lives there).
+    """
+    global _bridge_session
+    session = _bridge_session
+    _bridge_session = None
+    if session is not None:
+        await session.close()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

@@ -3,17 +3,26 @@
 # PATH: backend/app/db/pg.py
 # PURPOSE: Synchronous Postgres data-access port for the Firestore → SQLAlchemy
 #          migration. Legacy service functions are sync, so reads/writes run on
-#          the bridge loop via app/db/runner.py (NullPool engine is cross-loop
-#          safe). Domain documents are stored as typed columns (a projection of
-#          frequently queried fields) PLUS a JSONB `data` bag preserving the
-#          original schemaless Firestore fields — so the one-time data migration
-#          loses nothing and already-migrated consumers see the full doc shape.
+#          the bridge loop via app/db/runner.py. Domain documents are stored as
+#          typed columns (a projection of frequently queried fields) PLUS a
+#          JSONB `data` bag preserving the original schemaless Firestore fields
+#          — so the one-time data migration loses nothing and already-migrated
+#          consumers see the full doc shape.
+#
+#          CONNECTION REUSE: every query here runs on the single bridge loop and
+#          is serialized there, so pg.py keeps ONE long-lived session
+#          (session.get_bridge_session) instead of a NullPool per query. The
+#          ~1.5-3 s Supabase pooler handshake is paid once per process rather
+#          than once per query; each operation still runs in its own
+#          begin()/commit so no cross-request transaction is held open. A
+#          stale timed-out connection is detected and recreated once on the
+#          next use.
 # ============================================================================
 
 from __future__ import annotations
 
 import os
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence
 
 from loguru import logger
 from sqlalchemy import delete as sa_delete
@@ -22,7 +31,7 @@ from sqlalchemy import update as sa_update
 
 from app.db import db_models
 from app.db.runner import run
-from app.db.session import get_session_factory
+from app.db.session import close_bridge_session, get_bridge_session
 
 # Default Firestore-facing id column per model (the string key Firestore used).
 # UUID-keyed domain tables list the PK column itself so `row_to_doc` exposes
@@ -95,6 +104,56 @@ def _record_db(op: str, model: type, fn: Callable[[], Any]) -> Any:
                 f"[PERF] slow_sql op={op} table={table} dur={ms:.0f}ms"
             )
             note_append("slow_sql", f"{op}:{table}:{ms:.0f}ms")
+
+
+def _run_on_bridge(op: Callable[[Any], Awaitable[Any]]) -> Any:
+    """Run one DB operation inside its own transaction on the shared session.
+
+    Every pg.py call funnels through here so the sync path reuses the one
+    long-lived bridge-loop connection (session.get_bridge_session) instead of
+    opening a fresh TCP/TLS connection per query — the per-query Supabase pooler
+    handshake measured at ~1.5-3 s was the dominant constant across all
+    dashboard endpoints.
+
+    Each operation gets its own ``begin()``/commit (rolled back on error), so a
+    reused connection never holds a transaction across requests. When the
+    connection has been dropped by an idle timeout or the pooler, the session is
+    recreated once and the operation retried a single time.
+    """
+    from sqlalchemy.exc import OperationalError
+
+    session = get_bridge_session()
+
+    def once() -> Any:
+        async def _go() -> Any:
+            async with session.begin():
+                return await op(session)
+
+        return run(_go())
+
+    try:
+        return once()
+    except (OperationalError, ConnectionError, OSError) as exc:
+        name = type(exc).__name__
+        if (
+            name
+            in {
+                "ConnectionDoesNotExistError",
+                "InterfaceError",
+                "ProtocolError",
+                "AdminShutdownError",
+                "ConnectionResetError",
+                "PipeError",
+                "BrokenPipeError",
+            }
+            or getattr(exc, "connection_invalidated", False)
+        ):
+            logger.warning(
+                f"[PERF] SQL connection dropped ({name}); recreating once"
+            )
+            run(close_bridge_session())
+            return once()
+        raise
 
 
 def _deterministic_tenant_id(kwargs: Dict[str, Any], fallback_slug: Any = None) -> None:
@@ -223,12 +282,8 @@ def fetch_all(
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
-    session = get_session_factory()()
-    try:
-        rows = _record_db("fetch_all", model, lambda: run(_go(session)))
-        return [row_to_doc(r) for r in rows]
-    finally:
-        run(session.close())
+    rows = _record_db("fetch_all", model, lambda: _run_on_bridge(_go))
+    return [row_to_doc(r) for r in rows]
 
 
 def fetch_by(model: type, column: str, value: Any) -> Optional[Dict[str, Any]]:
@@ -243,10 +298,8 @@ def insert(model: type, doc: Dict[str, Any]) -> None:
         kwargs = _split_doc(model, dict(doc))
         _deterministic_tenant_id(kwargs)
         session.add(model(**kwargs))
-        await session.commit()
 
-    run_coro = _go(get_session_factory()())
-    _record_db("insert", model, lambda: run(run_coro))
+    _record_db("insert", model, lambda: _run_on_bridge(_go))
 
 
 def upsert(model: type, key_column: str, key_value: Any, doc: Dict[str, Any]) -> None:
@@ -266,10 +319,8 @@ def upsert(model: type, key_column: str, key_value: Any, doc: Dict[str, Any]) ->
         else:
             for k, v in kwargs.items():
                 setattr(existing, k, v)
-        await session.commit()
 
-    run_coro = _go(get_session_factory()())
-    _record_db("upsert", model, lambda: run(run_coro))
+    _record_db("upsert", model, lambda: _run_on_bridge(_go))
 
 
 def update(
@@ -301,10 +352,8 @@ def update(
         await session.execute(
             sa_update(model).where(getattr(model, column) == value).values(**kwargs)
         )
-        await session.commit()
 
-    run_coro = _go(get_session_factory()())
-    _record_db("update", model, lambda: run(run_coro))
+    _record_db("update", model, lambda: _run_on_bridge(_go))
     return merged
 
 
@@ -315,7 +364,6 @@ def delete(model: type, column: str, value: Any) -> int:
         result = await session.execute(
             sa_delete(model).where(getattr(model, column) == value)
         )
-        await session.commit()
         return result.rowcount or 0
 
-    return _record_db("delete", model, lambda: run(_go(get_session_factory()())))
+    return _record_db("delete", model, lambda: _run_on_bridge(_go))

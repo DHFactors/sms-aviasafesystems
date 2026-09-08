@@ -297,7 +297,7 @@ async def _database_status() -> str:
         return "error"
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     db = await _database_status()
     return {
@@ -308,11 +308,11 @@ async def health_check():
         "version": settings.API_VERSION,
     }
 
-@app.get("/live")
+@app.api_route("/live", methods=["GET", "HEAD"])
 async def liveness_probe():
     return {"status": "alive"}
 
-@app.get("/ready")
+@app.api_route("/ready", methods=["GET", "HEAD"])
 async def readiness_probe():
     fb = is_firebase_ready()
     db = await _database_status()
