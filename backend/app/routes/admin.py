@@ -1132,21 +1132,24 @@ async def admin_demo_data(
     req: DemoDataRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Seed or unseed dummy operational data (VSR/MOR/CAN/CAP/Survey).
+    """Seed, unseed or replace-with-12-months dummy operational data.
 
-    Targets one tenant (tenant_ids) or every tenant (all=True) and writes to
-    PostgreSQL with is_demo=true. Unseed only removes rows created by this
-    seeder (marked admin-demo-1).
+    action='seed12m' replaces an existing demo dataset with a realistic
+    12-month set (~80 VSR / ~20 MOR, CANs + CAPs). Targets one tenant
+    (tenant_ids) or every tenant (all=True) and writes to PostgreSQL with
+    is_demo=true. Unseed only removes rows created by this seeder (marked
+    admin-demo-1).
     """
     _verify_admin_setup(req.setup_key)
     from app.services.admin_data_service import (
         demo_data_scope,
+        generate_12_month_data,
         seed_tenant_demo_data,
         unseed_tenant_demo_data,
     )
 
-    if req.action not in ("seed", "unseed"):
-        raise HTTPException(status_code=400, detail="action must be 'seed' or 'unseed'")
+    if req.action not in ("seed", "unseed", "seed12m"):
+        raise HTTPException(status_code=400, detail="action must be 'seed', 'unseed' or 'seed12m'")
 
     tenant_ids = demo_data_scope(req.tenant_ids, all_tenants=req.all)
     if not tenant_ids:
@@ -1160,8 +1163,10 @@ async def admin_demo_data(
         try:
             if req.action == "seed":
                 results.append(await seed_tenant_demo_data(tid, req.kinds, user, counts=req.counts))
-            else:
+            elif req.action == "unseed":
                 results.append(await unseed_tenant_demo_data(tid, req.kinds, user))
+            else:
+                results.append(await generate_12_month_data(tid, user))
         except ValueError as e:
             results.append({"tenant_id": tid, "error": str(e)})
         except Exception as e:

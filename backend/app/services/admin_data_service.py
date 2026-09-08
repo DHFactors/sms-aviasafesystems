@@ -101,6 +101,118 @@ _OCCURRENCE_TYPE_LABELS = [
 
 DEFAULT_SEED_COUNTS = {"vsr": 5, "mor": 3, "can": 3, "cap": 3, "survey": 12}
 
+# ---------------------------------------------------------------------------
+# Trailing/windowed 12-month demo dataset
+# ---------------------------------------------------------------------------
+# Realistic monthly volumes so dashboard trends, KPIs and regulatory reports
+# have live-looking content (~80 VSR / ~19 MOR / ~16 CAN / ~12 CAP).
+_MONTHLY_VSR = [5, 6, 5, 7, 6, 7, 6, 7, 8, 7, 8, 8]
+_MONTHLY_MOR = [2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2]
+_MONTHLY_CAN = [1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2]
+_MONTHLY_CAP = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+
+# ICAO category distribution — bird-strike / powerplant / runway-excursion
+# heavy, as in a typical airline operation.
+_ICAO_CATEGORY_DISTRIBUTION = [
+    ("BIRD", 15), ("ENG", 12), ("RE", 12), ("WX", 10), ("SYS", 10),
+    ("PRO", 10), ("CABIN", 8), ("GCOL", 8), ("LOCI", 5), ("CFIT", 5),
+    ("OTHER", 5),
+]
+# Severity distribution: Critical 10% / High 30% / Medium 40% / Low 20%.
+_SEVERITY_DISTRIBUTION = [(5, 10), (4, 30), (3, 40), (2, 20)]
+
+# Human-readable occurrence label per ICAO category so hazard-frequency
+# grouping stays coherent with the category shown in tables/filters.
+_OCCURRENCE_TYPE_FOR_ICAO = {
+    "BIRD": "Bird Strike",
+    "ENG": "Powerplant Failure",
+    "RE": "Runway Excursion",
+    "RI": "Runway Incursion",
+    "WX": "Weather Encounter",
+    "SYS": "System/Component Failure",
+    "PRO": "Procedural Deviation",
+    "CABIN": "Cabin Safety Event",
+    "GCOL": "Ground Collision",
+    "LOCI": "Airborne Conflict",
+    "CFIT": "Abnormal Runway Contact",
+    "ARC": "ATC Operational Incident",
+    "MAC": "Airborne Conflict",
+    "FIRE": "System/Component Failure",
+    "OTHER": "ATC Operational Incident",
+}
+
+# Rotor-wing flavour so Annapurna Helicopter gets helicopter-specific occurrence
+# types / hazards instead of generic fixed-wing content.
+_HELICOPTER_OCCURRENCE_LABELS = {
+    "BIRD": "Bird Strike",
+    "ENG": "Powerplant / Engine Failure",
+    "RE": "Forced Landing",
+    "RI": "Loss of Tail Rotor Effectiveness",
+    "WX": "Mountain Valley Clouding",
+    "SYS": "Main Rotor / Transmission Failure",
+    "PRO": "SOP Deviation (Mountain Ops)",
+    "CABIN": "Passenger Handling Event",
+    "GCOL": "Ground / Skid Contact",
+    "LOCI": "Airborne Conflict",
+    "CFIT": "Terrain Proximity / Hard Landing",
+    "ARC": "Uncoordinated Mountain Approach",
+    "MAC": "Mountain Ridge Encounter",
+    "FIRE": "Electrical / Battery Fire Risk",
+    "OTHER": "Density Altitude Encounter",
+}
+
+# Fixed-wing flavour for Sita Air (no helicopter content).
+_FIXED_WING_OCCURRENCE_LABELS = {
+    "BIRD": "Bird Strike",
+    "ENG": "Powerplant Failure",
+    "RE": "Runway Excursion",
+    "RI": "Runway Incursion",
+    "WX": "Weather Encounter",
+    "SYS": "System/Component Failure",
+    "PRO": "Procedural Deviation",
+    "CABIN": "Cabin Safety Event",
+    "GCOL": "Ground Collision",
+    "LOCI": "Airborne Conflict",
+    "CFIT": "Abnormal Runway Contact",
+    "ARC": "ATC Operational Incident",
+    "MAC": "Airborne Conflict",
+    "FIRE": "System/Component Failure",
+    "OTHER": "ATC Operational Incident",
+}
+
+_DEFAULT_LOCATIONS = ["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]
+
+# Per-tenant operational profiles driving realistic 12-month demo content:
+# Sita Air is fixed-wing only (DHC-6 Twin Otter / Dornier Do 228), Annapurna
+# Helicopter is rotor-wing only (AS350B3e / H125 / Bell 407) with mountain
+# helipad routes. Unknown tenants fall back to generic content with no
+# aircraft detail.
+_DEMO_TENANT_PROFILES = {
+    "sita-air": {
+        "category": "Aeroplane",
+        "fleet": ["de Havilland DHC-6 Twin Otter", "Dornier Do 228"],
+        "registrations": ["9N-AMK", "9N-AML", "9N-AMM", "9N-AMN", "9N-AMP", "9N-AMQ"],
+        "locations": [
+            "Kathmandu (VNKT)", "Pokhara (VNPK)", "Simikot (VNSK)", "Dolpa (VNDP)",
+            "Lukla (VNLK)", "Taplejung (VNTJ)", "Janakpur (VNJP)", "Bharatpur (VNBG)",
+            "In-flight (mountain sector)",
+        ],
+        "occurrence_labels": _FIXED_WING_OCCURRENCE_LABELS,
+    },
+    "annapurna-heli": {
+        "category": "Helicopter",
+        "fleet": ["Eurocopter AS350B3e", "Airbus H125", "Bell 407GXi"],
+        "registrations": ["9N-AHN", "9N-AHO", "9N-AHP", "9N-AHR", "9N-AHT"],
+        "locations": [
+            "Kathmandu (VNKT) Helipad", "Lukla (VNLK)", "Jomsom (VNJS)", "Manang LZ",
+            "Everest Base Camp LZ", "Kangel Danda (VNDG)", "Simikot (VNSK)",
+            "Annapurna Base Camp LZ", "Langtang (VNLT)",
+            "In-flight (high mountain sector)", "In-flight (autorotation sector)",
+        ],
+        "occurrence_labels": _HELICOPTER_OCCURRENCE_LABELS,
+    },
+}
+
 
 def _get_tenant(tenant_id: str) -> Dict[str, Any]:
     doc = pg.fetch_by(Tenant, "slug", tenant_id)
@@ -393,10 +505,36 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _seed_reports(session, tid: str, report_type: str, count: int, base: datetime) -> int:
+def _weighted_pick(pairs: List[Tuple[Any, int]]) -> Any:
+    """Return one element from ``pairs`` randomly weighted by each weight."""
+    total = sum(int(w) for _, w in pairs)
+    r = random.uniform(0, total)
+    upto = 0.0
+    for val, w in pairs:
+        upto += int(w)
+        if r <= upto:
+            return val
+    return pairs[-1][0]
+
+
+async def _seed_reports(session, tid: str, report_type: str, count: int, base: datetime,
+                        category_picker=None, severity_picker=None,
+                        locations=None, label_map=None, aircraft=None) -> int:
     for i in range(count):
-        sev, prob, idx, lvl = _risk(random.randint(2, 5), random.randint(1, 4))
+        sev = severity_picker() if severity_picker else random.randint(2, 5)
+        sev, prob, idx, lvl = _risk(sev, random.randint(1, 4))
         created = base - timedelta(days=i)
+        occ_cat = category_picker() if category_picker else random.choice(_ICAO_CATEGORIES)
+        loc = random.choice(locations) if locations else random.choice(_DEFAULT_LOCATIONS)
+        registration = None
+        aircraft_make = None
+        aircraft_model = None
+        aircraft_category = None
+        if aircraft:
+            aircraft_model = random.choice(aircraft["fleet"])
+            aircraft_make = aircraft_model.split(" ", 1)[0]
+            aircraft_category = aircraft["category"]
+            registration = random.choice(aircraft["registrations"])
         session.add(Report(
             tenant_id=uuid.UUID(tid),
             report_type=report_type,
@@ -404,15 +542,20 @@ async def _seed_reports(session, tid: str, report_type: str, count: int, base: d
             ai_status="PENDING",
             narrative=(
                 f"Dummy {'voluntary' if report_type == 'voluntary' else 'mandatory'} safety "
-                f"report {i + 1} for demonstration."
+                f"report {i + 1} for demonstration"
+                + (f" ({registration} {aircraft_model})." if registration else ".")
             ),
-            location=random.choice(["KTM", "Pokhara", "Bhairahawa", "In-flight", "Kathmandu Valley"]),
+            location=loc,
             occurrence_date=created,
+            aircraft_registration=registration,
+            aircraft_make=aircraft_make,
+            aircraft_model=aircraft_model,
+            aircraft_category=aircraft_category,
             # Vary the occurrence type across realistic ICAO hazards so the
             # hazard-frequency chart / top-hazards dashboard show real
             # categories rather than a single generic "Report" bar.
-            occurrence_type=random.choice(_OCCURRENCE_TYPE_LABELS),
-            occurrence_category=random.choice(_ICAO_CATEGORIES),
+            occurrence_type=(label_map or _OCCURRENCE_TYPE_FOR_ICAO).get(occ_cat) or random.choice(_OCCURRENCE_TYPE_LABELS),
+            occurrence_category=occ_cat,
             # The severity string drives the risk distribution + high/critical
             # KPI buckets; derive it from the numeric level that is also stored.
             severity=_SEVERITY_STRING_BY_LEVEL[sev],
@@ -474,6 +617,109 @@ async def _seed_surveys(session, tid: str, count: int, base: datetime) -> int:
     return count
 
 
+async def _seed_hazards_cans_caps(session, tuuid: str, n_can: int, n_cap: int,
+                                  base: datetime, start_seq: int = 0,
+                                  label_map=None) -> Tuple[int, int]:
+    """Seed ``n_can`` hazard+CAN pairs and ``n_cap`` CAPs attached to the first
+    CANs. Returns ``(seeded_can, seeded_cap)``.
+
+    ``start_seq`` offsets the generated CAN/hazard sequence numbers so ids stay
+    unique across repeated calls (e.g. one call per month in the 12-month
+    dataset) — ``generate_hazard_id`` scopes its sequence per function+year.
+    """
+    can_ids = []
+    for i in range(n_can):
+        sev, prob, idx, lvl = _risk(random.randint(2, 4), random.randint(2, 4))
+        cat = random.choice(_ICAO_CATEGORIES)
+        created = base - timedelta(days=i)
+        # Use ICAO category as occurrence_type/adrep for realistic hazard frequency chart
+        occ_type = (label_map or _OCCURRENCE_TYPE_FOR_ICAO).get(cat) or cat
+        dept = random.choice(_DEPARTMENTS)
+        priority = "H" if idx >= 12 else "M" if idx >= 6 else "L"
+        function = resolve_function_code(dept, None)
+        taxonomy = revalue_taxonomy(_ICAO_TO_TAXONOMY.get(cat, ""))
+        seq = start_seq + i + 1
+        hazard = Hazard(
+            tenant_id=uuid.UUID(tuuid),
+            hazard_id=generate_hazard_id(function, priority, created.year, seq),
+            function=function,
+            title=f"Dummy hazard {seq} for demonstration",
+            description="Dummy demonstration hazard created by the Super-Admin seed tool.",
+            source="Internal Audit",
+            source_id="",
+            occurrence_type=occ_type,
+            adrep_category=cat,
+            threat=f"Demonstration {cat} precursor (Super-Admin seed).",
+            top_event="Demonstration top event (seed data).",
+            taxonomy=taxonomy,
+            severity=sev,
+            probability=prob,
+            risk_index=idx,
+            risk_level=lvl,
+            priority=priority,
+            corrective_action_flag=True,
+            srm_flag=True,
+            status="Open",
+            priority_date=created,
+            status_date=created,
+            srm_conducted=True,
+            analysis_mode="FISHBONE_ONLY",
+            is_demo=True,
+            created_by=ADMIN_DEMO_CREATOR,
+            created_at=created,
+            updated_at=created,
+        )
+        session.add(hazard)
+        await session.flush()
+        can = Can(
+            tenant_id=uuid.UUID(tuuid),
+            hazard_id=hazard.id,
+            can_reference=f"CAN-DEMO-{seq:03d}",
+            title=f"Dummy corrective action {seq}",
+            description=f"Dummy corrective action notice {seq}.",
+            required_action="Implement the agreed corrective action and report back.",
+            target_completion_date=created + timedelta(days=random.randint(14, 60)),
+            assigned_to=ADMIN_DEMO_CREATOR,
+            assigned_to_uid=ADMIN_DEMO_CREATOR,
+            department=random.choice(_DEPARTMENTS),
+            priority=random.choice(["High", "Medium", "Low"]),
+            status="Open",
+            issued_by=ADMIN_DEMO_CREATOR,
+            issued_by_uid=ADMIN_DEMO_CREATOR,
+            issued_at=created,
+            is_demo=True,
+            created_by=ADMIN_DEMO_CREATOR,
+            created_at=created,
+            updated_at=created,
+        )
+        session.add(can)
+        await session.flush()
+        can_ids.append((can.id, can.can_reference, created))
+
+    seeded_cap = 0
+    for j in range(min(n_cap, len(can_ids))):
+        can_id, can_ref, created = can_ids[j]
+        session.add(Cap(
+            tenant_id=uuid.UUID(tuuid),
+            can_id=can_id,
+            cap_reference=f"{can_ref}-CAP-{j + 1:03d}",
+            action_plan="Dummy corrective/preventive action plan describing the mitigation steps.",
+            timeline=f"{random.randint(30, 90)} days",
+            resources_required="Manpower and materials per the plan",
+            implementation_plan="Phase the work, verify effectiveness, and close out.",
+            target_completion_date=created + timedelta(days=random.randint(30, 90)),
+            status="In Progress",
+            submitted_by=ADMIN_DEMO_CREATOR,
+            submitted_by_uid=ADMIN_DEMO_CREATOR,
+            submitted_at=created,
+            is_demo=True,
+            created_at=created,
+            updated_at=created,
+        ))
+        seeded_cap += 1
+    return len(can_ids), seeded_cap
+
+
 async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any],
                                 counts: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Seed dummy VSR/MOR/CAN/CAP/Survey rows into PostgreSQL for one tenant."""
@@ -497,102 +743,94 @@ async def seed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[st
             counts_total["survey"] = await _seed_surveys(session, tuuid, seed_counts.get("survey", 0), base)
 
         if "can" in kinds or "cap" in kinds:
-            can_ids = []
-            for i in range(n_can):
-                sev, prob, idx, lvl = _risk(random.randint(2, 4), random.randint(2, 4))
-                cat = random.choice(_ICAO_CATEGORIES)
-                created = base - timedelta(days=i)
-                # Use ICAO category as occurrence_type/adrep for realistic hazard frequency chart
-                occ_type = cat  # e.g., CFIT, RE, BIRD, etc. — matches seeded adrep for frequency grouping
-                dept = random.choice(_DEPARTMENTS)
-                priority = "H" if idx >= 12 else "M" if idx >= 6 else "L"
-                function = resolve_function_code(dept, None)
-                taxonomy = revalue_taxonomy(_ICAO_TO_TAXONOMY.get(cat, ""))
-                hazard = Hazard(
-                    tenant_id=uuid.UUID(tuuid),
-                    hazard_id=generate_hazard_id(function, priority, created.year, i + 1),
-                    function=function,
-                    title=f"Dummy hazard {i + 1} for demonstration",
-                    description="Dummy demonstration hazard created by the Super-Admin seed tool.",
-                    source="Internal Audit",
-                    source_id="",
-                    occurrence_type=occ_type,
-                    adrep_category=cat,
-                    threat=f"Demonstration {cat} precursor (Super-Admin seed).",
-                    top_event="Demonstration top event (seed data).",
-                    taxonomy=taxonomy,
-                    severity=sev,
-                    probability=prob,
-                    risk_index=idx,
-                    risk_level=lvl,
-                    priority=priority,
-                    corrective_action_flag=True,
-                    srm_flag=True,
-                    status="Open",
-                    priority_date=created,
-                    status_date=created,
-                    srm_conducted=True,
-                    analysis_mode="FISHBONE_ONLY",
-                    is_demo=True,
-                    created_by=ADMIN_DEMO_CREATOR,
-                    created_at=created,
-                    updated_at=created,
-                )
-                session.add(hazard)
-                await session.flush()
-                can = Can(
-                    tenant_id=uuid.UUID(tuuid),
-                    hazard_id=hazard.id,
-                    can_reference=f"CAN-DEMO-{i + 1:03d}",
-                    title=f"Dummy corrective action {i + 1}",
-                    description=f"Dummy corrective action notice {i + 1}.",
-                    required_action="Implement the agreed corrective action and report back.",
-                    target_completion_date=created + timedelta(days=random.randint(14, 60)),
-                    assigned_to=ADMIN_DEMO_CREATOR,
-                    assigned_to_uid=ADMIN_DEMO_CREATOR,
-                    department=random.choice(_DEPARTMENTS),
-                    priority=random.choice(["High", "Medium", "Low"]),
-                    status="Open",
-                    issued_by=ADMIN_DEMO_CREATOR,
-                    issued_by_uid=ADMIN_DEMO_CREATOR,
-                    issued_at=created,
-                    is_demo=True,
-                    created_by=ADMIN_DEMO_CREATOR,
-                    created_at=created,
-                    updated_at=created,
-                )
-                session.add(can)
-                await session.flush()
-                can_ids.append((can.id, can.can_reference, created))
-            counts_total["can"] = len(can_ids)
-
+            n_cap = seed_counts["cap"] if "cap" in kinds else 0
+            n_can_seeded, n_cap_seeded = await _seed_hazards_cans_caps(
+                session, tuuid, n_can, n_cap, base)
+            if "can" in kinds:
+                counts_total["can"] = n_can_seeded
             if "cap" in kinds:
-                n_cap = min(seed_counts["cap"], len(can_ids))
-                for j in range(n_cap):
-                    can_id, can_ref, created = can_ids[j]
-                    session.add(Cap(
-                        tenant_id=uuid.UUID(tuuid),
-                        can_id=can_id,
-                        cap_reference=f"{can_ref}-CAP-{j + 1:03d}",
-                        action_plan="Dummy corrective/preventive action plan describing the mitigation steps.",
-                        timeline=f"{random.randint(30, 90)} days",
-                        resources_required="Manpower and materials per the plan",
-                        implementation_plan="Phase the work, verify effectiveness, and close out.",
-                        target_completion_date=created + timedelta(days=random.randint(30, 90)),
-                        status="In Progress",
-                        submitted_by=ADMIN_DEMO_CREATOR,
-                        submitted_by_uid=ADMIN_DEMO_CREATOR,
-                        submitted_at=created,
-                        is_demo=True,
-                        created_at=created,
-                        updated_at=created,
-                    ))
-                counts_total["cap"] = n_cap
+                counts_total["cap"] = n_cap_seeded
 
     _audit("DEMO_DATA_SEED", actor, tid,
            f"Seeded {', '.join(f'{k}={counts_total[k]}' for k in kinds)} for tenant {tid}")
     logger.info(f"Demo data seeded for {tid}: {counts_total}")
     return {"tenant_id": tid, "seeded": counts_total}
+
+
+async def generate_12_month_data(tenant_id: str, actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Replace a tenant's demo dataset with a realistic 12-month demo set.
+
+    Unseeds existing demo VSR/MOR/CAN/CAP rows, then seeds ~100 reports
+    (≈80 VSR / ~20 MOR), ≈16 CANs and ~12 CAPs spread across a randomly chosen
+    12-month window inside Jan 2026 – Sep 2027. ICAO categories and severities
+    are sampled from realistic weighted distributions so dashboard trends, KPIs
+    and regulatory reports have live-looking content.
+    """
+    tid = _validate_id(tenant_id, "tenant id")
+    tenant_doc = _get_tenant(tid)
+
+    removed = await unseed_tenant_demo_data(tid, ["vsr", "mor", "can", "cap"], actor)
+
+    # Per-tenant operational realism: Sita Air (fixed-wing) vs Annapurna
+    # Helicopter (rotor-wing). Unknown tenants fall back to generic content.
+    profile = _DEMO_TENANT_PROFILES.get(
+        tenant_doc.get("slug") or tenant_doc.get("tenant_id") or tid, {})
+    locations = profile.get("locations")
+    label_map = profile.get("occurrence_labels")
+    aircraft = profile or None
+
+    # Random 12-month window: start anywhere from Jan 2026 (offset 0) up to
+    # Oct 2026 (offset 9) so the last month never exceeds Sep 2027.
+    start_y, start_m = (2026, 1 + random.randint(0, 9))
+
+    seeded = {"vsr": 0, "mor": 0, "can": 0, "cap": 0}
+    seq = 0
+
+    async with session_scope() as session:
+        tuuid = await _resolve_tenant_uuid(session, tid)
+        for idx in range(12):
+            m = start_m + idx
+            y = start_y
+            if m > 12:
+                m -= 12
+                y += 1
+            # Cluster reports mid-month so an entire month's batch stays inside
+            # the month boundary (max backdate is 7 days).
+            base = datetime(y, m, 1, tzinfo=timezone.utc) + timedelta(days=random.randint(10, 18))
+
+            seeded["vsr"] += await _seed_reports(
+                session, tuuid, "voluntary", _MONTHLY_VSR[idx], base,
+                category_picker=lambda: _weighted_pick(_ICAO_CATEGORY_DISTRIBUTION),
+                severity_picker=lambda: _weighted_pick(_SEVERITY_DISTRIBUTION),
+                locations=locations, label_map=label_map, aircraft=aircraft,
+            )
+            seeded["mor"] += await _seed_reports(
+                session, tuuid, "mandatory", _MONTHLY_MOR[idx], base,
+                category_picker=lambda: _weighted_pick(_ICAO_CATEGORY_DISTRIBUTION),
+                severity_picker=lambda: _weighted_pick(_SEVERITY_DISTRIBUTION),
+                locations=locations, label_map=label_map, aircraft=aircraft,
+            )
+            n_can_seeded, n_cap_seeded = await _seed_hazards_cans_caps(
+                session, tuuid, _MONTHLY_CAN[idx], _MONTHLY_CAP[idx], base, start_seq=seq,
+                label_map=label_map)
+            seq += _MONTHLY_CAN[idx]
+            seeded["can"] += n_can_seeded
+            seeded["cap"] += n_cap_seeded
+
+    total_reports = seeded["vsr"] + seeded["mor"]
+    removed_total = sum(removed.get("removed", {}).values())
+    _audit("DEMO_DATA_SEED_12M", actor, tid,
+           f"Seeded 12-month demo set {start_y:04d}-{start_m:02d}→{y:04d}-{m:02d}: "
+           f"{total_reports} reports, {seeded['can']} CANs, {seeded['cap']} CAPs "
+           f"(replaced {removed_total} demo rows)")
+    logger.info(f"12-month demo data seeded for {tid}: {seeded}")
+    return {
+        "tenant_id": tid,
+        "seeded": seeded,
+        "removed": removed.get("removed", {}),
+        "total_reports": total_reports,
+        "window": f"{start_y:04d}-{start_m:02d} to {y:04d}-{m:02d}",
+    }
 
 
 async def unseed_tenant_demo_data(tenant_id: str, kinds: List[str], actor: Dict[str, Any]) -> Dict[str, Any]:

@@ -78,6 +78,13 @@ AUTHOR: AviaSAFE Systems
                 <button class="btn btn-danger" onclick="demoData('unseed')"><i class="fas fa-broom"></i> Unseed Dummy Data</button>
             </div>
             <div style="border-top:1px dashed #e2e8f0;margin:16px 0 12px;padding-top:14px;">
+                <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:6px;"><i class="fas fa-calendar-alt"></i> 12-Month Demo Dataset</div>
+                <p class="card-sub" style="margin-bottom:10px;">Replaces the demo rows with a realistic 12-month set (~80 VSR / ~20 MOR / ~16 CAN / ~12 CAP) across a random window in Jan 2026 – Sep 2027. Content is tenant-realistic: <strong>Sita Air</strong> gets fixed-wing only (DHC-6 / Do 228); <strong>Annapurna Helicopter</strong> gets helicopter-only (AS350 / H125 / Bell 407).</p>
+                <div class="btn-row">
+                    <button class="btn btn-primary" onclick="demoData('seed12m')"><i class="fas fa-calendar-alt"></i> Seed 12-Month Demo Data</button>
+                </div>
+            </div>
+            <div style="border-top:1px dashed #e2e8f0;margin:16px 0 12px;padding-top:14px;">
                 <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-file-export"></i> Export Dummy Data</div>
                 <p class="card-sub" style="margin-bottom:10px;">Download the seeded demo rows (<code>is_demo = true</code>) as CSV, scoped to all tenants or a single tenant.</p>
                 <div class="form-row" style="margin-bottom:10px;">
@@ -170,6 +177,23 @@ function demoKindChanged() {
 }
 
 function demoData(action) {
+    if (action === 'seed12m') {
+        var scope = document.querySelector('input[name=demoScope]:checked').value;
+        var body = { action: 'seed12m' };
+        if (scope === 'one') {
+            var tid = document.getElementById('demoTenantSelect').value;
+            if (!tid) { toast('Select a tenant.', 'error'); return; }
+            body.all = false; body.tenant_ids = [tid];
+        } else { body.all = true; }
+        openConfirm(
+            'Seed 12-Month Demo Data',
+            '<strong>Replace demo dataset with 12 months of realistic data</strong>' +
+            (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
+            '.<br><br>Unseeds existing demo VSR/MOR/CAN/CAP rows, then seeds ~100 reports (≈80 VSR / ~20 MOR), ~16 CANs and ~12 CAPs across a random 12-month window (Jan 2026 – Sep 2027). Content is tenant-realistic: <strong>Sita Air</strong> → fixed-wing only; <strong>Annapurna Helicopter</strong> → helicopter only.<br><br><span style="color:#b91c1c;font-weight:700;">⚠️ Existing demo data will be replaced. Real data is untouched.</span>',
+            { type: 'demo', body: body }
+        );
+        return;
+    }
     var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
     if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP/Survey).', 'error'); return; }
     var scope = document.querySelector('input[name=demoScope]:checked').value;
@@ -209,8 +233,10 @@ function demoData(action) {
 
 async function execDemo(body) {
     var area = document.getElementById('demoDataArea');
-    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' +
-        (body.action === 'seed' ? 'Seeding' : 'Unseeding') + ' dummy data...</div>';
+    var is12m = body.action === 'seed12m';
+    var verb = is12m ? 'Seeding 12-month demo' : (body.action === 'seed' ? 'Seeding' : 'Unseeding');
+    var doneLabel = is12m ? '12-month seed complete' : (body.action === 'seed' ? 'Seed complete' : 'Unseed complete');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' + verb + ' dummy data...</div>';
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/demo-data', body);
         var rows = (resp.results || []).map(function (r) {
@@ -220,14 +246,13 @@ async function execDemo(body) {
                 '<td>' + (r.error ? '<span class="badge badge-danger">' + esc(r.error) + '</span>' : esc(detail || 'ok')) + '</td></tr>';
         }).join('');
         if (area) {
-            area.innerHTML = '<div class="status-box success"><strong>' +
-                (body.action === 'seed' ? 'Seed complete' : 'Unseed complete') + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
+            area.innerHTML = '<div class="status-box success"><strong>' + doneLabel + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
                 (rows ? '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Tenant</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '');
         }
         loadAuditLog();
     } catch (err) {
         if (area) area.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>';
-        toast((body.action === 'seed' ? 'Seed' : 'Unseed') + ' failed: ' + err.message, 'error');
+        toast(verb + ' failed: ' + err.message, 'error');
     }
 }
 
