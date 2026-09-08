@@ -132,18 +132,6 @@ AUTHOR: AviaSAFE Systems
         .side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
         .side-foot i { color: #e2574c; }
 
-        /* ---- Stats grid (merged from super-admin) ------------------------- */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
-        .stat-card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; }
-        .stat-card .stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; }
-        .stat-card .stat-value { font-size: 1.55rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
-        .stat-card .stat-icon { float: right; font-size: 1.5rem; color: #cbd5e1; }
-        .admin-tile { background: #fff; border-radius: 14px; padding: 24px; text-decoration: none; display: block; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; transition: transform .12s, box-shadow .12s; color: inherit; }
-        .admin-tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,23,42,.12); }
-        .admin-tile .tile-icon { font-size: 2rem; color: #0ea5e9; margin-bottom: .6rem; }
-        .admin-tile h2 { margin: 0 0 4px; font-size: 1.02rem; color: #0f172a; }
-        .admin-tile p { margin: 0; color: #64748b; font-size: .84rem; line-height: 1.5; }
-        .admin-tile .tile-go { margin-top: .8rem; font-weight: 700; font-size: .8rem; color: #0ea5e9; }
         .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
         .toggle-switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 22px; transition: .3s; }
@@ -183,19 +171,6 @@ AUTHOR: AviaSAFE Systems
             <h1><i class="fas fa-cogs" style="color:var(--color-brand-600);"></i> Production Setup</h1>
             <div class="sub">Full rollout flow (Steps 1&ndash;9), fully data-driven. Mutations require the admin setup key.</div>
         </div>
-
-        <div class="section-title"><i class="fas fa-chart-simple"></i> Summary</div>
-        <div class="stats-grid" id="statsGrid">
-            <div class="stat-card"><span class="stat-icon"><i class="fas fa-building"></i></span><div class="stat-label">Total Tenants</div><div class="stat-value" id="statTenants">–</div></div>
-            <div class="stat-card"><span class="stat-icon" style="color:#22c55e;"><i class="fas fa-play-circle"></i></span><div class="stat-label">Active Tenants</div><div class="stat-value" id="statActive">–</div></div>
-            <div class="stat-card"><span class="stat-icon" style="color:#7c3aed;"><i class="fas fa-flask"></i></span><div class="stat-label">Demo Tenants</div><div class="stat-value" id="statDemo">–</div></div>
-            <div class="stat-card"><span class="stat-icon" style="color:#f59e0b;"><i class="fas fa-hourglass-half"></i></span><div class="stat-label">Trial Tenants</div><div class="stat-value" id="statTrial">–</div></div>
-            <div class="stat-card"><span class="stat-icon"><i class="fas fa-landmark"></i></span><div class="stat-label">Total Regulators</div><div class="stat-value" id="statRegulators">–</div></div>
-            <div class="stat-card"><span class="stat-icon" style="color:#0ea5e9;"><i class="fas fa-handshake"></i></span><div class="stat-label">SaaS Customers</div><div class="stat-value" id="statSaas">–</div></div>
-        </div>
-
-        <div class="section-title"><i class="fas fa-compass"></i> Quick Access</div>
-        <div class="grid" id="quickAccessGrid"></div>
 
         <div class="step-progress" id="stepProgress">
             <span class="sp-chip"><span class="sp-num">1</span> Regulator</span>
@@ -733,7 +708,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     currentUser = user;
     document.getElementById('userDisplay').textContent = user.email;
-    renderQuickAccess();
     loadExistingRegulators();
     populateRegulatorDropdown();
     loadExistingTenants();
@@ -741,23 +715,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     loadAuditLog();
     loadDemoTenants();
     markProgress();
-    // Update stats after tenants load (also triggered in loadExistingTenants)
-    setTimeout(renderStats, 800);
 });
-
-function renderQuickAccess() {
-    var grid = document.getElementById('quickAccessGrid');
-    if (!grid) return;
-    var items = [
-        { label: 'Production Setup', path: '/admin/production-setup.html', icon: 'fa-cogs', desc: 'State regulator, operator tenants, audit log, dummy data and PSOE baselines.' },
-        { label: 'PSOE Audit', path: '/admin/psoe-audit.html', icon: 'fa-clipboard-check', desc: 'CAAN Appendix 10 surveillance assessments — questions, scoring, findings and reports.' },
-        { label: 'Audit Log', path: '/admin/audit-log.html', icon: 'fa-clipboard-list', desc: 'Platform audit trail of admin actions and data changes.' },
-        { label: 'User Management', path: '/admin/user-management.html', icon: 'fa-users-gear', desc: 'Tenant users, roles and account management.' }
-    ];
-    grid.innerHTML = items.map(function(n){
-        return '<a class="admin-tile" href="' + n.path + '"><div class="tile-icon"><i class="fas ' + n.icon + '"></i></div><h2>' + esc(n.label) + '</h2><p>' + esc(n.desc) + '</p><div class="tile-go">Open &nbsp;<i class="fas fa-arrow-right"></i></div></a>';
-    }).join('');
-}
 
 function renderAccessDenied() {
     var gate = document.createElement('div');
@@ -1069,29 +1027,6 @@ function readModules(row) {
         module4: row.querySelector('input[data-module="module4"]').checked
     };
 }
-function updateStats(tenants, regulators) {
-    var by = { ACTIVE: 0, DEMO: 0, TRIAL: 0 };
-    (tenants || []).forEach(function (t) {
-        var s = normStatus(t.status || 'demo');
-        if (s in by) by[s]++;
-    });
-    function set(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; }
-    set('statTenants', (tenants || []).length);
-    set('statActive', by.ACTIVE);
-    set('statDemo', by.DEMO);
-    set('statTrial', by.TRIAL);
-    set('statRegulators', (regulators || []).length);
-    var saasCount = (regulators || []).filter(function(r){ return r.is_saas_customer === true || r.is_saas_customer === 'true'; }).length;
-    set('statSaas', saasCount);
-}
-function renderStats() {
-    // Fallback using cached tenants if regulators not yet loaded
-    updateStats(EXISTING_TENANTS || [], []);
-    // Try to fetch regulators for SaaS count
-    AdminUI.apiGet('/api/v1/admin/regulators').then(function(resp){
-        updateStats(EXISTING_TENANTS || [], resp.regulators || []);
-    }).catch(function(){});
-}
 async function saveSingleTenant(tenantId) {
     var row = document.querySelector('tr[data-tenant="' + tenantId + '"]');
     if (!row) return;
@@ -1114,7 +1049,6 @@ async function saveSingleTenant(tenantId) {
         }
         if (cached) { cached.status = status; cached.modules = modules; }
         row.classList.remove('dirty-row','error-row'); row.classList.add('saved-row');
-        renderStats();
         toast('Tenant ' + tenantId + ' updated.', 'success');
     } catch (err) {
         row.classList.add('error-row'); toast('Update failed: ' + err.message, 'error');
@@ -1134,7 +1068,7 @@ async function toggleSaaSCustomer(regulatorId, newStatus) {
     try {
         await AdminUI.apiPost('/api/v1/admin/regulators/' + regulatorId + '/toggle-saas', { setup_key: setupKey, is_saas_customer: newStatus });
         toast('Regulator SaaS status updated.', 'success');
-        loadExistingRegulators(); renderStats();
+        loadExistingRegulators();
     } catch (err) { toast('SaaS toggle failed: ' + err.message, 'error'); }
 }
 async function activateModule3(regulatorId) {
