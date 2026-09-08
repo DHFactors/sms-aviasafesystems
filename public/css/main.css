@@ -173,6 +173,18 @@ select.form-control { appearance: auto; }
     font-size: var(--font-size-sm);
     margin-top: var(--spacing-xs);
 }
+.auto-severity-note {
+    background: var(--color-brand-50, #eaf5fd);
+    border: 1px solid var(--color-info, #2979ff);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--color-gray-800);
+    line-height: 1.4;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+}
 
 /* ========== CARDS ========== */
 .card {

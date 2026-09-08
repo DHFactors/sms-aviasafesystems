@@ -72,7 +72,6 @@ function gatherSectionData(sectionIdx) {
             d.safetySuggestions = getVal('safetySuggestions') || null;
             break;
         case 4:
-            d.severity = getNum('severityLevel');
             d.probability = getNum('probabilityLevel');
             break;
         case 5:

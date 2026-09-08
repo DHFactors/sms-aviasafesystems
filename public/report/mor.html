@@ -519,17 +519,6 @@
 
                 <div class="grid-2">
                     <div class="form-group">
-                        <label for="severityLevel">Severity (1-5)</label>
-                        <select id="severityLevel" class="form-control" onchange="updateRiskDisplay()">
-                            <option value="">— Optional —</option>
-                            <option value="5">5 — Catastrophic</option>
-                            <option value="4">4 — Hazardous</option>
-                            <option value="3">3 — Major</option>
-                            <option value="2">2 — Minor</option>
-                            <option value="1">1 — Negligible</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
                         <label for="probabilityLevel">Probability (1-5)</label>
                         <select id="probabilityLevel" class="form-control" onchange="updateRiskDisplay()">
                             <option value="">— Optional —</option>
@@ -539,6 +528,12 @@
                             <option value="2">2 — Improbable</option>
                             <option value="1">1 — Extremely Improbable</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Severity</label>
+                        <div class="auto-severity-note">
+                            Automatically assigned from the ICAO occurrence category selected in the previous section.
+                        </div>
                     </div>
                 </div>
 

@@ -92,7 +92,9 @@ async def submit_report(
 ):
     tenant_id = user["tenant_id"]
     service = ReportService(tenant_id)
-    stored = service.create_report(report.model_dump(), user)
+    payload = report.model_dump()
+    apply_auto_severity(payload)
+    stored = service.create_report(payload, user)
     background_tasks.add_task(service.run_ai_analysis, stored["id"], report.narrative)
     _auto_create_hazard_from_report(stored, user)
     ip, request_id = request_context(request)
@@ -134,15 +136,15 @@ async def submit_mor(
     tenant_id = user["tenant_id"]
     service = ReportService(tenant_id)
     payload = report.model_dump()
+    apply_auto_severity(payload)
 
     risk_index = None
-    sev = payload.get("severity")
+    sev = payload.get("severity_level")
     prob = payload.get("probability")
     if sev is not None and prob is not None:
         risk_index = compute_risk_index(sev, prob)
 
     payload["risk_index"] = risk_index
-    payload["severity_level"] = sev
     payload["probability_level"] = prob
     payload["report_type"] = "mandatory"
     payload["is_anonymous"] = False
@@ -187,6 +189,7 @@ async def submit_vsr(
     tenant_id = user["tenant_id"]
     service = ReportService(tenant_id)
     payload = report.model_dump()
+    apply_auto_severity(payload)
 
     sev = payload.get("severity_level")
     prob = payload.get("probability_level")

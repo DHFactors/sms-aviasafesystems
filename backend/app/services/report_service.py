@@ -36,6 +36,7 @@ from app.services.risk_matrix import (
     get_thresholds,
     get_tolerability_tier,
 )
+from app.services.severity_service import LEVEL_TO_LABEL
 
 
 def _dt(value: Any):
@@ -289,6 +290,10 @@ class ReportService:
             risk_level = get_risk_level(risk_index, thresholds)
             tolerability_tier = get_tolerability_tier(risk_index, thresholds)
 
+        severity_label = payload.get("severity")
+        if severity_level is not None and not severity_label:
+            severity_label = LEVEL_TO_LABEL.get(severity_level)
+
         values: Dict[str, Any] = {}
         for col in Report.__table__.columns:
             key = col.name
@@ -327,6 +332,9 @@ class ReportService:
                 continue
             if key == "ai_status":
                 values[key] = payload.get("ai_status", "PENDING")
+                continue
+            if key == "severity":
+                values[key] = severity_label
                 continue
             if key in ("is_anonymous", "etops", "manufacturer_advised", "fdr_data_retained"):
                 values[key] = payload.get(key, False)

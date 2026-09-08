@@ -421,19 +421,8 @@
             <!-- Section 4: Risk Assessment -->
             <div class="section-panel" data-section="4">
                 <h3><i class="fas fa-th-large"></i> Risk Assessment</h3>
-                <p class="form-hint">Provide your initial assessment if you wish. Leave blank for AI-assisted classification.</p>
+                <p class="form-hint">Severity is auto-assigned from the ICAO category. Provide the probability for the risk matrix if known.</p>
                 <div class="grid-2">
-                    <div class="form-group">
-                        <label for="severityLevel">Severity (1-5)</label>
-                        <select id="severityLevel" class="form-control" onchange="updateRiskDisplay()">
-                            <option value="">— Optional —</option>
-                            <option value="5">5 — Catastrophic</option>
-                            <option value="4">4 — Hazardous</option>
-                            <option value="3">3 — Major</option>
-                            <option value="2">2 — Minor</option>
-                            <option value="1">1 — Negligible</option>
-                        </select>
-                    </div>
                     <div class="form-group">
                         <label for="probabilityLevel">Probability (1-5)</label>
                         <select id="probabilityLevel" class="form-control" onchange="updateRiskDisplay()">
@@ -444,6 +433,12 @@
                             <option value="2">2 — Improbable</option>
                             <option value="1">1 — Extremely Improbable</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Severity</label>
+                        <div class="auto-severity-note">
+                            Automatically assigned from the ICAO occurrence category selected in the previous section.
+                        </div>
                     </div>
                 </div>
                 <div class="risk-display" id="riskDisplay">

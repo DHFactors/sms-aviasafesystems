@@ -89,7 +89,6 @@ function gatherSectionData(sectionIdx) {
             d.fdrRetained = getChecked('fdrRetained');
             break;
         case 7:
-            d.severity = getNum('severityLevel');
             d.probability = getNum('probabilityLevel');
             break;
     }
