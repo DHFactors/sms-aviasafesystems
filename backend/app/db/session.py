@@ -30,6 +30,7 @@ from typing import AsyncGenerator, Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -44,6 +45,7 @@ logger = logging.getLogger(__name__)
 _engine: Optional[AsyncEngine] = None
 _session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 _bridge_session: Optional[AsyncSession] = None
+_bridge_conn: Optional[AsyncConnection] = None
 
 
 def _unique_prepared_stmt_name() -> str:
@@ -159,34 +161,53 @@ def get_bridge_session() -> AsyncSession:
 
     Every pg.py query is dispatched onto the dedicated bridge loop
     (app/db/runner.py), which executes one coroutine at a time, so a single
-    session is exclusively touched from that loop — it is both thread-safe and
-    event-loop-safe there. The connection is established lazily on the first
-    awaited operation (i.e. inside the bridge loop) and then kept hot across
-    calls, removing the ~1.5-3 s TCP/TLS handshake Supabase's pooler charges per
-    fresh connection. Each operation runs inside its own
-    ``session.begin()``/commit, so the connection never idles inside a
-    transaction across requests.
+    connection is exclusively touched from that loop — it is both thread-safe
+    and event-loop-safe there.
 
-    Note: unlike ``get_session_factory`` sessions this one is intentionally
-    NOT closed by callers; drop it with ``close_bridge_session()`` only when
-    the connection is known to be stale (pg.py performs that on retry).
+    The session is bound to ONE permanently checked-out ``AsyncConnection``
+    created (and warmed with ``SELECT 1``) on the bridge loop. Binding the
+    connection directly is what defeats the NullPool's dispose-on-release:
+    a normal ``session_scope()`` session returns its connection to the (Null)
+    pool at every commit, so each transaction would still open + close a fresh
+    TCP/TLS socket. With a bound connection the socket stays hot across calls,
+    removing the ~1.5-3 s Supabase pooler handshake that was once paid per
+    query. Each operation still runs inside its own ``begin()``/commit, so no
+    cross-request transaction is held open.
+
+    Note: this session is intentionally NOT closed by callers; drop it with
+    ``close_bridge_session()`` only when the connection is known to be stale
+    (pg.py performs that on retry).
     """
-    global _bridge_session
+    global _bridge_session, _bridge_conn
     if _bridge_session is None:
-        _bridge_session = get_session_factory()()
+        from app.db.runner import run
+
+        async def _open() -> AsyncSession:
+            conn = await get_engine().connect()
+            await conn.execute(text("SELECT 1"))
+            await conn.rollback()
+            _bridge_conn = conn
+            return AsyncSession(bind=conn, expire_on_commit=False, autoflush=False)
+
+        _bridge_session = run(_open())
     return _bridge_session
 
 
 async def close_bridge_session() -> None:
-    """Close the shared bridge session, clearing the module-level reference.
+    """Close the shared bridge session + its held connection.
 
-    Must be run on the bridge loop (the session's connection lives there).
+    Must be run on the bridge loop (the connection lives there). ``session``
+    and ``conn`` are only mutable from that loop because every access funnels
+    through ``runner.run``.
     """
-    global _bridge_session
-    session = _bridge_session
+    global _bridge_session, _bridge_conn
+    session, conn = _bridge_session, _bridge_conn
     _bridge_session = None
+    _bridge_conn = None
     if session is not None:
         await session.close()
+    if conn is not None:
+        await conn.close()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
