@@ -1,0 +1,160 @@
+<!-- ============================================================================
+FILE: step7-state-risk.html
+PATH: public/admin/setup/step7-state-risk.html
+PURPOSE: Step 7 of the Production Setup suite — write the ICAO top-risk
+         reference categories for the state-level SSP risk register, and purge
+         demo state-risk rows. Part of the modular menu under
+         /admin/production-setup.html.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 7: State Risk Register Reference — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-setup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/admin-setup-core.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Setup</a>
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title">Step 7 — State Risk Register Reference</span>
+        </div>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-shield-halved" style="color:var(--color-brand-600);"></i> Step 7 — State Risk Register Reference</h1>
+            <div class="sub">Write the ICAO top-risk reference categories that the state-level SSP risk register measures against. Global reference data &mdash; not tied to any specific tenant.</div>
+        </div>
+
+        <div class="admin-card">
+            <div class="card-head"><span class="step-badge">Step 7</span></div>
+            <h2>State Risk Register Reference</h2>
+            <p class="card-sub">Write the ICAO top-risk reference categories that the state-level SSP risk register measures against. Global reference data &mdash; not tied to any specific tenant.</p>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="seedStateRisk()"><i class="fas fa-shield-halved"></i> Seed State Risk Reference</button>
+                <button type="button" class="btn btn-danger" onclick="purgeStateRiskDemo()"><i class="fas fa-broom"></i> Purge Demo State Risk</button>
+            </div>
+            <div id="stateRiskArea" style="margin-top:14px;"><div class="empty-state">Not seeded yet.</div></div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL — captures SETUP_SECRET inline for destructive actions -->
+<div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:480px;width:90%;">
+        <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
+        <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div id="confirmSetupKeyWrap" style="display:none;margin-top:14px;">
+            <label for="confirmSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="confirmSetupKey" placeholder="Enter setup key to authorize this destructive action" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <small style="display:block;color:#94a3b8;font-size:.72rem;margin-top:4px;">Stored in this tab only (sessionStorage) — never sent except to verify this action.</small>
+            <div id="confirmSetupKeyError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeConfirm()">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+});
+
+// ============================================================================
+// STEP 7 — STATE RISK REFERENCE
+// ============================================================================
+
+async function seedStateRisk() {
+    openConfirm(
+        'Confirm State Risk Seed',
+        'Write the ICAO top-risk reference categories for the state-level SSP risk register. Global reference data — not tied to any specific tenant.',
+        { type: 'stateRisk', body: {} }
+    );
+}
+
+async function execStateRisk(body) {
+    var area = document.getElementById('stateRiskArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Seeding state risk reference...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk', body);
+        if (area) area.innerHTML = '<div class="status-box success"><strong>State risk reference seeded:</strong> ' +
+            (resp.categories || resp.result && resp.result.categories || 0) + ' ICAO categories.</div>';
+        toast('State risk reference seeded.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">State risk seeding failed: ' + esc(err.message) + '</div>';
+        toast('State risk seeding failed: ' + err.message, 'error');
+    }
+}
+
+// ============================================================================
+// STEP 7B — PURGE DEMO STATE RISK (granular, is_demo = true)
+// ============================================================================
+
+function purgeStateRiskDemo() {
+    openConfirm(
+        '⚠️ Purge Demo State Risk',
+        '<strong>Purge all State Risk demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>state_risk_register</code>). The Firestore ICAO reference taxonomy is global reference data and is preserved.<br><br>' +
+        '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE all State Risk demo data (is_demo = true).</span>',
+        { type: 'purgeStateRiskDemo', body: {} }
+    );
+}
+
+async function execPurgeStateRiskDemo(body) {
+    var area = document.getElementById('stateRiskArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Purging State Risk demo data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/state-risk/purge', body);
+        if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'State Risk purge request failed');
+        if (area) area.innerHTML = '<div class="status-box success"><strong>✅ State Risk demo data purged &mdash; ' + esc(resp.deleted_count) + ' Postgres rows removed.</strong></div>';
+        toast('State Risk demo data purged.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">❌ Purge Demo State Risk failed: ' + esc(err.message) + '</div>';
+        toast('Purge Demo State Risk failed: ' + err.message, 'error');
+    }
+}
+</script>
+
+</body>
+</html>

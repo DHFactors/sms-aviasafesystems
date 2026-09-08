@@ -1,0 +1,227 @@
+<!-- ============================================================================
+FILE: step2-tenants.html
+PATH: public/admin/setup/step2-tenants.html
+PURPOSE: Step 2 of the Production Setup suite — create operator tenants
+         individually (data-driven, regulator assigned here), or paste a CSV /
+         JSON list and use Bulk Import. For full onboarding (Auth user
+         provisioning with generated passwords) use the Detailed Wizard.
+         Part of the modular menu under /admin/production-setup.html.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 2: Add Operator Tenants — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-setup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/admin-setup-core.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Setup</a>
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title">Step 2 — Add Operator Tenants</span>
+        </div>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-building" style="color:var(--color-brand-600);"></i> Step 2 — Add Operator Tenants</h1>
+            <div class="sub">Create the operator tenants that the Step-1 regulator oversees. Assign the regulator, oversight level and contact details, or bulk-import from CSV / JSON.</div>
+        </div>
+
+        <div class="grid">
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 2</span></div>
+                <h2>Add Operator Tenants</h2>
+                <p class="card-sub">Create operator tenants individually (data-driven, regulator assigned here), or paste a CSV / JSON list and use Bulk Import. For full onboarding &mdash; Auth user provisioning with generated passwords &mdash; use the detailed wizard.</p>
+                <div class="btn-row" style="margin-bottom:14px;">
+                    <a href="/admin/tenant-credentials.html" class="btn btn-outline"><i class="fas fa-user-plus"></i> Detailed Onboarding Wizard</a>
+                </div>
+                <form onsubmit="createTenant(event)">
+                    <div class="form-row">
+                        <div class="form-group"><label>Tenant ID *</label><input type="text" id="tenantId" placeholder="sita-air" required pattern="[a-z0-9-]+"></div>
+                        <div class="form-group"><label>Organization Name *</label><input type="text" id="tenantName" placeholder="Sita Air" required></div>
+                        <div class="form-group"><label>ICAO</label><input type="text" id="tenantIcao" placeholder="STA" maxlength="3"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Country</label><input type="text" id="tenantCountry" placeholder="Nepal" value="Nepal"></div>
+                        <div class="form-group"><label>Regulator (State Regulator from Step 1) *</label><select id="tenantRegulator" required><option value="">— select regulator —</option></select></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Oversight Level *</label>
+                            <select id="tenantOversightLevel" required>
+                                <option value="full" selected>Full</option>
+                                <option value="limited">Limited</option>
+                                <option value="audit_only">Audit Only</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Oversight Effective Date</label><input type="date" id="tenantOversightDate"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tenantIsDemo" checked>
+                                Demo Tenant
+                            </label>
+                            <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
+                        </div>
+                    </div>
+                    <!-- Contact Person Section -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Person Name</label>
+                            <input type="text" id="tenantContactName" placeholder="e.g., Rajesh Thapa">
+                            <small style="color:#94a3b8;font-size:.72rem;">Safety Manager / Accountable Manager</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email</label>
+                            <input type="email" id="tenantContactEmail" placeholder="e.g., safety@airline.com">
+                            <small style="color:#94a3b8;font-size:.72rem;">Primary safety contact email</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Phone</label>
+                            <input type="tel" id="tenantContactPhone" placeholder="e.g., +977 9841 234567">
+                            <small style="color:#94a3b8;font-size:.72rem;">Primary safety contact phone</small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Contact Title</label>
+                            <input type="text" id="tenantContactTitle" placeholder="e.g., Safety Manager">
+                            <small style="color:#94a3b8;font-size:.72rem;">Job title of the contact person</small>
+                        </div>
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Add Tenant</button>
+                        <button type="button" class="btn btn-outline" onclick="bulkImport()"><i class="fas fa-file-import"></i> Bulk Import</button>
+                    </div>
+                </form>
+                <textarea id="bulkTextarea" placeholder="CSV (paste below), e.g.:
+tenant_id,name,icao,country,regulator_id
+nepal-airlines,Nepal Airlines,NAL,Nepal,caan
+shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14px;width:100%;min-height:110px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:.82rem;box-sizing:border-box;"></textarea>
+            </div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+    populateRegulatorDropdown();
+});
+
+// ============================================================================
+// STEP 2 — POPULATE REGULATOR DROPDOWN (from Step 1)
+// ============================================================================
+
+async function populateRegulatorDropdown() {
+    var sel = document.getElementById('tenantRegulator');
+    if (!sel) return;
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/regulators');
+        var regs = resp.regulators || [];
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">— select regulator —</option>' +
+            regs.map(function (r) {
+                return '<option value="' + esc(r.id) + '">' + esc(r.name || r.id) + ' (' + esc(r.id) + ')</option>';
+            }).join('');
+        if (prev && Array.from(sel.options).some(function (o) { return o.value === prev; })) sel.value = prev;
+    } catch (err) { /* dropdown is non-critical; leave current options */ }
+}
+
+// ============================================================================
+// STEP 2 — CREATE / BULK IMPORT TENANTS
+// ============================================================================
+
+async function createTenant(e) {
+    e.preventDefault();
+    var regulatorId = document.getElementById('tenantRegulator').value.trim();
+    if (!regulatorId) {
+        toast('Regulator is required. Please select a State Regulator from Step 1.', 'error');
+        return;
+    }
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        tenant: {
+            tenant_id: document.getElementById('tenantId').value.trim().toLowerCase(),
+            name: document.getElementById('tenantName').value.trim(),
+            icao: document.getElementById('tenantIcao').value.trim().toUpperCase(),
+            country: document.getElementById('tenantCountry').value.trim() || 'Nepal',
+            regulator_id: regulatorId,
+            is_demo: document.getElementById('tenantIsDemo').checked,
+            oversight_level: document.getElementById('tenantOversightLevel').value,
+            oversight_effective_date: document.getElementById('tenantOversightDate').value || null,
+            contact_name: document.getElementById('tenantContactName').value.trim(),
+            contact_email: document.getElementById('tenantContactEmail').value.trim(),
+            contact_phone: document.getElementById('tenantContactPhone').value.trim(),
+            contact_title: document.getElementById('tenantContactTitle').value.trim()
+        }
+    };
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/tenants', payload);
+        toast('Tenant "' + resp.tenant.tenant_id + '" created.', 'success');
+        e.target.reset();
+    } catch (err) { toast('Create failed: ' + err.message, 'error'); }
+}
+
+function bulkImport() {
+    var ta = document.getElementById('bulkTextarea');
+    if (ta.style.display === 'none') { ta.style.display = 'block'; return; }
+    var text = ta.value.trim();
+    if (!text) { toast('Paste CSV or JSON into the box first.', 'error'); return; }
+    var body = { setup_key: AdminUI.ensureSetupKey() };
+    if (text.charAt(0) === '[') {
+        try { body.records = JSON.parse(text); }
+        catch (err) { toast('Invalid JSON: ' + err.message, 'error'); return; }
+    } else { body.csv = text; }
+    AdminUI.apiPost('/api/v1/admin/tenants/bulk', body).then(function (resp) {
+        toast('Bulk import: ' + resp.ok + '/' + resp.total + ' created.', resp.ok === resp.total ? 'success' : 'warn');
+        var failed = (resp.results || []).filter(function (r) { return r.status !== 'ok'; });
+        if (failed.length) {
+            window.alert('Bulk import finished. ' + resp.ok + '/' + resp.total + ' created.\n\nFailures:\n' +
+                failed.map(function (r) { return (r.tenant_id || '?') + ' — ' + (r.detail || r.status); }).join('\n'));
+        }
+        ta.style.display = 'none'; ta.value = '';
+    }).catch(function (err) { toast('Bulk import failed: ' + err.message, 'error'); });
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!-- ============================================================================
+FILE: step5-dummy-data.html
+PATH: public/admin/setup/step5-dummy-data.html
+PURPOSE: Step 5 of the Production Setup suite — seed / unseed demo VSR, MOR,
+         CAN, CAP and Survey records per tenant, and export the seeded rows as
+         CSV. Part of the modular menu under /admin/production-setup.html.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 5: Dummy Data — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-setup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/admin-setup-core.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Setup</a>
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title">Step 5 — Dummy Data</span>
+        </div>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-seedling" style="color:var(--color-brand-600);"></i> Step 5 — Dummy Data</h1>
+            <div class="sub">Seed or unseed demo records (VSR / MOR / CAN / CAP / Survey) for all tenants or a single tenant, scoped per data type.</div>
+        </div>
+
+        <div class="admin-card">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Scope</label>
+                    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="all" checked onchange="demoScopeChanged()"> All tenants</label>
+                        <label style="font-size:.85rem;display:flex;align-items:center;gap:6px;"><input type="radio" name="demoScope" value="one" onchange="demoScopeChanged()"> Single tenant</label>
+                        <select id="demoTenantSelect" disabled style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;"><option value="">— select tenant —</option></select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data types &amp; quantities</label>
+                    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+                        <label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="vsr" checked onchange="demoKindChanged()"> VSR <input type="number" class="demo-count" data-kind="vsr" value="5" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>
+                        <label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="mor" checked onchange="demoKindChanged()"> MOR <input type="number" class="demo-count" data-kind="mor" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>
+                        <label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="can" checked onchange="demoKindChanged()"> CAN <input type="number" class="demo-count" data-kind="can" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>
+                        <label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="cap" checked onchange="demoKindChanged()"> CAP <input type="number" class="demo-count" data-kind="cap" value="3" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>
+                        <label class="demo-kind-wrap" style="display:flex;align-items:center;gap:6px;font-size:.85rem;"><input type="checkbox" class="demo-kind" value="survey" checked onchange="demoKindChanged()"> Survey <input type="number" class="demo-count" data-kind="survey" value="12" min="1" max="500" style="width:64px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;"></label>
+                    </div>
+                    <small>Enter how many of each record to create per tenant. Disabled types are skipped.</small>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-success" onclick="demoData('seed')"><i class="fas fa-seedling"></i> Seed Dummy Data</button>
+                <button class="btn btn-danger" onclick="demoData('unseed')"><i class="fas fa-broom"></i> Unseed Dummy Data</button>
+            </div>
+            <div style="border-top:1px dashed #e2e8f0;margin:16px 0 12px;padding-top:14px;">
+                <div style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-file-export"></i> Export Dummy Data</div>
+                <p class="card-sub" style="margin-bottom:10px;">Download the seeded demo rows (<code>is_demo = true</code>) as CSV, scoped to all tenants or a single tenant.</p>
+                <div class="form-row" style="margin-bottom:10px;">
+                    <div class="form-group">
+                        <label>Tenant (slug or uuid) — optional</label>
+                        <input type="text" id="exportDummyTenant" placeholder="e.g. fixedwing — blank = all tenants" style="padding:8px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.84rem;">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-outline" onclick="exportDummy('all')"><i class="fas fa-file-csv"></i> Export All</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('vsr')">VSR</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('mor')">MOR</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('can')">CAN</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('cap')">CAP</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="exportDummy('survey')">Survey</button>
+                </div>
+                <div id="exportDummyStatus"></div>
+            </div>
+            <div id="demoDataArea" style="margin-top:14px;"></div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL — captures SETUP_SECRET inline for destructive actions -->
+<div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:480px;width:90%;">
+        <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
+        <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div id="confirmSetupKeyWrap" style="display:none;margin-top:14px;">
+            <label for="confirmSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="confirmSetupKey" placeholder="Enter setup key to authorize this destructive action" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <small style="display:block;color:#94a3b8;font-size:.72rem;margin-top:4px;">Stored in this tab only (sessionStorage) — never sent except to verify this action.</small>
+            <div id="confirmSetupKeyError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeConfirm()">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+    loadDemoTenants();
+});
+
+// ============================================================================
+// STEP 5 — DUMMY DATA
+// ============================================================================
+
+async function loadDemoTenants() {
+    var sel = document.getElementById('demoTenantSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— select tenant —</option>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+        (resp.tenants || []).forEach(function (t) {
+            var opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = (t.name || t.id) + ' (' + t.id + ')';
+            sel.appendChild(opt);
+        });
+    } catch (err) { /* non-fatal */ }
+}
+
+function demoScopeChanged() {
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var sel = document.getElementById('demoTenantSelect');
+    if (sel) sel.disabled = scope !== 'one';
+}
+
+function demoKindChanged() {
+    document.querySelectorAll('.demo-kind').forEach(function (cb) {
+        var count = cb.closest('.demo-kind-wrap').querySelector('.demo-count');
+        if (count) count.disabled = !cb.checked;
+    });
+}
+
+function demoData(action) {
+    var kinds = Array.prototype.slice.call(document.querySelectorAll('.demo-kind:checked')).map(function (cb) { return cb.value; });
+    if (!kinds.length) { toast('Select at least one data type (VSR/MOR/CAN/CAP/Survey).', 'error'); return; }
+    var scope = document.querySelector('input[name=demoScope]:checked').value;
+    var body = { action: action, kinds: kinds };
+    if (scope === 'one') {
+        var tid = document.getElementById('demoTenantSelect').value;
+        if (!tid) { toast('Select a tenant.', 'error'); return; }
+        body.all = false; body.tenant_ids = [tid];
+    } else { body.all = true; }
+
+    var verb = action === 'seed' ? 'Seed' : 'Unseed';
+    var quantLabel = '';
+    if (action === 'seed') {
+        body.counts = {};
+        kinds.forEach(function (k) {
+            var input = document.querySelector('.demo-count[data-kind="' + k + '"]');
+            var val = input ? parseInt(input.value, 10) : NaN;
+            body.counts[k] = (isFinite(val) && val >= 1) ? Math.min(val, 500) : NaN;
+        });
+        quantLabel = ' — ' + kinds.map(function (k) {
+            var v = body.counts[k];
+            return k.toUpperCase() + ' x' + (isFinite(v) ? v : '?');
+        }).join(', ');
+    }
+
+    var warning = verb === 'Unseed'
+        ? '<br><br><span style="color:#b91c1c;font-weight:700;">⚠️ This will UNSEED dummy data (is_demo = true). Real data is untouched.</span>'
+        : '';
+    openConfirm(
+        'Confirm ' + verb,
+        '<strong>' + verb + ' dummy ' + kinds.map(function (k) { return k.toUpperCase(); }).join(' / ') + quantLabel + '</strong>' +
+        (scope === 'one' ? ' for tenant <code>' + esc(body.tenant_ids[0]) + '</code>' : ' for <strong>all tenants</strong>') +
+        ' per tenant.' + warning,
+        { type: 'demo', body: body }
+    );
+}
+
+async function execDemo(body) {
+    var area = document.getElementById('demoDataArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' +
+        (body.action === 'seed' ? 'Seeding' : 'Unseeding') + ' dummy data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/demo-data', body);
+        var rows = (resp.results || []).map(function (r) {
+            var payload = r.seeded || r.removed || {};
+            var detail = Object.keys(payload).map(function (k) { return k.toUpperCase() + '=' + payload[k]; }).join(', ');
+            return '<tr><td><code>' + esc(r.tenant_id) + '</code></td>' +
+                '<td>' + (r.error ? '<span class="badge badge-danger">' + esc(r.error) + '</span>' : esc(detail || 'ok')) + '</td></tr>';
+        }).join('');
+        if (area) {
+            area.innerHTML = '<div class="status-box success"><strong>' +
+                (body.action === 'seed' ? 'Seed complete' : 'Unseed complete') + '</strong> — ' + rows.length + ' tenant(s) processed.</div>' +
+                (rows ? '<div style="overflow-x:auto;"><table class="admin-table"><thead><tr><th>Tenant</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '');
+        }
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">' + esc(err.message) + '</div>';
+        toast((body.action === 'seed' ? 'Seed' : 'Unseed') + ' failed: ' + err.message, 'error');
+    }
+}
+
+function exportDummy(type) {
+    var input = document.getElementById('exportDummyTenant');
+    var tenant = input ? input.value.trim() : '';
+    var qs = tenant ? ('?tenant_id=' + encodeURIComponent(tenant)) : '';
+    exportCsv('/api/v1/admin/export/dummy-data?type=' + encodeURIComponent(type) + qs, 'exportDummyStatus');
+}
+</script>
+
+</body>
+</html>

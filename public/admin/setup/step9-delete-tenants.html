@@ -1,0 +1,167 @@
+<!-- ============================================================================
+FILE: step9-delete-tenants.html
+PATH: public/admin/setup/step9-delete-tenants.html
+PURPOSE: Step 9 of the Production Setup suite — delete demo tenants from
+         Postgres (all attached data) with Firestore cleanup, scoped per
+         selection with a Count-first preview. Part of the modular menu under
+         /admin/production-setup.html.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 9: Delete Tenants — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-setup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/admin-setup-core.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Setup</a>
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title">Step 9 — Delete Tenants</span>
+        </div>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-eraser" style="color:var(--color-brand-600);"></i> Step 9 — Delete Tenants</h1>
+            <div class="sub">Delete demo tenants from Postgres (all attached data) with Firestore cleanup — scoped per selection. Count first, then delete.</div>
+        </div>
+
+        <div class="admin-card">
+            <div class="card-head"><span class="step-badge">Step 9</span></div>
+            <h2>Delete Demo Tenants</h2>
+            <p class="card-sub">Scoped per selection — <strong>Count First</strong> shows row totals per table before deleting, <strong>Then Delete</strong>.</p>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;min-width:240px;">
+                    <label for="delTenantId">Tenant (slug or uuid)</label>
+                    <input type="text" id="delTenantId" placeholder="e.g. fixedwing" style="width:100%;padding:8px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;">
+                    <small class="sub-note">Deleting a <code>fixedwing</code>-style tenant also removes its generated demo records.</small>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-outline" onclick="deleteDemoTenants('count')"><i class="fas fa-calculator"></i> Count First</button>
+                <button class="btn btn-danger" onclick="deleteDemoTenants('delete')"><i class="fas fa-trash"></i> Then Delete</button>
+            </div>
+            <div id="deleteArea" style="margin-top:14px;"><div class="empty-state">Nothing to show yet.</div></div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<!-- CONFIRM MODAL — captures SETUP_SECRET inline for destructive actions -->
+<div id="confirmModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:999;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:26px;border-radius:10px;max-width:480px;width:90%;">
+        <h3 style="margin:0 0 10px;color:#c5221f;"><i class="fas fa-triangle-exclamation"></i> <span id="confirmTitle">Confirm</span></h3>
+        <p id="confirmText" style="font-size:.9rem;color:#334155;line-height:1.5;"></p>
+        <div id="confirmSetupKeyWrap" style="display:none;margin-top:14px;">
+            <label for="confirmSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+            <input type="password" id="confirmSetupKey" placeholder="Enter setup key to authorize this destructive action" autocomplete="off"
+                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            <small style="display:block;color:#94a3b8;font-size:.72rem;margin-top:4px;">Stored in this tab only (sessionStorage) — never sent except to verify this action.</small>
+            <div id="confirmSetupKeyError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end;">
+            <button class="btn" onclick="closeConfirm()">Cancel</button>
+            <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+});
+
+// ============================================================================
+// STEP 9 — DELETE DEMO TENANTS
+// ============================================================================
+
+function deleteDemoTenants(mode) {
+    var input = document.getElementById('delTenantId');
+    var tid = input ? input.value.trim() : '';
+    if (!tid) { toast('Enter a tenant slug or uuid.', 'error'); return; }
+    if (mode === 'count') {
+        countTenantRows(tid);
+    } else {
+        openConfirm(
+            '⚠️ Delete Tenant',
+            '<strong>Delete demo tenant <code>' + esc(tid) + '</code></strong> from Postgres <em>(all attached data)</em> and clean up its Firestore collections.<br><br>' +
+            '<span style="color:#b91c1c;font-weight:700;">⚠️ This removes the tenant and all of its data permanently.</span> Run Count First to review row totals before deleting.',
+            { type: 'deleteDemoTenants', body: { tenant_id: tid } }
+        );
+    }
+}
+
+async function countTenantRows(tid) {
+    var area = document.getElementById('deleteArea');
+    if (!area) return;
+    area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Counting rows for <code>' + esc(tid) + '</code>...</div>';
+    try {
+        var resp = await AdminUI.apiGet('/api/v1/admin/delete-demo-tenants/count?tenant_id=' + encodeURIComponent(tid));
+        var counts = (resp && resp.counts) || {};
+        var html = '<div class="status-box success"><strong>Row counts for ' + esc(tid) + ' — total ' + esc(resp.total || 0) + ' rows.</strong></div>';
+        var keys = Object.keys(counts);
+        if (keys.length) {
+            html += '<div style="overflow-x:auto;margin-top:10px;"><table class="admin-table"><thead><tr><th style="text-align:left;">Table</th><th>Rows</th></tr></thead><tbody>';
+            keys.forEach(function (k) { html += '<tr><td><code>' + esc(k) + '</code></td><td>' + esc(counts[k]) + '</td></tr>'; });
+            html += '</tbody></table></div>';
+        } else { html += '<div class="empty-state">No rows found for this tenant.</div>'; }
+        area.innerHTML = html;
+    } catch (err) { area.innerHTML = '<div class="status-box error">Count failed: ' + esc(err.message) + '</div>'; }
+}
+
+async function execDeleteDemoTenants(body) {
+    var area = document.getElementById('deleteArea');
+    if (area) area.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Deleting tenant <code>' + esc(body.tenant_id) + '</code> and its data...</div>';
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/delete-demo-tenants', body);
+        if (area) {
+            area.innerHTML = '<div class="status-box success"><strong>✅ Delete complete</strong> — tenant <code>' + esc(body.tenant_id) + '</code>: ' +
+                esc(resp.deleted || resp.detail || 'removed') + '</div>';
+        }
+        toast('Demo tenant deleted.', 'success');
+        loadAuditLog();
+    } catch (err) {
+        if (area) area.innerHTML = '<div class="status-box error">❌ Delete failed: ' + esc(err.message) + '</div>';
+        toast('Delete failed: ' + err.message, 'error');
+    }
+}
+</script>
+
+</body>
+</html>

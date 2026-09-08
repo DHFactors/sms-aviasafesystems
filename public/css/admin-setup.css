@@ -1,0 +1,151 @@
+/* ============================================================================
+FILE: public/css/admin-setup.css
+PATH: public/css/admin-setup.css
+PURPOSE: Shared styles for the modular Production Setup suite — the hub
+         (public/admin/production-setup.html) and every step page under
+         public/admin/setup/. Loaded alongside /css/admin.css.
+AUTHOR: AviaSAFE Systems
+============================================================================ */
+
+body { font-family: var(--font-family); background: var(--color-bg, #f1f5f9); color: var(--color-text, #1e293b); }
+
+/* ---------- Shell ---------- */
+.admin-shell { min-height: 100vh; display: flex; flex-direction: column; }
+.topbar {
+    background: linear-gradient(135deg, var(--color-deep-teal-950, #051a26), var(--color-deep-teal-900, #0b3a4d));
+    color: #fff; padding: 14px 26px; display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18); position: sticky; top: 0; z-index: 20;
+}
+.tb-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tb-brand { font-weight: 800; font-size: 1rem; display: flex; align-items: center; gap: 8px; }
+.tb-brand i { color: #4fc3f7; }
+.page-title { font-weight: 600; font-size: .9rem; color: #bcd6e3; }
+.tb-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tb-actions a.nav-link {
+    color: #cbd5e1; text-decoration: none; font-size: .82rem; padding: 6px 12px;
+    border-radius: 8px; transition: background .15s, color .15s;
+}
+.tb-actions a.nav-link:hover { background: rgba(255,255,255,.1); color: #fff; }
+.back-link {
+    color: #bcd6e3; text-decoration: none; font-size: .82rem; padding: 6px 12px; border-radius: 8px;
+    background: rgba(255,255,255,.08); transition: background .15s, color .15s; white-space: nowrap;
+}
+.back-link:hover { background: rgba(255,255,255,.16); color: #fff; }
+.user-badge { background: rgba(255,255,255,.14); color: #fff; padding: .3rem 1rem; border-radius: 999px; font-size: .82rem; }
+.user-badge .role-chip { background: #4fc3f7; color: #072535; padding: .02rem .5rem; border-radius: 999px; margin-right: .4rem; font-weight: 700; }
+
+.content-area { padding: 26px; flex: 1; max-width: 1080px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+
+.page-head h1 { margin: 0 0 4px; font-size: 1.5rem; color: var(--color-text-strong, #0f172a); }
+.page-head .sub { color: var(--color-text-muted, #64748b); font-size: .9rem; }
+
+/* ---------- Step progress ---------- */
+.step-progress { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 22px; }
+.step-progress .sp-chip {
+    display: inline-flex; align-items: center; gap: 7px; font-size: .76rem; font-weight: 600;
+    padding: 6px 12px; border-radius: 999px; background: #fff; color: #475569;
+    border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+.step-progress .sp-chip .sp-num {
+    width: 20px; height: 20px; border-radius: 50%; background: var(--color-brand-600, #0ea5e9);
+    color: #fff; display: inline-flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 700;
+}
+.step-progress .sp-chip.done { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
+.step-progress .sp-chip.done .sp-num { background: #10b981; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px; }
+
+/* ---------- Menu hub ---------- */
+.step-menu-grid { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+.category-section { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; }
+.category-title { margin: 0 0 12px; font-size: .95rem; color: #0f172a; display: flex; align-items: center; gap: 8px; }
+.category-title i { color: #0ea5e9; }
+.step-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.step-card {
+    display: flex; flex-direction: column; gap: 4px; text-decoration: none;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;
+    transition: transform .12s, box-shadow .12s, border-color .12s; color: inherit;
+}
+.step-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(15,23,42,.1); border-color: var(--color-brand-600, #0ea5e9); }
+.step-card .step-number {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--color-brand-600, #0ea5e9); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 800;
+}
+.step-card .step-label { font-weight: 700; font-size: .9rem; color: #0f172a; }
+.step-card .step-desc { font-size: .78rem; color: #64748b; line-height: 1.45; }
+
+.quick-status { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 22px; }
+.quick-status .status-item { background: #fff; border: 1px solid #eef2f6; border-radius: 12px; padding: 14px 20px; flex: 1; min-width: 160px; box-shadow: 0 1px 4px rgba(15,23,42,.08); }
+.quick-status .status-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; }
+.quick-status .status-value { font-size: 1.4rem; font-weight: 800; color: #0f172a; margin-top: 2px; }
+
+.admin-card {
+    background: #fff; border-radius: 14px; padding: 22px;
+    box-shadow: 0 1px 4px rgba(15,23,42,.08); border: 1px solid #eef2f6; margin-bottom: 20px;
+}
+.admin-card .card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.admin-card h2 { margin: 0; font-size: 1.05rem; color: var(--color-text-strong, #0f172a); display: flex; align-items: center; gap: 10px; }
+.admin-card .card-sub { color: var(--color-text-muted, #64748b); font-size: .84rem; margin: 0 0 14px; line-height: 1.5; }
+.step-badge {
+    background: var(--color-brand-100, #e0f2fe); color: var(--color-brand-700, #0369a1);
+    font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+    padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+}
+
+.form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.form-group { flex: 1; min-width: 150px; }
+.form-group label { display: block; font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--color-border, #cbd5e1);
+    border-radius: 8px; font-size: .86rem; box-sizing: border-box; background: #fff;
+}
+.form-group small { display: block; color: #94a3b8; font-size: .72rem; margin-top: 3px; }
+
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.empty-state { padding: 22px; text-align: center; color: #94a3b8; font-size: .85rem; background: #f8fafc; border-radius: 8px; }
+.loading { padding: 18px; text-align: center; color: #64748b; font-size: .85rem; }
+.status-box { padding: 12px 14px; border-radius: 8px; font-size: .85rem; margin-top: 12px; }
+.status-box.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.status-box.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+.status-box.warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.status-box.info { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+
+.section-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; margin: 26px 0 10px; }
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.admin-table th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; }
+.admin-table td { padding: 9px 10px; border-bottom: 1px solid #eef2f6; vertical-align: middle; }
+.admin-table tr:hover td { background: #f8fafc; }
+
+.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-danger { background: #fee2e2; color: #b91c1c; }
+.badge-info { background: #e0f2fe; color: #075985; }
+.badge-demo { background: #f3e8ff; color: #6b21a8; }
+.badge-trial { background: #fff7ed; color: #c2410c; }
+.badge-active { background: #dcfce7; color: #166534; }
+.badge-inactive { background: #f1f5f9; color: #475569; }
+.badge-paid { background: #dcfce7; color: #166534; }
+.badge-unpaid { background: #fee2e2; color: #b91c1c; }
+.badge-notapp { background: #f1f5f9; color: #64748b; }
+
+.side-foot { text-align: center; color: #94a3b8; font-size: .8rem; padding: 20px 0 26px; }
+.side-foot i { color: #e2574c; }
+
+.toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #cbd5e1; border-radius: 22px; transition: .3s; }
+.toggle-switch .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: .3s; }
+.toggle-switch input:checked + .slider { background: #0ea5e9; }
+.toggle-switch input:checked + .slider:before { transform: translateX(18px); }
+.status-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.dot-demo { background: #7c3aed; } .dot-trial { background: #f59e0b; } .dot-active { background: #22c55e; } .dot-suspended { background: #ef4444; } .dot-retired { background: #6b7280; } .dot-cancelled { background: #d1d5db; } .dot-inactive { background: #94a3b8; }
+.status-select { padding: 6px 10px; border-radius: 8px; border: 1px solid #cbd5e1; background: #fff; font-size: .82rem; font-weight: 600; color: #1e293b; cursor: pointer; }
+.dirty-row { border-left: 3px solid #f59e0b !important; background: #fffbeb !important; }
+.saved-row { border-left: 3px solid #10b981 !important; }
+.error-row { border-left: 3px solid #ef4444 !important; }
+
+@media (max-width: 720px) { .content-area { padding: 16px; } }

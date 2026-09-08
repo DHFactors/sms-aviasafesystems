@@ -280,8 +280,8 @@ var FULL_ROLES = ['SUPER_ADMIN', 'CAAN_SMD', 'CAAN_ADMIN', 'CAAN_AUDITOR'];
 var NAV_ITEMS = [
     { label: 'Production Setup', path: '/admin/production-setup.html' },
     { label: 'PSOE Audit', path: '/admin/psoe-audit.html' },
-    { label: 'Audit Log', path: '/admin/audit-log.html' },
-    { label: 'User Management', path: '/admin/user-management.html' },
+    { label: 'Audit Log', path: '/admin/setup/step4-audit-log.html' },
+    { label: 'Manage Users', path: '/admin/setup/step3-manage.html' },
 ];
 
 function esc(v) { return AdminUI.esc(v); }
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('topNav').innerHTML =
         NAV_ITEMS.map(function (n) {
             return '<a class="nav-link' + (n.path === '/admin/psoe-audit.html' ? ' active' : '') + '" href="' + n.path + '">' +
-                '<i class="fas ' + (n.label === 'Production Setup' ? 'fa-cogs' : n.label === 'Audit Log' ? 'fa-clipboard-list' : n.label === 'User Management' ? 'fa-users-gear' : 'fa-clipboard-check') + '"></i> ' + n.label + '</a>';
+                '<i class="fas ' + (n.label === 'Production Setup' ? 'fa-cogs' : n.label === 'Audit Log' ? 'fa-clipboard-list' : n.label === 'Manage Users' ? 'fa-users-gear' : 'fa-clipboard-check') + '"></i> ' + n.label + '</a>';
         }).join('') +
         '<span class="user-badge"><span class="role-chip">' + esc(user.role) + '</span><span>' + esc(user.email) + '</span></span>' +
         '<button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>';

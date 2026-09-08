@@ -1,0 +1,174 @@
+<!-- ============================================================================
+FILE: step1-regulator.html
+PATH: public/admin/setup/step1-regulator.html
+PURPOSE: Step 1 of the Production Setup suite — create the state civil-aviation
+         authority (e.g. CAAN for Nepal, DGCA for India) that oversees the
+         operator tenants. Part of the modular menu under /admin/production-setup.html.
+         SUPER_ADMIN only; mutations require the admin setup key.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Step 1: Create State Regulator — AviaSAFE Admin</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin-setup.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="/js/firebase.js?v=4.0.1"></script>
+    <script src="/js/api/client.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/admin-setup-core.js"></script>
+</head>
+<body class="admin-body">
+
+<div class="admin-shell">
+    <div class="topbar">
+        <div class="tb-left">
+            <a href="/admin/production-setup.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Setup</a>
+            <span class="tb-brand"><i class="fas fa-plane"></i> AviaSAFE Admin</span>
+            <span class="page-title">Step 1 — Create State Regulator</span>
+        </div>
+        <div class="tb-actions" id="topNav">
+            <a href="/admin/production-setup.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-cogs" style="color:#4fc3f7;"></i> Production Setup</a>
+            <a href="/admin/psoe-audit.html" class="nav-link" style="color:#cbd5e1; text-decoration:none; font-size:.82rem; padding:6px 12px; border-radius:8px;"><i class="fas fa-clipboard-check"></i> PSOE Audit</a>
+            <span class="user-badge"><span class="role-chip">SUPER_ADMIN</span><span id="userDisplay">—</span></span>
+            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="content-area">
+        <div class="page-head">
+            <h1><i class="fas fa-landmark" style="color:var(--color-brand-600);"></i> Step 1 — Create State Regulator</h1>
+            <div class="sub">The state civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</div>
+        </div>
+
+        <div class="grid">
+            <div class="admin-card">
+                <div class="card-head"><span class="step-badge">Step 1</span></div>
+                <h2>Create State Regulator</h2>
+                <p class="card-sub">The state civil-aviation authority (e.g. CAAN for Nepal, DGCA for India) that oversees the operator tenants.</p>
+                <form onsubmit="createRegulator(event)">
+                    <div class="form-row">
+                        <div class="form-group"><label>Regulator ID *</label><input type="text" id="regId" placeholder="caan" required pattern="[a-z0-9-]+"><small>Lowercase letters, numbers, hyphens</small></div>
+                        <div class="form-group"><label>Full Name *</label><input type="text" id="regName" placeholder="Civil Aviation Authority of Nepal" required></div>
+                        <div class="form-group"><label>Short Name</label><input type="text" id="regShort" placeholder="CAAN"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Country Code</label><input type="text" id="regCountry" placeholder="NP" maxlength="2"></div>
+                        <div class="form-group"><label>Country Name</label><input type="text" id="regCountryName" placeholder="Nepal"></div>
+                        <div class="form-group"><label>Domain</label><input type="text" id="regDomain" placeholder="ssp.caanepal.gov.np"></div>
+                    </div>
+                    <div class="form-group"><label>Operator Tenant IDs (comma-separated)</label><input type="text" id="regOperators" placeholder="sita-air, yeti-airlines, buddha-air"></div>
+
+                    <!-- SaaS Customer Checkbox -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="regIsSaaSCustomer">
+                                SaaS Customer <i class="fas fa-crown" style="color:#f59e0b;"></i>
+                            </label>
+                            <small style="color:#94a3b8;">
+                                Checked = Regulator purchases SaaS (Module 3 unlocked).<br>
+                                Unchecked = Reference data only (for marketing/audit purposes).
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Subscription Dates -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Subscription Start</label>
+                            <input type="date" id="regSubscriptionStart">
+                        </div>
+                        <div class="form-group">
+                            <label>Subscription End</label>
+                            <input type="date" id="regSubscriptionEnd">
+                        </div>
+                    </div>
+
+                    <!-- Demo Regulator Checkbox -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="regIsDemo" checked>
+                                Demo Regulator
+                            </label>
+                            <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
+                        </div>
+                    </div>
+                    <div class="btn-row" style="margin-top:12px;">
+                        <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="side-foot">Made with <i class="fas fa-heart"></i> from Nepal</div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// AUTH — SUPER_ADMIN only
+// ============================================================================
+document.addEventListener('DOMContentLoaded', async function () {
+    await waitForFirebase();
+    var user = await getCurrentUser();
+    if (!user) { window.location.href = '/admin/login.html'; return; }
+    if (user.role !== 'SUPER_ADMIN') { renderAccessDenied(); return; }
+
+    currentUser = user;
+    document.getElementById('userDisplay').textContent = user.email;
+});
+
+// ============================================================================
+// STEP 1 — CREATE REGULATOR
+// ============================================================================
+
+async function createRegulator(e) {
+    e.preventDefault();
+
+    var regId = document.getElementById('regId').value.trim().toLowerCase();
+    var isDemo = document.getElementById('regIsDemo').checked;
+    var isSaaSCustomer = document.getElementById('regIsSaaSCustomer').checked;
+
+    var payload = {
+        setup_key: AdminUI.ensureSetupKey(),
+        regulator: {
+            id: regId,
+            name: document.getElementById('regName').value.trim(),
+            short_name: document.getElementById('regShort').value.trim(),
+            country: document.getElementById('regCountry').value.trim().toUpperCase(),
+            country_name: document.getElementById('regCountryName').value.trim(),
+            domain: document.getElementById('regDomain').value.trim(),
+            operator_tenant_ids: document.getElementById('regOperators').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean),
+            is_demo: isDemo,
+            is_saas_customer: isSaaSCustomer,
+            subscription_start: document.getElementById('regSubscriptionStart').value || null,
+            subscription_end: document.getElementById('regSubscriptionEnd').value || null
+        }
+    };
+
+    try {
+        var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
+        var reg = resp.regulator || resp.data?.regulator || {};
+        toast('Regulator "' + (reg.slug || reg.id || regId) + '" created. SaaS: ' + (isSaaSCustomer ? '✅' : '❌'), 'success');
+        e.target.reset();
+    } catch (err) {
+        toast('Create failed: ' + err.message, 'error');
+    }
+}
+</script>
+
+</body>
+</html>
