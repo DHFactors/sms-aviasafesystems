@@ -251,3 +251,131 @@ have their tenant-led composities (`db_models.py` index audit).
 - Production: after deploy, apply the DDL in 4.2.1 then re-run the slowest
   actions and diff the `[PERF]` lines (expect `queries=` / `db=` and
   per-endpoint `total=` to drop; `slow_sql` lines should disappear).
+
+---
+
+## 6. Post-optimization benchmark (live, Sep 2026)
+
+Measured with the automated harness (auth as the operator, warm-up + 5 samples
+per endpoint against the production Render service + real Supabase pooler).
+`db` = cumulative Postgres time (`X-Perf-Db-Ms`), `cpu` = residual
+server-side time (total − db; includes Firestore I/O on master-register).
+
+| Endpoint | Baseline | Final | Reduction | db | cpu |
+|---|--:|--:|--:|--:|--:|
+| master-register | 9978 ms | 3527 ms | 65% | 1757 | 1770* |
+| airline sms-maturity | 7978 ms | 884 ms | 89% | 878 | 6 |
+| trends (180d) | 5975 ms | 886 ms | 85% | 880 | 6 |
+| risk-trends (730d) | 4050 ms | 886 ms | 78% | 880 | 6 |
+| overview (90d) | 4025 ms | 885 ms | 78% | 881 | 4 |
+| overview (365d) | 4021 ms | 885 ms | 78% | 880 | 5 |
+| tenant config | 4017 ms | 883 ms | 78% | 878 | 5 |
+| hazards list | 4015 ms | 883 ms | 78% | — | — |
+| recent (90d) | 4008 ms | 885 ms | 78% | 880 | 5 |
+| reporting quarterly | 4004 ms | 884 ms | 78% | 879 | 5 |
+| recent (365d) | 4003 ms | 887 ms | 78% | 880 | 7 |
+| reporting annual | 3998 ms | 883 ms | 78% | 879 | 4 |
+| hazards (90d) | 3986 ms | 886 ms | 78% | 880 | 6 |
+| actions (90d) | 3986 ms | 886 ms | 78% | 880 | 6 |
+| reports list | 3986 ms | 883 ms | 78% | — | — |
+| risk (90d) | 3951 ms | 886 ms | 78% | 880 | 5 |
+| **Median** | **4015 ms** | **886 ms** | **78%** | 880 | 5–8 |
+
+\* master-register’s `cpu` column is Firestore document I/O (it reads
+hazards/CAN/CAP from Firestore by design), not server CPU.
+
+Progression per deployed change (median): baseline 4015 ms →
+**1758 ms** (+persistent bridge connection, `0a3fcdc`) →
+**888 ms** (+tenant status auth cache, `f4ee77d`) →
+**887 ms** (+bridge-loop `session_scope` reuse, `5e26c29`) →
+**886 ms** (+stable-read TTL cache for tenants/slug registry/diversions,
+`8f03c0c`).
+
+## 7. Architecture of the changes
+
+1. **One persistent Postgres connection** (`app/db/session.py`). The engine
+   keeps NullPool (caps Supabase free-tier connections), but the sync `pg.py`
+   helpers now operate on a single `AsyncSession` bound to one permanently
+   checked-out `AsyncConnection` created and warmed on the bridge loop
+   (`get_bridge_session` / async `ensure_bridge_session`, dropped via
+   `close_bridge_session`). Binding the session to the connection - rather
+   than the pool - defeats NullPool’s dispose-on-release, so the TCP/TLS
+   handshake to the pooler (~1.5-2.5 s observed) is paid once per process
+   instead of per query. Operations still use their own `begin()`/commit; no
+   cross-request transaction is held. `session_scope()` (used by async
+   services like hazard/survey lists running on the bridge loop) now reuses
+   the same bound connection instead of opening a fresh NullPool connection
+   per request; off-loop routes get a per-call session as before.
+2. **Tenant status auth cache** (`app/middleware/tenant_status_cache.py`).
+   The per-request `Tenant.status` read in `auth.py::_tenant_is_suspended`
+   (the single most common query in profiling, 129 slow traces) is now one
+   lookup per slug per 45 s TTL. Fail-open (errors/not-found never block
+   login), invalidated on `_set_tenant`.
+3. **Stable-read TTL cache** (`app/services/pg_cache.py`). Dashboard reads of
+   tenant rows, the tenant slug registry and flight-diversion rows are
+   effectively static; they built extra ~880 ms queries on `sms-maturity`
+   (two tenant lookups), `trends` (diversions) and every CAAN-driven survey
+   aggregation (slug registry). Cached per process with a 45 s TTL; missing /
+   expired values fall through to the DB; `tenant_row:*` is invalidated on
+   `_set_tenant`. Surveys themselves are NOT cached - submission visibility
+   stays immediate.
+4. **HEAD support on `/live`, `/health`, `/ready`** (`app/main.py`):
+   `@app.api_route(methods=["GET","HEAD"])` so uptime monitors that probe HEAD
+   get 200 instead of 405.
+
+## 8. Risk assessment
+
+- **Single bridge connection = serialized DB I/O.** The bridge loop executes
+  one query at a time; under concurrent page views requests share the
+  connection, so heavy queries queue behind each other (head-of-line
+  blocking). Fine for the current single-instance operator dashboard; noted
+  as the ceiling if concurrency grows.
+- **Connection drop handling.** If the pooled connection goes stale (Supabase
+  restart/idle timeout) `pg.py` reconnects once on
+  `OperationalError`/disconnect-name errors (`_run_on_bridge`), then surfaces
+  the error. Behavior is identical to pre-change fail-fast, just against one
+  connection.
+- **Cache freshness.** Bounded 45 s staleness on tenant status / tenant rows /
+  slug registry / diversions; both caches fail open and are invalidated on
+  tenant writes. Surveys and all mutable business data are never cached.
+- **Surface unchanged.** No DDL, no schema, no Firestore writes, no auth
+  contract changes. `/live` gained a HEAD response (GET unchanged).
+- **Regression evidence.** Full backend suite: 671 passed, 38 failed, 56
+  errors - byte-identical to the pre-change baseline at `5e26c29`
+  (all pre-existing environment gaps: missing `caan_reports`, CORS preflight
+  test, offline Firestore-rules/emulator suites).
+
+## 9. Rollback plan
+
+All five performance commits are self-contained and independently reversible;
+because the later ones assume the earlier connection model, revert in reverse
+order (newest first):
+
+```
+git revert 8f03c0c   # stable-read TTL cache (adds pg_cache.py)
+git revert 5e26c29   # bridge-loop session_scope reuse
+git revert f4ee77d   # tenant status auth cache
+git revert 0a3fcdc   # persistent bridge connection
+git revert a3c6bde   # instrumentation + /live HEAD  → opt. keep
+```
+
+Push `main`; Render auto-deploys (~90-165 s). The app is fully functional on
+every step along the way; partial revert (e.g. keep `0a3fcdc`, drop the
+caches) is safe since each commit passes the suite on its own. Full revert to
+the 4 s baseline is achieved at `a3c6bde`.
+
+## 10. Render tier recommendation
+
+**No infrastructure upgrade is justified by post-optimization metrics.**
+
+- The dominant remaining cost is network RTT to the Supabase pooler
+  (~880 ms/query: BEGIN+PREPARE+EXECUTE+COMMIT over ~220 ms RTT) - an I/O
+  bound, not CPU-bound, profile. Median endpoint now completes at 886 ms and
+  the biggest consumer (master-register) is Firestore document I/O.
+- Measured server CPU is single-digit milliseconds on every dashboard
+  endpoint (see `cpu` column), and the app now holds exactly one Postgres
+  connection - none of these drive Render’s CPU/RAM tiers.
+- The only issue a paid tier actually fixes is free-tier **spin-down after
+  50 s idle**: if uptime-monitor or end-user cold starts matter, move to the
+  $7 Starter (persistent web service) - NOT for CPU/latency. The $25 instance
+  type is not justified: it would not move any number in the table above.
