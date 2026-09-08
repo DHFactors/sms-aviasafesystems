@@ -413,6 +413,38 @@ class TenantSetupRequest(BaseModel):
     tenant: TenantCreate
 
 
+class TenantUpdate(BaseModel):
+    setup_key: str
+    name: Optional[str] = None
+    country: Optional[str] = None
+    icao: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    contact_title: Optional[str] = None
+    regulator_id: Optional[str] = None
+
+
+class RegulatorUpdate(BaseModel):
+    setup_key: str
+    name: Optional[str] = None
+    short_name: Optional[str] = None
+    country: Optional[str] = None
+    country_name: Optional[str] = None
+    domain: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class UserUpdate(BaseModel):
+    setup_key: str
+    uid: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    tenant_id: Optional[str] = None
+    department: Optional[str] = None
+    display_name: Optional[str] = None
+
+
 @router.post("/regulators", status_code=status.HTTP_200_OK)
 async def admin_create_regulator(
     req: RegulatorSetupRequest,
@@ -524,6 +556,151 @@ async def admin_list_tenants(
     from app.services.production_seed import list_tenants_admin_pg
     return {"success": True, "tenants": await list_tenants_admin_pg()}
 
+
+@router.patch("/tenants/{tenant_id}", status_code=status.HTTP_200_OK)
+async def admin_update_tenant(
+    request: Request,
+    tenant_id: str,
+    req: TenantUpdate,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Update editable operator-tenant metadata (SUPER_ADMIN + setup key).
+
+    Persists to Postgres and refreshes the Firestore mirror so tenant-scoped
+    pages pick up the new name/contact immediately.
+    """
+    _verify_admin_setup(req.setup_key)
+    from app.services.production_seed import sync_tenant_to_firestore
+
+    fields = {k: v for k, v in req.model_dump().items() if k != "setup_key" and v is not None}
+    if not fields:
+        raise HTTPException(status_code=422, detail="No updatable fields provided")
+    merged = pg.update(Tenant, "slug", tenant_id, fields)
+    if merged is None:
+        raise HTTPException(status_code=404, detail=f"Unknown tenant: {tenant_id}")
+    sync_tenant_to_firestore(tenant_id, merged)
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="TENANT_UPDATED",
+        user=user.get("email") or user.get("uid"),
+        tenant_id=tenant_id,
+        target_type="tenant",
+        target_id=tenant_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"fields": list(fields.keys()), "by_uid": user.get("uid")},
+    )
+    logger.info(f"Tenant {tenant_id} metadata updated by {user.get('uid')}")
+    return {"success": True, "tenant": merged}
+
+
+@router.patch("/regulators/{regulator_id}", status_code=status.HTTP_200_OK)
+async def admin_update_regulator(
+    request: Request,
+    regulator_id: str,
+    req: RegulatorUpdate,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Update editable State Regulator metadata (SUPER_ADMIN + setup key)."""
+    _verify_admin_setup(req.setup_key)
+
+    fields = {k: v for k, v in req.model_dump().items() if k != "setup_key" and v is not None}
+    if not fields:
+        raise HTTPException(status_code=422, detail="No updatable fields provided")
+    merged = pg.update(Regulator, "slug", regulator_id, fields)
+    if merged is None:
+        raise HTTPException(status_code=404, detail=f"Unknown regulator: {regulator_id}")
+    try:
+        from app.services.production_seed import _firestore_safe
+        get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(regulator_id).set(
+            _firestore_safe(dict(merged)), merge=True)
+    except Exception as e:
+        logger.warning(f"Regulator mirror sync failed ({regulator_id}): {e}")
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="REGULATOR_UPDATED",
+        user=user.get("email") or user.get("uid"),
+        tenant_id=None,
+        target_type="regulator",
+        target_id=regulator_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"fields": list(fields.keys()), "by_uid": user.get("uid")},
+    )
+    logger.info(f"Regulator {regulator_id} metadata updated by {user.get('uid')}")
+    return {"success": True, "regulator": merged}
+
+
+@router.patch("/users", status_code=status.HTTP_200_OK)
+async def admin_update_user(
+    request: Request,
+    req: UserUpdate,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Update a single Firebase Auth user (SUPER_ADMIN + setup key).
+
+    Changes custom claims (role / tenant_id / department) and/or display_name,
+    then refreshes the mirrored `users/{uid}` Firestore doc and writes a
+    USER_UPDATED audit entry. Either uid or email identifies the user.
+    """
+    _verify_admin_setup(req.setup_key)
+    if not req.uid and not req.email:
+        raise HTTPException(status_code=422, detail="Provide uid or email of the user to update")
+
+    auth = get_auth()
+    try:
+        rec = auth.get_user(req.uid) if req.uid and not req.email else auth.get_user_by_email((req.email or "").strip().lower())
+    except Exception:
+        raise HTTPException(status_code=404, detail="User not found in Firebase Authentication")
+    uid = getattr(rec, "uid", "") or (req.uid or "")
+
+    auth_updates: Dict[str, Any] = {}
+    if req.role is not None or req.tenant_id is not None or req.department is not None:
+        existing = {}
+        claims = getattr(rec, "custom_claims", None) or {}
+        if isinstance(claims, dict):
+            existing = claims
+        new_claims = dict(existing)
+        if req.role is not None:
+            new_claims["role"] = req.role
+        if req.tenant_id is not None:
+            new_claims["tenant_id"] = req.tenant_id
+        if req.department is not None:
+            new_claims["department"] = req.department
+        auth_updates["custom_claims"] = new_claims
+    if req.display_name is not None:
+        auth_updates["display_name"] = req.display_name
+    if auth_updates:
+        auth.update_user(uid, **auth_updates)
+
+    refreshed = auth.get_user(uid)
+    upsert_user_doc(uid, user_doc_from_auth_record(refreshed))
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="USER_UPDATED",
+        user=user.get("email") or user.get("uid"),
+        tenant_id=req.tenant_id,
+        target_type="user",
+        target_id=uid,
+        ip=ip,
+        request_id=request_id,
+        metadata={"email": getattr(refreshed, "email", "") or "", "role": req.role, "department": req.department},
+    )
+    logger.info(f"User {uid} updated by {user.get('uid')}")
+    return {
+        "success": True,
+        "user": {
+            "uid": uid,
+            "email": getattr(refreshed, "email", "") or "",
+            "display_name": getattr(refreshed, "display_name", "") or "",
+            "role": req.role,
+            "tenant_id": req.tenant_id,
+            "department": req.department,
+        },
+    }
 
 @router.get("/seed/logs", status_code=status.HTTP_200_OK)
 async def admin_seed_logs(

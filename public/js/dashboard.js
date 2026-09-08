@@ -65,6 +65,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.__AUTH_TENANT_ID = tenantId || null;
     } catch (_) { /* ignore */ }
 
+    // ── Tenant resolution for this session ──
+    // Resolve the tenant slug (auth claims -> email domain map -> subdomain /
+    // demo context) and expose it globally so every helper (dashboard demo
+    // fallbacks, shell context, API filters) sees the correct tenant. Without
+    // this, the bare `currentTenant` references below threw a ReferenceError
+    // whenever the KPI data was empty.
+    let currentTenantSlug = null;
+    try {
+        if (typeof TenantResolver !== 'undefined' && TenantResolver.resolveTenantFromSession) {
+            currentTenantSlug = TenantResolver.resolveTenantFromSession(session);
+        } else if (typeof TenantResolver !== 'undefined' && TenantResolver.getTenantSlugFromEmail) {
+            currentTenantSlug = (session.email && TenantResolver.getTenantSlugFromEmail(session.email)) ||
+                TenantResolver.getCurrentTenant();
+        } else {
+            currentTenantSlug = tenantId || null;
+        }
+    } catch (_) {
+        currentTenantSlug = tenantId || null;
+    }
+    window.currentTenant = currentTenantSlug;
+    window.currentTenantSlug = currentTenantSlug;
+    window.currentTenantName = currentTenantSlug ? currentTenantSlug.toUpperCase() : null;
+
     if (role !== 'AIRLINE_ADMIN' && role !== 'CAAN_SMD' && role !== 'SUPER_ADMIN') {
         showError('Unauthorized role. Contact your administrator.');
         return;
@@ -72,8 +95,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('dashboardSection').style.display = 'block';
 
+    // Best-effort: resolve the formal tenant name + verify tenant slug against
+    // the backend. Never blocks the dashboard — failures fall back to the
+    // slug-derived name already set above.
+    if (currentTenantSlug) {
+        ApiClient.get('/api/v1/tenants/' + encodeURIComponent(currentTenantSlug) + '/config')
+            .then(function (t) {
+                if (t && t.name) {
+                    window.currentTenantName = t.name;
+                    if (typeof TenantResolver !== 'undefined' && TenantResolver.applyTenantContext) {
+                        TenantResolver.applyTenantContext().catch(function () { /* ignore */ });
+                    }
+                }
+            })
+            .catch(function () { /* keep slug-derived name */ });
+    }
+
     // Dynamic tenant context: derive display directly from auth claims
-    const tenantName = tenantId ? tenantId.toUpperCase() : 'Cross-Tenant Safety Overview';
+    const tenantName = (currentTenantSlug || tenantId)
+        ? (currentTenantSlug || tenantId).toUpperCase()
+        : 'Cross-Tenant Safety Overview';
     const subtitle = getDepartmentDisplayName({
         role: session.role,
         department: (session.claims && session.claims.department) || ''

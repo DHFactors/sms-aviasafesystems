@@ -17,6 +17,19 @@
     // subdomain and demo-switching controls are hidden.
     var DEMO_HOSTNAMES = ['demo.aviasafesystems.com'];
 
+    // Email domain -> operator tenant slug. Backend twin is TENANT_DOMAIN_MAP
+    // in backend/app/services/tenant_service.py. Used as a claims fallback so
+    // pages (e.g. safety.html) can resolve the tenant from the signed-in
+    // user's email even before Firebase custom claims propagate.
+    var TENANT_SLUG_MAP = {
+        'sitaair.com': 'sita-air',
+        'buddhair.com': 'buddha-air',
+        'fixedwing.com': 'fixedwing',
+        'rotarywing.com': 'rotarywing',
+        'demoairline.com': 'demoairline',
+        'demostate.com': 'demostate'
+    };
+
     // Reserved platform subdomains are NEVER treated as tenants. Visiting
     // a reserved host (e.g. www, app, sms) must not auto-scope the login to
     // `?tenant=<reserved>` or show a tenant badge on the root domain.
@@ -232,6 +245,33 @@
         return SUBDOMAIN_TO_TENANT_ID[slug] || slug;
     }
 
+    // Resolve the operator tenant slug from a sign-in email's domain. Returns
+    // null for unknown/empty addresses so cross-tenant (SUPER_ADMIN / CAAN_SMD)
+    // and external (gmail.com) accounts are never pinned to an operator tenant.
+    function getTenantSlugFromEmail(email) {
+        if (!email) return null;
+        var domain = String(email).split('@').pop().trim().toLowerCase();
+        return TENANT_SLUG_MAP[domain] || null;
+    }
+
+    // Preferred resolution order for a signed-in session:
+    //   1. tenant from Firebase auth claims (normalized)
+    //   2. tenant from the email domain map (claims propagation fallback)
+    //   3. running subdomain / demo context
+    function resolveTenantFromSession(session) {
+        var slug = null;
+        if (session && (session.tenantId || session.tenant_id)) {
+            slug = normalizeTenantId(session.tenantId || session.tenant_id);
+        }
+        if (!slug && session && session.email) {
+            slug = getTenantSlugFromEmail(session.email);
+        }
+        if (!slug) {
+            slug = getCurrentTenant();
+        }
+        return slug;
+    }
+
     // Return the formal operational classification for a tenant (mirrors the
     // backend OperationalScope enum). Falls back to a best-effort inference
     // from the id so unknown demo tenants still resolve sensibly.
@@ -354,10 +394,13 @@
     var TenantResolver = {
         DEMO_HOSTNAMES: DEMO_HOSTNAMES,
         DEMO_PERSONAS: DEMO_PERSONAS,
+        TENANT_SLUG_MAP: TENANT_SLUG_MAP,
         DEFAULT_DEMO_TENANT: DEFAULT_DEMO_TENANT,
         isDemoEnvironment: isDemoEnvironment,
         getTenantFromSubdomain: getTenantFromSubdomain,
         getCurrentTenant: getCurrentTenant,
+        getTenantSlugFromEmail: getTenantSlugFromEmail,
+        resolveTenantFromSession: resolveTenantFromSession,
         getDemoTenant: getDemoTenant,
         setDemoTenant: setDemoTenant,
         clearDemoTenant: clearDemoTenant,

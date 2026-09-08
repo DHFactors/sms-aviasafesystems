@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.db import pg
 from app.db.db_models import Tenant
 from app.firebase import verify_firebase_token
+from app.services.tenant_service import get_tenant_slug_from_email
 
 security = HTTPBearer()
 
@@ -62,6 +63,15 @@ def resolve_user_context(email: str, role: str, tenant_id: Optional[str]) -> Dic
             role = tenant_info["role"]
             tenant_id = tenant_info["tenant_id"]
             logger.info(f"Claims resolved via tenants-table fallback for {email}: role={role}, tenant={tenant_id}")
+        else:
+            # Second fallback: the email domain -> tenant slug map (demo and
+            # prospect domains such as sitaair.com / buddhair.com). Mirrors the
+            # frontend TENANT_SLUG_MAP resolution when custom claims are absent.
+            slug = get_tenant_slug_from_email(email)
+            if slug:
+                role = "AIRLINE_ADMIN"
+                tenant_id = slug
+                logger.info(f"Claims resolved via email-domain map for {email}: tenant={tenant_id}, role={role}")
 
     return {"role": role, "tenant_id": tenant_id}
 

@@ -26,6 +26,32 @@ from app.db.db_models import Tenant
 
 SURVEY_RATE_LIMIT_OPTIONS = (5, 10, 25, 50, 100)
 
+# Email domain -> operator tenant slug. Backend twin of TENANT_SLUG_MAP in
+# public/js/tenant_context.js. Used as a claims fallback so a sign-in whose ID
+# token carries no tenant claim (known Firebase custom-claims propagation issue)
+# is still scoped to the correct tenant for demo/prospect domains.
+TENANT_DOMAIN_MAP = {
+    "sitaair.com": "sita-air",
+    "buddhair.com": "buddha-air",
+    "fixedwing.com": "fixedwing",
+    "rotarywing.com": "rotarywing",
+    "demoairline.com": "demoairline",
+    "demostate.com": "demostate",
+}
+
+
+def get_tenant_slug_from_email(email: Optional[str]) -> Optional[str]:
+    """Resolve a sign-in email's domain to its operator tenant slug.
+
+    Returns None for unknown domains and for empty addresses. Public domains
+    (gmail.com etc.) intentionally resolve to nothing so cross-tenant
+    (SUPER_ADMIN / CAAN_SMD) accounts are never pinned to an operator tenant.
+    """
+    if not email:
+        return None
+    domain = str(email).split("@")[-1].strip().lower()
+    return TENANT_DOMAIN_MAP.get(domain) or None
+
 
 def _auto_survey_active(open_date: Optional[str], close_date: Optional[str]) -> bool:
     """Derive the survey active flag from the configured dates vs today (UTC).

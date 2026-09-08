@@ -171,6 +171,39 @@ def _firestore_safe(value: Any) -> Any:
     return value
 
 
+def _firestore_tenant_doc_exists(tid: str) -> bool:
+    """True when the tenant's Firestore mirror document exists.
+
+    Fails closed (treats the mirror as existing) when the check itself errors
+    so a storage outage keeps the previous duplicate-creation 409 behaviour.
+    """
+    try:
+        return get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).get().exists
+    except Exception as e:
+        logger.warning(f"Tenant Firestore existence check failed ({tid}): {e}")
+        return True
+
+
+def sync_tenant_to_firestore(tid: str, tenant_row: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Write/refresh a tenant's Firestore mirror from its PostgreSQL row.
+
+    Used when a tenant exists in Postgres but its Firestore document was
+    removed (e.g. a demo purge) so tenant-scoped pages resolve again. Raises
+    ValueError when the Postgres row is missing or the mirror write fails.
+    """
+    row = tenant_row if tenant_row is not None else pg.fetch_by(Tenant, "slug", tid)
+    if row is None:
+        raise ValueError(f"tenant does not exist: {tid}")
+    safe = _firestore_safe(dict(row))
+    try:
+        get_db().collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid).set(safe)
+    except Exception as e:
+        logger.warning(f"Tenant mirror sync failed ({tid}): {e}")
+        raise ValueError(f"tenant sync failed: {e}")
+    logger.info(f"Tenant {tid} synced to Firestore")
+    return safe
+
+
 def _json_safe_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
     """Mirror ``pg._split_doc`` routing but stringify date/datetime values
     wherever they land in JSONB (typed JSONB columns or the ``data`` bag).
@@ -275,13 +308,28 @@ def create_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, A
 
 
 def create_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
-    """Create an operator tenant document. 409 when the id already exists."""
+    """Create an operator tenant document. 409 when the id already exists.
+
+    A tenant that exists in PostgreSQL but whose Firestore mirror document was
+    removed (e.g. a demo purge) is silently re-synced instead of rejected, so
+    tenant-scoped pages resolve again.
+    """
     tid = _validate_id(data.get("tenant_id") or data.get("id"), "tenant id")
     name = (data.get("name") or "").strip()
     if not name:
         raise ValueError("tenant name is required")
 
-    if pg.fetch_by(Tenant, "slug", tid) is not None:
+    existing = pg.fetch_by(Tenant, "slug", tid)
+    if existing is not None:
+        if not _firestore_tenant_doc_exists(tid):
+            # Postgres row exists but the Firestore mirror is missing — rebuild
+            # it so the tenant is visible again (the case the "tenant already
+            # exists" 409 used to reject).
+            sync_tenant_to_firestore(tid, existing)
+            _audit("TENANT_SYNCED", actor, tid,
+                   f"Synced existing tenant '{name}' back to Firestore")
+            logger.info(f"Tenant {tid} (existing PG row) synced to Firestore by {actor.get('uid')}")
+            return existing
         raise ValueError(f"tenant already exists: {tid}")
 
     regulator_id = (data.get("regulator_id") or "").strip() or None

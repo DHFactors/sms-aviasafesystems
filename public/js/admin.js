@@ -50,6 +50,12 @@
         return data;
     }
 
+    async function apiPatch(path, body) {
+        const data = await ApiClient.patch(path, body);
+        if (!data) throw new Error('Request failed');
+        return data;
+    }
+
     // ========================================================================
     // SETUP KEY — stored in sessionStorage for this tab only. The key is
     // env-prefixed (aviasafe:{env}:setup_key) so beta sessions can never reuse
@@ -165,6 +171,7 @@ global.AdminUI = {
         apiGet: apiGet,
         apiPost: apiPost,
         apiPut: apiPut,
+        apiPatch: apiPatch,
         getSetupKey: getSetupKey,
         setSetupKey: setSetupKey,
         ensureSetupKey: ensureSetupKey,
