@@ -213,12 +213,12 @@
     }
     global.getTenantModules = getTenantModules;
 
-    // Resolve the signed-in tenant's module toggles (module1/2/3/4) from the
-    // tenant doc's Firestore mirror and re-apply nav visibility. The mirror is
-    // written by the backend on every Step-3 module change, and Firestore reads
-    // are already used across the app (tenant titles), so this is safe on any
-    // page that loads the shell. Non-fatal: on any failure the nav simply keeps
-    // its role/plan gating.
+    // Resolve the signed-in tenant's module toggles (module1/2/3/4). Channels,
+    // most authoritative first: resolved auth claims -> per-tenant storage cache
+    // (maintained by Step-3 module saves and refreshModulesFromApi) -> a refresh
+    // from the backend Postgres tenant doc via refreshModulesFromApi(). Firestore
+    // is NOT consulted: the tenants mirror was removed with the data-plane
+    // migration, so there is no Firestore doc to read.
     function loadTenantModules() {
         const tenantId = currentUserState.tenant ||
             (typeof TenantResolver !== 'undefined' ? TenantResolver.getCurrentTenant() : null);
@@ -234,18 +234,45 @@
                 }
             }
         } catch (e) {}
-        if (!(global.db && global.db.collection)) return;
-        global.db.collection('tenants').doc(tenantId).get().then(function (snap) {
-            if (!snap.exists) return;
-            const modules = (snap.data() || {}).modules;
-            if (modules && typeof modules === 'object') {
+    }
+
+    // Refresh the tenant module flags from the Supabase API (Postgres tenant
+    // doc — the authoritative source; Firestore is auth/claims only). Applies
+    // the flags as soon as they arrive, caches them per-tenant so subsequent
+    // pages render instantly, and keeps claims + this API as the only two live
+    // channels for the module gates. Non-fatal: on any failure the nav simply
+    // keeps its previous gating.
+    var _refreshingModules = false;
+    function refreshModulesFromApi() {
+        if (_refreshingModules) return;
+        var tenantId = currentUserState.tenant ||
+            (typeof TenantResolver !== 'undefined' ? TenantResolver.getCurrentTenant() : null);
+        if (!tenantId || typeof window.fetch !== 'function') return;
+        if (typeof firebase === 'undefined' || !firebase.auth || !firebase.auth().currentUser) return;
+        _refreshingModules = true;
+        firebase.auth().currentUser.getIdToken(false).then(function (token) {
+            return window.fetch('/api/v1/tenants/' + encodeURIComponent(tenantId), {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+        }).then(function (resp) {
+            if (!resp.ok) return null;
+            return resp.json();
+        }).then(function (body) {
+            if (!body || body.status !== 'success') return;
+            var data = body.data || {};
+            var modules = data.modules || {};
+            if (typeof modules === 'object') {
                 currentUserState.modules = modules;
+                try { localStorage.setItem('tenantModules:' + tenantId, JSON.stringify(modules)); } catch (e) {}
                 applyNavVisibility();
             }
         }).catch(function () {
-            // Non-fatal — keep role/plan gating on failure.
+            // Non-fatal — keep previous gating.
+        }).then(function () {
+            _refreshingModules = false;
         });
     }
+    global.refreshTenantModules = refreshModulesFromApi;
 
     // Allow other pages (e.g. the Step-3 admin screen after a module save) to
     // push the freshest module flags into the live header.
@@ -752,6 +779,7 @@
         setActiveNav();
         applyNavVisibility();
         loadTenantModules();
+        refreshModulesFromApi();
 
         // Close dropdowns when clicking anywhere else, and on Escape.
         document.addEventListener('click', function () { closeAllDropdowns(); });
@@ -777,6 +805,7 @@
                         currentUserState.modules = claims.modules || null;
                         applyNavVisibility();
                         loadTenantModules();
+                        refreshModulesFromApi();
                         if (pageSubtitle && typeof getDepartmentLabel === 'function') {
                             pageSubtitle.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }

@@ -141,6 +141,36 @@ async def get_tenant_config(
     })
 
 
+@router.get("/{tenant_id}", status_code=status.HTTP_200_OK)
+async def get_tenant_summary(
+    tenant_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Return the Postgres tenant doc (name, status, module flags) for the
+    shell header nav (shell.js).
+
+    The legacy Firestore tenants mirror was removed with the data-plane
+    migration, so the nav resolves the subscribed module flags (M1-M4) from
+    here instead of reading a Firestore doc. Only the tenant's Safety Manager /
+    Department Admin or SUPER_ADMIN may read it.
+    """
+    tenant_id = tenant_id.strip()
+    _require_tenant_viewer(user, tenant_id)
+    try:
+        tenant_data = pg.fetch_by(Tenant, "slug", tenant_id)
+    except Exception as e:
+        logger.warning(f"Tenant summary lookup failed for {tenant_id}: {e}")
+        raise HTTPException(status_code=500, detail="Tenant storage unavailable")
+    if tenant_data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown tenant: {tenant_id}")
+    return _envelope({
+        "tenant_id": tenant_id,
+        "name": tenant_data.get("name"),
+        "status": tenant_data.get("status"),
+        "modules": tenant_data.get("modules") or {},
+    })
+
+
 @router.get("/{tenant_id}/users", status_code=status.HTTP_200_OK)
 async def list_users(
     tenant_id: str,
