@@ -68,8 +68,14 @@
 
     // ---- Header navigation: ICAO Annex 19 4-pillar structure ----
     // Each item opens a WordPress-style dropdown. Visibility gates:
-    //   requires: 'pro'  -> tenant plan pro/addon, or a regulator account
-    //   requires: 'admin' -> airline/system admin or regulator account
+    //   requires: 'pro'            -> tenant plan pro/addon, or a regulator account
+    //   requires: 'admin'          -> airline/system admin or regulator account
+    //   requires: {plan:'pro', module:'module2'} -> pro/addon or regulator, OR the
+    //                               tenant's subscribed modules include the key
+    //                               (module1 SMS / module2 Risk-Hazard /
+    //                               module3 PSOE / module4 Regulator). The
+    //                               module flags come from the tenant doc and are
+    //                               refreshed by loadTenantModules().
     const NAV_ITEMS = [
         {
             label: 'SMS Maturity',
@@ -90,7 +96,7 @@
                 { label: 'Barrier Register', path: '/barrier-register/index.html' },
                 { label: 'Reports', path: '/reports/index.html' }
             ],
-            requires: 'pro'
+            requires: { plan: 'pro', module: 'module2' }
         },
         {
             label: 'Assurance',
@@ -100,7 +106,7 @@
                 { label: 'PSOE Audit', path: '/audits/psoe.html' },
                 { label: 'Management of Change', path: '/moc/index.html' }
             ],
-            requires: 'pro'
+            requires: { plan: 'pro', module: 'module3' }
         },
         {
             label: 'Reports',
@@ -177,24 +183,103 @@
         return 'free';
     }
 
-    // Visibility filter over NAV_ITEMS driven by role + plan.
-    function getVisibleNavItems() {
-        const userRole = getUserRole();
-        const tenantPlan = getTenantPlan();
-        const isRegulator = userRole === 'regulator';
-        return NAV_ITEMS.filter(function (item) {
-            if (item.requires === 'pro') {
-                return tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator;
+    // Truthy-check a tenant module flag, tolerating both boolean and 'true'
+    // string encodings from claims / storage.
+    function moduleEnabled(modules, key) {
+        if (!modules || !key) return false;
+        var v = modules[key];
+        return v === true || v === 'true' || (typeof v === 'number' && v !== 0 && !!v);
+    }
+
+    // Tenants' subscribed-module flags, resolved in order: resolved auth claims
+    // -> window.currentUser claims -> per-tenant storage cache (maintained by the
+    // Step-3 admin module toggles) -> null (unknown; falls back to plan/role).
+    function getTenantModules() {
+        if (currentUserState.modules) return currentUserState.modules;
+        try {
+            if (window.currentUser && window.currentUser.claims && window.currentUser.claims.modules) {
+                return window.currentUser.claims.modules;
             }
-            if (item.requires === 'admin') {
-                return userRole === 'admin' || userRole === 'super_admin' || isRegulator;
+        } catch (e) {}
+        const tenantId = currentUserState.tenant ||
+            (typeof TenantResolver !== 'undefined' ? TenantResolver.getCurrentTenant() : null);
+        if (tenantId) {
+            try {
+                const cached = localStorage.getItem('tenantModules:' + tenantId);
+                if (cached) return JSON.parse(cached);
+            } catch (e) {}
+        }
+        return null;
+    }
+    global.getTenantModules = getTenantModules;
+
+    // Resolve the signed-in tenant's module toggles (module1/2/3/4) from the
+    // tenant doc's Firestore mirror and re-apply nav visibility. The mirror is
+    // written by the backend on every Step-3 module change, and Firestore reads
+    // are already used across the app (tenant titles), so this is safe on any
+    // page that loads the shell. Non-fatal: on any failure the nav simply keeps
+    // its role/plan gating.
+    function loadTenantModules() {
+        const tenantId = currentUserState.tenant ||
+            (typeof TenantResolver !== 'undefined' ? TenantResolver.getCurrentTenant() : null);
+        if (!tenantId) return;
+        try {
+            const cached = localStorage.getItem('tenantModules:' + tenantId);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && typeof parsed === 'object') {
+                    currentUserState.modules = parsed;
+                    applyNavVisibility();
+                    return;
+                }
             }
-            return true;
+        } catch (e) {}
+        if (!(global.db && global.db.collection)) return;
+        global.db.collection('tenants').doc(tenantId).get().then(function (snap) {
+            if (!snap.exists) return;
+            const modules = (snap.data() || {}).modules;
+            if (modules && typeof modules === 'object') {
+                currentUserState.modules = modules;
+                applyNavVisibility();
+            }
+        }).catch(function () {
+            // Non-fatal — keep role/plan gating on failure.
         });
     }
 
+    // Allow other pages (e.g. the Step-3 admin screen after a module save) to
+    // push the freshest module flags into the live header.
+    global.setNavTenantModules = function (modules) {
+        if (modules && typeof modules === 'object') currentUserState.modules = modules;
+        applyNavVisibility();
+    };
+
+    // Visibility filter over NAV_ITEMS driven by role + plan + tenant modules.
+    function navItemVisible(item) {
+        const userRole = getUserRole();
+        const tenantPlan = getTenantPlan();
+        const isRegulator = userRole === 'regulator';
+        const req = item.requires;
+        if (!req) return true;
+        if (req === 'admin') {
+            return userRole === 'admin' || userRole === 'super_admin' || isRegulator;
+        }
+        if (req === 'pro') {
+            return tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator;
+        }
+        if (req && req.plan === 'pro') {
+            if (tenantPlan === 'pro' || tenantPlan === 'addon' || isRegulator) return true;
+            return req.module ? moduleEnabled(getTenantModules(), req.module) : false;
+        }
+        return true;
+    }
+
+    function getVisibleNavItems() {
+        return NAV_ITEMS.filter(navItemVisible);
+    }
+
     // Persistent user session surface so static pages can share tenant/user info.
-    const currentUserState = { email: null, tenant: null, dept: null };
+    const currentUserState = { email: null, tenant: null, dept: null, modules: null };
 
     global.handleLogout = function () {
         try {
@@ -666,6 +751,7 @@
 
         setActiveNav();
         applyNavVisibility();
+        loadTenantModules();
 
         // Close dropdowns when clicking anywhere else, and on Escape.
         document.addEventListener('click', function () { closeAllDropdowns(); });
@@ -688,7 +774,9 @@
                         currentUserState.tenant = claims.tenant_id || null;
                         currentUserState.role = claims.role || claims.roles || null;
                         currentUserState.plan = claims.plan || null;
+                        currentUserState.modules = claims.modules || null;
                         applyNavVisibility();
+                        loadTenantModules();
                         if (pageSubtitle && typeof getDepartmentLabel === 'function') {
                             pageSubtitle.textContent = cfg.heroSubtitle || getDepartmentLabel(claims) || '—';
                         }

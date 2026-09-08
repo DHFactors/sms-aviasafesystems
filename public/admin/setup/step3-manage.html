@@ -545,6 +545,10 @@ async function saveSingleTenant(tenantId) {
         }
         if (modulesChanged) {
             await AdminUI.apiPost('/api/v1/admin/tenants/' + tenantId + '/modules', { setup_key: setupKey, modules: modules });
+            // Cache per-tenant so the nav on operator pages reflects the toggle
+            // immediately in this browser (shell.js also refreshes from the doc).
+            try { localStorage.setItem('tenantModules:' + tenantId, JSON.stringify(modules)); } catch (e) {}
+            if (window.setNavTenantModules) window.setNavTenantModules(modules);
         }
         if (cached) { cached.status = status; cached.modules = modules; }
         row.classList.remove('dirty-row','error-row'); row.classList.add('saved-row');
