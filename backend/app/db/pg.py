@@ -112,10 +112,33 @@ def row_to_doc(row: Any) -> Dict[str, Any]:
     return doc
 
 
+def _json_safe(value: Any) -> Any:
+    """Recursively convert datetime/date to ISO strings for JSONB storage.
+
+    JSONB can never round-trip a datetime as an object — it always decodes as
+    an ISO string — so serializing to ISO on write is what reads already
+    produce and keeps the ``data`` bag JSON-serializable (avoids the "Object of
+    type datetime is not JSON serializable" error from Python's json.dumps).
+    """
+    from datetime import date, datetime
+
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(v) for v in value]
+    return value
+
+
 def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
     """Route Firestore-shaped fields into typed columns vs the JSONB bag.
 
     Models without a JSONB ``data`` column drop the unrecognized extras.
+    Datetimes destined for the JSONB bag are serialized to ISO strings so the
+    bag always round-trips cleanly.
     """
     from datetime import date, datetime
     from sqlalchemy import Date, DateTime
@@ -141,7 +164,7 @@ def _split_doc(model: type, doc: Dict[str, Any]) -> Dict[str, Any]:
                     pass
             typed[key] = value
         elif "data" in table.columns:
-            extras[key] = value
+            extras[key] = _json_safe(value)
     if extras and "data" in table.columns:
         typed["data"] = extras
     return typed
