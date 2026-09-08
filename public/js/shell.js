@@ -58,6 +58,11 @@
     //     tenantTitle: 'SITA AIR',                  // optional (tenant scope)
     //     heroTitle: 'Custom Page Title',           // optional page title override
     //     heroSubtitle: 'Custom subtitle',          // optional subtitle override
+    //     nav: [                                    // optional: replaces the
+    //       { href: '/safety.html', label: 'Key Indicators', icon: 'fa-chart-simple' },
+    //       { href: '/settings/team.html', label: 'Team', icon: 'fa-users-gear',
+    //         roles: ['AIRLINE_ADMIN', 'TENANT_ADMIN'] },   // optional role gate
+    //     ],
     //   }
     let cfg = global.SHELL_CONFIG || {};
 
@@ -349,6 +354,53 @@
         btn.setAttribute('aria-expanded', String(willOpen));
     }
 
+    // Render a single nav item that came from SHELL_CONFIG.nav — a flat set of
+    // direct links (no dropdowns). Role gating is stored on the element and
+    // applied by applyConfigNavVisibility() once the user role resolves.
+    function buildConfigNavItem(item) {
+        const link = document.createElement('a');
+        link.href = item.href || '#';
+        link.className = 'nav-link config-nav-link';
+        link.dataset.navItem = item.label || '';
+        if (Array.isArray(item.roles) && item.roles.length) {
+            link.dataset.requiresRoles = item.roles.join(',');
+        }
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid ' + (item.icon || 'fa-circle');
+        link.appendChild(icon);
+        link.appendChild(document.createTextNode(' ' + (item.label || '')));
+        return link;
+    }
+
+    // Raw role list of the signed-in user (claims.role / claims.roles).
+    function currentRoles() {
+        const raw = currentUserState.role ||
+            (window.currentUser && (window.currentUser.roles || window.currentUser.role)) || '';
+        return String(raw).split(',').map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean);
+    }
+
+    // An item is visible when it declares no roles, or the user holds one of
+    // them. Until claims resolve (role unknown) the item stays visible —
+    // fail-open so it is never permanently hidden by a timing race.
+    function configNavVisible(item) {
+        if (!Array.isArray(item.roles) || !item.roles.length) return true;
+        const allowed = item.roles.map(function (r) { return String(r).trim().toUpperCase(); }).filter(Boolean);
+        const have = currentRoles();
+        if (!have.length) return true;
+        return allowed.some(function (r) { return have.indexOf(r) !== -1; });
+    }
+
+    // Hide/show SHELL_CONFIG.nav links per their role arrays. Called from
+    // applyNavVisibility() so it re-runs whenever auth claims resolve.
+    function applyConfigNavVisibility() {
+        document.querySelectorAll('.app-header .header-nav .config-nav-link[data-requires-roles]').forEach(function (a) {
+            const allowed = (a.dataset.requiresRoles || '').split(',').map(function (s) { return s.trim().toUpperCase(); }).filter(Boolean);
+            const have = currentRoles();
+            const visible = !have.length || allowed.some(function (r) { return have.indexOf(r) !== -1; });
+            a.style.display = visible ? '' : 'none';
+        });
+    }
+
     // Render a single top-level nav item as a dropdown (button + menu).
     function buildNavItem(item) {
         const wrapper = document.createElement('div');
@@ -406,6 +458,7 @@
         document.querySelectorAll('.app-header .header-nav .nav-dropdown[data-nav-item]').forEach(function (dd) {
             dd.style.display = visible[dd.dataset.navItem] ? '' : 'none';
         });
+        applyConfigNavVisibility();
     }
 
     function buildHeader() {
@@ -478,14 +531,24 @@
             nav.appendChild(homeLink);
         }
 
-        // Render ALL nav items (gated ones start hidden). Visibility is
-        // applied by applyNavVisibility() so items that become eligible later
-        // (plan/tenant-module claims resolve after first paint) can be shown
-        // without rebuilding the header — filtering here would permanently drop
-        // them from the DOM.
-        NAV_ITEMS.forEach(function (item) {
-            nav.appendChild(buildNavItem(item));
-        });
+        // Custom navigation list supplied via SHELL_CONFIG.nav wins over the
+        // default pillar dropdowns. Flat top-level links, optional per-item
+        // roles arrays.
+        const customNav = Array.isArray(cfg.nav) && cfg.nav.length ? cfg.nav : null;
+        if (customNav) {
+            customNav.forEach(function (item) {
+                nav.appendChild(buildConfigNavItem(item));
+            });
+        } else {
+            // Render ALL nav items (gated ones start hidden). Visibility is
+            // applied by applyNavVisibility() so items that become eligible later
+            // (plan/tenant-module claims resolve after first paint) can be shown
+            // without rebuilding the header — filtering here would permanently drop
+            // them from the DOM.
+            NAV_ITEMS.forEach(function (item) {
+                nav.appendChild(buildNavItem(item));
+            });
+        }
         header.appendChild(nav);
 
         return header;
