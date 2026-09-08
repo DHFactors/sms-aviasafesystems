@@ -26,7 +26,7 @@
     var lastResult = null;
     var userCounter = 0;
 
-    var ROLES = ['AIRLINE_ADMIN', 'AIRLINE_SAFETY', 'AIRLINE_INSPECTOR', 'VIEWER'];
+    var ROLES = ['AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN', 'SAFETY_OFFICER', 'STAFF', 'CAAN_SMD'];
 
     // ========================================================================
     // INIT
@@ -183,6 +183,9 @@
             '<div class="form-group"><label>Role</label><select class="u-role">' +
             ROLES.map(function (r) { return '<option value="' + r + '"' + (r === 'AIRLINE_ADMIN' ? ' selected' : '') + '>' + r + '</option>'; }).join('') +
             '</select></div>' +
+            '</div>' +
+            '<div class="form-row">' +
+            '<div class="form-group"><label>Department</label><input type="text" class="u-dept" placeholder="e.g., Safety, Operations"></div>' +
             '</div>';
         var emailInput = div.querySelector('.u-email');
         emailInput.addEventListener('blur', function () { checkEmail(idx); });
@@ -210,7 +213,8 @@
             var name = row.querySelector('.u-name').value.trim();
             var email = row.querySelector('.u-email').value.trim();
             var role = row.querySelector('.u-role').value;
-            if (email) out.push({ full_name: name, email: email, role: role });
+            var department = row.querySelector('.u-dept') ? row.querySelector('.u-dept').value.trim() : '';
+            if (email) out.push({ full_name: name, email: email, role: role, department: department });
         });
         return out;
     }

@@ -632,47 +632,83 @@ shree-airlines,Shree Airlines,SHA,Nepal,caan" style="display:none;margin-top:14p
 
 <!-- CREATE USER MODAL — add a tenant-scoped Firebase Auth user -->
 <div id="createUserModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;">
-    <div style="background:#fff;padding:24px;border-radius:12px;max-width:560px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);">
-        <h3 style="margin:0 0 4px;color:#0f172a;"><i class="fas fa-user-plus" style="color:var(--color-brand-600);"></i> Create User</h3>
-        <p style="margin:0 0 14px;color:#64748b;font-size:.85rem;">User is created on the selected tenant with a generated password (shown once) and gets a welcome email. Existing emails are rejected.</p>
-        <div class="form-group">
-            <label for="createUserEmail">Email *</label>
-            <input type="email" id="createUserEmail" placeholder="safety@operator.com" autocomplete="off"
-                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
-        </div>
-        <div class="form-row" style="margin-top:12px;">
+    <div style="background:#fff;padding:24px;border-radius:12px;max-width:540px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,.18);">
+        <h3 style="margin:0 0 4px;color:#0f172a;"><i class="fas fa-user-plus" style="color:#0ea5e9;"></i> Create User</h3>
+        <p style="margin:0 0 14px;color:#64748b;font-size:.85rem;">Create a new user account for a tenant. A one-time password is generated and shown once.</p>
+
+        <div id="createUserError" style="display:none;padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#b91c1c;font-size:.85rem;margin-bottom:12px;"></div>
+
+        <form id="createUserForm">
             <div class="form-group">
-                <label for="createUserTenant">Tenant *</label>
-                <select id="createUserTenant" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
-                    <option value="">— select tenant —</option>
-                </select>
+                <label for="newUserEmail">Email *</label>
+                <input type="email" id="newUserEmail" placeholder="user@tenant.com" required autocomplete="off"
+                       style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
             </div>
-            <div class="form-group">
-                <label for="createUserRole">Role *</label>
-                <select id="createUserRole" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
-                    <option value="AIRLINE_ADMIN">AIRLINE_ADMIN (Accountable Executive)</option>
-                    <option value="TENANT_ADMIN">TENANT_ADMIN (Safety Manager)</option>
-                    <option value="DEPT_ADMIN">DEPT_ADMIN (Department Admin)</option>
-                    <option value="SAFETY_OFFICER">SAFETY_OFFICER</option>
-                    <option value="STAFF">STAFF</option>
-                </select>
-                <small style="color:#94a3b8;">Role claim recognized by the app RBAC.</small>
+            <div style="margin-top:12px;">
+                <div class="form-group">
+                    <label for="newUserTenant">Tenant *</label>
+                    <select id="newUserTenant" required style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
+                        <option value="">— Select tenant —</option>
+                    </select>
+                </div>
             </div>
-        </div>
-        <div class="form-row" style="margin-top:12px;">
-            <div class="form-group"><label for="createUserName">Full Name</label><input type="text" id="createUserName" placeholder="Full display name" autocomplete="off" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;"></div>
-            <div class="form-group"><label for="createUserDept">Department</label><input type="text" id="createUserDept" placeholder="e.g. Safety" autocomplete="off" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;"></div>
-        </div>
-        <div style="margin-top:14px;">
-            <label for="createUserSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
-            <input type="password" id="createUserSetupKey" placeholder="Enter setup key to authorize this change" autocomplete="off"
-                   style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
-            <div id="createUserError" style="display:none;margin-top:6px;color:#b91c1c;font-size:.78rem;"></div>
-        </div>
-        <div id="createUserResult" style="display:none;margin-top:14px;padding:12px 14px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;"></div>
-        <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
-            <button class="btn" onclick="closeCreateUserModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="submitCreateUser()"><i class="fas fa-user-plus"></i> Create User &amp; Invite</button>
+            <div style="margin-top:12px;">
+                <div class="form-group">
+                    <label for="newUserRole">Role *</label>
+                    <select id="newUserRole" required onchange="toggleCustomRole()" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
+                        <option value="AIRLINE_ADMIN">Airline Admin (Safety Manager)</option>
+                        <option value="TENANT_ADMIN">Tenant Admin</option>
+                        <option value="DEPT_ADMIN">Department Admin</option>
+                        <option value="SAFETY_OFFICER">Safety Officer</option>
+                        <option value="STAFF" selected>Staff (View-Only)</option>
+                        <option value="CAAN_SMD">CAAN SMD (Regulator)</option>
+                        <option value="__custom__">+ Custom Role</option>
+                    </select>
+                    <small style="color:#94a3b8;">Roles recognized by the app RBAC.</small>
+                </div>
+                <div class="form-group" id="customRoleGroup" style="display:none;">
+                    <label for="customRoleName">Custom Role Name</label>
+                    <input type="text" id="customRoleName" placeholder="e.g., QUALITY_MANAGER" autocomplete="off"
+                           style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+                    <small style="color:#94a3b8;">Custom roles may not have full access until RBAC is updated.</small>
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <div class="form-group">
+                    <label for="newUserName">Display Name</label>
+                    <input type="text" id="newUserName" placeholder="Full name" autocomplete="off"
+                           style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <div class="form-group">
+                    <label for="newUserDepartment">Department</label>
+                    <input type="text" id="newUserDepartment" placeholder="e.g., Safety, Operations" autocomplete="off"
+                           style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+                </div>
+            </div>
+            <div style="margin-top:14px;">
+                <label for="createUserSetupKey" style="display:block;font-size:.78rem;font-weight:600;color:#475569;margin-bottom:4px;">Setup Key (SETUP_SECRET) *</label>
+                <input type="password" id="createUserSetupKey" placeholder="Enter setup key" required autocomplete="off"
+                       style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;box-sizing:border-box;">
+            </div>
+            <div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">
+                <button type="button" class="btn" onclick="closeCreateUserModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
+            </div>
+        </form>
+
+        <div id="createUserSuccess" style="display:none;text-align:center;padding:16px;background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;">
+            <i class="fas fa-check-circle" style="font-size:2.5rem;color:#166534;"></i>
+            <h4 style="margin:8px 0 4px;color:#166534;">User Created Successfully!</h4>
+            <p style="color:#065f46;font-size:.85rem;" id="newUserSuccessMessage"></p>
+            <div style="background:#f8fafc;padding:12px;border-radius:6px;margin:12px 0;border:1px solid #e2e8f0;">
+                <strong>One-Time Password:</strong>
+                <div id="newUserPassword" style="font-family:monospace;font-size:1.1rem;color:#0b2a42;user-select:all;"></div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="createUserDone()">
+                <i class="fas fa-check"></i> Done
+            </button>
         </div>
     </div>
 </div>
@@ -1192,24 +1228,48 @@ document.addEventListener('DOMContentLoaded', function () {
 // USER MANAGEMENT — CREATE USER
 // ============================================================================
 
-function populateCreateUserTenants() {
-    var sel = document.getElementById('createUserTenant');
+function toggleCustomRole() {
+    var roleSelect = document.getElementById('newUserRole');
+    var customGroup = document.getElementById('customRoleGroup');
+    if (roleSelect && customGroup) {
+        customGroup.style.display = (roleSelect.value === '__custom__') ? 'block' : 'none';
+    }
+}
+
+function populateUserTenantDropdown() {
+    var sel = document.getElementById('newUserTenant');
     if (!sel) return;
     var tenants = EXISTING_TENANTS || [];
-    sel.innerHTML = '<option value="">— select tenant —</option>' +
+    sel.innerHTML = '<option value="">— Select tenant —</option>' +
         tenants.map(function (t) {
             return '<option value="' + esc(t.id) + '">' + esc(t.name || t.id) + ' (' + esc(t.id) + ')</option>';
         }).join('');
 }
 
-function openCreateUserModal() {
-    populateCreateUserTenants();
+async function openCreateUserModal() {
+    var tenantSelect = document.getElementById('newUserTenant');
+    if (tenantSelect) {
+        if ((EXISTING_TENANTS || []).length) {
+            populateUserTenantDropdown();
+        } else {
+            try {
+                var resp = await AdminUI.apiGet('/api/v1/admin/tenants');
+                EXISTING_TENANTS = resp.tenants || [];
+                populateUserTenantDropdown();
+            } catch (err) {
+                toast('Failed to load tenants', 'error');
+            }
+        }
+    }
+    var form = document.getElementById('createUserForm');
+    if (form) { form.reset(); form.style.display = 'block'; }
+    var successEl = document.getElementById('createUserSuccess');
+    if (successEl) successEl.style.display = 'none';
     var errEl = document.getElementById('createUserError');
-    var resEl = document.getElementById('createUserResult');
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-    if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
+    toggleCustomRole();
     document.getElementById('createUserModal').style.display = 'flex';
-    var email = document.getElementById('createUserEmail');
+    var email = document.getElementById('newUserEmail');
     if (email) setTimeout(function () { email.focus(); }, 50);
 }
 
@@ -1219,52 +1279,73 @@ function closeCreateUserModal() {
     if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
 }
 
-async function submitCreateUser() {
-    var errEl = document.getElementById('createUserError');
-    var resEl = document.getElementById('createUserResult');
-    function showErr(msg) {
-        if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
-        toast(msg, 'error');
+function createUserDone() {
+    closeCreateUserModal();
+    loadUsers();
+    loadAuditLog();
+}
+
+document.getElementById('createUserForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var errorEl = document.getElementById('createUserError');
+    var submitBtn = this.querySelector('button[type="submit"]');
+    if (errorEl) { errorEl.style.display = 'none'; errorEl.textContent = ''; }
+
+    var email = (document.getElementById('newUserEmail') || {}).value.trim() || '';
+    var tenantId = (document.getElementById('newUserTenant') || {}).value || '';
+    var roleVal = (document.getElementById('newUserRole') || {}).value || '';
+    var role = roleVal === '__custom__'
+        ? ((document.getElementById('customRoleName') || {}).value || '').trim().toUpperCase()
+        : roleVal;
+    var name = (document.getElementById('newUserName') || {}).value.trim() || '';
+    var department = (document.getElementById('newUserDepartment') || {}).value.trim() || '';
+    var setupKey = (document.getElementById('createUserSetupKey') || {}).value.trim() || '';
+
+    if (!email || !tenantId || !role || !setupKey) {
+        if (errorEl) { errorEl.textContent = 'Please fill in all required fields.'; errorEl.style.display = 'block'; }
+        toast('All required fields must be filled.', 'error');
+        return;
     }
+    if (roleVal === '__custom__' && !role) {
+        if (errorEl) { errorEl.textContent = 'Please enter a custom role name.'; errorEl.style.display = 'block'; }
+        toast('Please enter a custom role name.', 'error');
+        return;
+    }
+
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+    }
+
     try {
-        if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-        if (resEl) { resEl.style.display = 'none'; resEl.innerHTML = ''; }
-        var email = (document.getElementById('createUserEmail') || {}).value || '';
-        var tenant_id = (document.getElementById('createUserTenant') || {}).value || '';
-        var role = (document.getElementById('createUserRole') || {}).value || 'AIRLINE_ADMIN';
-        var name = (document.getElementById('createUserName') || {}).value || '';
-        var department = (document.getElementById('createUserDept') || {}).value || '';
-        var setup_key = (document.getElementById('createUserSetupKey') || {}).value || '';
-        if (!email) { showErr('A valid email is required.'); return; }
-        if (!tenant_id) { showErr('Please select a tenant.'); return; }
-        if (!setup_key) {
-            try { setup_key = AdminUI.getSetupKey() || ''; } catch (e) { setup_key = ''; }
-        }
-        if (!setup_key) { showErr('Setup key is required.'); return; }
-        try { AdminUI.setSetupKey(setup_key); } catch (e) {}
-        var body = { setup_key: setup_key, email: email, tenant_id: tenant_id, role: role };
-        if (name) body.name = name;
+        var body = { setup_key: setupKey, email: email, tenant_id: tenantId, role: role };
+        if (name) body.display_name = name;
         if (department) body.department = department;
         var resp = await AdminUI.apiPost('/api/v1/admin/users', body);
+
         var delivery = resp.delivery || {};
         var mailInfo = delivery.sent ? 'Welcome email sent (' + (delivery.provider || 'smtp') + ').'
-            : (delivery.provider === 'none' || delivery.reason ? 'Email provider not configured — welcome email skipped (password below).'
+            : (delivery.provider === 'none' || delivery.reason
+                ? 'Email provider not configured — welcome email skipped (password below).'
                 : 'Welcome email: ' + (delivery.reason || delivery.error || 'not sent') + '.');
-        if (resEl) {
-            resEl.style.display = 'block';
-            resEl.innerHTML = '<strong style="color:#065f46;">User created.</strong> Share the one-time password with the user — it will not be shown again.<br>' +
-                '<div style="margin-top:8px;font-size:.8rem;">Email: <code>' + esc(resp.email) + '</code><br>' +
-                'Role: <code>' + esc(resp.role) + '</code> &nbsp; Tenant: <code>' + esc(resp.tenant_id) + '</code><br>' +
-                'Password: <code style="user-select:all;">' + esc(resp.password) + '</code></div>' +
-                '<div style="margin-top:8px;color:#065f46;font-size:.78rem;">' + esc(mailInfo) + '</div>';
-        }
+        var successEl = document.getElementById('createUserSuccess');
+        document.getElementById('createUserForm').style.display = 'none';
+        document.getElementById('newUserSuccessMessage').textContent =
+            'User ' + esc(resp.email) + ' created successfully with role ' + esc(resp.role) + '. ' + esc(mailInfo);
+        document.getElementById('newUserPassword').textContent = resp.password || 'Password sent via email.';
+        if (successEl) successEl.style.display = 'block';
         toast('User created for ' + esc(resp.email), 'success');
-        loadUsers();
-        loadAuditLog();
+        setTimeout(function () { loadUsers(); loadAuditLog(); }, 500);
     } catch (err) {
-        showErr(err.message || String(err));
+        if (errorEl) { errorEl.textContent = err.message || 'Failed to create user.'; errorEl.style.display = 'block'; }
+        toast('Create failed: ' + (err.message || String(err)), 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create User';
+        }
     }
-}
+});
 
 document.getElementById('createUserModal').addEventListener('click', function (e) {
     if (e.target === this) closeCreateUserModal();

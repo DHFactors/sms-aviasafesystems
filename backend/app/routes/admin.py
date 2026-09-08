@@ -1442,11 +1442,13 @@ class UserCreateRequest(BaseModel):
     role: str = Field("AIRLINE_ADMIN", description="App role written to custom claims")
     tenant_id: str = Field(..., description="Tenant slug the user belongs to")
     name: Optional[str] = Field(None, description="Full display name")
+    display_name: Optional[str] = Field(None, description="Alias for name (legacy clients)")
     department: Optional[str] = Field(None, description="Department claim")
 
 
-# Roles recognized by the app RBAC for tenant-scoped operator users
-ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "STAFF"}
+# Roles recognized by the app RBAC for tenant-scoped operator users. Custom
+# roles are accepted for future RBAC additions but logged for awareness.
+ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "STAFF", "CAAN_SMD"}
 
 
 SUPER_ADMIN_PROTECTED_EMAILS = {"ezondiza.dhf@gmail.com", "ghanshyamacharya@outlook.com"}
@@ -1754,18 +1756,19 @@ async def admin_create_user(
 ):
     """Create one tenant-scoped Firebase Auth user (SUPER_ADMIN + setup key).
 
-    Verifies the SUPER_ADMIN token and setup key, validates the app role,
-    creates the Auth user with role/tenant/department claims, upserts the
-    `users/{uid}` doc, records the user on the tenant document, sends a
-    best-effort welcome email, and writes a `USER_CREATED` audit entry. The
-    generated password is returned exactly once and never persisted.
+    Verifies the SUPER_ADMIN token and setup key, creates the Auth user with
+    role/tenant/department claims, upserts the `users/{uid}` doc, records the
+    user on the tenant document, sends a best-effort welcome email, and writes
+    a `USER_CREATED` audit entry. The generated password is returned exactly
+    once and never persisted. Unknown/custom roles are accepted for future
+    RBAC additions but logged for admin awareness.
     """
     _verify_admin_setup(req.setup_key)
     role = (req.role or "AIRLINE_ADMIN").strip().upper()
     if role not in ALLOWED_USER_CREATE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"role must be one of: {', '.join(sorted(ALLOWED_USER_CREATE_ROLES))}",
+        logger.warning(
+            f"Custom role '{role}' created for {req.email} by {user.get('email')} "
+            "— verify RBAC permissions cover this role",
         )
     from app.services.tenant_credentials import create_user_for_tenant
     try:
@@ -1773,7 +1776,7 @@ async def admin_create_user(
             "tenant_id": (req.tenant_id or "").strip(),
             "email": (req.email or "").strip(),
             "role": role,
-            "full_name": (req.name or "").strip(),
+            "full_name": (req.name or req.display_name or "").strip(),
             "department": (req.department or "").strip(),
         }, user)
         return {"success": True, **result}

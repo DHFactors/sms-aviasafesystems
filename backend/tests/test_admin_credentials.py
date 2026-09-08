@@ -535,14 +535,46 @@ def test_create_user_route(monkeypatch):
         _clear_overrides()
 
 
-def test_create_user_route_bad_role(monkeypatch):
-    _patch_all(monkeypatch)
+def test_create_user_route_custom_role_allowed(monkeypatch):
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
     try:
         resp = _client().post("/api/v1/admin/users", json={
             "setup_key": "test-setup-key",
-            "email": "x@y.com", "role": "GOD_MODE", "tenant_id": "new-air",
+            "email": "custom@newair.com", "role": "QUALITY_MANAGER", "tenant_id": "new-air",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 200
+        assert resp.json()["role"] == "QUALITY_MANAGER"
+        assert auth.by_email["custom@newair.com"].custom_claims["role"] == "QUALITY_MANAGER"
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_caan_smd_allowed(monkeypatch):
+    db, _ = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "test-setup-key",
+            "email": "smd@newair.com", "role": "CAAN_SMD", "tenant_id": "new-air",
+        })
+        assert resp.status_code == 200
+        assert resp.json()["role"] == "CAAN_SMD"
+    finally:
+        _clear_overrides()
+
+
+def test_create_user_route_display_name_alias(monkeypatch):
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    try:
+        resp = _client().post("/api/v1/admin/users", json={
+            "setup_key": "test-setup-key",
+            "email": "named@newair.com", "role": "STAFF", "tenant_id": "new-air",
+            "display_name": "Jane Staff",
+        })
+        assert resp.status_code == 200
+        assert auth.by_email["named@newair.com"].display_name == "Jane Staff"
     finally:
         _clear_overrides()
 
