@@ -66,8 +66,13 @@ function closeConfirm() {
     pendingConfirm = null;
 }
 
-var confirmOkBtn = document.getElementById('confirmOkBtn');
-if (confirmOkBtn) {
+// Bind modal handlers only once the DOM exists. This script is loaded in
+// <head> on every /admin/setup/* step page, so direct getElementById() at
+// load time would return null and the Confirm button would silently do
+// nothing. See bindOnReady() below.
+function bindConfirmOkBtn() {
+    var confirmOkBtn = document.getElementById('confirmOkBtn');
+    if (!confirmOkBtn) return;
     confirmOkBtn.addEventListener('click', function () {
         var action = pendingConfirm;
         if (!action) return;
@@ -181,12 +186,31 @@ async function saveLifecycleModal() {
     }
 }
 
-var lifecycleModalEl = document.getElementById('lifecycleModal');
-if (lifecycleModalEl) {
+function bindLifecycleModal() {
+    var lifecycleModalEl = document.getElementById('lifecycleModal');
+    if (!lifecycleModalEl) return;
     lifecycleModalEl.addEventListener('click', function (e) {
         if (e.target === this) closeLifecycleModal();
     });
 }
+
+// ============================================================================
+// READY GATE — this script is loaded in <head> on every /admin/setup/* page,
+// before the modal markup exists. Attach DOM listeners only once the document
+// is parsed; run immediately when the document is already ready.
+// ============================================================================
+
+function bindOnReady(fn) {
+    if (typeof fn !== 'function') return;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fn);
+    } else {
+        fn();
+    }
+}
+
+bindOnReady(bindConfirmOkBtn);
+bindOnReady(bindLifecycleModal);
 
 // ============================================================================
 // AUDIT LOG — shared loader. Step 4 (audit-log) renders into #auditArea;
