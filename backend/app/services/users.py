@@ -54,6 +54,7 @@ def user_doc_from_auth_record(record: Any) -> Dict[str, Any]:
         "role": claims.get("role") or "USER",
         "tenant_id": claims.get("tenant_id"),
         "department": claims.get("department") or "",
+        "modules": claims.get("modules"),
         "is_developer": bool(claims.get("is_developer")),
         "created_at": created_at,
         "last_login": last_login,

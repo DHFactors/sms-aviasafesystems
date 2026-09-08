@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.firebase import get_auth, get_db
 from app.models.hazard import revalue_taxonomy
 from app.services.hazard_service import generate_hazard_id, resolve_function_code
+from app.services.users import list_tenant_users, upsert_user_doc, user_doc_from_auth_record
 from app.db.ids import register_tenant, tenant_uuid
 from app.db import pg
 from app.db.session import session_scope
@@ -423,6 +424,11 @@ def update_tenant_modules(tenant_id: str, actor: Dict[str, Any],
     }
     _set_tenant(tid, updates)
 
+    # Propagate the module flags into the tenant's Firebase custom claims so the
+    # shell nav (shell.js) can gate synchronously from claims.modules on the next
+    # token refresh. Best-effort: a failure here must never fail the toggle save.
+    sync_tenant_module_claims(tid, clean)
+
     merged = dict(doc)
     merged.update(updates)
     merged["modules"] = clean
@@ -432,6 +438,32 @@ def update_tenant_modules(tenant_id: str, actor: Dict[str, Any],
     )
     logger.info(f"Tenant {tid} modules -> {clean} by {actor.get('uid')}")
     return merged
+
+
+def sync_tenant_module_claims(tenant_id: str, modules: Dict[str, Any]) -> None:
+    """Best-effort propagation of a tenant's module toggles into its users'
+    Firebase custom claims (key ``modules``), so the shell nav can gate on the
+    flags synchronously from ``claims.modules``. The tenants-user mapping is read
+    from the Postgres users table (mirror of the auth directory). Never raises:
+    claims lag must never break a toggle save — the frontend also falls back to
+    reading the tenant doc when claims are stale.
+    """
+    try:
+        auth = get_auth()
+        for tenant_user in list_tenant_users(tenant_id):
+            uid = tenant_user.get("uid")
+            if not uid:
+                continue
+            try:
+                record = auth.get_user(uid)
+                claims = dict(record.custom_claims or {})
+                claims["modules"] = dict(modules)
+                auth.update_user(uid, custom_claims=claims)
+                upsert_user_doc(uid, user_doc_from_auth_record(auth.get_user(uid)))
+            except Exception as e:
+                logger.warning(f"Failed to sync module claims for user {uid}: {e}")
+    except Exception as e:
+        logger.error(f"Module claims sync failed for tenant {tenant_id}: {e}")
 
 
 # ============================================================================
