@@ -27,6 +27,11 @@ from app.core.config import settings
 from app.firebase import get_auth, get_db
 from app.models.hazard import revalue_taxonomy
 from app.services.hazard_service import generate_hazard_id, resolve_function_code
+from app.services.survey_scoring import (
+    SURVEY_VERSION_V4,
+    V4_QUESTION_PILLARS,
+    compute_survey_result,
+)
 from app.services.users import list_tenant_users, upsert_user_doc, user_doc_from_auth_record
 from app.db.ids import register_tenant, tenant_uuid
 from app.db import pg
@@ -609,54 +614,78 @@ async def _seed_reports(session, tid: str, report_type: str, count: int, base: d
 
 async def _seed_surveys(session, tid: str, count: int, base: datetime,
                         progress: Optional[float] = None) -> int:
+    """Seed realistic SMS-maturity surveys so EVERY consumer has data: pillar
+    KPIs, per-question averages, element breakdowns and raw-response analysis.
+
+    Each drill builds a full v4 answer map and runs it through the exact same
+    scoring engine the live submission API uses (compute_survey_result), then
+    persists consistent answers + question/element scores into both `surveys`
+    (scored) and `survey_responses` (raw) — mirroring a real submission.
+    Optional ``progress`` (0 → 1) raises the answer floor so later surveys score
+    higher and the monthly SMS-maturity history shows an improving trend.
+    """
+    questions = sorted(V4_QUESTION_PILLARS)
     for i in range(count):
-        # Optional maturity progression (0 → 1): later surveys score higher so
-        # the monthly SMS-maturity history shows a believable improvement trend.
-        lo_p = lo_s = lo_a = lo_m = 3
+        floor = 3
         if progress is not None:
-            lo = min(5, 3 + round(2 * max(0.0, min(progress, 1.0))))
-            lo_p = lo_s = lo_a = lo_m = lo
-        policy = random.randint(lo_p, 5)
-        srm = random.randint(lo_s, 5)
-        assurance = random.randint(lo_a, 5)
-        promotion = random.randint(lo_m, 5)
-        overall = round((policy + srm + assurance + promotion) / 4)
-        scored = overall >= 3
+            floor = min(5, 3 + round(2 * max(0.0, min(progress, 1.0))))
+
+        answers: Dict[str, Any] = {}
+        for qid in questions:
+            if qid == "q1_aware":
+                answers[qid] = random.choice([True, False])
+            else:
+                answers[qid] = random.randint(floor, 5)
+        if random.random() < 0.25:
+            answers["q24_comments"] = random.choice([
+                "SMS awareness is improving through crew briefings.",
+                "More practical SMS training sessions would help.",
+                "The hazard reporting flow is clear and responsive.",
+                "Monthly safety newsletters keep teams informed.",
+            ])
+
+        result = compute_survey_result(answers, SURVEY_VERSION_V4)
+        pillar = result["pillar_scores"]
+        overall = result["overall_maturity"]
+        overall_pct = result["overall_score_pct"]
         submitted_at = base - timedelta(days=i)
+        department = random.choice(_DEPARTMENTS)
+        respondent_id = f"demo-respondent-{i + 1}"
+        survey_version = SURVEY_VERSION_V4
+
         session.add(Survey(
             tenant_id=uuid.UUID(tid),
             submitted_at=submitted_at,
-            respondent_id=f"demo-respondent-{i + 1}",
-            department=random.choice(_DEPARTMENTS),
+            respondent_id=respondent_id,
+            department=department,
             employee_category=random.choice(["Pilot", "Cabin Crew", "Engineer", "Ground", "Admin"]),
             years_experience=random.choice(["1-5", "6-10", "11-20", "20+"]),
             language_used="English",
-            survey_version="sms-maturity-v1",
-            answers={},
-            question_scores={},
-            element_scores={},
-            safety_policy=policy,
-            safety_risk_management=srm,
-            safety_assurance=assurance,
-            safety_promotion=promotion,
-            overall_sms_maturity=overall,
-            overall_score_pct=float(overall * 20),
+            survey_version=survey_version,
+            answers=answers,
+            question_scores=result["question_scores"],
+            element_scores=result["element_scores"],
+            safety_policy=int(round(pillar["safety_policy"])),
+            safety_risk_management=int(round(pillar["safety_risk_management"])),
+            safety_assurance=int(round(pillar["safety_assurance"])),
+            safety_promotion=int(round(pillar["safety_promotion"])),
+            overall_sms_maturity=int(round(overall)) if overall is not None else None,
+            overall_score_pct=float(overall_pct) if overall_pct is not None else None,
             is_demo=True,
             seed_version=ADMIN_DEMO_SEED_VERSION,
         ))
-        if scored:
-            session.add(SurveyResponse(
-                tenant_id=uuid.UUID(tid),
-                respondent_id=f"demo-respondent-{i + 1}",
-                answers={},
-                department=random.choice(_DEPARTMENTS),
-                employee_category="Pilot",
-                years_experience="11-20",
-                language_used="English",
-                submitted_at=submitted_at,
-                survey_version="sms-maturity-v1",
-                is_demo=True,
-            ))
+        session.add(SurveyResponse(
+            tenant_id=uuid.UUID(tid),
+            respondent_id=respondent_id,
+            answers=answers,
+            department=department,
+            employee_category="Pilot",
+            years_experience="11-20",
+            language_used="English",
+            submitted_at=submitted_at,
+            survey_version=survey_version,
+            is_demo=True,
+        ))
     return count
 
 
