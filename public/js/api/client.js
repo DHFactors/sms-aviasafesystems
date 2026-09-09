@@ -170,3 +170,5 @@ const ApiClient = {
     patch: (path, body) => ApiClient._request('PATCH', path, body),
     del: (path) => ApiClient._request('DELETE', path),
 };
+
+window.ApiClient = ApiClient;
