@@ -119,8 +119,29 @@ def _run_on_bridge(op: Callable[[Any], Awaitable[Any]]) -> Any:
     reused connection never holds a transaction across requests. When the
     connection has been dropped by an idle timeout or the pooler, the session is
     recreated once and the operation retried a single time.
+
+    When invoked from inside a coroutine already running on the bridge loop
+    (an async service dispatched through ``runner.run``) the shared session is
+    bypassed: it is bound to the bridge loop and cannot be awaited from the
+    nested loop ``run()`` uses in that case, so the operation runs on its own
+    fresh session + NullPool connection instead (session_scope does this
+    automatically off the bridge loop).
     """
     from sqlalchemy.exc import OperationalError
+
+    from app.db.runner import in_bridge_loop, run
+
+    if in_bridge_loop():
+        async def _go_nested() -> Any:
+            from app.db.session import session_scope
+
+            async with session_scope() as session:
+                return await op(session)
+
+        try:
+            return run(_go_nested())
+        except OperationalError:
+            return run(_go_nested())
 
     session = get_bridge_session()
 

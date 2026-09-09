@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import threading
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Awaitable, TypeVar
@@ -27,6 +28,7 @@ T = TypeVar("T")
 _BRIDGE_LOOP: "asyncio.AbstractEventLoop | None" = None
 _BRIDGE_THREAD: "threading.Thread | None" = None
 _BRIDGE_LOCK = threading.Lock()
+_NESTED_POOL: "concurrent.futures.ThreadPoolExecutor | None" = None
 
 
 def _bridge_loop() -> "asyncio.AbstractEventLoop":
@@ -50,6 +52,21 @@ def _run_loop_forever(loop: "asyncio.AbstractEventLoop") -> None:
     loop.run_forever()
 
 
+def in_bridge_loop() -> bool:
+    """True when called from a coroutine already executing on the bridge loop.
+
+    Async services invoked through ``run()`` run their whole body on the bridge
+    loop. When such a body calls a synchronous pg.py helper (which itself calls
+    ``run()``), dispatching onto the bridge loop again would deadlock — the
+    loop's only thread is blocked inside this call — until the timeout fires.
+    """
+    try:
+        running = asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return running is _BRIDGE_LOOP and threading.current_thread() is _BRIDGE_THREAD
+
+
 def run(coro: Awaitable[T], timeout: float = 60.0) -> T:
     """Execute an awaitable to completion and return its result.
 
@@ -61,7 +78,20 @@ def run(coro: Awaitable[T], timeout: float = 60.0) -> T:
     future while the bridge thread owns the actual loop. A fresh per-call loop
     cannot be used here - Python forbids running a second loop in a thread that
     already has a running one.
+
+    When called from within a coroutine that is itself on the bridge loop (see
+    ``in_bridge_loop``) the awaitable is executed on its own fresh loop in a
+    pooled worker thread instead — scheduling onto the bridge loop would block
+    the very thread that must run it.
     """
+    global _NESTED_POOL
+    if in_bridge_loop():
+        if _NESTED_POOL is None:
+            _NESTED_POOL = concurrent.futures.ThreadPoolExecutor(
+                max_workers=4, thread_name_prefix="pg-nested"
+            )
+        return _NESTED_POOL.submit(lambda: asyncio.run(coro)).result(timeout=timeout)
+
     future = asyncio.run_coroutine_threadsafe(coro, _bridge_loop())
     try:
         return future.result(timeout=timeout)
