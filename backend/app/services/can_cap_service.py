@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.db.db_models import Can, Cap, Hazard, Tenant
@@ -61,6 +62,26 @@ def generate_can_reference(tenant_id: str, sequence: int) -> str:
 def generate_cap_reference(tenant_id: str, sequence: int) -> str:
     year = datetime.now(timezone.utc).strftime("%y")
     return f"CAP-{year}-{sequence:03d}"
+
+
+def _next_reference_seq(refs: List[str], prefix: str, year: str) -> int:
+    """Highest existing '<PREFIX>-YY-NNN' sequence for the tenant plus one.
+
+    The scan spans BOTH demo and production scope rows: the DB unique
+    constraint on (tenant_id, reference) is scope-agnostic, so a
+    scope-filtered scan can collide with rows from the other scope (500s on
+    issue/submit)."""
+    max_seq = 0
+    for ref in refs:
+        parts = str(ref or "").split("-")
+        if len(parts) == 3 and parts[0] == prefix and parts[1] == year:
+            try:
+                seq = int(parts[2])
+            except (TypeError, ValueError):
+                continue
+            if seq > max_seq:
+                max_seq = seq
+    return max_seq + 1
 
 
 _CAN_FIXED_COLUMNS = {"id", "tenant_id", "hazard_id", "can_reference", "is_demo", "created_at", "updated_at"}
@@ -343,118 +364,119 @@ class CanCapService:
     async def _issue_can_async(self, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
         tid = register_tenant(self.tenant_id)
+        year = now.strftime("%y")
+        last_err: Optional[BaseException] = None
 
-        async with session_scope() as session:
-            refs = (
-                await session.scalars(
-                    select(Can.can_reference).where(
-                        Can.tenant_id == tid,
-                        Can.is_demo == demo_scope(),
+        for _attempt in range(3):
+            try:
+                async with session_scope() as session:
+                    refs = (
+                        await session.scalars(
+                            select(Can.can_reference).where(
+                                Can.tenant_id == tid,
+                            )
+                        )
+                    ).all()
+                    can_reference = generate_can_reference(
+                        self.tenant_id, _next_reference_seq(list(refs), "CAN", year)
                     )
-                )
-            ).all()
-            year = now.strftime("%y")
-            max_seq = 0
-            for ref in refs:
-                # CAN-YY-NNN
-                parts = ref.split("-")
-                if len(parts) == 3 and parts[0] == "CAN" and parts[1] == year:
-                    try:
-                        seq = int(parts[2])
-                        if seq > max_seq:
-                            max_seq = seq
-                    except (IndexError, ValueError):
-                        pass
-            can_reference = generate_can_reference(self.tenant_id, max_seq + 1)
 
-            hazard = await _resolve_hazard(session, tid, payload["hazard_id"], now)
+                    hazard = await _resolve_hazard(session, tid, payload["hazard_id"], now)
 
-            severity = payload.get("initial_severity")
-            probability = payload.get("initial_probability")
-            initial_sra = self._sra_block(
-                severity,
-                probability,
-                assessed_by=user.get("email", user["uid"]),
-                assessed_at=now,
-                provided=payload.get("initial_sra"),
-            )
-
-            init = {
-                "initial_severity": severity,
-                "initial_probability": probability,
-                "initial_risk_index": payload.get("initial_risk_index"),
-                "initial_risk_level": payload.get("initial_risk_level"),
-                "initial_risk_outcome": payload.get("initial_risk_outcome"),
-                "initial_tolerability_tier": payload.get("initial_tolerability_tier"),
-                "initial_sra": _json_safe(payload.get("initial_sra")),
-            }
-            if initial_sra:
-                init["initial_severity"] = initial_sra["severity"]
-                init["initial_probability"] = initial_sra["probability"]
-                init["initial_risk_index"] = initial_sra["risk_index"]
-                init["initial_risk_level"] = initial_sra["risk_level"]
-                init["initial_risk_outcome"] = initial_sra["risk_outcome"]
-                init["initial_tolerability_tier"] = initial_sra["tolerability_tier"]
-                init["initial_sra"] = _json_safe(initial_sra)
-            elif payload.get("initial_risk_index"):
-                # Back-compat: legacy clients that only sent an index get a level too.
-                thresholds = get_thresholds(self.tenant_id)
-                init["initial_risk_level"] = get_risk_level(payload["initial_risk_index"], thresholds)
-                init["initial_risk_outcome"] = risk_outcome(
-                    payload.get("initial_severity") or 1,
-                    payload.get("initial_probability") or 1,
-                    thresholds,
-                )
-                init["initial_tolerability_tier"] = get_tolerability_tier(
-                    payload["initial_risk_index"], thresholds
-                )
-
-            row = Can(
-                tenant_id=tid,
-                can_reference=can_reference,
-                hazard_id=hazard.id,
-                title=payload["title"],
-                description=payload["description"],
-                required_action=payload["required_action"],
-                target_completion_date=_dt(payload["target_completion_date"]),
-                assigned_to=payload["assigned_to"],
-                assigned_to_uid=payload.get("assigned_to_uid") or "",
-                department=payload.get("department")
-                or (
-                    get_user_department(
-                        uid=payload.get("assigned_to_uid"), email=payload.get("assigned_to")
+                    severity = payload.get("initial_severity")
+                    probability = payload.get("initial_probability")
+                    initial_sra = self._sra_block(
+                        severity,
+                        probability,
+                        assessed_by=user.get("email", user["uid"]),
+                        assessed_at=now,
+                        provided=payload.get("initial_sra"),
                     )
-                    if payload.get("assigned_to_uid") or payload.get("assigned_to")
-                    else ""
-                ),
-                priority=payload["priority"],
-                status="Open",
-                is_demo=demo_scope(),
-                issued_by=user.get("email", user["uid"]),
-                issued_by_uid=user["uid"],
-                issued_at=payload.get("issued_at") or now,
-                created_by=user["uid"],
-                created_at=now,
-                updated_at=now,
-                # Buddha Air FORM SMSM 8.8.2 — CAN issuance block (all optional)
-                copies_to=payload.get("copies_to"),
-                requested_function=payload.get("requested_function"),
-                addressed_function=payload.get("addressed_function"),
-                classification_type=payload.get("classification_type"),
-                classification_level=payload.get("classification_level"),
-                psoe_assessment_id=payload.get("psoe_assessment_id"),
-                **init,
-            )
-            session.add(row)
-            await session.flush()
 
-            # Update hazard status to Processing
-            await self._set_hazard_status(session, hazard.id, "Processing", now)
+                    init = {
+                        "initial_severity": severity,
+                        "initial_probability": probability,
+                        "initial_risk_index": payload.get("initial_risk_index"),
+                        "initial_risk_level": payload.get("initial_risk_level"),
+                        "initial_risk_outcome": payload.get("initial_risk_outcome"),
+                        "initial_tolerability_tier": payload.get("initial_tolerability_tier"),
+                        "initial_sra": _json_safe(payload.get("initial_sra")),
+                    }
+                    if initial_sra:
+                        init["initial_severity"] = initial_sra["severity"]
+                        init["initial_probability"] = initial_sra["probability"]
+                        init["initial_risk_index"] = initial_sra["risk_index"]
+                        init["initial_risk_level"] = initial_sra["risk_level"]
+                        init["initial_risk_outcome"] = initial_sra["risk_outcome"]
+                        init["initial_tolerability_tier"] = initial_sra["tolerability_tier"]
+                        init["initial_sra"] = _json_safe(initial_sra)
+                    elif payload.get("initial_risk_index"):
+                        # Back-compat: legacy clients that only sent an index get a level too.
+                        thresholds = get_thresholds(self.tenant_id)
+                        init["initial_risk_level"] = get_risk_level(payload["initial_risk_index"], thresholds)
+                        init["initial_risk_outcome"] = risk_outcome(
+                            payload.get("initial_severity") or 1,
+                            payload.get("initial_probability") or 1,
+                            thresholds,
+                        )
+                        init["initial_tolerability_tier"] = get_tolerability_tier(
+                            payload["initial_risk_index"], thresholds
+                        )
 
-            data = _can_to_dict(row, hazard_id_ref=hazard.hazard_id)
-        data["id"] = str(row.id)
-        logger.info(f"CAN {can_reference} issued by {user['uid']}")
-        return data
+                    row = Can(
+                        tenant_id=tid,
+                        can_reference=can_reference,
+                        hazard_id=hazard.id,
+                        title=payload["title"],
+                        description=payload["description"],
+                        required_action=payload["required_action"],
+                        target_completion_date=_dt(payload["target_completion_date"]),
+                        assigned_to=payload["assigned_to"],
+                        assigned_to_uid=payload.get("assigned_to_uid") or "",
+                        department=payload.get("department")
+                        or (
+                            get_user_department(
+                                uid=payload.get("assigned_to_uid"), email=payload.get("assigned_to")
+                            )
+                            if payload.get("assigned_to_uid") or payload.get("assigned_to")
+                            else ""
+                        ),
+                        priority=payload["priority"],
+                        status="Open",
+                        is_demo=demo_scope(),
+                        issued_by=user.get("email", user["uid"]),
+                        issued_by_uid=user["uid"],
+                        issued_at=payload.get("issued_at") or now,
+                        created_by=user["uid"],
+                        created_at=now,
+                        updated_at=now,
+                        # Buddha Air FORM SMSM 8.8.2 — CAN issuance block (all optional)
+                        copies_to=payload.get("copies_to"),
+                        requested_function=payload.get("requested_function"),
+                        addressed_function=payload.get("addressed_function"),
+                        classification_type=payload.get("classification_type"),
+                        classification_level=payload.get("classification_level"),
+                        psoe_assessment_id=payload.get("psoe_assessment_id"),
+                        **init,
+                    )
+                    session.add(row)
+                    await session.flush()
+
+                    # Update hazard status to Processing
+                    await self._set_hazard_status(session, hazard.id, "Processing", now)
+
+                    data = _can_to_dict(row, hazard_id_ref=hazard.hazard_id)
+                    data["id"] = str(row.id)
+                logger.info(f"CAN {can_reference} issued by {user['uid']}")
+                return data
+            except IntegrityError as e:
+                last_err = e
+                logger.warning(
+                    f"CAN reference {can_reference} collided (attempt {_attempt + 1}); moving to next sequence"
+                )
+                continue
+
+        raise last_err  # type: ignore[misc]
 
     async def _set_hazard_status(
         self, session, hazard_id: uuid.UUID, status: str, now: datetime
@@ -635,126 +657,129 @@ class CanCapService:
     async def _submit_cap_async(self, can_id: str, payload: dict, user: dict) -> dict:
         now = datetime.now(timezone.utc)
         tid = register_tenant(self.tenant_id)
+        year = now.strftime("%y")
+        last_err: Optional[BaseException] = None
 
-        async with session_scope() as session:
-            can_row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
-            if not can_row:
-                raise ValueError("CAN not found")
+        for _attempt in range(3):
+            try:
+                async with session_scope() as session:
+                    can_row = (await session.execute(_can_lookup_stmt(tid, can_id))).scalars().first()
+                    if not can_row:
+                        raise ValueError("CAN not found")
 
-            cap_refs = (
-                await session.scalars(
-                    select(Cap.cap_reference).where(
-                        Cap.tenant_id == tid,
-                        Cap.is_demo == demo_scope(),
+                    cap_refs = (
+                        await session.scalars(
+                            select(Cap.cap_reference).where(
+                                Cap.tenant_id == tid,
+                            )
+                        )
+                    ).all()
+                    cap_reference = generate_cap_reference(
+                        self.tenant_id, _next_reference_seq(list(cap_refs), "CAP", year)
                     )
+
+                    residual_sra = self._sra_block(
+                        payload.get("residual_severity"),
+                        payload.get("residual_probability"),
+                        assessed_by=user.get("email", user["uid"]),
+                        assessed_at=now,
+                        provided=payload.get("residual_sra"),
+                    )
+
+                    res: Dict[str, Any] = {
+                        "residual_severity": payload.get("residual_severity"),
+                        "residual_probability": payload.get("residual_probability"),
+                        "residual_risk_index": payload.get("residual_risk_index"),
+                        "residual_risk_level": payload.get("residual_risk_level"),
+                        "residual_risk_outcome": payload.get("residual_risk_outcome"),
+                        "residual_tolerability_tier": payload.get("residual_tolerability_tier"),
+                        "residual_sra": _json_safe(payload.get("residual_sra")),
+                    }
+                    if residual_sra:
+                        res["residual_severity"] = residual_sra["severity"]
+                        res["residual_probability"] = residual_sra["probability"]
+                        res["residual_risk_index"] = residual_sra["risk_index"]
+                        res["residual_risk_level"] = residual_sra["risk_level"]
+                        res["residual_risk_outcome"] = residual_sra["risk_outcome"]
+                        res["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
+                        res["residual_sra"] = _json_safe(residual_sra)
+                    elif payload.get("residual_risk_index"):
+                        thresholds = get_thresholds(self.tenant_id)
+                        res["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
+                        res["residual_risk_outcome"] = risk_outcome(
+                            payload.get("residual_severity") or 1,
+                            payload.get("residual_probability") or 1,
+                            thresholds,
+                        )
+                        res["residual_tolerability_tier"] = get_tolerability_tier(
+                            payload["residual_risk_index"], thresholds
+                        )
+
+                    rca_method = payload.get("rca_method")
+                    if rca_method not in ("bow_tie", "fishbone"):
+                        rca_method = None
+
+                    row = Cap(
+                        tenant_id=tid,
+                        can_id=can_row.id,
+                        cap_reference=cap_reference,
+                        department=payload.get("department") or can_row.department or "",
+                        action_plan=payload["action_plan"],
+                        timeline=payload["timeline"],
+                        resources_required=payload.get("resources_required") or "",
+                        implementation_plan=payload.get("implementation_plan") or "",
+                        target_completion_date=_dt(payload["target_completion_date"]),
+                        status="In Progress",
+                        is_demo=demo_scope(),
+                        submitted_by=user.get("email", user["uid"]),
+                        submitted_by_uid=user["uid"],
+                        submitted_at=payload.get("submitted_at") or now,
+                        created_at=now,
+                        updated_at=now,
+                        # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)
+                        company_name=payload.get("company_name"),
+                        base_location=payload.get("base_location"),
+                        area_system_of_interest=payload.get("area_system_of_interest"),
+                        finding_number=payload.get("finding_number"),
+                        file_ref=payload.get("file_ref"),
+                        factual_review=payload.get("factual_review"),
+                        rca=payload.get("rca"),
+                        short_term_ca=payload.get("short_term_ca"),
+                        long_term_ca=payload.get("long_term_ca"),
+                        implementation_timeline=payload.get("implementation_timeline"),
+                        managerial_approval=_json_safe(payload.get("managerial_approval")),
+                        caa_acceptance=_json_safe(payload.get("caa_acceptance")),
+                        # Structured RCA (Fishbone / Ishikawa 5M + Management)
+                        root_causes=_json_safe(payload.get("root_causes")),
+                        action_items=_json_safe(payload.get("action_items")),
+                        # Selected RCA methodology ('bow_tie' | 'fishbone')
+                        rca_method=rca_method,
+                        process_owner=payload.get("process_owner"),
+                        # CAAN CAR-19 SRM (Bow-Tie) block
+                        sram_data=_json_safe(payload.get("sram_data")),
+                        **res,
+                    )
+                    session.add(row)
+                    await session.flush()
+
+                    # Update CAN status to Under Review
+                    can_row.status = "Under Review"
+                    can_row.updated_at = now
+
+                    data = _cap_to_dict(
+                        row, can_row=can_row, hazard_id_ref=await _hazard_ref(session, can_row)
+                    )
+                    data["id"] = str(row.id)
+                logger.info(f"CAP {cap_reference} submitted for CAN {can_row.can_reference}")
+                return data
+            except IntegrityError as e:
+                last_err = e
+                logger.warning(
+                    f"CAP reference {cap_reference} collided (attempt {_attempt + 1}); moving to next sequence"
                 )
-            ).all()
-            year = now.strftime("%y")
-            max_seq = 0
-            for ref in cap_refs:
-                # CAP-YY-NNN
-                parts = ref.split("-")
-                if len(parts) == 3 and parts[0] == "CAP" and parts[1] == year:
-                    try:
-                        seq = int(parts[2])
-                        if seq > max_seq:
-                            max_seq = seq
-                    except (IndexError, ValueError):
-                        pass
-            cap_reference = generate_cap_reference(self.tenant_id, max_seq + 1)
+                continue
 
-            residual_sra = self._sra_block(
-                payload.get("residual_severity"),
-                payload.get("residual_probability"),
-                assessed_by=user.get("email", user["uid"]),
-                assessed_at=now,
-                provided=payload.get("residual_sra"),
-            )
-
-            res: Dict[str, Any] = {
-                "residual_severity": payload.get("residual_severity"),
-                "residual_probability": payload.get("residual_probability"),
-                "residual_risk_index": payload.get("residual_risk_index"),
-                "residual_risk_level": payload.get("residual_risk_level"),
-                "residual_risk_outcome": payload.get("residual_risk_outcome"),
-                "residual_tolerability_tier": payload.get("residual_tolerability_tier"),
-                "residual_sra": _json_safe(payload.get("residual_sra")),
-            }
-            if residual_sra:
-                res["residual_severity"] = residual_sra["severity"]
-                res["residual_probability"] = residual_sra["probability"]
-                res["residual_risk_index"] = residual_sra["risk_index"]
-                res["residual_risk_level"] = residual_sra["risk_level"]
-                res["residual_risk_outcome"] = residual_sra["risk_outcome"]
-                res["residual_tolerability_tier"] = residual_sra["tolerability_tier"]
-                res["residual_sra"] = _json_safe(residual_sra)
-            elif payload.get("residual_risk_index"):
-                thresholds = get_thresholds(self.tenant_id)
-                res["residual_risk_level"] = get_risk_level(payload["residual_risk_index"], thresholds)
-                res["residual_risk_outcome"] = risk_outcome(
-                    payload.get("residual_severity") or 1,
-                    payload.get("residual_probability") or 1,
-                    thresholds,
-                )
-                res["residual_tolerability_tier"] = get_tolerability_tier(
-                    payload["residual_risk_index"], thresholds
-                )
-
-            rca_method = payload.get("rca_method")
-            if rca_method not in ("bow_tie", "fishbone"):
-                rca_method = None
-
-            row = Cap(
-                tenant_id=tid,
-                can_id=can_row.id,
-                cap_reference=cap_reference,
-                department=payload.get("department") or can_row.department or "",
-                action_plan=payload["action_plan"],
-                timeline=payload["timeline"],
-                resources_required=payload.get("resources_required") or "",
-                implementation_plan=payload.get("implementation_plan") or "",
-                target_completion_date=_dt(payload["target_completion_date"]),
-                status="In Progress",
-                is_demo=demo_scope(),
-                submitted_by=user.get("email", user["uid"]),
-                submitted_by_uid=user["uid"],
-                submitted_at=payload.get("submitted_at") or now,
-                created_at=now,
-                updated_at=now,
-                # Buddha Air FORM SMSM 8.8.2 — CAP submission block (all optional)
-                company_name=payload.get("company_name"),
-                base_location=payload.get("base_location"),
-                area_system_of_interest=payload.get("area_system_of_interest"),
-                finding_number=payload.get("finding_number"),
-                file_ref=payload.get("file_ref"),
-                factual_review=payload.get("factual_review"),
-                rca=payload.get("rca"),
-                short_term_ca=payload.get("short_term_ca"),
-                long_term_ca=payload.get("long_term_ca"),
-                implementation_timeline=payload.get("implementation_timeline"),
-                managerial_approval=_json_safe(payload.get("managerial_approval")),
-                caa_acceptance=_json_safe(payload.get("caa_acceptance")),
-                # Structured RCA (Fishbone / Ishikawa 5M + Management)
-                root_causes=_json_safe(payload.get("root_causes")),
-                action_items=_json_safe(payload.get("action_items")),
-                # Selected RCA methodology ('bow_tie' | 'fishbone')
-                rca_method=rca_method,
-                process_owner=payload.get("process_owner"),
-                # CAAN CAR-19 SRM (Bow-Tie) block
-                sram_data=_json_safe(payload.get("sram_data")),
-                **res,
-            )
-            session.add(row)
-            await session.flush()
-
-            # Update CAN status to Under Review
-            can_row.status = "Under Review"
-            can_row.updated_at = now
-
-            data = _cap_to_dict(row, can_row=can_row, hazard_id_ref=await _hazard_ref(session, can_row))
-            logger.info(f"CAP {cap_reference} submitted for CAN {can_row.can_reference}")
-        data["id"] = str(row.id)
-        return data
+        raise last_err  # type: ignore[misc]
 
     def list_caps(self, can_id: str, user: dict) -> List[dict]:
         return run(self._list_caps_async(can_id, user))
