@@ -11,52 +11,34 @@ Description: Interactive Hazard Analysis, ICAO 5x5 Risk Tolerability Matrix,
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AviaSAFE — Hazard Analysis & HFACS RCA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/styles/global.css">
+  <link rel="stylesheet" href="/css/theme.css">
+  <link rel="stylesheet" href="/css/dashboard-responsive.css">
   <link rel="stylesheet" href="/css/shell.css">
   <style>
-    :root {
-      --bg: #0f1720;
-      --panel: #16212c;
-      --panel-2: #1c2a37;
-      --line: #2a3947;
-      --text: #dbe4ec;
-      --muted: #8ba0b3;
-      --amber: #e8a33d;
-      --act: #d9634f;
-      --precond: #4fa3d9;
-      --super: #7fbf6a;
-      --org: #c48fd9;
-      --mono: "IBM Plex Mono", Consolas, monospace;
-      --sans: "IBM Plex Sans", -apple-system, sans-serif;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
-    header { padding: 20px 24px; border-bottom: 1px solid var(--line); background: rgba(15,23,32,0.95); }
-    h1 { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
-    .sub { color: var(--muted); font-size: 13px; }
-    .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
-    .card h2 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--line); padding-bottom: 10px; color: var(--amber); }
+    .ha-layout { max-width: 1200px; margin: 0 auto; padding: 24px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card { background: var(--color-surface, var(--color-gray-100)); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg, 12px); padding: 20px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+    .card h2 { margin-top: 0; font-size: 16px; border-bottom: 1px solid var(--color-border); padding-bottom: 10px; color: var(--color-deep-teal-900, #0b2a42); }
     .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); }
-    input, select, textarea { width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--text); padding: 10px 12px; border-radius: 6px; font-family: var(--sans); }
-    .matrix-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; font-family: var(--mono); font-size: 12px; text-align: center; }
+    label { display: block; font-size: 12px; color: var(--color-muted, #64748b); margin-bottom: 6px; font-weight: 600; }
+    input:not([type="submit"]), select, textarea { width: 100%; background: #fff; border: 1px solid var(--color-border); color: var(--color-deep-teal-900, #0b2a42); padding: 10px 12px; border-radius: 6px; font-family: var(--font-sans, 'Inter', system-ui, sans-serif); }
+    input:not([type="submit"]):focus, select:focus, textarea:focus { outline: none; border-color: var(--color-brand-500, #1a6b8a); }
+    .matrix-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 10px; font-family: var(--font-mono, monospace); font-size: 12px; text-align: center; }
     .matrix-cell { padding: 8px 4px; border-radius: 4px; font-weight: 700; }
-    .cell-intolerable { background: rgba(217, 99, 79, 0.25); color: #ff7b66; border: 1px solid #d9634f; }
-    .cell-tolerable { background: rgba(232, 163, 61, 0.25); color: #f5b958; border: 1px solid #e8a33d; }
-    .cell-acceptable { background: rgba(127, 191, 106, 0.25); color: #94e07c; border: 1px solid #7fbf6a; }
-    .btn { background: var(--amber); color: #0f1720; font-weight: 700; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
+    .cell-intolerable { background: rgba(217, 99, 79, 0.25); color: #d9634f; border: 1px solid #d9634f; }
+    .cell-tolerable { background: rgba(232, 163, 61, 0.25); color: #b97c18; border: 1px solid #e8a33d; }
+    .cell-acceptable { background: rgba(127, 191, 106, 0.25); color: #2e7d32; border: 1px solid #7fbf6a; }
+    .btn { background: var(--color-brand-600, #1a6b8a); color: #fff; font-weight: 700; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; }
     .btn:hover { opacity: 0.9; }
+    @media (max-width: 860px) { .ha-layout { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="app-shell" id="appShell">
-  <header>
-    <div style="font-family: var(--mono); font-size: 11px; color: var(--amber); text-transform: uppercase;">Safety Risk Management (ICAO Doc 9859 / DoD HFACS 7.0)</div>
-    <h1>Hazard Assessment & RCA Analysis</h1>
-    <div class="sub">Structured root cause identification, 5x5 matrix scoring, and CAPA formulation.</div>
-  </header>
-
-  <div class="container">
+  <div class="ha-layout">
     <!-- Hazard Definition & Risk Evaluation -->
     <div class="card">
       <h2>1. Hazard Definition & ICAO Matrix</h2>
