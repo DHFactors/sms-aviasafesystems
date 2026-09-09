@@ -167,6 +167,10 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
     # Per-tenant daily survey submission cap (configurable per deployment).
     SURVEY_RATE_LIMIT: int = 5
+    # Max failed login attempts per IP per 15-min sliding window. Raised from
+    # 5 (credential-stuffing default) to 20 to avoid blocking operators during
+    # staging/testing while keeping a basic brute-force guard.
+    LOGIN_FAILURE_RATE_LIMIT: int = 20
 
     # ── Admin security (env-only; RC-1) ──
     # Setup key used as a second factor on admin provisioning endpoints. Never

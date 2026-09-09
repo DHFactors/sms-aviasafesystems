@@ -70,7 +70,7 @@ RATE_LIMITS = {
 #                  for the public chat endpoint in privacy modes where App
 #                  Check tokens are unavailable)
 SLIDING_WINDOW_LIMITS = {
-    "login_failures": (5, 900),
+    "login_failures": (settings.LOGIN_FAILURE_RATE_LIMIT, 900),
     "register_tenant": (5, 3600),
     "verify_invite": (10, 3600),
     "copilot_guest": (10, 60),
