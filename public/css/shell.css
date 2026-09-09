@@ -281,3 +281,26 @@
     .app-shell .shell-main { margin-left: 0; }
     .shell-header .shell-tenant { text-align: left; }
 }
+
+/* ========== SHELL.JS TOP-NAV EXTENSIONS ========== */
+.app-header .header-nav .config-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.app-header .header-nav .config-nav-link i {
+    font-size: 0.8rem;
+}
+.app-header .header-nav .nav-dropdown .nav-icon i {
+    font-size: 0.85rem;
+}
+.app-header .header-nav .nav-badge-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ff5252;
+    margin-left: 5px;
+    vertical-align: middle;
+    box-shadow: 0 0 0 2px rgba(255, 82, 82, 0.25);
+}

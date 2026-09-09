@@ -11,6 +11,7 @@ Description: Interactive Hazard Analysis, ICAO 5x5 Risk Tolerability Matrix,
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AviaSAFE — Hazard Analysis & HFACS RCA</title>
+  <link rel="stylesheet" href="/css/shell.css">
   <style>
     :root {
       --bg: #0f1720;
@@ -48,6 +49,7 @@ Description: Interactive Hazard Analysis, ICAO 5x5 Risk Tolerability Matrix,
   </style>
 </head>
 <body>
+  <div class="app-shell" id="appShell">
   <header>
     <div style="font-family: var(--mono); font-size: 11px; color: var(--amber); text-transform: uppercase;">Safety Risk Management (ICAO Doc 9859 / DoD HFACS 7.0)</div>
     <h1>Hazard Assessment & RCA Analysis</h1>
@@ -124,5 +126,19 @@ Description: Interactive Hazard Analysis, ICAO 5x5 Risk Tolerability Matrix,
       <button class="btn" style="width: 100%;">Save Hazard & RCA Factors</button>
     </div>
   </div>
+</div>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="/js/firebase.js?v=4.0.1"></script>
+  <script>
+    window.SHELL_CONFIG = {
+        brand: 'AviaSAFE',
+        roleLabel: 'Operator Safety Dashboard',
+        heroTitle: 'Hazard Analysis & RCA',
+        heroSubtitle: 'ICAO 5x5 Tolerability Matrix · DoD HFACS 7.0 Nanocode RCA',
+    };
+  </script>
+  <script src="/js/nav-config.js"></script>
+  <script src="/js/shell.js"></script>
 </body>
 </html>

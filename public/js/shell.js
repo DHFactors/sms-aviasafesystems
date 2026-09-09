@@ -402,11 +402,15 @@
     }
 
     // Render a single top-level nav item as a dropdown (button + menu).
+    // When the group comes from NAV_CONFIG each dropdown link may carry
+    // per-item role gates (data-requires-roles) applied by
+    // applyConfigItemVisibility().
     function buildNavItem(item) {
         const wrapper = document.createElement('div');
         wrapper.className = 'nav-dropdown';
         wrapper.dataset.navItem = item.label;
         if (item.requires) wrapper.dataset.requires = item.requires;
+        if (item.navSource) wrapper.dataset.navSource = item.navSource;
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -416,7 +420,11 @@
 
         const icon = document.createElement('span');
         icon.className = 'nav-icon';
-        icon.textContent = item.icon || '';
+        if (typeof item.icon === 'string' && item.icon.indexOf('fa-') === 0) {
+            icon.innerHTML = '<i class="fa-solid ' + item.icon + '"></i>';
+        } else {
+            icon.textContent = item.icon || '';
+        }
         btn.appendChild(icon);
         btn.appendChild(document.createTextNode(' ' + item.label + ' '));
 
@@ -439,6 +447,17 @@
             link.href = d.path;
             link.className = 'nav-link dropdown-link';
             link.textContent = d.label;
+            link.dataset.navItemLabel = d.label;
+            if (item.navSource === 'config') link.dataset.navGroup = item.label;
+            if (Array.isArray(d.roles) && d.roles.length) {
+                link.dataset.requiresRoles = d.roles.join(',');
+            }
+            if (d.badge) {
+                const dot = document.createElement('span');
+                dot.className = 'nav-badge-dot';
+                dot.setAttribute('aria-label', 'New');
+                link.appendChild(dot);
+            }
             menu.appendChild(link);
         });
 
@@ -447,17 +466,75 @@
         return wrapper;
     }
 
-    // Hide/show top-level items based on the current role + plan. Keeps the
-    // full NAV_ITEMS in the DOM and toggles visibility, so items reappear as
-    // soon as auth claims resolve without rebuilding the header.
+    // ── NAV_CONFIG support ────────────────────────────────────────────────
+    // Build a user-shaped object for role resolution used by nav-config.js.
+    function buildNavUser() {
+        let email = '';
+        try { email = getUserEmail() || ''; } catch (e) {}
+        let role = currentUserState.role ||
+            (window.currentUser && (window.currentUser.roles || window.currentUser.role)) || '';
+        return { email: email || '', role: String(role) || 'USER' };
+    }
+
+    // Convert NAV_CONFIG into dropdown groups. EVERY group and item is rendered
+    // so visibility can later be toggled once claims resolve (no DOM rebuild);
+    // gating lives in applyNavVisibility / applyConfigItemVisibility.
+    function buildNavFromConfig() {
+        const groups = [];
+        Object.keys(NAV_CONFIG).forEach(function (key) {
+            const group = NAV_CONFIG[key];
+            groups.push({
+                label: group.label,
+                icon: group.icon || 'fa-circle',
+                navSource: 'config',
+                dropdown: group.items.map(function (item) {
+                    return {
+                        label: item.label,
+                        path: item.href,
+                        roles: Array.isArray(item.roles) && !item.roles.includes('ALL') ? item.roles : null,
+                        badge: !!item.badge
+                    };
+                })
+            });
+        });
+        return groups;
+    }
+
+    // Per-item role toggling for NAV_CONFIG dropdown links.
+    function applyConfigItemVisibility() {
+        const userObj = buildNavUser();
+        const vis = getVisibleNav(userObj);
+        const visibleItems = new Set();
+        vis.forEach(function (g) {
+            g.items.forEach(function (it) { visibleItems.add(g.group + '::' + it.label); });
+        });
+        document.querySelectorAll('.app-header .header-nav .dropdown-link[data-nav-group]').forEach(function (a) {
+            a.style.display = visibleItems.has(a.dataset.navGroup + '::' + a.dataset.navItemLabel) ? '' : 'none';
+        });
+    }
+
+    // Hide/show nav items per the active navigation source. NAV_CONFIG groups are
+    // toggled by role type; legacy/SHELL_CONFIG items use the legacy gate. Runs
+    // again whenever auth claims resolve (initShell, tokenResult, module push).
     function applyNavVisibility() {
         const visible = {};
         getVisibleNavItems().forEach(function (item) {
             visible[item.label] = true;
         });
+        const hasNavConfig = typeof window.NAV_CONFIG === 'object' && window.NAV_CONFIG !== null;
+        let visibleGroups = null;
+        if (hasNavConfig) {
+            visibleGroups = new Set(getVisibleNav(buildNavUser()).map(function (g) { return g.group; }));
+        }
         document.querySelectorAll('.app-header .header-nav .nav-dropdown[data-nav-item]').forEach(function (dd) {
-            dd.style.display = visible[dd.dataset.navItem] ? '' : 'none';
+            const source = dd.dataset.navSource || 'legacy';
+            if (source === 'config' && visibleGroups) {
+                dd.style.display = visibleGroups.has(dd.dataset.navItem) ? '' : 'none';
+            } else {
+                dd.style.display = visible[dd.dataset.navItem] ? '' : 'none';
+            }
         });
+        if (hasNavConfig) applyConfigItemVisibility();
         applyConfigNavVisibility();
     }
 
@@ -531,20 +608,24 @@
             nav.appendChild(homeLink);
         }
 
-        // Custom navigation list supplied via SHELL_CONFIG.nav wins over the
-        // default pillar dropdowns. Flat top-level links, optional per-item
-        // roles arrays.
-        const customNav = Array.isArray(cfg.nav) && cfg.nav.length ? cfg.nav : null;
-        if (customNav) {
-            customNav.forEach(function (item) {
+        // Navigation source precedence:
+        //   1. SHELL_CONFIG.nav — page-explicit flat links (psoe, team, etc.).
+        //   2. NAV_CONFIG (js/nav-config.js) — role-based default for pages
+        //      that do not declare their own nav.
+        //   3. Legacy NAV_ITEMS (pages that load neither).
+        // Group dropdowns are ALWAYS fully rendered and role-gated via
+        // applyNavVisibility()/applyConfigItemVisibility(), so items never go
+        // missing from the DOM when claims resolve after first paint.
+        const hasNavConfig = typeof window.NAV_CONFIG === 'object' && window.NAV_CONFIG !== null;
+        if (Array.isArray(cfg.nav) && cfg.nav.length) {
+            cfg.nav.forEach(function (item) {
                 nav.appendChild(buildConfigNavItem(item));
             });
+        } else if (hasNavConfig) {
+            buildNavFromConfig().forEach(function (item) {
+                nav.appendChild(buildNavItem(item));
+            });
         } else {
-            // Render ALL nav items (gated ones start hidden). Visibility is
-            // applied by applyNavVisibility() so items that become eligible later
-            // (plan/tenant-module claims resolve after first paint) can be shown
-            // without rebuilding the header — filtering here would permanently drop
-            // them from the DOM.
             NAV_ITEMS.forEach(function (item) {
                 nav.appendChild(buildNavItem(item));
             });
