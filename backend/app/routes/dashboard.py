@@ -174,7 +174,7 @@ async def get_master_register(
     user_department: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="Filter by status"),
     search: Optional[str] = Query(None, description="Search reference or title"),
-    page_size: Optional[int] = Query(50, ge=1, le=100, description="Page size (1-100, default 50)"),
+    page_size: Optional[int] = Query(50, ge=1, le=200, description="Page size (1-200, default 50)"),
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor from previous response"),
     days: Optional[int] = Query(None, ge=0, description="Date range filter: last N days, 0 or omitted = all time"),
     archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),

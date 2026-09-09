@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     # ── Repository / Pagination ──
     REPO_CACHE_TTL_SECONDS: int = 60
     REPO_DEFAULT_PAGE_SIZE: int = 20
-    REPO_MAX_PAGE_SIZE: int = 100
+    REPO_MAX_PAGE_SIZE: int = 200
     REPO_QUERY_LIMIT: int = 5000
 
     # ── Dashboard defaults ──
