@@ -215,6 +215,7 @@ async function loadAll() {
     if (document.getElementById('hazardChart')) jobs.push(loadHazardFrequency());
     if (document.getElementById('reportsTable')) jobs.push(loadRecentReports());
     if (typeof fetchCans === 'function') jobs.push(fetchCans(currentDays));
+    if (document.getElementById('escalationQueue')) jobs.push(loadExecutiveOversight());
 
     await Promise.all(jobs);
 }
@@ -258,6 +259,118 @@ async function loadKpis() {
         setError(el, err.message);
     }
 }
+
+// ============================================================================
+// Executive Risk Oversight — AE dashboard content duplicated for the safety
+// manager on safety.html. Mirrors /dashboard/ae-dashboard.html against the
+// SAME real endpoints (CANs, CAPs, hazards) so the safety manager sees and can
+// action the same residual exposure and escalated-CAP decisions.
+// ============================================================================
+let gExecCans = [];
+let gExecCaps = [];
+let gExecHazards = [];
+
+async function loadExecutiveOversight() {
+    try {
+        const [cans, caps, hazards] = await Promise.all([
+            ApiClient.get('/api/v1/cans/').catch(() => []),
+            ApiClient.get('/api/v1/cans/caps').catch(() => []),
+            ApiClient.get('/api/v1/hazards/').catch(() => []),
+        ]);
+        gExecCans = safeArray(cans);
+        gExecCaps = safeArray(caps);
+        gExecHazards = safeArray(hazards);
+        renderExecRisk(gExecCans, gExecCaps, gExecHazards);
+        renderExecEscalations(gExecCaps);
+    } catch (err) {
+        const el = document.getElementById('escalationQueue');
+        if (el) {
+            el.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'empty-msg';
+            p.textContent = 'Failed to load: ' + err.message;
+            el.appendChild(p);
+        }
+    }
+}
+
+function renderExecRisk(cans, caps, hazards) {
+    const isOpen = s => { const v = String(s || '').toLowerCase(); return v !== 'closed' && v !== 'completed'; };
+    let intolerable = 0, high = 0;
+    safeArray(cans).forEach(c => {
+        if (!isOpen(c.status)) return;
+        const sra = c.initial_sra || {};
+        const idx = sra.risk_index != null ? sra.risk_index : (sra.severity && sra.probability ? sra.severity * sra.probability : null);
+        if (idx == null) return;
+        if (idx > 15) intolerable++;
+        else if (idx >= 12) high++;
+    });
+    let overdue = 0;
+    safeArray(cans).forEach(c => { if (!isOpen(c.status) || !c.target_completion_date) return; if (new Date(c.target_completion_date) < new Date()) overdue++; });
+    safeArray(caps).forEach(c => { if (!isOpen(c.status) || !c.target_completion_date) return; if (new Date(c.target_completion_date) < new Date()) overdue++; });
+    const closed = safeArray(caps).filter(c => c.closed_at && c.submitted_at).map(c => Math.round((new Date(c.closed_at) - new Date(c.submitted_at)) / 86400000)).filter(d => d >= 0);
+    const mttc = closed.length ? Math.round(closed.reduce((a, b) => a + b, 0) / closed.length) : null;
+
+    const setNum = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setNum('kpiIntolerable', intolerable);
+    setNum('kpiHigh', high);
+    setNum('kpiOverdue', overdue);
+    setNum('kpiMttc', mttc != null ? mttc : '—');
+
+    const hm = document.getElementById('heatmap');
+    if (!hm) return;
+    const active = safeArray(hazards).filter(h => String(h.status || '').toLowerCase() !== 'closed');
+    const grid = {};
+    active.forEach(h => { const s = h.severity || null; const p = h.probability || null; if (!s || !p || s < 1 || s > 5 || p < 1 || p > 5) return; const k = s + '-' + p; grid[k] = (grid[k] || 0) + 1; });
+    const cellColor = (s, p, n) => { if (!n) return ''; const idx = s * p; if (idx > 15) return '#b91c1c'; if (idx >= 12) return '#ea580c'; if (idx >= 8) return '#d97706'; if (idx >= 4) return '#ca8a04'; return '#1e7e34'; };
+    let html = '<div class="hm-cell"></div>';
+    for (let p = 1; p <= 5; p++) html += '<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">P' + p + '</div>';
+    for (let s = 5; s >= 1; s--) {
+        html += '<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">S' + s + '</div>';
+        for (let p = 1; p <= 5; p++) { const n = grid[s + '-' + p] || 0; html += '<div class="hm-cell" ' + (n ? 'style="background:' + cellColor(s, p, n) + ';color:#fff;"' : '') + '>' + (n || '') + '</div>'; }
+    }
+    hm.innerHTML = html;
+}
+
+function renderExecEscalations(caps) {
+    const queue = safeArray(caps).filter(c => c.escalated_to_ae).sort((a, b) => new Date(b.escalated_at || 0) - new Date(a.escalated_at || 0));
+    const el = document.getElementById('escalationQueue');
+    if (el) {
+        if (!queue.length) {
+            el.innerHTML = '<p class="empty-msg" style="text-align:center;padding:0.8rem;">No escalated CAPs — all clear.</p>';
+        } else {
+            el.innerHTML = queue.map(c => '<div class="escalation-card"><div class="ref">' + (c.cap_reference || c.id) + ' <span>· ' + (c.department || '—') + '</span></div><div class="reason">' + (c.escalation_reason || '—') + '</div><div class="actions"><button class="btn btn-approve" onclick="decideEscalation(\'' + c.id + '\',\'authorize\')">Authorize</button><button class="btn btn-risk" onclick="decideEscalation(\'' + c.id + '\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
+        }
+    }
+    const ledger = document.getElementById('decisionLedger');
+    if (ledger) {
+        const decided = safeArray(caps).filter(c => c.ae_signature).slice(0, 3);
+        ledger.innerHTML = decided.length
+            ? decided.map(c => '<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>' + (c.cap_reference || c.id) + '</strong> — ' + (c.ae_signature || '—') + ' on ' + fmtDate(c.ae_signed_at) + '</div>').join('')
+            : '<p class="empty-msg" style="text-align:center;padding:0.8rem;">No executive decisions yet.</p>';
+    }
+}
+
+function fmtDate(iso) {
+    if (!iso) return '-';
+    try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return String(iso); }
+}
+
+window.decideEscalation = function decideEscalation(capId, decision) {
+    if (decision === 'accept_risk') { window.location.href = '/can_cap/cap_review.html?id=' + encodeURIComponent(capId); return; }
+    const note = window.prompt('AE authorization note:', 'Resources authorized.');
+    if (note == null || !note.trim()) return;
+    const cap = gExecCaps.find(c => c.id === capId);
+    if (!cap) return;
+    ApiClient.post('/api/v1/cans/caps/' + encodeURIComponent(capId) + '/review', {
+        status: 'In Progress',
+        comments: '[AE] ' + note.trim(),
+        escalated_to_ae: false,
+    }).then(() => {
+        cap.escalated_to_ae = false;
+        renderExecEscalations(gExecCaps);
+    }).catch(e => window.alert(e.message));
+};
 
 async function loadRiskDistribution() {
     const el = document.getElementById('riskChart');

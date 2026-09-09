@@ -267,6 +267,61 @@
         .table-card .state-loading {
             min-height: 120px;
         }
+
+        /* ── Executive Risk Oversight (AE content duplicated for the safety manager) ── */
+        .eo-grid {
+            display: grid;
+            grid-template-columns: 2fr 3fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 980px) { .eo-grid { grid-template-columns: 1fr; } }
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6rem;
+            margin: 0.4rem 0 0.8rem;
+        }
+        @media (min-width: 560px) { .kpi-strip { grid-template-columns: repeat(4, 1fr); } }
+        .kpi {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 0.7rem;
+            text-align: center;
+            border: 1px solid #eef2f7;
+        }
+        .kpi .num { font-size: 1.3rem; font-weight: 800; }
+        .kpi .lbl {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: #64748b;
+        }
+        .heatmap { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; font-size: 0.6rem; }
+        .hm-cell {
+            aspect-ratio: 1.2;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background: #f1f5f9;
+            color: #94a3b8;
+        }
+        .escalation-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.8rem;
+            margin-bottom: 0.6rem;
+        }
+        .escalation-card .ref { font-weight: 700; font-size: 0.85rem; }
+        .escalation-card .ref span { color: #64748b; font-weight: 400; }
+        .escalation-card .reason { font-size: 0.78rem; color: #475569; margin: 0.3rem 0; }
+        .escalation-card .actions { display: flex; gap: 0.4rem; }
+        .btn-approve { background: #1e7e34; color: #fff; }
+        .btn-risk { background: #b45309; color: #fff; }
+        .btn-approve:hover { background: #145e27; color: #fff; }
+        .btn-risk:hover { background: #92400e; color: #fff; }
     </style>
 
     <link rel="stylesheet" href="css/theme.css">
@@ -297,6 +352,33 @@
             <!-- Section 1: KPI Cards -->
             <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
             <div id="kpiGrid" class="kpi-grid state-container"></div>
+
+            <!-- Section 1b: Executive Risk Oversight — AE dashboard content duplicated
+                 for the safety manager. Same real data as /dashboard/ae-dashboard.html. -->
+            <div class="section-title shell-scroll-spy" id="executive-oversight"><i class="fas fa-user-shield"></i> Executive Risk Oversight</div>
+            <div class="eo-grid">
+                <div class="chart-card" style="border-top:4px solid #dc3545;">
+                    <h3><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure</h3>
+                    <div class="kpi-strip">
+                        <div class="kpi" style="border-left:3px solid #dc3545;"><div class="num" id="kpiIntolerable" style="color:#dc3545;">—</div><div class="lbl">Intolerable</div></div>
+                        <div class="kpi" style="border-left:3px solid #d97706;"><div class="num" id="kpiHigh" style="color:#d97706;">—</div><div class="lbl">High</div></div>
+                        <div class="kpi"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue</div></div>
+                        <div class="kpi"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC days</div></div>
+                    </div>
+                    <div id="heatmap" class="heatmap"></div>
+                    <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.4rem;text-align:center;">5×5 Residual Risk Heatmap</div>
+                </div>
+                <div class="chart-card" style="border-top:4px solid #1a6b8a;">
+                    <h3><i class="fas fa-gavel" style="color:#1a6b8a;"></i> Executive Decisions
+                        <a href="/dashboard/ae-dashboard.html" style="margin-left:auto;font-size:0.72rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> Full AE View</a>
+                    </h3>
+                    <div id="escalationQueue"></div>
+                    <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
+                        <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
+                        <div id="decisionLedger" style="margin-top:0.5rem;"></div>
+                    </div>
+                </div>
+            </div>
 
         </div>
 
