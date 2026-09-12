@@ -26,6 +26,15 @@ def _high_in_memory_rate_limit(monkeypatch):
     monkeypatch.setattr("app.middleware.rate_limit.redis_enabled", False)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_tenant_status_cache():
+    """The tenant-status cache lives in a module global keyed by tenant slug,
+    so a status cached by one test (e.g. SUSPENDED for a slug) can poison a
+    later test that reuses the same slug. Clear it before every test."""
+    from app.middleware import tenant_status_cache
+    tenant_status_cache._cache = {}
+
+
 @pytest.fixture
 def sample_reports():
     from datetime import datetime, timezone

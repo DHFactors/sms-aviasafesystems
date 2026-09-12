@@ -28,8 +28,33 @@ from app.services.risk_matrix import (
 )
 from app.services.users import upsert_user_doc, user_doc_from_auth_record
 from app.services.audit_service import log_audit, request_context
+from app.schemas.user import (
+    AdminUserListResponse,
+    AdminUserUpdateResponse,
+    UserProfileCreate,
+    UserProfileUpdate,
+)
 
 router = APIRouter()
+
+_ADMIN_FIRESTORE_WARNED: set = set()
+
+
+def _admin_db(call_site: str):
+    """Transitional A1 no-op stub for legacy Firestore writes in admin routes.
+
+    get_db() now raises NotImplementedError (Firestore removed, A1). Returns
+    None so downstream (None).collection(...) access fails loudly-but-caught in
+    per-route try/except blocks instead of 500ing the route. Warns once per
+    call site; never raises.
+    """
+    try:
+        return get_db()
+    except NotImplementedError:
+        if call_site not in _ADMIN_FIRESTORE_WARNED:
+            logger.warning(f"[admin.py:{call_site}] Firestore removed (A1); legacy Firestore write skipped")
+            _ADMIN_FIRESTORE_WARNED.add(call_site)
+        return None
 
 
 def _verify_admin_setup(setup_key: str) -> None:
@@ -169,7 +194,7 @@ async def setup_test_user_claims(
                 claims["tenant_id"] = tenant_id
             uid = user_record.uid
             auth.update_user(uid, custom_claims=claims)
-            upsert_user_doc(uid, user_doc_from_auth_record(auth.get_user(uid)))
+            upsert_user_doc(**user_doc_from_auth_record(auth.get_user(uid)))
             results.append({"email": email, "uid": uid, "role": role, "tenant_id": tenant_id, "status": "ok"})
             logger.info(f"Claims set for {email}: role={role}, tenant_id={tenant_id}")
         except Exception as e:
@@ -221,7 +246,7 @@ async def provision_20_airlines(
         )
 
     auth = get_auth()
-    db = get_db()
+    db = _admin_db("provision-airlines")
     results = []
     now = datetime.now(timezone.utc).isoformat()
 
@@ -250,7 +275,7 @@ async def provision_20_airlines(
 
             uid = user.uid
             auth.update_user(uid, custom_claims={"role": "AIRLINE_ADMIN", "tenant_id": tid})
-            upsert_user_doc(uid, user_doc_from_auth_record(auth.get_user(uid)))
+            upsert_user_doc(**user_doc_from_auth_record(auth.get_user(uid)))
 
             tenant_ref = db.collection("tenants").document(tid)
             tenant_doc = tenant_ref.get()
@@ -435,14 +460,15 @@ class RegulatorUpdate(BaseModel):
     active: Optional[bool] = None
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(UserProfileUpdate):
+    """Admin PATCH payload — extends ``UserProfileUpdate`` with the locator
+    fields (``setup_key``, ``uid``, ``email``) used only to find the target
+    Auth user; ``uid`` and ``email`` remain immutable and are not updated.
+    """
+
     setup_key: str
     uid: Optional[str] = None
     email: Optional[str] = None
-    role: Optional[str] = None
-    tenant_id: Optional[str] = None
-    department: Optional[str] = None
-    display_name: Optional[str] = None
 
 
 @router.post("/regulators", status_code=status.HTTP_200_OK)
@@ -633,7 +659,7 @@ async def admin_update_regulator(
     return {"success": True, "regulator": merged}
 
 
-@router.patch("/users", status_code=status.HTTP_200_OK)
+@router.patch("/users", status_code=status.HTTP_200_OK, response_model=AdminUserUpdateResponse)
 async def admin_update_user(
     request: Request,
     req: UserUpdate,
@@ -676,7 +702,7 @@ async def admin_update_user(
         auth.update_user(uid, **auth_updates)
 
     refreshed = auth.get_user(uid)
-    upsert_user_doc(uid, user_doc_from_auth_record(refreshed))
+    upsert_user_doc(**user_doc_from_auth_record(refreshed))
 
     ip, request_id = request_context(request)
     log_audit(
@@ -690,15 +716,19 @@ async def admin_update_user(
         metadata={"email": getattr(refreshed, "email", "") or "", "role": req.role, "department": req.department},
     )
     logger.info(f"User {uid} updated by {user.get('uid')}")
+    fresh_claims = getattr(refreshed, "custom_claims", None) or {}
+    if not isinstance(fresh_claims, dict):
+        fresh_claims = {}
     return {
         "success": True,
         "user": {
             "uid": uid,
             "email": getattr(refreshed, "email", "") or "",
             "display_name": getattr(refreshed, "display_name", "") or "",
-            "role": req.role,
-            "tenant_id": req.tenant_id,
-            "department": req.department,
+            "role": fresh_claims.get("role") or req.role or "USER",
+            "tenant_id": fresh_claims.get("tenant_id") or req.tenant_id,
+            "department": (fresh_claims.get("department") or req.department or ""),
+            "is_developer": bool(fresh_claims.get("is_developer")),
         },
     }
 
@@ -1625,14 +1655,18 @@ class UserDeleteRequest(BaseModel):
     tenant_id: Optional[str] = Field(None, description="Optional tenant scope hint")
 
 
-class UserCreateRequest(BaseModel):
+class UserCreateRequest(UserProfileCreate):
+    """Create payload for a new operator user — extends ``UserProfileCreate``
+    with the admin ``setup_key`` and legacy ``name``/``display_name`` aliases.
+    ``tenant_id`` stays required for admin creation (LSP provisioning post-role
+    assignment), and the admin default role is ``AIRLINE_ADMIN``.
+    """
+
     setup_key: str = Field(..., description="Admin setup key (SETUP_SECRET)")
-    email: str = Field(..., description="User email (must be unique)")
-    role: str = Field("AIRLINE_ADMIN", description="App role written to custom claims")
     tenant_id: str = Field(..., description="Tenant slug the user belongs to")
     name: Optional[str] = Field(None, description="Full display name")
     display_name: Optional[str] = Field(None, description="Alias for name (legacy clients)")
-    department: Optional[str] = Field(None, description="Department claim")
+    role: str = Field("AIRLINE_ADMIN", description="App role written to custom claims")
 
 
 # Roles recognized by the app RBAC for tenant-scoped operator users. Custom
@@ -1643,7 +1677,7 @@ ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAF
 SUPER_ADMIN_PROTECTED_EMAILS = {"ezondiza.dhf@gmail.com", "ghanshyamacharya@outlook.com"}
 
 
-@router.get("/users", status_code=status.HTTP_200_OK)
+@router.get("/users", status_code=status.HTTP_200_OK, response_model=AdminUserListResponse)
 async def admin_list_users(
     tenant_id: Optional[str] = Query(None, description="Filter by tenant_id slug"),
     limit: int = Query(100, ge=1, le=1000, description="Max users to return (paginated, 1-1000)"),
@@ -1655,7 +1689,7 @@ async def admin_list_users(
     state. Supports optional tenant_id filter and limit. SUPER_ADMIN-only.
     """
     auth = get_auth()
-    db = get_db()
+    db = _admin_db("list-users")
     users: List[Dict[str, Any]] = []
     try:
         # Iterate with pagination — list_users uses page token internally.
@@ -1740,7 +1774,7 @@ async def admin_delete_user(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide email or uid of user to delete")
 
     auth = get_auth()
-    db = get_db()
+    db = _admin_db("users-cascade")
 
     # Resolve UID + email + tenant for audit and protection checks
     target_email = email
@@ -1859,7 +1893,7 @@ async def admin_delete_user_post(
     if not email and not uid:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide email or uid of user to delete")
     auth = get_auth()
-    db = get_db()
+    db = _admin_db("users-cascade")
     target_email = email
     target_uid = uid
     target_tenant = req.tenant_id or ""
