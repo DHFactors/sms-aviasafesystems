@@ -14,7 +14,7 @@ from collections import defaultdict
 from typing import Dict, Any, List, Optional
 from loguru import logger
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.db import pg
@@ -507,12 +507,56 @@ class DashboardService:
         days = overrides.get("days")
         docs = self._survey_docs(days)
         regulator_id = overrides.get("regulator_id")
+        allowed: set = set()
         if regulator_id:
             from app.services.regulator_service import operator_tenant_ids_for_regulator
             allowed = set(operator_tenant_ids_for_regulator(regulator_id))
             if allowed:
                 docs = [d for d in docs if (d.to_dict().get("tenant_id") or None) in allowed]
-        return self._aggregate_surveys(docs)
+        data = self._aggregate_surveys(docs)
+        # B-scope exception (approved): hydrate each operator's latest
+        # assessment date from MAX(survey_responses.submitted_at) so the CAAN
+        # maturity page can drop its client-side Firestore read entirely.
+        latest = self._latest_survey_assessment_dates(tenant_ids=allowed or None)
+        for op in data.get("operators", []):
+            op["assessment_date"] = latest.get(op.get("tenant_id"))
+        return data
+
+    def _latest_survey_assessment_dates(
+        self, tenant_ids: Optional[set] = None
+    ) -> Dict[str, str]:
+        """Latest survey submission date (ISO ``YYYY-MM-DD``) per tenant slug.
+
+        Single, tightly-scoped exception to the no-Firestore rule (approved):
+        the per-operator date that ```caan-sms-maturity.html``` used to read
+        from the Firestore collectionGroup is now computed as
+        ``MAX(survey_responses.submitted_at)`` filtered by the current demo
+        scope. Returns an empty map on any query failure so the operator cards
+        degrade to "—" exactly as they did without the Firestore read.
+        """
+        self._register_all_tenant_slugs()
+
+        async def _fetch() -> List[tuple]:
+            async with session_scope() as session:
+                stmt = (
+                    select(SurveyResponse.tenant_id, func.max(SurveyResponse.submitted_at))
+                    .where(SurveyResponse.is_demo == demo_scope())
+                    .group_by(SurveyResponse.tenant_id)
+                )
+                rows = (await session.execute(stmt)).all()
+                return [(str(tid), ts) for tid, ts in rows if ts is not None]
+
+        try:
+            out: Dict[str, str] = {}
+            for tid_raw, ts in run(_fetch()):
+                slug = tenant_slug(tid_raw)
+                if tenant_ids is not None and slug not in tenant_ids:
+                    continue
+                out[slug] = ts.date().isoformat()
+            return out
+        except Exception as e:
+            logger.warning(f"CAAN latest assessment-date query failed: {e}")
+            return {}
 
     def get_caan_state(self, **overrides) -> Dict[str, Any]:
         """Full CAAN executive-summary payload, aggregated server-side.

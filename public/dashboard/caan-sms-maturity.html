@@ -22,7 +22,6 @@ AUTHOR: AviaSAFE Systems
     <link rel="stylesheet" href="/css/shell.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="../js/chart-theme.js"></script>
@@ -239,37 +238,17 @@ function regQuery() {
     return `regulator_id=${encodeURIComponent(REGULATOR_ID)}`;
 }
 
-async function loadTenantMap() {
+async function loadTenantNames() {
+    // Operator display names come from the CAAN-scoped state endpoint (the
+    // API aggregates tenant metadata server-side) instead of a Firestore read.
     const map = {};
     try {
-        if (!window.db) return map;
-        const snap = await window.db.collection('tenants').get();
-        snap.forEach(doc => {
-            const d = doc.data();
-            map[doc.id] = d.name || doc.id;
+        const stateData = await ApiClient.get(`/api/v1/dashboard/caan/state?${regQuery()}`);
+        (stateData.operators || []).forEach(op => {
+            if (op.tenant_id && op.name) map[op.tenant_id] = op.name;
         });
     } catch (err) {
         console.warn('Tenant names unavailable:', err);
-    }
-    return map;
-}
-
-async function loadLastSurveyDates() {
-    const map = {};
-    try {
-        if (!window.db) return map;
-        const snap = await window.db.collectionGroup('surveys').get();
-        snap.forEach(doc => {
-            const d = doc.data();
-            const tid = d.tenant_id || doc.ref.path.split('/')[1];
-            const raw = d.submitted_at;
-            if (!tid || !raw) return;
-            const t = raw && raw.toDate ? raw.toDate() : new Date(raw);
-            if (isNaN(t.getTime())) return;
-            if (!map[tid] || t > map[tid]) map[tid] = t;
-        });
-    } catch (err) {
-        console.warn('Survey assessment dates unavailable:', err);
     }
     return map;
 }
@@ -281,16 +260,15 @@ async function loadMaturity() {
     const statsEl = document.getElementById('aggregateStats');
     statsEl.innerHTML = '<div class="loading" style="grid-column:1/-1;"><i class="fas fa-spinner fa-spin"></i> Loading State SMS maturity...</div>';
     try {
-        const [data, lastDates, tenantMap] = await Promise.all([
+        const [data, tenantMap] = await Promise.all([
             ApiClient.get(`/api/v1/dashboard/caan/survey-maturity?${regQuery()}`),
-            loadLastSurveyDates(),
-            loadTenantMap(),
+            loadTenantNames(),
         ]);
         const state = data.state || {};
         const operators = (data.operators || []).map(o => ({
             ...o,
             display_name: tenantMap[o.tenant_id] || o.tenant_id,
-            assessment_date: lastDates[o.tenant_id] ? lastDates[o.tenant_id] : null,
+            assessment_date: o.assessment_date || null,
         }));
         renderAggregateStats(state, operators.length);
         renderPillarRadar(state);

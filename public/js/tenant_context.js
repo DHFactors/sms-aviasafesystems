@@ -344,17 +344,17 @@
     async function resolveTenantTitle(tenantId) {
         if (!tenantId) return null;
         try {
-            if (global.db && global.db.collection) {
-                var profileRef = global.db.collection('tenants').doc(tenantId).collection('profile').doc('operational');
-                var snap = await profileRef.get();
-                if (snap.exists && snap.data().tenant_name) return snap.data().tenant_name;
-                var tenantRef = global.db.collection('tenants').doc(tenantId);
-                var t = await tenantRef.get();
-                if (t.exists) {
-                    var d = t.data() || {};
-                    if (d.name) return d.name;
-                    if (d.tenant_name) return d.tenant_name;
-                    if (d.display_name) return d.display_name;
+            // Tenant display name resolved from the public config endpoint
+            // instead of a Firestore read. The legacy curated
+            // profile/operational.tenant_name field has no API equivalent, so
+            // the tenant row `name` is used as the display name.
+            var base = (global.APP_CONFIG && global.APP_CONFIG.apiBaseUrl) || global.API_BASE_URL || '';
+            if (base && global.fetch) {
+                var res = await global.fetch(base + '/api/v1/tenants/' + encodeURIComponent(tenantId) + '/config');
+                if (res.ok) {
+                    var body = await res.json();
+                    var d = body && body.data !== undefined ? body.data : body;
+                    if (d && d.name) return d.name;
                 }
             }
         } catch (e) {

@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="/css/shell.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="/js/firebase.js?v=4.0.1"></script>
     <script src="/js/tenant_context.js"></script>
@@ -238,22 +237,27 @@ async function loadTenants() {
         }
 
         document.getElementById('tenantSelectorCard').style.display = 'block';
-        var snapshot = await firebase.firestore().collection('tenants').get();
+        var res = await ApiClient.get('/api/v1/admin/tenants');
+        var rows = (res && res.tenants) ? res.tenants : [];
 
-        if (snapshot.empty) {
+        if (!rows.length) {
             select.innerHTML = '<option value="">No tenants available</option>';
             return;
         }
 
         tenants = [];
-        snapshot.forEach(function(doc) {
-            var data = doc.data();
-            tenants.push({ id: doc.id, name: data.name || doc.id, icao: data.icao, surveyConfig: data.surveyConfig || null });
+        rows.forEach(function(r) {
+            var id = r.id || r.tenant_id;
+            if (!id) return;
+            tenants.push({ id: id, name: r.name || id, icao: r.icao, surveyConfig: r.surveyConfig || null });
             var option = document.createElement('option');
-            option.value = doc.id;
-            option.textContent = data.name || doc.id;
+            option.value = id;
+            option.textContent = r.name || id;
             select.appendChild(option);
         });
+        if (tenants.length === 0) {
+            select.innerHTML = '<option value="">No tenants available</option>';
+        }
     } catch (error) {
         console.error('Error loading tenants:', error);
         select.innerHTML = '<option value="">Error loading tenants</option>';

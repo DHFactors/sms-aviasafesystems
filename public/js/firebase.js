@@ -14,9 +14,10 @@
 // ============================================================================
 
 // Single consolidated environment (2026): the whole platform runs against the
-// `sms-db` named Firestore database in the aerosafety-sms-prod project. The
-// former isolated `sms-db-beta` environment (and its beta host detection) has
-// been decommissioned — every host uses the same config.
+// aerosafety-sms-prod project. The former isolated beta environment (and its
+// beta host detection) has been decommissioned — every host uses the same
+// config. Firebase Auth is the only client SDK service used; data-plane reads
+// are served by the Render backend API (the Firestore client was removed in B).
 const IS_BETA_ENV = false;
 
 const PROD_CONFIG = {
@@ -26,7 +27,6 @@ const PROD_CONFIG = {
     storageBucket: "aerosafety-sms-prod.firebasestorage.app",
     messagingSenderId: "527947363983",
     appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
-    databaseId: "sms-db",
     appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
 };
 
@@ -89,67 +89,56 @@ function loadFirebaseSDK() {
         scriptApp.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js';
         scriptApp.async = true;
         scriptApp.onload = function() {
-            // Load Firestore SDK
-            const scriptFirestore = document.createElement('script');
-            scriptFirestore.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js';
-            scriptFirestore.async = true;
-            scriptFirestore.onload = function() {
-                // Load Auth SDK
-                const scriptAuth = document.createElement('script');
-                scriptAuth.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js';
-                scriptAuth.async = true;
-                scriptAuth.onload = function() {
-                    // Load App Check SDK
-                    const scriptAppCheck = document.createElement('script');
-                    scriptAppCheck.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js';
-                    scriptAppCheck.async = true;
-                    scriptAppCheck.onload = function() {
-                        // Load Storage SDK (optional)
-                        const scriptStorage = document.createElement('script');
-                        scriptStorage.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js';
-                        scriptStorage.async = true;
-                        scriptStorage.onload = function() {
-                            initializeFirebase();
-                            initAppCheck();
-                            resolve(firebase);
-                        };
-                        scriptStorage.onerror = function() {
-                            initializeFirebase();
-                            initAppCheck();
-                            resolve(firebase);
-                        };
-                        document.head.appendChild(scriptStorage);
+            // Load Auth SDK — Auth is the only Firebase client service used
+            // (Firestore was removed in B; data comes from the Render API).
+            const scriptAuth = document.createElement('script');
+            scriptAuth.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js';
+            scriptAuth.async = true;
+            scriptAuth.onload = function() {
+                // Load App Check SDK
+                const scriptAppCheck = document.createElement('script');
+                scriptAppCheck.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js';
+                scriptAppCheck.async = true;
+                scriptAppCheck.onload = function() {
+                    // Load Storage SDK (optional)
+                    const scriptStorage = document.createElement('script');
+                    scriptStorage.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js';
+                    scriptStorage.async = true;
+                    scriptStorage.onload = function() {
+                        initializeFirebase();
+                        initAppCheck();
+                        resolve(firebase);
                     };
-                    scriptAppCheck.onerror = function() {
-                        // App Check is optional
-                        const scriptStorage = document.createElement('script');
-                        scriptStorage.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js';
-                        scriptStorage.async = true;
-                        scriptStorage.onload = function() {
-                            initializeFirebase();
-                            resolve(firebase);
-                        };
-                        scriptStorage.onerror = function() {
-                            initializeFirebase();
-                            resolve(firebase);
-                        };
-                        document.head.appendChild(scriptStorage);
+                    scriptStorage.onerror = function() {
+                        initializeFirebase();
+                        initAppCheck();
+                        resolve(firebase);
                     };
-                    document.head.appendChild(scriptAppCheck);
+                    document.head.appendChild(scriptStorage);
                 };
-                scriptAuth.onerror = function() {
-                    // Auth is optional, still resolve
-                    initializeFirebase();
-                    resolve(firebase);
+                scriptAppCheck.onerror = function() {
+                    // App Check is optional
+                    const scriptStorage = document.createElement('script');
+                    scriptStorage.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js';
+                    scriptStorage.async = true;
+                    scriptStorage.onload = function() {
+                        initializeFirebase();
+                        resolve(firebase);
+                    };
+                    scriptStorage.onerror = function() {
+                        initializeFirebase();
+                        resolve(firebase);
+                    };
+                    document.head.appendChild(scriptStorage);
                 };
-                document.head.appendChild(scriptAuth);
+                document.head.appendChild(scriptAppCheck);
             };
-            scriptFirestore.onerror = function() {
-                // Firestore is optional, still resolve
+            scriptAuth.onerror = function() {
+                // Auth is optional, still resolve
                 initializeFirebase();
                 resolve(firebase);
             };
-            document.head.appendChild(scriptFirestore);
+            document.head.appendChild(scriptAuth);
         };
         scriptApp.onerror = function() {
             reject(new Error('Failed to load Firebase SDK'));
@@ -181,58 +170,20 @@ function initializeFirebase() {
 // ============================================================================
 
 let auth = null;
-let db = null;
 
 // ============================================================================
-// NAMED DATABASE BINDING
+// SERVICE INIT
 // ============================================================================
-// The compat SDK's firebase.firestore() always resolves to the "(default)"
-// database and silently ignores a databaseId argument, so it can never reach
-// the sms-db named database this project uses. To fix that we
-// pull the modular Firestore from the app container using the database
-// identifier, wrap it in the compat Firestore class, and route the namespace
-// factory — and therefore every page's firebase.firestore() call — to it.
-// This keeps db.collection(...), collectionGroup(...) and all compat firestore
-// calls working against the correct database.
-
-var _compatFirestoreFactory = null;
-var _namedDbCache = {};
-
-function getNamedFirestore(appCompat, databaseId) {
-    if (_namedDbCache.hasOwnProperty(databaseId)) return _namedDbCache[databaseId];
-    var container = appCompat._delegate.container;
-    var modDb = container.getProvider('firestore').getImmediate({ identifier: databaseId });
-    // Borrow a real persistence provider from a default compat instance so
-    // enablePersistence() keeps working on the wrapped instance.
-    var defaultCompat = _compatFirestoreFactory(appCompat);
-    var compatDb = new _compatFirestoreFactory.Firestore(appCompat, modDb, defaultCompat._persistenceProvider);
-    _namedDbCache[databaseId] = compatDb;
-    return compatDb;
-}
-
-function patchFirestoreFactory() {
-    if (_compatFirestoreFactory) return; // already patched
-    _compatFirestoreFactory = firebase.firestore;
-    var originalFactory = _compatFirestoreFactory;
-    function factory(appArg, databaseIdArg) {
-        var app = appArg || firebase.app();
-        var dbId = databaseIdArg || firebaseConfig.databaseId;
-        return getNamedFirestore(app, dbId);
-    }
-    for (var key in originalFactory) {
-        if (typeof originalFactory[key] !== 'undefined') {
-            factory[key] = originalFactory[key];
-        }
-    }
-    firebase.firestore = factory;
-}
+// Firebase Auth is the only Firebase client service this app uses. The
+// Firestore named-database shim (getNamedFirestore / patchFirestoreFactory)
+// was removed in B: data-plane reads now come from the Render backend API.
 
 // Ensure the Auth compat library is present before initServices() tries to
-// call firebase.auth(). Some pages load only the App + Firestore compat SDKs,
-// or load firebase.js before the auth-compat <script> has finished — calling
-// firebase.auth() in that window throws "firebase.auth is not a function".
-// Best-effort: load auth-compat dynamically when missing, then always resolve
-// (auth stays null if the CDN script fails, never blocking the page).
+// call firebase.auth(). Some pages load firebase.js before the auth-compat
+// <script> has finished — calling firebase.auth() in that window throws
+// "firebase.auth is not a function". Best-effort: load auth-compat
+// dynamically when missing, then always resolve (auth stays null if the CDN
+// script fails, never blocking the page).
 function loadAuthCompatIfNeeded() {
     return new Promise(function (resolve) {
         if (typeof firebase === 'undefined') { resolve(); return; }
@@ -254,12 +205,6 @@ function initServices() {
                     auth = firebase.auth();
                 } else {
                     console.warn('⚠️ Firebase Auth SDK not available on this page — auth disabled.');
-                }
-                if (typeof firebase.firestore === 'function') {
-                    patchFirestoreFactory();
-                    db = getNamedFirestore(firebase.app(), firebaseConfig.databaseId);
-                } else {
-                    console.warn("Firestore SDK not available on this page.");
                 }
                 console.log('✅ Firebase services initialized');
             } catch (error) {
@@ -394,7 +339,6 @@ window.getAppCheckToken = getAppCheckToken;
         initServices().then(function() {
             window.firebase = firebase;
             window.auth = auth;
-            window.db = db;
             console.log('✅ Firebase loaded from CDN');
         });
     } else {
@@ -408,14 +352,12 @@ window.getAppCheckToken = getAppCheckToken;
                 clearAppCheckThrottle();
                 window.firebase = firebase;
                 window.auth = auth;
-                window.db = db;
                 console.log('✅ Firebase loaded dynamically');
             })
             .catch(function(error) {
                 console.warn('⚠️ Firebase load failed:', error.message);
                 window.firebase = null;
                 window.auth = null;
-                window.db = null;
             });
     }
 })();

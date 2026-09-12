@@ -58,16 +58,36 @@ async function applyTenantBranding() {
 // TENANT VALIDATION
 // ============================================================================
 
+// Tenants flagged as lifecycle-inactive must be rejected exactly like the
+// legacy Firestore `active === false` check.
+const INACTIVE_TENANT_STATUSES = ['INACTIVE', 'SUSPENDED', 'RETIRED', 'CANCELLED'];
+
+async function tenantApi(path) {
+    try {
+        var user = (typeof firebase !== 'undefined' && firebase.auth) ? firebase.auth().currentUser : null;
+        var token = user ? await user.getIdToken(false) : null;
+        var base = (window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl) || window.API_BASE_URL || 'https://aviasafe-unified-platform.onrender.com';
+        var res = await fetch(base + path, {
+            headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+        });
+        if (!res.ok) return null;
+        var json = await res.json();
+        return json && json.data !== undefined ? json.data : json;
+    } catch (err) {
+        return null;
+    }
+}
+
 async function validateTenant(tenantId) {
     if (!tenantId) return { valid: false, error: 'No tenant provided' };
     
     try {
-        const doc = await db.collection('tenants').doc(tenantId).get();
-        if (!doc.exists) {
+        const data = await tenantApi('/api/v1/tenants/' + encodeURIComponent(tenantId));
+        if (!data) {
             return { valid: false, error: `Tenant "${tenantId}" not found` };
         }
-        const data = doc.data();
-        if (data.active === false) {
+        const status = String(data.status || '').toUpperCase();
+        if (INACTIVE_TENANT_STATUSES.indexOf(status) !== -1) {
             return { valid: false, error: `Tenant "${tenantId}" is inactive` };
         }
         return { valid: true, data, tenantId };
@@ -82,9 +102,8 @@ async function validateTenant(tenantId) {
 
 async function getTenantMetadata(tenantId) {
     try {
-        const doc = await db.collection('tenants').doc(tenantId).get();
-        if (!doc.exists) return null;
-        return doc.data();
+        const data = await tenantApi('/api/v1/tenants/' + encodeURIComponent(tenantId));
+        return data || null;
     } catch (error) {
         console.error('Error fetching tenant metadata:', error);
         return null;
