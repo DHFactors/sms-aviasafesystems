@@ -27,6 +27,14 @@ def _high_in_memory_rate_limit(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _disable_onboarding_hazard_seed(monkeypatch):
+    """Tenant onboarding (wizard + register/join) seeds ICAO hazards through the
+    unified seeder's live-connection Postgres path. The suite must stay hermetic
+    against the real DATABASE_URL, so the seed is switched off globally."""
+    monkeypatch.setattr(settings, "ONBOARDING_HAZARD_SEED", False)
+
+
+@pytest.fixture(autouse=True)
 def _fresh_tenant_status_cache():
     """The tenant-status cache lives in a module global keyed by tenant slug,
     so a status cached by one test (e.g. SUSPENDED for a slug) can poison a

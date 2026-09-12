@@ -498,6 +498,36 @@ async def admin_list_regulators(
     return {"success": True, "regulators": list_regulators()}
 
 
+async def _seed_new_tenant_hazards(tenant_data: Dict[str, Any], result: Dict[str, Any]) -> int:
+    """Seed the ICAO hazard register for a just-created tenant (FIX 1).
+
+    The wizard never seeded hazards; tenant onboarding relies on
+    seed_tenant_hazards. Firestore was removed, so only the Postgres half
+    runs. The seed must never fail the provisioning itself, so failures are
+    logged and surfaced as `seeded_hazards: 0` for a retry.
+    """
+    if not settings.ONBOARDING_HAZARD_SEED:
+        return 0
+    tid_slug = (
+        tenant_data.get("tenant_id")
+        or tenant_data.get("id")
+        or (result.get("tenant") or {}).get("tenant_id")
+    )
+    if not tid_slug:
+        logger.warning("No tenant_id for hazard seeding after admin create")
+        return 0
+    try:
+        from scripts.seed.unified_seeder import seed_tenant_hazards
+
+        seed_result = await seed_tenant_hazards(tid_slug, count=6, target="pg")
+        seeded = int(seed_result.get("seeded") or 0)
+        logger.info(f"Seeded {seeded} hazards for new tenant {tid_slug}")
+        return seeded
+    except Exception as e:
+        logger.error(f"Post-onboarding hazard seed failed for {tid_slug}: {e}")
+        return 0
+
+
 @router.post("/tenants", status_code=status.HTTP_200_OK)
 async def admin_create_tenant(
     req: TenantSetupRequest,
@@ -515,12 +545,13 @@ async def admin_create_tenant(
         from app.services.tenant_credentials import create_tenant_with_credentials
         try:
             result = create_tenant_with_credentials(data, user)
-            return {"success": True, **result}
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
         except Exception as e:
             logger.error(f"Create tenant with credentials failed: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+        result["seeded_hazards"] = await _seed_new_tenant_hazards(data, result)
+        return {"success": True, **result}
 
     from app.services.production_seed import create_tenant
     try:

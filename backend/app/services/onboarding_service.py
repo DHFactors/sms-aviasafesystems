@@ -74,27 +74,30 @@ async def onboard_tenant(
     tid = registered["tenant_id"]
 
     seed_result: Dict[str, Any] = {"seeded": 0, "dry_run": False}
-    try:
-        # Imported lazily so the whole `scripts.seed` path stays optional on
-        # deployments that only use the register/join flows.
-        from scripts.seed.unified_seeder import seed_tenant_hazards
+    if not settings.ONBOARDING_HAZARD_SEED:
+        logger.info(f"Onboarding hazard seed disabled for {tid} (ONBOARDING_HAZARD_SEED=False)")
+    else:
+        try:
+            # Imported lazily so the whole `scripts.seed` path stays optional on
+            # deployments that only use the register/join flows.
+            from scripts.seed.unified_seeder import seed_tenant_hazards
 
-        seed_result = await seed_tenant_hazards(
-            tid,
-            count=seed_count,
-            function=seed_function,
-            priority_override=priority_override,
-            target="both",
-        )
-        logger.info(f"Onboarding seeded {seed_result.get('seeded', 0)} hazards for {tid}")
-    except Exception as e:
-        # The seed must never fail the onboarding itself; surface as a warning
-        # so the caller can retry seeding separately.
-        logger.error(f"Onboarding hazard seed failed for {tid}: {e}")
-        seed_result = {
-            "seeded": 0,
-            "error": str(e)[:300],
-        }
+            seed_result = await seed_tenant_hazards(
+                tid,
+                count=seed_count,
+                function=seed_function,
+                priority_override=priority_override,
+                target="both",
+            )
+            logger.info(f"Onboarding seeded {seed_result.get('seeded', 0)} hazards for {tid}")
+        except Exception as e:
+            # The seed must never fail the onboarding itself; surface as a warning
+            # so the caller can retry seeding separately.
+            logger.error(f"Onboarding hazard seed failed for {tid}: {e}")
+            seed_result = {
+                "seeded": 0,
+                "error": str(e)[:300],
+            }
 
     email_result = send_welcome_email(
         email,

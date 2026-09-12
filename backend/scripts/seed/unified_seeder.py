@@ -182,7 +182,11 @@ async def seed_tenant_hazards(
     if not tid_slug:
         raise ValueError("tenant_id is required")
 
-    max_seqs = _max_sequences(get_db(), tid_slug)
+    try:
+        max_seqs = _max_sequences(get_db(), tid_slug)
+    except Exception as e:
+        logger.warning(f"Firestore sequence scan unavailable ({e}); using PG-only sequence start")
+        max_seqs = {}
     rows = _build_hazard_rows(
         tid_slug,
         count=count,
@@ -208,25 +212,29 @@ async def seed_tenant_hazards(
     now = datetime.now(timezone.utc)
 
     if target in ("firestore", "both"):
-        fb = get_db()
-        coll = (
-            fb.collection(settings.FIREBASE_COLLECTION_TENANTS)
-            .document(tid_slug)
-            .collection("hazards")
-        )
-        for row in rows:
-            doc = dict(row)
-            doc["tenant_id"] = tid_slug
-            doc["created_at"] = row["created_at"]
-            doc["updated_at"] = row["updated_at"]
-            doc["priority_date"] = row["priority_date"]
-            doc["status_date"] = row["status_date"]
-            doc["seed_version"] = SEED_VERSION
-            coll.document(f"haz-{row['hazard_id'].replace('/', '-')}").set(doc)
-        firestore_count = len(rows)
-        logger.info(f"Seeded {firestore_count} hazards to Firestore for {tid_slug}")
+        try:
+            fb = get_db()
+            coll = (
+                fb.collection(settings.FIREBASE_COLLECTION_TENANTS)
+                .document(tid_slug)
+                .collection("hazards")
+            )
+            for row in rows:
+                doc = dict(row)
+                doc["tenant_id"] = tid_slug
+                doc["created_at"] = row["created_at"]
+                doc["updated_at"] = row["updated_at"]
+                doc["priority_date"] = row["priority_date"]
+                doc["status_date"] = row["status_date"]
+                doc["seed_version"] = SEED_VERSION
+                coll.document(f"haz-{row['hazard_id'].replace('/', '-')}").set(doc)
+            firestore_count = len(rows)
+            logger.info(f"Seeded {firestore_count} hazards to Firestore for {tid_slug}")
+        except Exception as e:
+            logger.warning("Firestore removed — PG-only seed path used.")
+            firestore_count = 0
 
-    if target in ("supabase", "both"):
+    if target in ("supabase", "pg", "both"):
         tid_uuid = register_tenant(tid_slug)
         async with session_scope() as session:
             for row in rows:
@@ -384,8 +392,8 @@ def _main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--function", default=None, help="restrict to one ICAO function code")
     parser.add_argument("--priority", default=None, choices=["H", "M", "L"], help="force priority")
     parser.add_argument("--year", type=int, default=None, help="reference year")
-    parser.add_argument("--target", default="both", choices=["firestore", "supabase", "both"],
-                        help="which backend to write to")
+    parser.add_argument("--target", default="both", choices=["firestore", "supabase", "both", "pg"],
+                        help="which backend to write to ('pg' aliases 'supabase')")
     parser.add_argument("--demo", action="store_true", help="mark Supabase rows as demo data")
     parser.add_argument("--dry-run", action="store_true", help="compute only; write nothing")
     args = parser.parse_args(argv)
