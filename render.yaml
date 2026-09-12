@@ -2,8 +2,12 @@
 # Render Blueprint — single consolidated backend service
 # -----------------------------------------------------------------------------
 # Deploys the unified AviaSAFE API as one Docker web service. There is no
-# separate beta service: the platform runs against the consolidated `sms-db`
-# Firestore named database in the `aerosafety-sms-prod` project.
+# separate beta service.
+#
+# FIRESTORE DEPRECATION (phase C, 2026-09-12): the platform no longer reads the
+# Firestore named database `sms-db` (Auth-only). FIREBASE_DATABASE_URL and
+# FIREBASE_DATABASE_ID are commented out below; values stay in the dashboard for
+# 30-day rollback. All FIREBASE_AUTH_* keys remain active.
 #
 # Values marked `sync: false` are secrets — set them in the Render dashboard
 # (Services -> aviasafe-api -> Environment); they are never stored here.
@@ -34,17 +38,19 @@ services:
       - key: REDIS_URL
         sync: false
 
-      # ── Firebase Admin SDK (aerosafety-sms-prod / sms-db) ─────────────────
+      # ── Firebase Admin SDK (Auth-only; Firestore deprec. phase C 2026-09) ──
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_PRIVATE_KEY
         sync: false
       - key: FIREBASE_CLIENT_EMAIL
         sync: false
-      - key: FIREBASE_DATABASE_URL
-        sync: false
-      - key: FIREBASE_DATABASE_ID
-        value: sms-db
+      # DEPRECATED (phase C, 2026-09-12): Firestore named database — no longer
+      # read (Auth-only). Kept commented for 30-day rollback. Do not delete.
+      # - key: FIREBASE_DATABASE_URL
+      #   sync: false
+      # - key: FIREBASE_DATABASE_ID
+      #   value: sms-db
 
       # ── Supabase Postgres (operational tables) ────────────────────────────
       - key: DATABASE_URL

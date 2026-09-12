@@ -88,9 +88,10 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: Optional[str] = None
     FIREBASE_PRIVATE_KEY: Optional[str] = None
     FIREBASE_CLIENT_EMAIL: Optional[str] = None
-    # Deprecated: Firestore named database (sms-db) — no longer used after
-    # B4 Auth-only trim (app/firebase.py no longer creates a Firestore client).
-    # Kept for env backward-compat; ignored.
+    # Deprecated (phase C, 2026-09-12): Firestore named database (sms-db) — no
+    # longer used after B4 Auth-only trim (app/firebase.py no longer creates a
+    # Firestore client). Kept for env backward-compat and 30-day rollback;
+    # ignored at runtime. Do NOT delete yet.
     FIREBASE_DATABASE_ID: Optional[str] = None
     # Public Firebase Web API key used by the server-side login endpoint
     # (app/services/login_service.py) to verify credentials against the
