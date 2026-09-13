@@ -121,6 +121,11 @@ def test_upsert_user_doc_writes_through_pg(monkeypatch):
         captured["data"] = data
 
     monkeypatch.setattr(users_mod.pg, "upsert", _fake_upsert)
+    # Hardened upsert_user_doc verifies the row landed via fetch_by.
+    monkeypatch.setattr(
+        users_mod.pg, "fetch_by",
+        lambda model, col, value: {"uid": value, "email": "ops@x.test"},
+    )
     users_mod.upsert_user_doc("u9", email="ops@x.test", role="STAFF")
     assert captured["col"] == "uid"
     assert captured["value"] == "u9"
@@ -130,6 +135,19 @@ def test_upsert_user_doc_writes_through_pg(monkeypatch):
     assert captured["data"]["is_developer"] is False
     assert captured["data"]["tenant_id"] is None
     assert captured["data"]["updated_at"] is not None
+
+
+def test_upsert_user_doc_raises_when_mirror_not_verifiable(monkeypatch):
+    monkeypatch.setattr(
+        users_mod.pg, "upsert", lambda model, col, value, data: None
+    )
+    monkeypatch.setattr(
+        users_mod.pg, "fetch_by", lambda model, col, value: None
+    )
+    with pytest.raises(
+        RuntimeError, match="User mirror verification failed: u9"
+    ):
+        users_mod.upsert_user_doc("u9", email="ops@x.test", role="STAFF")
 
 
 # ---- regulator_service.py -------------------------------------------------
