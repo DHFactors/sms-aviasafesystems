@@ -1,0 +1,107 @@
+code,level_1_category,level_2_subcategory,nanocode_name
+AE101,Unsafe Acts,Performance-Based Errors,Unintended Operation of Equipment
+AE102,Unsafe Acts,Performance-Based Errors,Checklist Not Followed Correctly
+AE103,Unsafe Acts,Performance-Based Errors,Procedure Not Followed Correctly
+AE104,Unsafe Acts,Performance-Based Errors,Over-Controlled/Under-Controlled Aircraft/Vehicle
+AE105,Unsafe Acts,Performance-Based Errors,Breakdown in Visual Scan
+AE107,Unsafe Acts,Performance-Based Errors,Rushed or Delayed a Necessary Action
+AE201,Unsafe Acts,Judgment & Decision-Making Errors,Inadequate Real-Time Risk Assessment
+AE202,Unsafe Acts,Judgment & Decision-Making Errors,Failure to Prioritize Tasks Adequately
+AE205,Unsafe Acts,Judgment & Decision-Making Errors,Ignored a Caution/Warning
+AE206,Unsafe Acts,Judgment & Decision-Making Errors,Wrong Choice of Action During an Operation
+AV001,Unsafe Acts,Violations,Performs Work-Around Violation
+AV002,Unsafe Acts,Violations,Commits Widespread/Routine Violation
+AV003,Unsafe Acts,Violations,Extreme Violation - Lack of Discipline
+PE101,Preconditions,Physical Environment,Environmental Conditions Affecting Vision
+PE103,Preconditions,Physical Environment,Vibration Affects Vision or Balance
+PE106,Preconditions,Physical Environment,Heat/Cold Stress Impairs Performance
+PE108,Preconditions,Physical Environment,External Force or Object Impeded an Individual's Movement
+PE109,Preconditions,Physical Environment,Lights of Other Vehicle/Vessel/Aircraft Affected Vision
+PE110,Preconditions,Physical Environment,Noise Interference
+PE201,Preconditions,Technological Environment,Seat and Restraint System Problems
+PE202,Preconditions,Technological Environment,Instrumentation and Warning System Issues
+PE203,Preconditions,Technological Environment,Visibility Restrictions (not weather related)
+PE204,Preconditions,Technological Environment,Controls and Switches are Inadequate
+PE205,Preconditions,Technological Environment,Automated System Creates an Unsafe Situation
+PE206,Preconditions,Technological Environment,Workspace Incompatible with Operation
+PE207,Preconditions,Technological Environment,Personal Equipment Interference
+PE208,Preconditions,Technological Environment,Communication Equipment Inadequate
+PC302,Preconditions,Physical Problem,"Substance Effects (alcohol, supplements, medications, drugs)"
+PC304,Preconditions,Physical Problem,Loss of Consciousness (sudden or prolonged onset)
+PC305,Preconditions,Physical Problem,Physical Illness/Injury
+PC307,Preconditions,Physical Problem,Fatigue
+PC310,Preconditions,Physical Problem,Trapped Gas Disorders
+PC311,Preconditions,Physical Problem,Evolved Gas Disorders
+PC312,Preconditions,Physical Problem,Hypoxia/Hyperventilation
+PC314,Preconditions,Physical Problem,Inadequate Adaptation to Darkness
+PC315,Preconditions,Physical Problem,Dehydration
+PC317,Preconditions,Physical Problem,Body Size/Movement Limitations
+PC318,Preconditions,Physical Problem,Physical Strength & Coordination (inappropriate for task demands)
+PC319,Preconditions,Physical Problem,Nutrition/Diet
+PC202,Preconditions,State of Mind,Psychological Problem
+PC203,Preconditions,State of Mind,Life Stressors
+PC204,Preconditions,State of Mind,Emotional State
+PC205,Preconditions,State of Mind,Personality Style
+PC206,Preconditions,State of Mind,Overconfidence
+PC207,Preconditions,State of Mind,Pressing
+PC208,Preconditions,State of Mind,Complacency
+PC209,Preconditions,State of Mind,Motivation
+PC215,Preconditions,State of Mind,Mentally Exhausted (Burnout)
+PC501,Preconditions,Sensory Misperception,Motion Illusion – Kinesthetic
+PC502,Preconditions,Sensory Misperception,Turning/Balance Illusion – Vestibular
+PC503,Preconditions,Sensory Misperception,Visual Illusion
+PC504,Preconditions,Sensory Misperception,Misperception of Changing Environment
+PC505,Preconditions,Sensory Misperception,Misinterpreted/Misread Instrument
+PC507,Preconditions,Sensory Misperception,Misinterpretation of Auditory/Sound Cues
+PC508,Preconditions,Sensory Misperception,Spatial Disorientation
+PC511,Preconditions,Sensory Misperception,Temporal/Time Distortion
+PC101,Preconditions,Mental Awareness,Not Paying Attention
+PC102,Preconditions,Mental Awareness,Fixation
+PC103,Preconditions,Mental Awareness,Task Over-Saturation/Under-Saturation
+PC104,Preconditions,Mental Awareness,Confusion
+PC105,Preconditions,Mental Awareness,Negative Habit Transfer
+PC106,Preconditions,Mental Awareness,Distraction
+PC107,Preconditions,Mental Awareness,Geographically Lost
+PC108,Preconditions,Mental Awareness,Interference/Interruption
+PC109,Preconditions,Mental Awareness,Technical or Procedural Knowledge Not Retained after Training
+PC110,Preconditions,Mental Awareness,Inaccurate Expectation
+PP101,Preconditions,Teamwork,Failure of Crew/Team Leadership
+PP103,Preconditions,Teamwork,Inadequate Task Delegation
+PP104,Preconditions,Teamwork,Rank/Position Intimidation
+PP105,Preconditions,Teamwork,Lack of Assertiveness
+PP106,Preconditions,Teamwork,Critical Information Not Communicated
+PP107,Preconditions,Teamwork,Standard/Proper Terminology Not Used
+PP108,Preconditions,Teamwork,Failed to Effectively Communicate
+PP109,Preconditions,Teamwork,Task/Mission Planning/Briefing Inadequate
+SV001,Unsafe Supervision,Supervisory Violations,Failure to Enforce Existing Rules
+SV002,Unsafe Supervision,Supervisory Violations,Allowing Unwritten Policies to Become Standard
+SV003,Unsafe Supervision,Supervisory Violations,Directed Individual to Violate Existing Regulations
+SV004,Unsafe Supervision,Supervisory Violations,Authorized Unqualified Individuals for Task
+SP001,Unsafe Supervision,Planned Inappropriate Operations,Directed Task Beyond Personnel Capabilities
+SP002,Unsafe Supervision,Planned Inappropriate Operations,Inappropriate Team Composition
+SP003,Unsafe Supervision,Planned Inappropriate Operations,Selected Individual with Lack of Current or Limited Experience
+SP006,Unsafe Supervision,Planned Inappropriate Operations,Performed Inadequate Risk Assessment – Formal
+SP007,Unsafe Supervision,Planned Inappropriate Operations,Authorized Unnecessary Hazard
+SI001,Unsafe Supervision,Inadequate Supervision,Supervisory/Command Oversight Inadequate
+SI002,Unsafe Supervision,Inadequate Supervision,Improper Role-Modeling
+SI003,Unsafe Supervision,Inadequate Supervision,Failed to Provide Proper Training
+SI004,Unsafe Supervision,Inadequate Supervision,Failed to Provide Appropriate Policy/Guidance
+SI005,Unsafe Supervision,Inadequate Supervision,Personality Conflict with Supervisor
+SI006,Unsafe Supervision,Inadequate Supervision,Lack of Supervisory Responses to Critical Information
+SI007,Unsafe Supervision,Inadequate Supervision,Failed to Identify/Correct Risky or Unsafe Practices
+SI008,Unsafe Supervision,Inadequate Supervision,Selected Individual with Lack of Proficiency
+OR001,Organizational Influences,Resource Problems,Command and Control Resources are Deficient
+OR003,Organizational Influences,Resource Problems,Inadequate Infrastructure
+OR005,Organizational Influences,Resource Problems,Failure to Remove Inadequate/Worn-Out Equipment in a Timely Manner
+OR008,Organizational Influences,Resource Problems,Failure to Provide Adequate Operational Information Resources
+OR009,Organizational Influences,Resource Problems,Failure to Provide Adequate Funding
+OS001,Organizational Influences,Personnel Selection & Staffing,Personnel Recruiting and Selection Policies are Inadequate
+OS002,Organizational Influences,Personnel Selection & Staffing,Failure to Provide Adequate Manning/Staffing Resources
+OP001,Organizational Influences,Policy and Process Issues,Pace of Ops-tempo/Workload
+OP002,Organizational Influences,Policy and Process Issues,Organizational Program/Policy Risks not Adequately Assessed
+OP003,Organizational Influences,Policy and Process Issues,Provided Inadequate Procedural Guidance or Publications
+OP004,Organizational Influences,Policy and Process Issues,Organizational (formal) Training is Inadequate or Unavailable
+OP005,Organizational Influences,Policy and Process Issues,Flawed Doctrine/Philosophy
+OP006,Organizational Influences,Policy and Process Issues,Inadequate Program Management
+OP007,Organizational Influences,Policy and Process Issues,Purchasing or Providing Poorly Designed or Unsuitable Equipment
+OC001,Organizational Influences,Climate/Culture Influences,Organizational Climate/Culture

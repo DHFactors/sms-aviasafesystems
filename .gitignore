@@ -1,73 +1,85 @@
-# Database Secrets and Local Keys
+# ============================================================================
+# AviaSAFE — .gitignore
+# ============================================================================
+
+# ─── Environment & Secrets ─────────────────────────────────────────────────
 .env
-backend/.env
+.env.local
 *.env
-# Demo env copy carries real secrets — *.env does NOT match ".env.demo"
 .env.demo
+backend/.env
 backend/.env.demo
 **/.env.demo
+docs/.env.local
 
-# reCAPTCHA / App Check keys
-recaptch.txt
-*recaptch*
-
-# Firebase service account key
+# ─── Credentials & Keys ────────────────────────────────────────────────────
+# Firebase service account
 service-account.json
 *.service-account.json
 *-sa.json
+*serviceAccount*.json
 
-# Beta-testing credential exports (real passwords)
+# reCAPTCHA / App Check
+recaptch.txt
+*recaptch*
+
+# Test / beta credentials
 beta-testing-credentials.csv
-
-# Final consolidated credential reference (real passwords)
-final_credential.txt
+_archive/legacy-backups/beta-testing-credentials.csv
 BETA_CREDENTIALS_*.md
+credential.txt
 credential.md
 caan_credential.md
 docs/CREDENTIALS.md
+final_credential.txt
+*_credential*.txt
+*_credentials*.txt
 
-# Python Virtual Environments
+# TLS / SSH
+*.pem
+
+# ─── Client Data ───────────────────────────────────────────────────────────
+# Master Logsheets and other client-provided data
+
+# ─── Session & Working Artifacts ───────────────────────────────────────────
+session*.md
+session-*.md
+*-draft.md
+todos.md
+notes-*.md
+scratch*.txt
+*.bak
+
+# ─── Test Output ───────────────────────────────────────────────────────────
+test-results/
+tests/e2e/e2e_tokens.json
+
+# ─── Python ────────────────────────────────────────────────────────────────
 .venv/
 venv/
 env/
-
-# Python cache & build artifacts
 __pycache__/
 *.pyc
 .pytest_cache/
 .coverage
 *.egg-info/
 
-# Node.js
+# ─── Node.js ───────────────────────────────────────────────────────────────
 node_modules/
 
-# Firebase CLI cache
+# ─── Firebase / Supabase CLI Cache ─────────────────────────────────────────
 .firebase/
-
-# Supabase CLI local cache & transient data
 supabase/.temp/
 supabase/.branches/
-
-# Live auth tokens / one-off backup artifacts (never commit)
-tests/e2e/e2e_tokens.json
 scripts/firebase/backups/
 
-# Runtime logs
+# ─── Runtime Logs ──────────────────────────────────────────────────────────
 backend/logs/
 logs/
 backend/scripts/logs/
 
-# IDE and System Files
+# ─── IDE & OS Files ────────────────────────────────────────────────────────
 .vscode/
 .idea/
 Thumbs.db
-
-# Environment & credentials (Chunk 17)
-.env.local
-*.pem
-*serviceAccount*.json
-docs/.env.local
-
-docs/tenant_details.txt
-_archive/legacy-backups/beta-testing-credentials.csv
-credential.txt
+.DS_Store

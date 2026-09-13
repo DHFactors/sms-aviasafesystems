@@ -132,6 +132,95 @@ duplicates the `users` table. It is a Firestore-era denormalization that survive
 ### Effort
 ~2 days — one source of truth for user-tenant membership; prevents this class of bug permanently.
 
+## Phase 1 — Setup Key Hardening: Server-Issued Short-Lived Tokens (Backlog)
+
+Priority: **HIGH** (Phase 1, foundation). Recorded 2026-09-13. Quick hardening (client idle
+timeout for the `sessionStorage` setup key) is shipped in `public/js/admin.js`; this item removes
+the static `SETUP_SECRET` from the browser entirely.
+
+### Objective
+Eliminate client-side retention of the static setup key. The key is never sent to the browser, so
+an XSS or a compromised browser cannot exfiltrate it — the exposure window becomes zero.
+
+### Design
+- New `POST /api/v1/admin/setup-token` mints a **15-minute signed token**.
+- Exchange the raw `SETUP_SECRET` for the token **exactly once** (SUPER_ADMIN token + setup key
+  still required at mint time).
+- All ~40 privileged endpoints validate the token instead of the raw key.
+- Frontend stores **only the token** (sessionStorage, with the idle timeout already in place).
+- Token auto-renews on activity, expires on idle, full teardown on logout.
+
+### Effort
+~1–2 days — touches every privileged admin route and page.
+
+## Phase 1 — Welcome Email: Enable Real Delivery (Backlog)
+
+Priority: **Medium** — delivery provider is currently `'none'` (logged, not sent);
+new sita-air users received their password only via the one-time on-screen display.
+Recorded 2026-09-13.
+
+### Work
+1. Configure a real provider (`smtp` / `sendgrid`) for `EMAIL_PROVIDER` in deploy env.
+2. Verify `send_welcome_email` path (see `backend/app/services/email_service.py:258`) end-to-end on a stamp user.
+3. Fallback UX: if delivery is `'none'`, the Step-3 create page must surface "email will not be sent".
+
+## Phase 1 — Step 3 Create-User: Copy-Password Button (Backlog)
+
+Priority: **Low** — usability. The 14-char generated password is displayed as plain text and must be
+hand-typed; a prior incident was traced to a hand-transcription error. Recorded 2026-09-13.
+
+### Work
+1. Clipboard API button beside the password on `step3-manage.html` with a visual "copied" confirmation.
+2. Keep the one-time display; add a "reveal" toggle if hidden.
+
+## Phase 1 — CI Pipeline: Regression Test Automation (Backlog)
+
+Priority: **MEDIUM** — foundation, not blocking pilot delivery. Recorded 2026-09-13.
+
+### Objective
+Run the test suite automatically on every push to `main` and on every PR.
+
+### Design decisions to settle in Phase 1
+- **Runner**: GitHub Actions vs Render pre-deploy vs self-hosted.
+- **Secrets strategy**: inject the Firebase service account + web API key into the runner
+  securely, without committing them to the repo.
+- **Live-tests strategy**: keep live-Auth/live-DB tests (e.g. `tests/test_admin_user_password.py`)
+  gated behind an explicit env flag so faked tests stay fast and deterministic; live tests run
+  only in a trusted environment.
+- **Flake policy**: quarantine known-flaky, state-dependent tests so they never block deploys.
+
+### Effort
+~1–2 days. The regression test (`tests/test_admin_user_password.py`) already runs locally and
+must be run before each commit / milestone until this pipeline exists.
+
+## Phase 1 — Survey Hostname Mapping (Backlog)
+
+Priority: **Low**. Recovered 2026-09-13 from a stale session file. `public/survey/app.js` `routes`
+currently maps only `sita-air`, `nepal-airlines`, `caan-ops`.
+
+### Decision to make
+- (a) Add new tenant subdomains to the map as they onboard, or
+- (b) Standardize on `?tenant=` query params for all surveys.
+
+### Trigger
+A tenant outside the current map is onboarded.
+
+### Effort
+~1 hour.
+
+## Phase 1 — Repo Hygiene: No Snapshot Files (Convention)
+
+Working-session artifacts (todos snapshots, session logs, chat exports) must **not** be committed to
+the repo. Actionable items recovered from such files go into ROADMAP.md; the source files are
+deleted after extraction. Recorded 2026-09-13 (artifacts recovered from
+`sms360x/sms-aviasafesystems-main-downloaded/todos.md` before folder deletion).
+
+## Phase 3 — Per-Employee Survey Issuance (Enhancement)
+
+Employee-scoped collection with unique per-employee links or `respondentId`, built on top of the
+existing tenant-keyed storage. Enables per-employee analytics. **Not required for the pilot.**
+Recovered 2026-09-13 from a stale session file.
+
 ## Phase 2A — AE Dashboard Redesign
 
 Dependency for Phase 2B. Details TBD (separate backlog item; recorded 2026-09-13).
