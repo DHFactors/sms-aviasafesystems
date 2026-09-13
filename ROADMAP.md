@@ -5,6 +5,13 @@ Current-state roadmap for the AviaSAFE SMS Platform. Supersedes the earlier "Saf
 [docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md](./docs/archive/PROJECT_STATUS_REPORT_05AUG2026.md);
 the latest dated report is [docs/PROJECT_STATUS_REPORT_2026-08-24.md](./docs/PROJECT_STATUS_REPORT_2026-08-24.md).
 
+## Delivery Notes
+
+> The 12-month demo seed is **synthetic**. It provides a populated demo experience at delivery but is
+> **not** a substitute for real customer data. Customers must import their **Master Logsheet** via
+> Phase 2B to make the platform authoritative for their operation. Disclose this clearly in the
+> delivery scope email.
+
 ## Milestones Reached
 
 | Phase | Status | Notes |
@@ -29,6 +36,109 @@ the latest dated report is [docs/PROJECT_STATUS_REPORT_2026-08-24.md](./docs/PRO
   Firestore indexes (TD-10).
 - **RC-6 — Pre-Production / Pilot:** App Check server-side enforcement (TD-12), MFA, backups/PITR,
   audit trail, staging environment, penetration/security review.
+
+## Phase 1 — Nav Overhaul (Backlog, Scheduled Post-Pilot)
+
+Role-specific navigation, recorded 2026-09-13 from FIX 5 Phase 1D findings (145@ / sita-air walkthrough).
+Not blocking pilot delivery; announced to customers as "coming in the next release."
+
+### Current state
+- `shell.js` groups are role-gated at the group level only.
+- No item-level gating.
+- No distinct nav per role.
+- Home links to `safety.html` regardless of role.
+
+### Observed impact (145@ walkthrough)
+- DEPT_ADMIN sees **Hazard Management** and **Reporting** — not their job.
+- Home from DEPT_ADMIN links to `safety.html` — inaccessible (403).
+- Corrective Actions shows **Issue CAN** and **Master Register** — write actions not meant for DEPT_ADMIN.
+- AE sees the same nav as the Safety Manager.
+
+### Target state
+- Each role has a purpose-built nav (see matrix below).
+- Group-level **and** item-level gating.
+- Role-aware Home destination:
+  - SAFETY → `/safety.html`
+  - AE → `/dashboard/ae-dashboard.html`
+  - DEPT_ADMIN → `/dashboard/my-tasks.html`
+  - CAAN_SMD → `/caan.html`
+  - SUPER_ADMIN → `/admin/production-setup.html`
+
+### Role visibility matrix
+
+| Group              | SAFETY | AE        | DEPT_ADMIN | CAAN | SUPER |
+|--------------------|--------|-----------|------------|------|-------|
+| Dashboard          | ✅     | ✅        | ✅         | ✅   | ✅    |
+| Reporting          | ✅     | ❌        | ❌         | ❌   | ✅    |
+| Hazard Management  | ✅     | Read-only | ❌         | ❌   | ✅    |
+| Risk Assessment    | ✅     | Read-only | ❌         | ❌   | ✅    |
+| Corrective Actions | ✅     | Read-only | ✅ dept    | ❌   | ✅    |
+| SMS Health         | ✅     | ✅        | ❌         | ✅   | ✅    |
+| State Oversight    | ❌     | ❌        | ❌         | ✅   | ✅    |
+| Administration     | ✅     | Conditional| ❌         | ❌   | ✅    |
+
+### Implementation
+- `NAV_CONFIG` schema extended:
+  ```js
+  { group, items, visibleTo: ['ROLE1','ROLE2'],
+    itemOverrides: { itemId: { visibleTo: [...],
+                               readOnly: bool } } }
+  ```
+- `shell.js` renders per role at login.
+- Home destination resolved via `getHomeDestination(role)`.
+- Tests cover the matrix.
+
+### Summary decisions
+| Item | Decision |
+|---|---|
+| Reporting group | ❌ Hidden for DEPT_ADMIN (145@) |
+| Hazard Management | ❌ Hidden for DEPT_ADMIN (145@) |
+| Home destination | Role-aware — DEPT_ADMIN (145@) → `my-tasks.html` |
+| Corrective Actions submenu | Refined for DEPT_ADMIN (My Tasks, CAN Register, CAP Register) |
+| Issue CAN | Hidden for DEPT_ADMIN (145@) |
+| Master Register | Hidden or read-only for DEPT_ADMIN (145@) |
+| AE navigation | Distinct AE nav (no longer identical to Safety Manager) |
+| Full nav spec | Role-by-role matrix above |
+| Backlog | Phase 1 Nav Overhaul |
+| Pilot impact | Not blocking — scheduled for post-pilot |
+
+## Phase 2A — AE Dashboard Redesign
+
+Dependency for Phase 2B. Details TBD (separate backlog item; recorded 2026-09-13).
+
+## Phase 2B — Historical Import (Excel / CSV)
+
+Priority: HIGH — this is the "move from Excel" feature. Recorded 2026-09-13.
+
+### Objective
+Let the Safety Manager upload the customer's Master Logsheet (and related sheets) so the
+platform contains **real** safety data, not synthetic seed data.
+
+### Deliverables
+- Import UI (card on `safety.html` dashboard, leading to `/import/index.html`)
+- Sheet-type detection: Master logsheet, Occurrence, Safety Deficiencies, Hazard log,
+  Flight diversions, Risk register
+- Column-mapping UI (CSV column → platform field)
+- Validation (dates, ADREP codes, required fields)
+- Dry-run mode (validate only, no writes)
+- Import modes: append / replace / skip-duplicates
+- Audit-logged (who imported what, when)
+- Per-tenant scoping (a tenant imports only its own data)
+
+### Explicit non-goals
+- CAN/CAP import (the customer's Excel has no structured CAN/CAP data — these are platform
+  outputs, generated going forward)
+- Automatic derivation of hazards from VSR/MOR (Phase 3 — Dynamic Barrier Integrity)
+
+### Post-import outcome
+- Tenant's hazards, reports, diversions loaded
+- CAN/CAP registers start at zero
+- From go-live, the platform becomes authoritative
+- Leading and lagging indicators compute from real data
+
+### Cross-reference
+- Depends on Phase 2A (AE dashboard redesign) being complete
+- Feeds Phase 3 (Safety Intelligence) — statistical indicators need real data, not synthetic
 
 ## Product Roadmap (post-pilot, charter-gated)
 
