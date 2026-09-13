@@ -18,7 +18,7 @@ from datetime import date, datetime, timezone
 
 from app.core.config import settings
 from app.db import pg
-from app.db.db_models import Feedback, Tenant, UserProfile
+from app.db.db_models import Feedback, Regulator, Tenant, UserProfile
 from app.firebase import get_auth, get_db, verify_firebase_token
 from app.middleware.auth import get_current_user, get_safety_manager, get_admin_user
 from app.services.risk_matrix import (
