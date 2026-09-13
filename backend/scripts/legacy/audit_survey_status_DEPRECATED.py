@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - survey windows read from Postgres tenants.data
+# Do not run. Retained for historical reference only.
+
 """Read-only audit of tenant survey campaign status in the configured database.
 
 Outputs a plain-text table of every tenant's survey status based on the exact

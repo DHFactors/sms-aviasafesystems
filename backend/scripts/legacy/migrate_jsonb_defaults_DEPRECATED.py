@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - jsonb defaults in schema_init
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: migrate_jsonb_defaults.py
 # PATH: backend/scripts/migrate_jsonb_defaults.py

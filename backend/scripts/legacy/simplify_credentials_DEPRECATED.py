@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - onboarding + create_user_for_tenant supersede
+# Do not run. Retained for historical reference only.
+
 """
 Simplify user credentials to the 2026-08 scheme.
 

@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - Firestore removed; surveys/survey_responses Postgres-only
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: cleanup_firestore_surveys.py
 # PATH: backend/scripts/cleanup_firestore_surveys.py

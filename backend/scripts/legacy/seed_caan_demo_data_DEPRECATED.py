@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - CAAN demo state via unified seeder / Postgres
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: seed_caan_demo_data.py
 # PATH: backend/scripts/seed_caan_demo_data.py

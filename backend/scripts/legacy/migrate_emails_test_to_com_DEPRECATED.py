@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - .test emails retired
+# Do not run. Retained for historical reference only.
+
 """Migrate existing Firebase .test users to .com emails (in-place)."""
 import os, io, sys
 if os.name == "nt":

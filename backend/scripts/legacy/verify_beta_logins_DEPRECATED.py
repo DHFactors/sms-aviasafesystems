@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - beta credential artifacts retired
+# Do not run. Retained for historical reference only.
+
 """
 Verify beta login works for at least one account per tenant using the newly
 generated passwords from BETA_CREDENTIALS_<date>.md.

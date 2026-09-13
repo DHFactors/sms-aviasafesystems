@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - seed checks against Postgres
+# Do not run. Retained for historical reference only.
+
 """
 Validate the 365-day seasonal seed against the phase-3 integrity checks.
 

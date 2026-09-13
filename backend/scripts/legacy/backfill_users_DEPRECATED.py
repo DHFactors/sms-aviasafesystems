@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: app.services.users.backfill_users_from_auth / upsert_user_doc (Postgres users mirror)
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: backfill_users.py
 # PATH: backend/scripts/backfill_users.py

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - psoe_assessments Postgres table
+# Do not run. Retained for historical reference only.
+
 """
 Seed baseline PSOE assessments for key demo tenants into Firestore.
 

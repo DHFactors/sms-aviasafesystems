@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: seed/unified_seeder.py (Postgres hazards)
+# Do not run. Retained for historical reference only.
+
 """Backfill: create a hazard for every report that has no linked hazard.
 
 Each unlinked report gets an auto-created hazard (same logic as the live

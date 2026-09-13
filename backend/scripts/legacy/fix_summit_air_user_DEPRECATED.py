@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - summit-air tenant retired
+# Do not run. Retained for historical reference only.
+
 """
 Fix Summit Air login failure for the local Docker demo (sms-db).
 

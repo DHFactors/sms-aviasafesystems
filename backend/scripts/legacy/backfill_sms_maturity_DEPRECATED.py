@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - one-time rename already applied
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: backfill_sms_maturity.py
 # PATH: backend/scripts/backfill_sms_maturity.py

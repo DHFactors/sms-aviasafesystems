@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - feedback Postgres-backed
+# Do not run. Retained for historical reference only.
+
 """Audit the Firestore `feedback` collection in the configured database."""
 
 import os

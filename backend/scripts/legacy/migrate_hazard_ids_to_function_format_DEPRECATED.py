@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - hazards born in function format
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: migrate_hazard_ids_to_function_format.py
 # PATH: backend/scripts/migrate_hazard_ids_to_function_format.py

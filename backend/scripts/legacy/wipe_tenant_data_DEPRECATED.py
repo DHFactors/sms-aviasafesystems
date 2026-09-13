@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: reset_to_virgin.py (regulator-preserving PG demo reset)
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: wipe_tenant_data.py
 # PATH: backend/scripts/wipe_tenant_data.py

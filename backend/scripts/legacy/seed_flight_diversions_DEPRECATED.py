@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - flight_diversions Postgres table
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: seed_flight_diversions.py
 # PATH: backend/scripts/seed_flight_diversions.py

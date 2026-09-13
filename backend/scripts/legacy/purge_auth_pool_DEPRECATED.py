@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - auth pool superseded
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: purge_auth_pool.py
 # PATH: backend/scripts/purge_auth_pool.py

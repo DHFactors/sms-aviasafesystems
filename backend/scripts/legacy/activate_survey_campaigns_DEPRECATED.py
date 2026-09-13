@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - yeti-airlines/tara-air tenants retired
+# Do not run. Retained for historical reference only.
+
 """Activate survey campaign windows for yeti-airlines and tara-air in sms-db.
 
 Read-only otherwise: only writes the tenant config map + derived surveyConfig

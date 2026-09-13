@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - generic demo uids retired
+# Do not run. Retained for historical reference only.
+
 """List the current emails bound to the generic demo tenant uids in Firebase Auth."""
 import os, io, sys
 if os.name == "nt":

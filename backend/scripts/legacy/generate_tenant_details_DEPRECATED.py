@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - metric sources now Postgres
+# Do not run. Retained for historical reference only.
+
 """
 Generate the Tenant Details Audit document (docs/tenant_details.txt).
 

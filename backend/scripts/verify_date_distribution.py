@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verify the date distribution of all seeded safety-management data.
 
-Queries every date-bearing record created by the seeders (PostgreSQL + Firestore)
-and reports:
+Queries every date-bearing record created by the seeders (PostgreSQL only —
+the Firestore branch was removed in the A-series cleanup) and reports:
 
   * overall date range (min -> max)
   * distribution across months
@@ -16,9 +16,7 @@ Warnings are raised for dates that are:
   * over-clustered (e.g. >50% inside the last 30 days)
 
 Usage:
-    python scripts/verify_date_distribution.py            # sms-db (default)
-    python scripts/verify_date_distribution.py sms-db
-    SEED_DB=sms-db python scripts/verify_date_distribution.py
+    python scripts/verify_date_distribution.py
 """
 
 import os
@@ -30,9 +28,6 @@ BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND)
 os.chdir(BACKEND)
 
-DB_ID = os.environ.get("SEED_DB", "sms-db")
-os.environ["FIREBASE_DATABASE_ID"] = DB_ID
-
 from sqlalchemy import select
 
 from app.db.runner import run
@@ -42,14 +37,10 @@ from app.db.db_models import Report, Can, Cap, Hazard
 
 EXPECTED_MIN = datetime(2024, 9, 1, tzinfo=timezone.utc)
 
-# Tenant ids that the seeders write to (operators; demostate is the regulator).
-OPERATOR_TENANTS = ["fixedwing", "rotarywing", "demoairport"]
-
 
 def _aware(dt):
     """Return ``dt`` as a UTC-aware datetime (assume naive == UTC). Accepts
-    datetimes, ISO-8601 strings (Firestore stores timestamps as strings), and
-    Firestore datetime values. Returns ``None`` when it cannot be coerced."""
+    datetimes and ISO-8601 strings. Returns ``None`` when it cannot be coerced."""
     if not dt:
         return None
     if isinstance(dt, datetime):
@@ -128,46 +119,6 @@ def collect_postgres_dates() -> list:
     return dates
 
 
-def collect_firestore_dates() -> list:
-    """Collect diversion / PSOE / SSP date fields from Firestore."""
-    from app.firebase import get_db, get_tenant_collection
-    db = get_db()
-    dates = []
-
-    for tenant in OPERATOR_TENANTS:
-        col = get_tenant_collection(tenant, "flight_diversions")
-        for doc in col.stream():
-            data = doc.to_dict() or {}
-            d = _aware(data.get("date"))
-            if d:
-                dates.append((f"diversions[{tenant}].date", d, "event"))
-
-    psoe_col = db.collection("psoe_assessments")
-    for doc in psoe_col.stream():
-        data = doc.to_dict() or {}
-        d = _aware(data.get("assessment_date"))
-        if d:
-            dates.append(("psoe.assessment_date", d, "event"))
-
-    state_doc = db.collection("state").document("ssp")
-    spi_col = state_doc.collection("spis")
-    for doc in spi_col.stream():
-        data = doc.to_dict() or {}
-        d = _aware(data.get("created_at"))
-        if d:
-            dates.append(("ssp.spis.created_at", d, "event"))
-
-    reg_col = state_doc.collection("risk_register")
-    for doc in reg_col.stream():
-        data = doc.to_dict() or {}
-        raw = data.get("aggregated_at") or data.get("created_at")
-        d = _aware(raw)
-        if d:
-            dates.append(("ssp.risk_register.aggregated_at", d, "event"))
-
-    return dates
-
-
 def report(dates: list) -> int:
     """Print the distribution report. Returns the number of issues flagged."""
     now = datetime.now(timezone.utc)
@@ -176,7 +127,7 @@ def report(dates: list) -> int:
 
     print("=" * 70)
     print("DATE DISTRIBUTION VERIFICATION")
-    print(f"  Database: {DB_ID}")
+    print("  Source: PostgreSQL (relational data plane)")
     print(f"  Records inspected: {len(dates)}")
     print("=" * 70)
 
@@ -375,13 +326,7 @@ def main() -> int:
         print(f"[SKIP] PostgreSQL date collection failed: {e}")
         postgres_dates = []
 
-    try:
-        firestore_dates = collect_firestore_dates()
-    except Exception as e:
-        print(f"[SKIP] Firestore date collection failed: {e}")
-        firestore_dates = []
-
-    dist_issues = report(postgres_dates + firestore_dates)
+    dist_issues = report(postgres_dates)
 
     rel_issues = 0
     try:

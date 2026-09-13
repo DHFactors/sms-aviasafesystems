@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - Firestore-era diagnostic; 20-tenant registry retired
+# Do not run. Retained for historical reference only.
+
 """
 Deep Diagnostic & Architectural Root-Cause Analysis for All 20 Tenants on sms-db
 

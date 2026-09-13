@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - UAT fixtures superseded by phase checks + unified seeder
+# Do not run. Retained for historical reference only.
+
 """
 UAT Seed Data Utility — writes deterministic test fixtures into Firestore.
 

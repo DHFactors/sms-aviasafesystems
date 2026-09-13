@@ -1,3 +1,8 @@
+# DEPRECATED 2026-09-13
+# Reason: pre-A-series (Firestore data plane).
+# Superseded by: No replacement - schema_init provisions uuid5 tenant ids
+# Do not run. Retained for historical reference only.
+
 # ============================================================================
 # FILE: migrate_tenant_ids.py
 # PATH: backend/scripts/migrate_tenant_ids.py
