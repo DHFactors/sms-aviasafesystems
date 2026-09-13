@@ -109,7 +109,7 @@ def _create_auth_user(auth, u: Dict[str, Any], tid: str) -> Dict[str, Any]:
         if department:
             claims["department"] = department
         auth.update_user(user.uid, custom_claims=claims)
-        upsert_user_doc(user.uid, user_doc_from_auth_record(auth.get_user(user.uid)))
+        upsert_user_doc(**user_doc_from_auth_record(auth.get_user(user.uid)))
         return {"email": email, "role": role, "uid": user.uid, "password": password, "status": "ok"}
     except fb_auth.EmailAlreadyExistsError:
         return {"email": email, "role": role, "status": "error", "detail": "email already exists"}
