@@ -259,7 +259,8 @@ have their tenant-led composities (`db_models.py` index audit).
 Measured with the automated harness (auth as the operator, warm-up + 5 samples
 per endpoint against the production Render service + real Supabase pooler).
 `db` = cumulative Postgres time (`X-Perf-Db-Ms`), `cpu` = residual
-server-side time (total − db; includes Firestore I/O on master-register).
+server-side time (total − db). Measured on the Postgres data plane
+(Firestore reads removed 2026-09-12).
 
 | Endpoint | Baseline | Final | Reduction | db | cpu |
 |---|--:|--:|--:|--:|--:|
@@ -281,8 +282,9 @@ server-side time (total − db; includes Firestore I/O on master-register).
 | risk (90d) | 3951 ms | 886 ms | 78% | 880 | 5 |
 | **Median** | **4015 ms** | **886 ms** | **78%** | 880 | 5–8 |
 
-\* master-register’s `cpu` column is Firestore document I/O (it reads
-hazards/CAN/CAP from Firestore by design), not server CPU.
+\* master-register’s `cpu` column is residual server-side time from the
+Postgres register reads (hazards/CAN/CAP served from Supabase), not
+server CPU.
 
 Progression per deployed change (median): baseline 4015 ms →
 **1758 ms** (+persistent bridge connection, `0a3fcdc`) →

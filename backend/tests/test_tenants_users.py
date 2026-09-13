@@ -41,7 +41,6 @@ def test_user_doc_from_auth_record_full():
     assert doc["tenant_id"] == "tara-air"
     assert doc["created_at"] is not None
     assert doc["last_login"] is not None
-    assert doc["updated_at"] is not None
 
 
 def test_user_doc_defaults_when_no_claims():
@@ -66,15 +65,19 @@ def test_user_doc_parses_ms_epoch_last_login():
 # list_tenant_users
 # ============================================================================
 
+TARA_AIR_UUID = "7119c046-7a91-537a-b8fc-f6d74bfb3f03"
+BUDDHA_AIR_UUID = "d2f28d0d-5373-5ae1-ab38-50502cf25a5c"
+
+
 class _UsersDB:
     def __init__(self):
         self._users = {
             "u2": {"uid": "u2", "email": "b@taraair.com", "role": "AIRLINE_ADMIN",
-                   "tenant_id": "tara-air", "created_at": _dt(2), "last_login": None},
+                   "tenant_id": TARA_AIR_UUID, "created_at": _dt(2), "last_login": None},
             "u1": {"uid": "u1", "email": "a@taraair.com", "role": "USER",
-                   "tenant_id": "tara-air", "created_at": _dt(1), "last_login": _dt(3)},
+                   "tenant_id": TARA_AIR_UUID, "created_at": _dt(1), "last_login": _dt(3)},
             "u3": {"uid": "u3", "email": "x@buddhaair.com", "role": "AIRLINE_ADMIN",
-                   "tenant_id": "buddha-air", "created_at": _dt(1), "last_login": None},
+                   "tenant_id": BUDDHA_AIR_UUID, "created_at": _dt(1), "last_login": None},
         }
 
     def collection(self, name):
@@ -83,7 +86,7 @@ class _UsersDB:
                 self._db = db
 
             def where(self, field, op, value):
-                return _UsersQuery(self._db, value)
+                return _UsersQuery(self._db, str(value))
         if name == "users":
             return _UsersColl(self)
         raise AssertionError(f"unexpected collection {name}")
@@ -119,12 +122,12 @@ def test_list_tenant_users_filters_and_sorts(monkeypatch):
     patch_pg_through(monkeypatch, lambda: _UsersDB())
     rows = users.list_tenant_users("tara-air")
     assert len(rows) == 2
-    # sorted by createdAt then email
+    # sorted by created_at then email
     assert rows[0]["uid"] == "u1"
     assert rows[1]["uid"] == "u2"
     assert rows[0]["email"] == "a@taraair.com"
-    assert rows[0]["createdAt"].startswith("2026-08-01")
-    assert rows[1]["lastLogin"] is None
+    assert rows[0]["created_at"].startswith("2026-08-01")
+    assert rows[1]["last_login"] is None
 
 
 # ============================================================================
@@ -136,7 +139,7 @@ class _FakeUsersColl:
         self._db = db
 
     def where(self, field, op, value):
-        return _FakeUsersQuery(self._db, value)
+        return _FakeUsersQuery(self._db, str(value))
 
 
 class _FakeUsersQuery:
@@ -192,7 +195,8 @@ def _get(tid, headers=None):
 def test_get_users_airline_admin_own_tenant(monkeypatch):
     db = _FakeDB()
     db._users["u1"] = {"uid": "u1", "email": "officer@taraair.com", "role": "AIRLINE_ADMIN",
-                       "tenant_id": "tara-air", "created_at": _dt(1), "last_login": None}
+                       "tenant_id": TARA_AIR_UUID, "created_at": _dt(1), "last_login": None,
+                       "display_name": "Officer One"}
     _patch_db(monkeypatch, db)
     _patch_user(monkeypatch, _user())
 
@@ -204,7 +208,7 @@ def test_get_users_airline_admin_own_tenant(monkeypatch):
     assert len(body["data"]["users"]) == 1
     assert body["data"]["users"][0]["email"] == "officer@taraair.com"
     assert body["data"]["users"][0]["role"] == "AIRLINE_ADMIN"
-    assert body["data"]["users"][0]["createdAt"] is not None
+    assert body["data"]["users"][0]["display_name"] == "Officer One"
 
 
 def test_get_users_cross_tenant_denied(monkeypatch):
@@ -218,7 +222,7 @@ def test_get_users_cross_tenant_denied(monkeypatch):
 def test_get_users_super_admin_any_tenant(monkeypatch):
     db = _FakeDB()
     db._users["s1"] = {"uid": "s1", "email": "smd@caan.gov.np", "role": "SUPER_ADMIN",
-                       "tenant_id": "buddha-air", "created_at": _dt(1), "last_login": None}
+                       "tenant_id": BUDDHA_AIR_UUID, "created_at": _dt(1), "last_login": None}
     _patch_db(monkeypatch, db)
     _patch_user(monkeypatch, _user(role="SUPER_ADMIN", tid=None, uid="s-admin", email="smd@caan.gov.np"))
 

@@ -309,7 +309,6 @@ def mock_firebase_and_auth(monkeypatch):
         "app.firebase.get_tenant_metadata",
         lambda tid: {"risk_matrix": {"thresholds": {"low_max": 5, "medium_max": 9, "high_max": 15}}},
     )
-    monkeypatch.setattr("app.firebase._db", fs_client)
 
     import app.firebase as fb_mod
     import app.middleware.auth as auth_mod

@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.db import pg
 from app.db.db_models import CaanReport, RegulatoryReport, Tenant
 from app.db.ids import tenant_uuid, uuid5
+from app.db.schema_init import ensure_domain_schema
 
 router = APIRouter()
 REPORT_COLLECTION = "reporting"
@@ -62,6 +63,10 @@ def _save_report(doc_data: Dict[str, Any], effective_tenant: Optional[str]) -> D
             except Exception as mirror_e:
                 logger.warning(f"Report mirror write failed ({rid}): {mirror_e}")
         else:
+            try:
+                ensure_domain_schema()
+            except Exception as ensure_e:
+                logger.warning(f"Domain schema ensure failed ({rid}): {ensure_e}")
             stored = dict(doc_data)
             stored["report_id"] = rid
             pg.upsert(CaanReport, "report_id", rid, stored)

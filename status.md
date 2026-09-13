@@ -3,7 +3,7 @@
 Last updated: 2026-09-04
 
 ## Objective
-- **AviaSAFE SMS** production platform at `sms.aviasafesystems.com` (Firebase `aerosafety-sms-prod` + Render `aviasafe-unified-platform`) — single consolidated `sms-db` Firestore + Supabase Postgres.
+- **AviaSAFE SMS** production platform at `sms.aviasafesystems.com` (Firebase `aerosafety-sms-prod` + Render `aviasafe-unified-platform`) — Postgres (Supabase) data plane; Firebase Auth only for identity (Firestore deprecated 2026-09-12).
 - Super-admin landing = `admin/production-setup.html` (Steps 1–7 data-driven), executive = `dashboard/ae-dashboard.html` (minimalist), safety = `safety.html` (data-rich), all verified via live UAT. Platform cleanup consolidated.
 
 ## Key decisions (latest)

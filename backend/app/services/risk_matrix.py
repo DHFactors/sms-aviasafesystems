@@ -8,6 +8,8 @@ from app.firebase import get_db, get_tenant_collection
 
 RISK_MATRIX_DOC_PATH = "risk_matrix"
 
+_FIRESTORE_OFFLINE_WARNED: set = set()
+
 SEVERITY_LABELS_DEFAULT = {
     "1": "Negligible",
     "2": "Minor",
@@ -193,11 +195,16 @@ def set_risk_matrix_config(tenant_id: str, config: dict, updated_by: str) -> dic
     except Exception as e:
         logger.warning(f"Failed to write risk matrix PG for {tenant_id}: {e}")
 
-    doc_ref = (
-        get_tenant_collection(tenant_id, settings.FIREBASE_COLLECTION_METADATA)
-        .document(RISK_MATRIX_DOC_PATH)
-    )
-    doc_ref.set(base)
+    try:
+        doc_ref = (
+            get_tenant_collection(tenant_id, settings.FIREBASE_COLLECTION_METADATA)
+            .document(RISK_MATRIX_DOC_PATH)
+        )
+        doc_ref.set(base)
+    except Exception:
+        if "set_fallback" not in _FIRESTORE_OFFLINE_WARNED:
+            logger.warning("[risk_matrix] Firestore removed; risk matrix config kept in Postgres only")
+            _FIRESTORE_OFFLINE_WARNED.add("set_fallback")
     return base
 
 

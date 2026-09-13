@@ -14,6 +14,9 @@ Covers:
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from pg_bridge import patch_pg_through
+from app.db.ids import register_tenant, tenant_uuid
+from app.db.isolation import demo_scope
 from app.main import app
 from app.middleware.auth import get_current_user
 from app.models.psoe import PSOEAnswer
@@ -144,9 +147,10 @@ class _FakeDB:
 
 
 def _patch(monkeypatch, db):
-    monkeypatch.setattr("app.firebase.get_db", lambda: db)
-    monkeypatch.setattr("app.routes.psoe.get_db", lambda: db)
+    register_tenant("airline1")
+    register_tenant("airline2")
     monkeypatch.setattr("app.services.audit_service.get_db", lambda: db)
+    patch_pg_through(monkeypatch, db)
 
 
 def _as_role(role, tid="airline1", department=None):
@@ -344,7 +348,7 @@ def test_tenant_admin_can_create_assessment(monkeypatch):
     assert body["overall_score_pct"] is not None
     assert body["component_scores"]["component_1"]["score"] == 5
     stored = list(db.psoe_assessments.values())[0]
-    assert stored["tenant_id"] == "airline1"
+    assert stored["tenant_id"] == tenant_uuid("airline1")
     assert stored["created_by"] == "tenant_admin@example.com"
 
 
@@ -407,13 +411,13 @@ def test_list_is_scoped_to_own_tenant(monkeypatch):
     db = _FakeDB()
     _patch(monkeypatch, db)
     db.psoe_assessments["a1"] = {
-        "id": "a1", "tenant_id": "airline1", "title": "Airline 1 audit",
-        "status": "draft", "template_version": "1.0.0",
+        "id": "a1", "tenant_id": tenant_uuid("airline1"), "title": "Airline 1 audit",
+        "status": "draft", "template_version": "1.0.0", "is_demo": demo_scope(),
         "created_at": "2026-08-20T00:00:00Z",
     }
     db.psoe_assessments["a2"] = {
-        "id": "a2", "tenant_id": "airline2", "title": "Airline 2 audit",
-        "status": "draft", "template_version": "1.0.0",
+        "id": "a2", "tenant_id": tenant_uuid("airline2"), "title": "Airline 2 audit",
+        "status": "draft", "template_version": "1.0.0", "is_demo": demo_scope(),
         "created_at": "2026-08-20T00:00:00Z",
     }
     _override_user(_as_role("TENANT_ADMIN", tid="airline1"))
@@ -430,13 +434,13 @@ def test_caan_smd_lists_all_or_scopes_by_tenant(monkeypatch):
     db = _FakeDB()
     _patch(monkeypatch, db)
     db.psoe_assessments["a1"] = {
-        "id": "a1", "tenant_id": "airline1", "title": "Airline 1 audit",
-        "status": "draft", "template_version": "1.0.0",
+        "id": "a1", "tenant_id": tenant_uuid("airline1"), "title": "Airline 1 audit",
+        "status": "draft", "template_version": "1.0.0", "is_demo": demo_scope(),
         "created_at": "2026-08-20T00:00:00Z",
     }
     db.psoe_assessments["a2"] = {
-        "id": "a2", "tenant_id": "airline2", "title": "Airline 2 audit",
-        "status": "draft", "template_version": "1.0.0",
+        "id": "a2", "tenant_id": tenant_uuid("airline2"), "title": "Airline 2 audit",
+        "status": "draft", "template_version": "1.0.0", "is_demo": demo_scope(),
         "created_at": "2026-08-20T00:00:00Z",
     }
     _override_user(_as_role("CAAN_SMD", tid=None))
@@ -460,8 +464,8 @@ def test_get_assessment_scoped_to_own_tenant(monkeypatch):
     db = _FakeDB()
     _patch(monkeypatch, db)
     db.psoe_assessments["a1"] = {
-        "id": "a1", "tenant_id": "airline1", "title": "Airline 1 audit",
-        "status": "draft", "template_version": "1.0.0",
+        "id": "a1", "tenant_id": tenant_uuid("airline1"), "title": "Airline 1 audit",
+        "status": "draft", "template_version": "1.0.0", "is_demo": demo_scope(),
         "responses": [{"question_id": "SP-01", "score": 3}],
         "overall_score_pct": 50.0, "created_at": "2026-08-20T00:00:00Z",
     }
@@ -481,8 +485,8 @@ def test_get_assessment_forbidden_for_other_tenant(monkeypatch):
     db = _FakeDB()
     _patch(monkeypatch, db)
     db.psoe_assessments["a2"] = {
-        "id": "a2", "tenant_id": "airline2", "title": "Airline 2 audit",
-        "status": "draft", "created_at": "2026-08-20T00:00:00Z",
+        "id": "a2", "tenant_id": tenant_uuid("airline2"), "title": "Airline 2 audit",
+        "status": "draft", "is_demo": demo_scope(), "created_at": "2026-08-20T00:00:00Z",
     }
     _override_user(_as_role("TENANT_ADMIN", tid="airline1"))
     try:

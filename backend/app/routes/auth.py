@@ -13,7 +13,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 
 from app.core.config import settings
@@ -27,6 +27,7 @@ from app.middleware.rate_limit import (
 from app.middleware.auth import resolve_user_context, get_current_user
 from app.middleware.app_check import verify_app_check
 from app.models.tenant_profile import OperationalScope
+from app.schemas.user import UserProfileRead, UserProfileSelfUpdate
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
 from app.services import login_service
@@ -179,15 +180,14 @@ async def register_user(
         auth.set_custom_user_claims(user.uid, claims)
 
         now = datetime.now(timezone.utc)
-        upsert_user_doc(user.uid, {
-            "uid": user.uid,
-            "email": user.email,
-            "display_name": body.full_name,
-            "role": body.role,
-            "tenant_id": body.tenant_id,
-            "created_at": now,
-            "updated_at": now,
-        })
+        upsert_user_doc(
+            uid=user.uid,
+            email=user.email,
+            display_name=body.full_name,
+            role=body.role,
+            tenant_id=body.tenant_id,
+            created_at=now,
+        )
 
         ip, request_id = request_context(request)
         log_audit(
@@ -460,3 +460,71 @@ async def tenant_lookup_endpoint(
             {"code": d, "label": DEPARTMENT_LABELS.get(d, d)} for d in departments
         ],
     }
+
+
+def _profile_from_rec(user: dict, record: Any) -> UserProfileRead:
+    """Assemble a typed UserProfileRead from the authenticated context plus the
+    live Firebase Auth record (source of truth for display_name / phone)."""
+    uid = user.get("uid") or ""
+    email = user.get("email") or ""
+    claims = user.get("claims") or {}
+    rec_display = getattr(record, "display_name", None) if record else None
+    rec_phone = getattr(record, "phone_number", None) if record else None
+    return UserProfileRead(
+        uid=uid,
+        email=email,
+        display_name=rec_display or claims.get("display_name"),
+        role=user.get("role") or "USER",
+        department=user.get("department") or claims.get("department"),
+        tenant_id=user.get("tenant_id") or claims.get("tenant_id"),
+        phone=rec_phone,
+    )
+
+
+@router.get("/me", response_model=UserProfileRead)
+async def get_me(
+    user: dict = Depends(get_current_user),
+):
+    """Return the caller's own profile (Firebase Auth as source of truth)."""
+    auth = get_auth()
+    record = None
+    try:
+        record = auth.get_user(user.get("uid") or "")
+    except Exception:
+        pass
+    return _profile_from_rec(user, record)
+
+
+@router.patch("/me", response_model=UserProfileRead)
+async def update_me(
+    body: UserProfileSelfUpdate,
+    user: dict = Depends(get_current_user),
+    _app_check: None = Depends(verify_app_check),
+):
+    """Self-service profile update — display_name / phone only.
+
+    Role, department and tenant_id are privileged claims that must go through
+    the admin PATCH /api/v1/admin/users flow. Mirrors the change into the
+    Firebase Auth record and the flat Postgres users row.
+    """
+    uid = user.get("uid") or ""
+    auth = get_auth()
+    auth_updates: Dict[str, str] = {}
+    if body.display_name is not None:
+        auth_updates["display_name"] = body.display_name.strip()
+    if body.phone is not None:
+        auth_updates["phone_number"] = body.phone.strip() or None
+    if auth_updates:
+        auth.update_user(uid, **auth_updates)
+
+    record = auth.get_user(uid)
+    upsert_user_doc(
+        uid=uid,
+        email=user.get("email"),
+        role=user.get("role") or "USER",
+        tenant_id=user.get("tenant_id"),
+        department=user.get("department"),
+        display_name=getattr(record, "display_name", None),
+        phone=getattr(record, "phone_number", None),
+    )
+    return _profile_from_rec(user, record)

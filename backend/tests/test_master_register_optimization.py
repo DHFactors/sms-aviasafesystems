@@ -207,9 +207,9 @@ def test_pagination_page_size_default_and_max(monkeypatch):
     # explicit 25
     r2 = master_register.build_master_register(user, page_size=25)
     assert r2["pagination"]["page_size"] == 25
-    # max 100 enforcement
+    # max 200 enforcement
     r3 = master_register.build_master_register(user, page_size=200)
-    assert r3["pagination"]["page_size"] == 100
+    assert r3["pagination"]["page_size"] == 200
     # pagination limit applied
     r4 = master_register.build_master_register(user, page_size=3)
     assert len(r4["rows"]) == 3

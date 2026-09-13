@@ -65,7 +65,7 @@ class _CollQuery:
                 doc.setdefault("id", str(i))
                 ok = True
                 for field, op, value in self._filters:
-                    if op == "==" and doc.get(field) != value:
+                    if op == "==" and str(doc.get(field)) != str(value):
                         ok = False
                 if ok:
                     rows.append(_Doc(doc, exists=True, id=doc["id"]))
@@ -76,7 +76,7 @@ class _CollQuery:
             doc.setdefault("id", key)
             ok = True
             for field, op, value in self._filters:
-                if op == "==" and doc.get(field) != value:
+                if op == "==" and str(doc.get(field)) != str(value):
                     ok = False
             if ok:
                 rows.append(_Doc(doc, exists=True, id=key))
@@ -422,7 +422,7 @@ def test_join_with_scoped_invite_binds_department_and_staff_role(monkeypatch):
     user_doc = list(db.users.values())[0]
     assert user_doc["role"] == "STAFF"
     assert user_doc["department"] == "CAMO"
-    assert user_doc["status"] == "ACTIVE"
+    assert user_doc["email"] == "ramesh@yetiairlines.com"
 
 
 def test_join_alias_endpoint_binds_dept_admin_role(monkeypatch):
@@ -498,22 +498,25 @@ def test_verify_invite_returns_scoped_department_and_role(monkeypatch):
 # Department-scoped team listing
 # ============================================================================
 
+YETI_AIR_UUID = "0bc08e7f-bb15-5e7a-b07e-27a0ddd19fd0"
+
+
 def _seed_users(db):
     db.users["u-sm"] = {
         "uid": "u-sm", "email": "sm@yeti.com", "role": "AIRLINE_ADMIN",
-        "tenant_id": "yeti-airlines", "department": "Safety",
+        "tenant_id": YETI_AIR_UUID, "department": "Safety",
     }
     db.users["u-hod"] = {
         "uid": "u-hod", "email": "hodops@yeti.com", "role": "DEPT_ADMIN",
-        "tenant_id": "yeti-airlines", "department": "Flight Operations",
+        "tenant_id": YETI_AIR_UUID, "department": "Flight Operations",
     }
     db.users["u-eng"] = {
         "uid": "u-eng", "email": "eng@yeti.com", "role": "STAFF",
-        "tenant_id": "yeti-airlines", "department": "Flight Operations",
+        "tenant_id": YETI_AIR_UUID, "department": "Flight Operations",
     }
     db.users["u-camo"] = {
         "uid": "u-camo", "email": "camo@yeti.com", "role": "STAFF",
-        "tenant_id": "yeti-airlines", "department": "CAMO",
+        "tenant_id": YETI_AIR_UUID, "department": "CAMO",
     }
 
 

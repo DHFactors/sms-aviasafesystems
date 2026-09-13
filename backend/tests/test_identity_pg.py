@@ -82,14 +82,16 @@ def test_list_tenant_users_maps_doc_shape(monkeypatch):
     assert rows[1] == {
         "uid": "u1",
         "email": "a@b.c",
-        "displayName": "A B",
+        "display_name": "A B",
         "role": "STAFF",
         "department": "Flight Operations",
-        "createdAt": "2026-01-01T00:00:00+00:00",
-        "lastLogin": "2026-02-01T00:00:00+00:00",
+        "tenant_id": None,
+        "phone": None,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "last_login": "2026-02-01T00:00:00+00:00",
     }
     assert rows[0]["uid"] == "u2"  # None createdAt sorts first ("" < ISO text)
-    assert rows[0]["createdAt"] is None
+    assert rows[0]["created_at"] is None
 
 
 def test_get_user_department_by_uid_then_email(monkeypatch):
@@ -119,8 +121,15 @@ def test_upsert_user_doc_writes_through_pg(monkeypatch):
         captured["data"] = data
 
     monkeypatch.setattr(users_mod.pg, "upsert", _fake_upsert)
-    users_mod.upsert_user_doc("u9", {"uid": "u9", "role": "STAFF"})
-    assert captured == {"col": "uid", "value": "u9", "data": {"uid": "u9", "role": "STAFF"}}
+    users_mod.upsert_user_doc("u9", email="ops@x.test", role="STAFF")
+    assert captured["col"] == "uid"
+    assert captured["value"] == "u9"
+    assert captured["data"]["uid"] == "u9"
+    assert captured["data"]["email"] == "ops@x.test"
+    assert captured["data"]["role"] == "STAFF"
+    assert captured["data"]["is_developer"] is False
+    assert captured["data"]["tenant_id"] is None
+    assert captured["data"]["updated_at"] is not None
 
 
 # ---- regulator_service.py -------------------------------------------------

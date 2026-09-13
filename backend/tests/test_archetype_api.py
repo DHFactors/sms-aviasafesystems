@@ -148,26 +148,45 @@ class _Snap:
 
 
 def test_psoe_assessments_archetype_scope(monkeypatch):
-    docs = [
-        _Snap("a1", {"tenant_id": "demo-rotary-wing", "title": "RW audit",
-                     "status": "completed", "overall_score_pct": 80.0}),
-        _Snap("a2", {"tenant_id": "buddha-air", "title": "BA audit",
-                     "status": "completed", "overall_score_pct": 70.0}),
+    from app.db import pg as pg_mod
+    from app.db.ids import tenant_uuid
+    from app.db.isolation import demo_scope
+    from pg_bridge import _simple_eq
+
+    rows = [
+        {"id": "a1", "tenant_id": tenant_uuid("demo-rotary-wing"), "title": "RW audit",
+         "status": "completed", "overall_score_pct": 80.0, "is_demo": demo_scope(),
+         "created_at": "2026-08-20T00:00:00Z"},
+        {"id": "a2", "tenant_id": tenant_uuid("buddha-air"), "title": "BA audit",
+         "status": "completed", "overall_score_pct": 70.0, "is_demo": demo_scope(),
+         "created_at": "2026-08-20T00:00:00Z"},
     ]
-    from app.routes import psoe as psoe_routes
 
-    class _Coll:
-        def get(self):
-            return docs
+    def fake_fetch_all(model, **kwargs):
+        if model.__tablename__ != "psoe_assessments":
+            return []
+        conds = kwargs.get("where") or []
+        out = []
+        for row in rows:
+            ok = True
+            for cond in conds:
+                field, value = _simple_eq(cond)
+                if field is None or row.get(field) != value:
+                    ok = False
+                    break
+            if ok:
+                out.append(dict(row))
+        return out
 
-    monkeypatch.setattr(psoe_routes, "_coll", lambda: _Coll())
+    monkeypatch.setattr(pg_mod, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(pg_mod, "fetch_by", lambda model, col, value: None)
     _override({"uid": "smd", "email": "smd@caanepal.gov.np",
                "role": "CAAN_SMD", "tenant_id": "caan"})
     try:
         c = TestClient(app)
         r = c.get("/api/v1/psoe/assessments",
                   params={"archetypeId": "demo-rotary-wing"})
-        assert r.status_code == 200
+        assert r.status_code == 200, r.text
         titles = [i["title"] for i in r.json()]
         assert titles == ["RW audit"]
     finally:

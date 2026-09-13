@@ -255,18 +255,37 @@ class _FakeCollection:
 
 
 def _patch_aggregation_dbs(monkeypatch, hazards, reports):
+    from app.db import pg as pg_mod
+    from app.db.isolation import demo_scope
     from app.services.state_risk_service import StateRiskService
 
-    def fake_cg(self, name):
-        if name == "hazards":
-            return _FakeCollection(hazards)
-        return _FakeCollection(reports)
+    hazards = [dict(h) | {"is_demo": demo_scope()} for h in hazards]
+    reports = [dict(r) | {"is_demo": demo_scope()} for r in reports]
+
+    # Regulator lookup must route through the fake regulators/tenants store;
+    # only then can the aggregation fetch_all/fetch_by overrides take effect.
+    _patch_reg_db(monkeypatch, _regulator_db(*_sample_regulators()))
+
+    def fake_fetch_all(model, **kwargs):
+        table = model.__tablename__
+        if table == "hazards":
+            return list(hazards)
+        if table == "reports":
+            return list(reports)
+        return []
+
+    monkeypatch.setattr(pg_mod, "fetch_all", fake_fetch_all)
+    monkeypatch.setattr(pg_mod, "fetch_by", lambda model, col, value: None)
+
+    def fake_operator_ids(regulator_id):
+        if regulator_id == "caan":
+            return ["air1", "air2"]
+        return []
 
     monkeypatch.setattr(
-        "app.services.state_risk_service.get_db",
-        lambda: type("DB", (), {"collection_group": fake_cg})(),
+        "app.services.regulator_service.operator_tenant_ids_for_regulator",
+        fake_operator_ids,
     )
-    _patch_reg_db(monkeypatch, _regulator_db(*_sample_regulators()))
     return StateRiskService({"uid": "caan", "role": "CAAN_SMD"})
 
 

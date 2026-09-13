@@ -54,6 +54,7 @@ from app.db.db_models import (
     HazardRcaFactor,
     PsoeAssessment,
     PsoeFinding,
+    Regulator,
     RegulatoryReport,
     Report,
     RiskRegisterEntry,
@@ -469,7 +470,7 @@ def sync_tenant_module_claims(tenant_id: str, modules: Dict[str, Any]) -> None:
                 claims = dict(record.custom_claims or {})
                 claims["modules"] = dict(modules)
                 auth.update_user(uid, custom_claims=claims)
-                upsert_user_doc(uid, user_doc_from_auth_record(auth.get_user(uid)))
+                upsert_user_doc(**user_doc_from_auth_record(auth.get_user(uid)))
             except Exception as e:
                 logger.warning(f"Failed to sync module claims for user {uid}: {e}")
     except Exception as e:
@@ -1009,7 +1010,7 @@ def demo_data_scope(tenant_ids: Optional[List[str]] = None, all_tenants: bool = 
 #
 # Tables with an is_demo column: hazards, reports, cans, caps, surveys,
 # survey_responses, psoe_assessments, state_risk_register, regulatory_reports,
-# bow_tie_analyses, risk_register, barrier_register.
+# regulators, bow_tie_analyses, risk_register, barrier_register.
 # psoe_questions is GLOBAL reference data with no is_demo flag — never purged.
 
 
@@ -1102,9 +1103,13 @@ async def _build_purge_steps(tenant_uuids: Optional[List[uuid.UUID]] = None):
         ("barrier_register", delete(BarrierRegisterEntry).where(parent_scope(BarrierRegisterEntry))),
         ("state_risk_register", delete(StateRiskRegisterEntry).where(parent_scope(StateRiskRegisterEntry))),
         ("regulatory_reports", delete(RegulatoryReport).where(parent_scope(RegulatoryReport))),
-        # Master tenant registry (demo only; regulators/users reference slugs, not rows)
-        ("tenants", delete(Tenant).where(Tenant.is_demo.is_(True))),
     ]
+    if is_demo_scope:
+        # Regulators carry is_demo but no tenant_id — only the cluster-wide purge
+        # removes them; tenant-directed purges skip this table.
+        steps.append(("regulators", delete(Regulator).where(Regulator.is_demo == True)))
+    # Master tenant registry (demo only; regulators/users reference slugs, not rows)
+    steps.append(("tenants", delete(Tenant).where(Tenant.is_demo.is_(True))))
     return steps
 
 
@@ -1451,11 +1456,37 @@ def _delete_firestore_doc_tree(doc_ref, _visited=None, _count=None) -> None:
     _count[0] += 1
 
 
+_PURGE_FIRESTORE_WARNED: set = set()
+
+
+def _purge_firestore_or_none(call_site: str):
+    """Transitional A1 no-op stub for Firestore purge helpers.
+
+    get_db() now raises NotImplementedError (Firestore removed, A1). Returns
+    None so the purge functions fall back to their empty-result branch instead
+    of crashing; production repairs operate on Postgres only. Warns once per
+    call site; never raises.
+    """
+    try:
+        return get_db()
+    except NotImplementedError:
+        if call_site not in _PURGE_FIRESTORE_WARNED:
+            logger.warning(f"[admin_data_service:{call_site}] Firestore removed (A1); purge operates on Postgres only")
+            _PURGE_FIRESTORE_WARNED.add(call_site)
+        return None
+
+
 async def purge_firestore_demo_data(actor: Dict[str, Any]) -> Dict[str, Any]:
     """Delete Firestore demo/setup surfaces, preserving authority/identity data."""
-    db = get_db()
+    db = _purge_firestore_or_none("purge_firestore_demo_data")
     deleted: Dict[str, int] = {}
     total = 0
+
+    if db is None:
+        _audit("DEMO_DATA_PURGE_FIRESTORE", actor, "all",
+               "Firestore offline (A1); no Firestore docs to purge")
+        logger.info("Firestore demo surfaces skipped (A1: Firestore removed)")
+        return {"deleted": deleted, "total": total}
 
     # audit_logs — setup/action history; wiped in full.
     count = 0
@@ -1575,12 +1606,13 @@ async def delete_demo_tenants(actor: Dict[str, Any]) -> Dict[str, Any]:
     deletes the tenant's users (Firebase Auth + Firestore `users` docs). The
     global `psoe_questions` reference bank is preserved.
     """
-    db = get_db()
+    db = _purge_firestore_or_none("delete_demo_tenants")
     candidates: List[Tuple[str, Dict[str, Any]]] = []
-    for snap in db.collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
-        data = snap.to_dict() or {}
-        if _is_deleteable_demo_tenant(data):
-            candidates.append((snap.id, data))
+    if db is not None:
+        for snap in db.collection(settings.FIREBASE_COLLECTION_TENANTS).stream():
+            data = snap.to_dict() or {}
+            if _is_deleteable_demo_tenant(data):
+                candidates.append((snap.id, data))
 
     if not candidates:
         _audit("TENANTS_DEMO_DELETED", actor, "none",

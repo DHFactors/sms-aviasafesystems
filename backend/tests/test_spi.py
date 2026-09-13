@@ -4,6 +4,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from datetime import datetime, timezone
 
 from app.models.spi import SPIDomain, SPIType, SPIStatus
 from app.services.spi_service import SPIService
@@ -121,13 +122,38 @@ def test_api_state_values(client: TestClient):
     assert len(r.json()["values"]) == 8
 
 
-def test_state_diversion_rate_reflects_firestore():
+def test_state_diversion_rate_reflects_firestore(monkeypatch):
     svc = SPIService()
+    by_tenant = {"fixedwing": 3, "rotarywing": 2, "demoairport": 2, "demostate": 4}
+
+    def fake_load(tenant_id):
+        if tenant_id is None:
+            # state view excludes demostate (mirrors _load_diversion_docs_sync)
+            return [
+                {"date": datetime.now(timezone.utc), "tenant_id": tid}
+                for tid, n in by_tenant.items() if tid != "demostate"
+                for _ in range(n)
+            ]
+        return [
+            {"date": datetime.now(timezone.utc), "tenant_id": tenant_id}
+            for _ in range(by_tenant.get(tenant_id, 0))
+        ]
+
+    monkeypatch.setattr(SPIService, "_load_diversion_docs_sync", staticmethod(fake_load))
     assert svc.get_state_values()["diversion_rate"] == 7.0
 
 
-def test_tenant_diversion_rates_from_firestore():
+def test_tenant_diversion_rates_from_firestore(monkeypatch):
     svc = SPIService()
+    by_tenant = {"fixedwing": 3, "rotarywing": 2, "demoairport": 2, "demostate": 0}
+
+    def fake_load(tenant_id):
+        return [
+            {"date": datetime.now(timezone.utc), "tenant_id": tenant_id}
+            for _ in range(by_tenant.get(tenant_id, 0))
+        ]
+
+    monkeypatch.setattr(SPIService, "_load_diversion_docs_sync", staticmethod(fake_load))
     assert svc.calculate_diversion_rate("fixedwing") == 3.0
     assert svc.calculate_diversion_rate("rotarywing") == 2.0
     assert svc.calculate_diversion_rate("demoairport") == 2.0

@@ -41,7 +41,7 @@ approval.
 |---|---|---|
 | Frontend | HTML5 / CSS3 / Vanilla JS (Firebase Web SDK v9 compat) | No build step; served by Firebase Hosting |
 | Backend | Python 3.11, FastAPI, Uvicorn | `backend/` |
-| Database | Cloud Firestore (`sms-db`, us-west1) | Firebase project `aerosafety-sms-prod` |
+| Database | PostgreSQL (Supabase) — operational registers | Firebase Auth only for identity (Firestore deprecated 2026-09-12) |
 | Auth | Firebase Authentication (email/password) + ID-token JWT (RS256) | Custom claims for RBAC |
 | App Check | Firebase App Check with reCAPTCHA v3 | Client-side enforcement |
 | AI | Google Gemini (`gemini-2.0-pro-exp-02-05`) | Optional; mock fallback built in |
@@ -79,8 +79,8 @@ Live endpoints:
 │   ├── js/                   # firebase init, ApiClient, per-module logic
 │   ├── docs/tenant-guide/    # tenant onboarding docs (docs-as-code)
 │   └── portal/               # tenant portal pages (real Firebase auth)
-├── firestore/                # Firestore security rules
-├── firestore.indexes.json    # deployed composite indexes (camelCase)
+├── firestore/                # Firestore security rules (legacy; deprecated 2026-09-12)
+├── firestore.indexes.json    # deployed composite indexes (legacy; deprecated 2026-09-12)
 ├── scripts/                  # provisioning + Firebase admin scripts
 ├── tests/e2e/                # E2E scripts against the live API
 ├── docs/                     # project documentation (see index below)

@@ -5,22 +5,38 @@
 
 ---
 
+## Firestore Deprecation
+
+| Item | Value |
+|---|---|
+| Deprecation date | **2026-09-12** |
+| Backup snapshot | `gs://aerosafety-sms-prod-backups/firestore-20260912-062538/` |
+| Retention | 30 days |
+| Scheduled deletion | **2026-10-12** unless rollback required |
+| Deferred cleanup | see `docs/phase-f-cleanup.md` |
+
+Firestore is no longer read at runtime. The data plane is **Postgres (Supabase)
+only**; Firebase is used solely for identity (Auth + App Check). The `sms-db`
+named database and its env/config keys are deprecated (comment-only in
+`backend/.env*` and `render.yaml`, retained for 30-day rollback). Frontend code
+no longer loads any Firestore SDK.
+
+---
+
 ## 1. Executive Summary
 
-AviaSAFE runs on a **single consolidated database** (`FIREBASE_DATABASE_ID=sms-db`,
-project `aerosafety-sms-prod`) with one Render Blueprint deploy. The platform now
+AviaSAFE runs on a **PostgreSQL (Supabase) data plane** with one Render
+Blueprint deploy and Firebase **Auth only** for identity. The platform now
 ships a **fully seeded DEMO operator environment** alongside the state/regulator
 surfaces:
 
-* **4 Firestore tenants**: `fixedwing` (DEMO airline), `rotarywing` (DEMO
+* **4 demo tenants**: `fixedwing` (DEMO airline), `rotarywing` (DEMO
   helicopter operator), `demoairport` (DEMO aerodrome), `demostate` (STATE).
-* **Seeded operational data (idempotent)** — Postgres (Supabase) holds the
-  Hazard/Report/CAN/CAP registers; Firestore holds diversions, PSOE assessments,
-  and the SSP (state safety program) reference store:
-  * Postgres: **hazards 26, reports 10, cans 6, caps 6** (survey responses 1).
-  * Firestore: **tenants 4, flight_diversions 7** (fixedwing 3 · rotarywing 2 ·
-    demoairport 2 · demostate 0), **SSP 29** (spis 8 + risk_register 14 + nhrcs 7),
-    **PSOE 6** (3 demo assessments + 3 legacy production audits).
+* **Seeded operational data (idempotent)** — Postgres (Supabase) holds every
+  register and reference store:
+  * Postgres: **hazards 26, reports 10, cans 6, caps 6**, survey responses 1,
+    tenants 4, flight diversions 7, SSP 29 (spis 8 + risk_register 14 + nhrcs 7),
+    PSOE 6 (3 demo assessments + 3 legacy production audits).
   * Seeding is reproducible via a single CLI: `python -m seeders.cli --all`
     (dry-run today: **87 created, 0 skipped, 0 errors**).
 * **New safety-performance layer** on the `/api/v1` API:
@@ -32,9 +48,9 @@ surfaces:
   * Operator dashboards `/dashboard/spi-dashboard.html` and
     `/dashboard/nhrc-kpis.html`, wired into the shell navigation across all
     operator-facing pages.
-* **Data source of truth for diversions is Firestore** (`tenants/{tid}/flight_diversions`),
-  matching the app's operational `flight_diversion_service`; the Postgres
-  `flight_diversions` table is no longer read (deprecated for reads).
+* **Data source of truth for diversions is the Postgres `flight_diversions`
+  table** (read by `FlightDiversionService`); the legacy Firestore
+  `tenants/{tid}/flight_diversions` store is deprecated.
 * The **pre-UAT verification sweep** is green at the API/data level and the
   current backend is **live on Render** (auto-deploy from `main`,
   commit `82b4cc6`).
@@ -108,12 +124,12 @@ Westin-prefix role routing (live accounts, email ⇒ role ⇒ surface)
     smd@…     → CAAN SMD (CROSS_TENANT, scoped)     → CAAN aggregate
     super-admin → platform console                  → /administration.html
 
-═══ SINGLE CONSOLIDATED DATABASE (aerosafety-sms-prod / sms-db) ═══
-   Firebase Auth  → identity + custom claims (role, tenant_id)
-   Firestore      → tenants/{tid}/flight_diversions (source of truth),
-                    psoe_assessments, state/ssp/{spis,risk_register,nhrcs}
+═══ DATA PLANE (Postgres-only; Firebase Auth for identity) ═══
+   Firebase Auth  → identity + custom claims (role, tenant_id) + App Check
    Supabase (PG)  → operational registers, tenant-keyed: hazards, reports,
-                    cans, caps, surveys, survey_responses, state risk
+                    cans, caps, surveys, survey_responses, flight_diversions,
+                    psoe_assessments, state risk, SSP references, tenants
+   (Firestore sms-db deprecated 2026-09-12 — no runtime reads; see above)
    ═══════════════════════════════════════════════════════════════
    Tenant model: fixedwing · rotarywing · demoairport · demostate
 ```
@@ -124,9 +140,8 @@ CAAN cross-tenant role (`CROSS_TENANT_ROLES = ["CAAN_SMD", "SUPER_ADMIN"]`),
 and dashboards filter by tenant.
 
 **SPI/SPT service** (`backend/app/services/spi_service.py`) loads a single
-Postgres snapshot per call (hazards, reports as VSR/MOR, CANs/CAPs, surveys)
-and merges **Firestore diversions** into that snapshot, so per-tenant values,
-status, previous-month and monthly trend series all read one consistent view:
+Postgres snapshot per call (hazards, reports as VSR/MOR, CANs/CAPs, surveys,
+flight diversions) creating one consistent view:
 
 * `SPI_DEFINITIONS` — 8 SPIs (hazard id, VSR, diversion, risk reduction,
   MOR occurrence, CAN closure, CAP closure, safety culture) with
@@ -145,7 +160,7 @@ status, previous-month and monthly trend series all read one consistent view:
 | UAT API smoke (`scripts/run_uat_smoke.py`) | **8 / 8 passing** (/health, state-risk agg + PDF, tenant SMS summary + PDF, weekly SSP cron, audit logs) |
 | Live Render API | `/health` 200 (firebase + database connected); `/api/v1/nhrc/*`, `/api/v1/spi/*` 200 |
 | Seeder CLI dry-run | **87 created, 0 skipped, 0 errors** |
-| DB counts | PG hazards 26 · reports 10 · cans 6 · caps 6; Firestore tenants 4 · diversions 7 · SSP 29 · PSOE 6 |
+| DB counts | PG hazards 26 · reports 10 · cans 6 · caps 6 · tenants 4 · diversions 7 · SSP 29 · PSOE 6 |
 | HFACS catalog | **109 codes, 0 duplicates**, valid JSON (fetch-parseable) |
 | Navigation | N-HRC + SPI/SPT items on all operator pages, no duplicates |
 | Baseline (Aug 31) | 631 backend tests passing |
@@ -157,7 +172,7 @@ status, previous-month and monthly trend series all read one consistent view:
 | Hosting (prod) | https://aerosafety-sms-prod.web.app · https://sms.aviasafesystems.com |
 | Survey hosting | https://smssurvey.gsacharya.com |
 | API (Render) | https://aviasafe-unified-platform.onrender.com |
-| Firebase project | `aerosafety-sms-prod` · database `sms-db` |
+| Firebase project | `aerosafety-sms-prod` (Auth only); `sms-db` deprecated 2026-09-12 |
 | Deploy plumbing | root `render.yaml` (`autoDeploy: true`, `healthCheckPath: /live`, `dockerContext: backend`) |
 | Supabase | project ref `bftwNljNpnpniksmalnk` (config.toml tracked; remote schema migration tracked) |
 | Deployed commit | `82b4cc6` (feat(spi): fix diversion rate to read from Firestore) |
@@ -175,10 +190,10 @@ status, previous-month and monthly trend series all read one consistent view:
   `/dashboard/nhrc-kpis.html` (N-HRC KPIs) follow the standard
   `SHELL_CONFIG` + auth-gate + `ApiClient` pattern and are reachable from the
   sidebar on every operator page.
-* **Diversion data**: authored and read exclusively in
-  `tenants/{tid}/flight_diversions` (Firestore). The Postgres
-  `flight_diversions` table still exists in the schema for rollback but is not
-  read by any service.
+* **Diversion data**: authored and read from the Postgres `flight_diversions`
+  table (`FlightDiversionService`). The legacy Firestore
+  `tenants/{tid}/flight_diversions` store is deprecated (no runtime reads;
+  cleanup deferred per `docs/phase-f-cleanup.md`).
 * **Empty SPIs are meaningful**: with all seeded diversions/CANs dated inside
   the current month, diversion status is `alert` (rate 3.0 vs 0.5 target,
   lower-is-better) and closure rates are 0% — an honest, mixed-status demo.
@@ -198,4 +213,6 @@ status, previous-month and monthly trend series all read one consistent view:
 * `data/icao_adrep_taxonomies.csv` is imported to Supabase; keep reference CSVs
   versioned alongside `hfacs_nanocodes.csv`.
 * Legacy Firestore `surveys` / `responses` collections (if any historical docs
-  remain) can be purged with `backend/scripts/cleanup_firestore_surveys.py`.
+  remain) can be purged with `backend/scripts/cleanup_firestore_surveys.py`;
+  the runbook for the remaining Firestore-admin tooling lives in
+  `docs/phase-f-cleanup.md`.

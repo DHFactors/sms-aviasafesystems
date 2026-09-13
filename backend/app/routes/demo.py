@@ -25,6 +25,29 @@ from demo import analytics, session_manager
 
 router = APIRouter()
 
+_FIRESTORE_OFFLINE_WARNED: set = set()
+
+
+def _demo_db(call_site: str):
+    """Transitional A1 no-op stub for demo session/analytics Firestore writes.
+
+    get_db() now raises NotImplementedError (Firestore removed from the data
+    plane, A1). Demo storage degrades to a no-op — session_manager/analytics
+    already tolerate a falsy db and return None, so demo sessions simply stop
+    persisting until the demo layer is ported to Postgres (A5+). Warns once per
+    call site; never raises.
+    """
+    try:
+        from app.firebase import get_db
+        return get_db()
+    except NotImplementedError:
+        if call_site not in _FIRESTORE_OFFLINE_WARNED:
+            logger.warning(
+                f"[demo.py:{call_site}] Firestore removed (A1); demo storage is a no-op until ported to Postgres"
+            )
+            _FIRESTORE_OFFLINE_WARNED.add(call_site)
+        return None
+
 
 def _require_demo_ae(user: Dict[str, Any]) -> str:
     email = str((user or {}).get("email") or "").lower()
@@ -73,9 +96,8 @@ async def start_session(body: SessionStart, user: Dict[str, Any] = Depends(get_c
     _require_demo_ae(user)
     if str(body.email).lower() != str(user.get("email", "")).lower():
         raise HTTPException(status_code=403, detail="Email mismatch")
-    from app.firebase import get_db
 
-    sid = session_manager.get_or_create_session(get_db(), body.email, uid=user.get("uid"))
+    sid = session_manager.get_or_create_session(_demo_db("session/start"), body.email, uid=user.get("uid"))
     return {"ok": bool(sid), "session_id": sid}
 
 
@@ -84,9 +106,8 @@ async def log_action(body: ActionEvent, user: Dict[str, Any] = Depends(get_curre
     _require_demo_ae(user)
     if str(body.email).lower() != str(user.get("email", "")).lower():
         raise HTTPException(status_code=403, detail="Email mismatch")
-    from app.firebase import get_db
 
-    action_id = session_manager.log_action(get_db(), body.email, body.action_type, body.payload, uid=user.get("uid"))
+    action_id = session_manager.log_action(_demo_db("session/action"), body.email, body.action_type, body.payload, uid=user.get("uid"))
     return {"ok": action_id is not None, "action_id": action_id}
 
 
@@ -106,13 +127,11 @@ async def log_decision(body: DecisionEvent, user: Dict[str, Any] = Depends(get_c
 
     from datetime import datetime, timedelta, timezone
 
-    from app.firebase import get_db
-
     now = datetime.now(timezone.utc)
     interval = body.interval_days or (60 if body.decision == "accept_risk" else None)
     review_date = (now + timedelta(days=interval)).isoformat() if interval else None
 
-    overlay = session_manager.log_decision(get_db(), body.email, uid=user.get("uid"), decision={
+    overlay = session_manager.log_decision(_demo_db("session/decision"), body.email, uid=user.get("uid"), decision={
         "target": {"kind": "cap", "id": body.cap_id},
         "decision": body.decision,
         "result_status": "In Progress",
@@ -149,9 +168,8 @@ async def track_analytics_event(body: AnalyticsEvent, user: Dict[str, Any] = Dep
     _require_demo_ae(user)
     if str(body.email).lower() != str(user.get("email", "")).lower():
         raise HTTPException(status_code=403, detail="Email mismatch")
-    from app.firebase import get_db
 
-    event_id = analytics.track_event(get_db(), body.email, body.event_type, body.payload)
+    event_id = analytics.track_event(_demo_db("analytics/event"), body.email, body.event_type, body.payload)
     return {"ok": event_id is not None, "event_id": event_id}
 
 
@@ -160,10 +178,9 @@ async def track_analytics_batch(body: AnalyticsBatch, user: Dict[str, Any] = Dep
     _require_demo_ae(user)
     if str(body.email).lower() != str(user.get("email", "")).lower():
         raise HTTPException(status_code=403, detail="Email mismatch")
-    from app.firebase import get_db
 
     written = analytics.track_events(
-        get_db(), body.email,
+        _demo_db("analytics/batch"), body.email,
         [e.model_dump() for e in body.events],
     )
     return {"ok": True, "written": written}

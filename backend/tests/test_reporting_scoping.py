@@ -4,19 +4,27 @@ Verifies the ``_effective_tenant`` helper and the two production behaviors it
 drives for a CAAN inspector:
 
 1. Explicit ``?tenant_id=sita-air``  -> report scoped to the sita-air tenant
-   (metrics read from tenants/sita-air, report stored under sita-air).
+   (stored in regulatory_reports under the sita-air tenant uuid).
 2. No ``tenant_id``                 -> state scope (None -> caan_reports).
+
+The endpoints are Postgres-primary (app.db.pg): generation persists via
+``pg.upsert``, and listing/reading via ``pg.fetch_all``/``pg.fetch_by``. These
+tests mock the PG accessors and assert scoping on the stored/returned payloads
+— NOT on Firestore constructor call sites (Firestore was removed from the data
+plane). A ``data.state`` vs legacy ``data.national`` contract guard is kept.
 
 Also asserts the pure helper matrix for both cross-tenant and tenant roles.
 """
 
 from typing import Any, Dict
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.middleware.auth import get_current_user
+from app.db.db_models import CaanReport, RegulatoryReport
+from app.db.ids import tenant_uuid
 from app.routes import reporting
 
 CAAN_SMD = {"uid": "smd-caan-001", "role": "CAAN_SMD", "tenant_id": "caan"}
@@ -53,47 +61,6 @@ def test_effective_tenant_operator_role_always_own_tenant():
 # ============================================================================
 # 2. Endpoint behavior: generate quarterly report
 # ============================================================================
-
-class _Added:
-    def __init__(self, doc_id="rpt-001"):
-        self.id = doc_id
-
-
-class _CaanReports:
-    def __init__(self, adds):
-        self._adds = adds
-
-    def add(self, data):
-        self._adds.append(data)
-        return (Mock(), _Added())
-
-
-class _TenantReporting:
-    def __init__(self, records):
-        self._records = records
-
-    def add(self, data):
-        self._records.append(data)
-        return (Mock(), _Added())
-
-
-class _TenantCollection:
-    def __init__(self, records):
-        self._records = records
-
-    def __call__(self, tenant_id, collection):
-        self._last = (tenant_id, collection)
-        return _TenantReporting(self._records)
-
-
-class _DB:
-    def __init__(self, caan_adds):
-        self._caan_adds = caan_adds
-
-    def collection(self, name):
-        self.last_collection = name
-        return _CaanReports(self._caan_adds)
-
 
 class _FakeGenerator:
     def __init__(self):
@@ -147,12 +114,12 @@ def _assert_no_legacy_national(payload):
 
 
 def test_quarterly_generation_scopes_to_operator_when_tenant_id_given():
+    """Operator scope persists to PG regulatory_reports (tenant uuid) only."""
     gen = _FakeGenerator()
-    tenant_adds: list = []
     _override_user(CAAN_SMD)
     try:
         with patch.object(reporting, "ReportGenerator", gen), \
-             patch.object(reporting, "get_tenant_collection", _TenantCollection(tenant_adds)):
+             patch.object(reporting.pg, "upsert") as upsert:
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/reporting/quarterly?year=2026&quarter=2&tenant_id=sita-air"
@@ -164,24 +131,27 @@ def test_quarterly_generation_scopes_to_operator_when_tenant_id_given():
             assert "national" not in body["data"]
             assert body["data"]["state"] is False
             assert gen.init_tenants == ["sita-air"]
-            assert len(tenant_adds) == 1
-            assert tenant_adds[0]["tenant_id"] == "sita-air"
-            assert tenant_adds[0]["data"]["state"] is False
-            assert "caan_reports" not in [a.get("tenant_id") for a in tenant_adds]
+            rid = reporting._report_id("sita-air", "quarterly", 2026, 2)
+            assert body["id"] == rid
+            assert upsert.call_args.args[0] is RegulatoryReport
+            assert upsert.call_args.args[1] == "id"
+            assert upsert.call_args.args[2] == rid
+            stored = upsert.call_args.args[3]
+            assert stored["tenant_id"] == tenant_uuid("sita-air")
+            assert stored["data"]["state"] is False
             _assert_no_legacy_national(body)
-            _assert_no_legacy_national(tenant_adds[0])
+            _assert_no_legacy_national(stored)
     finally:
         _teardown()
 
 
 def test_quarterly_generation_reverts_to_state_when_tenant_id_omitted():
+    """State scope (no tenant_id) persists to PG caan_reports with tenant None."""
     gen = _FakeGenerator()
-    caan_adds: list = []
     _override_user(CAAN_SMD)
     try:
         with patch.object(reporting, "ReportGenerator", gen), \
-             patch.object(reporting, "get_tenant_collection", _TenantCollection([])), \
-             patch("app.firebase.get_db", lambda: _DB(caan_adds)):
+             patch.object(reporting.pg, "upsert") as upsert:
             client = TestClient(app)
             resp = client.post("/api/v1/reporting/quarterly?year=2026&quarter=2")
             assert resp.status_code == 201, resp.text
@@ -191,11 +161,16 @@ def test_quarterly_generation_reverts_to_state_when_tenant_id_omitted():
             assert "national" not in body["data"]
             assert body["data"]["state"] is True
             assert gen.init_tenants == [None]
-            assert len(caan_adds) == 1
-            assert caan_adds[0]["tenant_id"] is None
-            assert caan_adds[0]["data"]["state"] is True
+            rid = reporting._report_id(None, "quarterly", 2026, 2)
+            assert body["id"] == rid
+            assert upsert.call_args.args[0] is CaanReport
+            assert upsert.call_args.args[1] == "report_id"
+            assert upsert.call_args.args[2] == rid
+            stored = upsert.call_args.args[3]
+            assert stored["tenant_id"] is None
+            assert stored["data"]["state"] is True
             _assert_no_legacy_national(body)
-            _assert_no_legacy_national(caan_adds[0])
+            _assert_no_legacy_national(stored)
     finally:
         _teardown()
 
@@ -204,107 +179,63 @@ def test_quarterly_generation_reverts_to_state_when_tenant_id_omitted():
 # 3. Endpoint behavior: list + get quarterly reports
 # ============================================================================
 
-class _DocSnap:
-    def __init__(self, data, exists=True):
-        self._data = data
-        self.id = data.get("id", "doc")
-        self.exists = exists
-
-    def to_dict(self):
-        return self._data
-
-
-class _DocRef:
-    def __init__(self, snap):
-        self._snap = snap
-
-    def get(self):
-        return self._snap
-
-
-class _DocColl:
-    def __init__(self, snap):
-        self._snap = snap
-
-    def document(self, doc_id):
-        return _DocRef(self._snap)
-
-class _ListDocs:
-    def __init__(self, snapshots):
-        self._snapshots = snapshots
-
-    def get(self):
-        return self._snapshots
-
-
-class _Doc:
-    def __init__(self, data):
-        self._data = data
-        self.id = data.get("id", "doc")
-
-    def to_dict(self):
-        return self._data
-
-
-class _Query:
-    def __init__(self, snaps):
-        self._snaps = snaps
-
-    def where(self, *args, **kwargs):
-        return self
-
-    def get(self):
-        return self._snaps
-
-
 def test_list_quarterly_reports_state_reads_caan_reports():
+    """State scope queries the PG caan_reports table, filtered by report_type."""
     _override_user(CAAN_SMD)
-    seen = {}
-
-    def fake_tenant_collection(tenant_id, collection):
-        seen["tenant"] = (tenant_id, collection)
-        return _Query([])
-
-    def fake_get_db():
-        db = Mock()
-        db.collection.return_value = _Query(
-            [_Doc({"id": "r1", "report_type": "quarterly", "period": "2026-Q1",
-                   "year": 2026, "quarter": 1, "status": "completed"})]
-        )
-        return db
+    rid = reporting._report_id(None, "quarterly", 2026, 1)
+    row = {
+        "id": rid,
+        "report_id": rid,
+        "report_type": "quarterly",
+        "period": "2026-Q1",
+        "year": 2026,
+        "quarter": 1,
+        "status": "completed",
+        "generated_at": None,
+        "generated_by": "smd-caan-001",
+    }
 
     try:
-        with patch.object(reporting, "get_tenant_collection", fake_tenant_collection), \
-             patch("app.firebase.get_db", fake_get_db):
+        with patch.object(reporting.pg, "fetch_all", return_value=[row]) as fetch_all:
             client = TestClient(app)
             resp = client.get("/api/v1/reporting/quarterly")
             assert resp.status_code == 200, resp.text
             body = resp.json()
             assert len(body) == 1
-            assert body[0]["id"] == "r1"
-            assert "tenant" not in seen
+            assert body[0]["id"] == rid
+            assert fetch_all.call_args.args[0] is CaanReport
+            where = fetch_all.call_args.kwargs["where"]
+            assert where[0].right.value == "quarterly"
     finally:
         _teardown()
 
 
 def test_list_quarterly_reports_scoped_reads_operator_collection():
+    """Operator scope queries PG regulatory_reports, scoped to the tenant uuid."""
     _override_user(CAAN_SMD)
-    seen = {}
-
-    def fake_tenant_collection(tenant_id, collection):
-        seen["tenant"] = (tenant_id, collection)
-        return _Query(
-            [_Doc({"id": "r2", "report_type": "quarterly", "period": "2026-Q2",
-                   "year": 2026, "quarter": 2, "status": "completed"})]
-        )
+    tid_uuid = tenant_uuid("sita-air")
+    row = {
+        "tenant_id": tid_uuid,
+        "report_type": "quarterly",
+        "period": "2026-Q2",
+        "year": 2026,
+        "quarter": 2,
+        "status": "completed",
+        "generated_at": None,
+        "generated_by": "smd-caan-001",
+    }
 
     try:
-        with patch.object(reporting, "get_tenant_collection", fake_tenant_collection):
+        with patch.object(reporting.pg, "fetch_all", return_value=[row]) as fetch_all:
             client = TestClient(app)
             resp = client.get("/api/v1/reporting/quarterly?tenant_id=sita-air")
             assert resp.status_code == 200, resp.text
-            assert seen["tenant"] == ("sita-air", "reporting")
-            assert resp.json()[0]["id"] == "r2"
+            body = resp.json()
+            assert body[0]["id"] == reporting._report_id("sita-air", "quarterly", 2026, 2)
+            assert fetch_all.call_args.args[0] is RegulatoryReport
+            where = fetch_all.call_args.kwargs["where"]
+            assert where[0].right.value == tid_uuid
+            assert where[1].right.value == "quarterly"
     finally:
         _teardown()
 
@@ -312,8 +243,9 @@ def test_list_quarterly_reports_scoped_reads_operator_collection():
 def test_get_quarterly_report_returns_state_payload():
     """GET /api/v1/reporting/quarterly/{id} returns data.state, no national key."""
     _override_user(CAAN_SMD)
-    snap = _DocSnap({
-        "id": "rpt-001",
+    rid = reporting._report_id(None, "quarterly", 2026, 2)
+    row = {
+        "report_id": rid,
         "tenant_id": None,
         "report_type": "quarterly",
         "period": "2026-Q2",
@@ -322,23 +254,21 @@ def test_get_quarterly_report_returns_state_payload():
         "status": "completed",
         "summary": {"pillar_scores": {"safety_policy": 3.2}},
         "data": {"state": True},
-    })
-
-    def fake_get_db():
-        db = Mock()
-        db.collection.return_value = _DocColl(snap)
-        return db
+    }
 
     try:
-        with patch("app.firebase.get_db", fake_get_db):
+        with patch.object(reporting.pg, "fetch_by", return_value=row) as fetch_by:
             client = TestClient(app)
-            resp = client.get("/api/v1/reporting/quarterly/rpt-001")
+            resp = client.get(f"/api/v1/reporting/quarterly/{rid}")
             assert resp.status_code == 200, resp.text
             body = resp.json()
-            assert body["id"] == "rpt-001"
+            assert body["id"] == rid
             assert "state" in body["data"]
             assert body["data"]["state"] is True
             assert "national" not in body["data"]
             _assert_no_legacy_national(body)
+            assert fetch_by.call_args.args[0] is CaanReport
+            assert fetch_by.call_args.args[1] == "report_id"
+            assert fetch_by.call_args.args[2] == rid
     finally:
         _teardown()

@@ -12,13 +12,38 @@ from app.firebase import get_db
 COLLECTION_PATH = "audit_logs/regulatory/dispatches"
 TENANT_COLLECTION_PREFIX = "audit_logs/sms_dispatches"
 
+_FIRESTORE_OFFLINE_WARNED: set = set()
+
+
+def _mirror_db_or_none(call_site: str):
+    """Transitional no-op stub: Firestore was removed from the data plane.
+
+    get_db() raises NotImplementedError; the mirror is best-effort and must
+    never hard-fail the Postgres-primary dispatch pipeline. Returns None
+    (mirror skipped) per call site after a one-time warning. Test mocks that
+    patch this module's get_db still flow through unchanged.
+    """
+    try:
+        return get_db()
+    except NotImplementedError:
+        if call_site not in _FIRESTORE_OFFLINE_WARNED:
+            logger.warning(f"[audit_repo:{call_site}] Firestore removed; audit dispatch mirror skipped")
+            _FIRESTORE_OFFLINE_WARNED.add(call_site)
+        return None
+
 
 def _collection():
-    return get_db().collection(COLLECTION_PATH)
+    db = _mirror_db_or_none("_collection")
+    if db is None:
+        return None
+    return db.collection(COLLECTION_PATH)
 
 
 def _tenant_audit_collection(tenant_id: str):
-    return get_db().collection(f"tenants/{tenant_id}/audit_logs/sms_dispatches")
+    db = _mirror_db_or_none("_tenant_audit_collection")
+    if db is None:
+        return None
+    return db.collection(f"tenants/{tenant_id}/audit_logs/sms_dispatches")
 
 
 def _mirror(*, audit_id: str, collection, doc: Dict[str, Any]) -> None:

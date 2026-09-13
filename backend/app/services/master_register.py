@@ -19,7 +19,14 @@ import time
 from loguru import logger
 
 from app.core.config import settings
-from app.firebase import get_tenant_collection, get_cross_tenant_collection, get_db
+# A2: local PG-backed query symbols — Firestore was removed from the data
+# plane (A1). These keep the identical names so the stack behaves as before.
+from app.db.pg_query import (
+    get_tenant_collection,
+    get_cross_tenant_collection,
+    get_db,
+    DESCENDING,
+)
 
 HAZARD_COLLECTION = "hazards"
 CAN_COLLECTION = "can_cap"
@@ -208,8 +215,7 @@ def build_master_register(
                         pass
         # Order and limit
         try:
-            from google.cloud.firestore import Query as FirestoreQuery
-            q = q.order_by(order_field, direction=FirestoreQuery.DESCENDING).limit(per_type_limit)
+            q = q.order_by(order_field, direction=DESCENDING).limit(per_type_limit)
         except Exception as e:
             logger.warning(f"Master register order/limit failed (fallback): {e}")
             try:
@@ -441,9 +447,8 @@ def build_master_register(
             logger.warning(f"Master register CAN DB filter build partial failure: {e}")
 
         try:
-            from google.cloud.firestore import Query as FirestoreQuery
             # Prefer issued_at/created_at; fallback to created_at
-            can_query = can_query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(per_type_limit)
+            can_query = can_query.order_by("created_at", direction=DESCENDING).limit(per_type_limit)
             # Cursor via start_after
             if cursor_dt is not None and hasattr(can_query, "start_after"):
                 try:
@@ -602,8 +607,7 @@ def build_master_register(
                 cap_query = cap_query.where("created_at", ">=", cutoff_from)
             if cutoff_to is not None:
                 cap_query = cap_query.where("created_at", "<=", cutoff_to)
-            from google.cloud.firestore import Query as FirestoreQuery
-            cap_query = cap_query.order_by("created_at", direction=FirestoreQuery.DESCENDING).limit(cap_limit)
+            cap_query = cap_query.order_by("created_at", direction=DESCENDING).limit(cap_limit)
             # Cursor via start_after
             if cursor_dt is not None and hasattr(cap_query, "start_after"):
                 try:
@@ -655,8 +659,7 @@ def build_master_register(
                     # Try order_by+limit if supported (real Firestore), else just get()
                     try:
                         if hasattr(coll, "order_by"):
-                            from google.cloud.firestore import Query as _Q
-                            coll_q = coll.order_by("created_at", direction=_Q.DESCENDING)
+                            coll_q = coll.order_by("created_at", direction=DESCENDING)
                             if hasattr(coll_q, "limit"):
                                 coll_q = coll_q.limit(min(5, remaining))
                             per_can_caps = list(coll_q.get())

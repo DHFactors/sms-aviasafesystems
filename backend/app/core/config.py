@@ -196,6 +196,11 @@ class Settings(BaseSettings):
     BETA_ACCESS_KEY: str = "AVIASAFE-BETA-2026"
 
     # ── Tenant credentials / welcome email ──
+    # When True (default), tenant onboarding seeds the ICAO hazard register
+    # via the unified seeder (Postgres path only; Firestore is removed).
+    # Disabled in tests so the suite stays hermetic against the live DB.
+    ONBOARDING_HAZARD_SEED: bool = True
+
     # Provider: none (log + preview only), smtp, or sendgrid.
     EMAIL_PROVIDER: str = "none"
     EMAIL_FROM: Optional[str] = None

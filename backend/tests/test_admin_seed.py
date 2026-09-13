@@ -244,7 +244,8 @@ def test_create_regulator_success(monkeypatch):
         "country": "IN", "country_name": "India", "operator_tenant_ids": ["ind-air1"],
     }, _admin_user())
     assert doc["id"] == "dgca"
-    assert doc["short_name"] == "DGCA"
+    assert doc["display_name"] == "DGCA"
+    assert doc["data"]["short_name"] == "DGCA"
     stored = db._stores["regulators"]["dgca"]
     assert stored["name"] == "Directorate General of Civil Aviation"
     assert stored["operator_tenant_ids"] == ["ind-air1"]
@@ -637,7 +638,7 @@ def test_update_tenant_status_explicit(monkeypatch):
     doc = update_tenant_status("tara-air", _admin_user(), status="Trial")
     stored = db._stores["tenants"]["tara-air"]
     assert stored["status"] == "TRIAL"
-    assert stored["active"] is False
+    assert stored["active"] is True
     assert any(l["action"] == "TENANT_STATUS_UPDATED" for l in db._stores["audit_logs"].values())
     assert doc["status"] == "TRIAL"
 
@@ -666,7 +667,7 @@ def test_update_tenant_status_demo_with_trial_end(monkeypatch):
                                payment_status="Not Applicable", trial_end_date="2026-09-30")
     stored = db._stores["tenants"]["tara-air"]
     assert stored["status"] == "DEMO"
-    assert stored["active"] is False
+    assert stored["active"] is True
     assert stored["payment_status"] == "not_applicable"
     assert stored["contract"]["trial_end_date"] == "2026-09-30"
     assert doc["status"] == "DEMO"
@@ -786,7 +787,8 @@ def test_seed_psoe_tenant_writes_baselines(monkeypatch):
     assert "tara-air-baseline-draft" in ids
     docs = db._stores["psoe_assessments"]
     assert len(docs) == 2
-    with_tenant = [v for v in docs.values() if v.get("tenant_id") == "tara-air"]
+    from app.db.ids import tenant_uuid
+    with_tenant = [v for v in docs.values() if str(v.get("tenant_id")) == str(tenant_uuid("tara-air"))]
     assert len(with_tenant) == 2
     statuses = [v.get("status") for v in with_tenant]
     assert "completed" in statuses and "draft" in statuses
@@ -807,8 +809,10 @@ def test_seed_state_risk_reference(monkeypatch):
     from app.services.seed_surfaces import ICAO_TOP_RISK_CATEGORIES, seed_state_risk_reference
     result = asyncio.run(seed_state_risk_reference(_admin_user()))
     assert result["categories"] == len(ICAO_TOP_RISK_CATEGORIES)
-    store = db._subs.get(("icao_top_risks", "categories"))
+    store = db._stores.get("state_risk_categories")
     assert isinstance(store, dict) and len(store) == len(ICAO_TOP_RISK_CATEGORIES)
+    slugs = {d.get("slug") for d in store.values()}
+    assert slugs == {c["category"] for c in ICAO_TOP_RISK_CATEGORIES}
 
 
 def test_admin_psoe_route_seeds(monkeypatch):

@@ -599,7 +599,7 @@ def test_login_sixth_failure_returns_429_with_retry_after(monkeypatch):
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
 
     client = TestClient(app)
-    for i in range(5):
+    for i in range(settings.LOGIN_FAILURE_RATE_LIMIT):
         resp = client.post(
             "/api/v1/auth/login",
             json={"email": f"user{i}@corp.com", "password": "wrong-pass"},
@@ -608,7 +608,7 @@ def test_login_sixth_failure_returns_429_with_retry_after(monkeypatch):
 
     resp = client.post(
         "/api/v1/auth/login",
-        json={"email": "user6@corp.com", "password": "wrong-pass"},
+        json={"email": "lockout@corp.com", "password": "wrong-pass"},
     )
     assert resp.status_code == 429, resp.text
     retry_after = resp.headers.get("Retry-After")
@@ -624,7 +624,8 @@ def test_login_success_clears_failure_window(monkeypatch):
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
 
     client = TestClient(app)
-    # 4 failures (window capacity is 5): the next attempt may still be a login.
+    # 4 failures (window capacity is settings.LOGIN_FAILURE_RATE_LIMIT): the
+    # next attempt may still be a login.
     for i in range(4):
         assert client.post(
             "/api/v1/auth/login",

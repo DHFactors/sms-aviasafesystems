@@ -291,7 +291,7 @@ def test_register_tenant_fixed_wing(monkeypatch):
 
     user_doc = list(db.users.values())[0]
     assert user_doc["role"] == "AIRLINE_ADMIN"
-    assert user_doc["tenant_id"] == "summit-air"
+    assert str(user_doc["tenant_id"]) == "cbfc60c9-6210-5922-88ab-6601ee2e56d5"
     assert user_doc["department"] == "safety"
 
     assert db.audit and db.audit[0]["action"] == "TENANT_REGISTERED"

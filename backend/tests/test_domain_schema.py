@@ -43,7 +43,8 @@ def test_domain_model_registered(table, key_col, unique_cols):
     [
         ("tenants", ["safety_manager", "data"]),
         ("regulators", ["operator_tenant_ids", "data"]),
-        ("users", ["claims", "data"]),
+        # users flatten claims/data into first-class columns; no JSONB bags remain
+        ("users", []),
         ("audit_logs", ["metadata_json"]),
         ("sms_dispatches", ["data"]),
         ("invites", ["data"]),

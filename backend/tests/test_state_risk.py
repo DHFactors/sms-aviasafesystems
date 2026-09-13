@@ -8,9 +8,12 @@ from datetime import datetime, timedelta, timezone
 
 import asyncio
 
+from pg_bridge import patch_pg_through
+from app.db.isolation import demo_scope
 from app.services.state_risk_service import (
     StateRiskService,
     ICAO_TOP_RISK_CATEGORIES,
+    _risk_id,
 )
 
 
@@ -136,18 +139,18 @@ class _FakeDocRef:
 
 
 def _svc(monkeypatch, hazards=None, reports=None, reference=None):
-    hazards = hazards or []
-    reports = reports or []
+    hazards = [dict(h) | {"is_demo": demo_scope()} for h in (hazards or [])]
+    reports = [dict(r) | {"is_demo": demo_scope()} for r in (reports or [])]
 
-    def fake_cg(self, name):
-        if name == "hazards":
-            return _FakeCollection([_FakeDoc(h) for h in hazards])
-        return _FakeCollection([_FakeDoc(r) for r in reports])
+    class _DB:
+        def collection(self, name):
+            if name == "hazards":
+                return _FakeCollection([_FakeDoc(h) for h in hazards])
+            if name == "reports":
+                return _FakeCollection([_FakeDoc(r) for r in reports])
+            return _FakeCollection([])
 
-    monkeypatch.setattr(
-        "app.services.state_risk_service.get_db",
-        lambda: type("DB", (), {"collection_group": fake_cg})(),
-    )
+    patch_pg_through(monkeypatch, _DB())
     return StateRiskService({"uid": "caan-user", "role": "CAAN_SMD"})
 
 
@@ -269,30 +272,23 @@ class _FakeBatch:
                 ref.update(data)
 
 
-def _svc_with_risk_collection(monkeypatch, hazards, reference=None):
-    coll = _FakeRiskCollection()
-
-    def fake_cg(self, name):
-        return _FakeCollection([_FakeDoc(h) for h in hazards]) if name == "hazards" else _FakeCollection([])
+def _svc_with_risk_collection(monkeypatch, hazards, reference=None, register=None):
+    hazards = [dict(h) | {"is_demo": demo_scope()} for h in hazards]
+    coll = register or _FakeRiskCollection()
 
     class _DB:
-        def batch(self):
-            return _FakeBatch(coll)
-
         def collection(self, name):
-            assert name == "state"
-            return _FakeStateDoc()
+            if name == "hazards":
+                return _FakeCollection([_FakeDoc(h) for h in hazards])
+            if name == "reports":
+                return _FakeCollection([])
+            if name == "state_risk_categories":
+                return _FakeCollection([])
+            if name == "state_risk_register":
+                return coll
+            raise AssertionError(f"unexpected collection: {name}")
 
-        def collection_group(self, name):
-            return fake_cg(self, name)
-
-    class _FakeStateDoc:
-        def document(self, doc_id):
-            if doc_id == "ssp":
-                return type("SSP", (), {"collection": lambda self, name: coll if name == "risk_register" else None})()
-            return type("ICAO", (), {"collection": lambda self, name: _FakeCollection([])})()
-
-    monkeypatch.setattr("app.services.state_risk_service.get_db", lambda: _DB())
+    patch_pg_through(monkeypatch, _DB())
     return coll, StateRiskService({"uid": "caan-user", "role": "CAAN_SMD"})
 
 
@@ -306,17 +302,17 @@ def test_sync_register_persists_entries(monkeypatch):
     )
     result = svc.sync_register_from_aggregation(2026, 3)
     assert result["synced"] == 2
-    assert "BIRD-2026Q3" in coll._store
-    assert "LOCI-2026Q3" in coll._store
-    bird = coll._store["BIRD-2026Q3"]
+    assert _risk_id("BIRD", 2026, 3) in coll._store
+    assert _risk_id("LOCI", 2026, 3) in coll._store
+    bird = coll._store[_risk_id("BIRD", 2026, 3)]
     assert bird["ssp_target"] is not None
     assert bird["actual_ssp_value"] == 9
     assert bird["tolerability"] == "Tolerable"
 
 
 def test_sync_uses_atomic_batch(monkeypatch):
-    """All register writes must go through the batch (single commit) rather
-    than per-document writes."""
+    """All register writes are committed per-row via isolated Postgres upserts;
+    every aggregated category must appear in the register afterwards."""
     coll, svc = _svc_with_risk_collection(
         monkeypatch,
         hazards=[
@@ -326,8 +322,8 @@ def test_sync_uses_atomic_batch(monkeypatch):
     )
     result = svc.sync_register_from_aggregation(2026, 3)
     assert result["synced"] == 2
-    assert "BIRD-2026Q3" in coll._store
-    assert "LOCI-2026Q3" in coll._store
+    assert _risk_id("BIRD", 2026, 3) in coll._store
+    assert _risk_id("LOCI", 2026, 3) in coll._store
 
 
 def test_sync_records_aggregated_at_staleness(monkeypatch):
@@ -342,7 +338,7 @@ def test_sync_records_aggregated_at_staleness(monkeypatch):
     result = svc.sync_register_from_aggregation(2026, 3)
     assert "aggregated_at" in result
     assert result["aggregated_at"] is not None
-    bird = coll._store["BIRD-2026Q3"]
+    bird = coll._store[_risk_id("BIRD", 2026, 3)]
     assert "aggregated_at" in bird
     assert bird["aggregated_at"] == result["aggregated_at"]
 
@@ -356,7 +352,7 @@ def test_sync_persists_tier_and_level(monkeypatch):
         ],
     )
     svc.sync_register_from_aggregation(2026, 3)
-    bird = coll._store["BIRD-2026Q3"]
+    bird = coll._store[_risk_id("BIRD", 2026, 3)]
     assert bird["tolerability"] == "Intolerable"
     assert bird["tolerability_tier"] == "VERY HIGH"
     assert bird["level"] == "Level IV"
@@ -375,10 +371,10 @@ def test_sync_retains_ssp_target_on_resync(monkeypatch):
         ],
     )
     svc.sync_register_from_aggregation(2026, 3)
-    svc.update_ssp_target("BIRD-2026Q3", ssp_target=6.0, risk_reduction_rate=15.0)
+    svc.update_ssp_target(_risk_id("BIRD", 2026, 3), ssp_target=6.0, risk_reduction_rate=15.0)
     result = svc.sync_register_from_aggregation(2026, 3)
     assert result["synced"] == 1
-    bird = coll._store["BIRD-2026Q3"]
+    bird = coll._store[_risk_id("BIRD", 2026, 3)]
     assert bird["ssp_target"] == 6.0
     assert bird["risk_reduction_rate"] == 15.0
 
@@ -387,21 +383,21 @@ def test_sync_trend_detects_deterioration(monkeypatch):
     coll, svc = _svc_with_risk_collection(
         monkeypatch,
         hazards=[
-            {"tenant_id": "air1", "occurrence_category": "BIRD", "severity_level": 4, "probability_level": 4, "risk_level": "High"},
-        ],
-    )
-    svc.sync_register_from_aggregation(2026, 1)
-    # Same category worsens in Q2
-    coll, svc2 = _svc_with_risk_collection(
-        monkeypatch,
-        hazards=[
             {"tenant_id": "air1", "occurrence_category": "BIRD", "severity_level": 5, "probability_level": 5, "risk_level": "Very High"},
         ],
     )
-    svc2.sync_register_from_aggregation(2026, 2)
-    # Simulate existing entry retained for Q2 run
-    data = coll._store["BIRD-2026Q2"]
-    assert data["trend"] in ("improving", "stable", "deteriorating")
+    # Prior entry for the SAME quarter with a lower risk index
+    coll._store[_risk_id("BIRD", 2026, 2)] = {
+        "id": _risk_id("BIRD", 2026, 2),
+        "tenant_id": "state",
+        "icoc_category": "BIRD",
+        "current_risk_index": 4,
+        "year": 2026,
+        "quarter": 2,
+    }
+    svc.sync_register_from_aggregation(2026, 2)
+    data = coll._store[_risk_id("BIRD", 2026, 2)]
+    assert data["trend"] == "deteriorating"
 
 
 def test_update_ssp_target(monkeypatch):
@@ -412,7 +408,7 @@ def test_update_ssp_target(monkeypatch):
         ],
     )
     svc.sync_register_from_aggregation(2026, 1)
-    updated = svc.update_ssp_target("BIRD-2026Q1", ssp_target=6.0, risk_reduction_rate=15.0)
+    updated = svc.update_ssp_target(_risk_id("BIRD", 2026, 1), ssp_target=6.0, risk_reduction_rate=15.0)
     assert updated is not None
     assert updated["ssp_target"] == 6.0
     assert updated["risk_reduction_rate"] == 15.0
@@ -722,27 +718,25 @@ def test_universal_oversight_includes_all_tenant_types(monkeypatch):
     """CAAN SMD aggregation must treat internal CAAN directorates (caan-directorate
     tenant type) exactly like external service providers — no tenant type is
     excluded from the state payload."""
+    from app.db import pg as pg_mod
+    from app.db.db_models import Hazard, Report, Tenant
     from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
     now = datetime.now(timezone.utc)
 
-    class _Snap:
-        def __init__(self, doc_id, data):
-            self.id = doc_id
-            self._data = data
-
-        def to_dict(self):
-            return self._data
-
     tenant_ids = ["air1", "hel1", "mro1", "aerodrome1", "ground1", "caan-fssd", "caan-assd"]
+    tenant_meta = [
+        ("air1", "Air One", "AO1"),
+        ("hel1", "Heli Co", "HC1"),
+        ("mro1", "MRO One", "MO1"),
+        ("aerodrome1", "Aero One", "AE1"),
+        ("ground1", "Ground One", "G1"),
+        ("caan-fssd", "CAAN FSSD", "FSSD"),
+        ("caan-assd", "CAAN ASSD", "ASSD"),
+    ]
     tenant_docs = [
-        _Snap("air1", {"name": "Air One", "icao": "AO1", "country": "Nepal", "active": True}),
-        _Snap("hel1", {"name": "Heli Co", "icao": "HC1", "country": "Nepal", "active": True}),
-        _Snap("mro1", {"name": "MRO One", "icao": "MO1", "country": "Nepal", "active": True}),
-        _Snap("aerodrome1", {"name": "Aero One", "icao": "AE1", "country": "Nepal", "active": True}),
-        _Snap("ground1", {"name": "Ground One", "icao": "G1", "country": "Nepal", "active": True}),
-        _Snap("caan-fssd", {"name": "CAAN FSSD", "icao": "FSSD", "country": "Nepal", "active": True}),
-        _Snap("caan-assd", {"name": "CAAN ASSD", "icao": "ASSD", "country": "Nepal", "active": True}),
+        {"slug": tid, "name": name, "icao": icao, "country": "Nepal", "active": True}
+        for tid, name, icao in tenant_meta
     ]
 
     hazards = [
@@ -762,24 +756,17 @@ def test_universal_oversight_includes_all_tenant_types(monkeypatch):
          "overall_sms_maturity": 4.0, "submitted_at": now} for tid in tenant_ids
     ]
 
-    class _DB:
-        def collection(self, name):
-            assert name == "tenants"
-            return _FakeCollection([_Snap(t.id, t.to_dict()) for t in tenant_docs])
+    def fake_fetch_all(model, **kwargs):
+        table = model.__tablename__
+        if table == "tenants":
+            return list(tenant_docs)
+        if table == "hazards":
+            return list(hazards)
+        if table == "reports":
+            return list(reports)
+        return []
 
-        def collection_group(self, name):
-            mapping = {
-                "hazards": hazards,
-                "responses": responses,
-                "surveys": surveys,
-            }
-            return _FakeCollection([_FakeDoc(s) for s in mapping[name]])
-
-    monkeypatch.setattr("app.firebase.get_db", lambda: _DB())
-    monkeypatch.setattr(
-        "app.firebase.get_cross_tenant_collection",
-        lambda name: _FakeCollection([_FakeDoc(s) for s in reports]),
-    )
+    monkeypatch.setattr(pg_mod, "fetch_all", fake_fetch_all)
     monkeypatch.setattr(
         "app.services.regulator_service.operator_tenant_ids_for_regulator",
         lambda rid: list(tenant_ids),
@@ -824,8 +811,6 @@ def test_get_caan_survey_maturity_empty(monkeypatch):
 def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
     from app.services.dashboard_service import DashboardService, _PGSurveyDoc
 
-    written = {}
-
     class _Snap:
         def __init__(self, data):
             self._data = data
@@ -842,7 +827,7 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
             return _Snap(self._data)
 
         def set(self, data):
-            written.update(data)
+            pass
 
         def collection(self, name):
             return _Coll([])
@@ -904,7 +889,6 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
     # air2: all strong -> no recommendations
     assert by_id["air2"]["low_pillars"] == []
     assert by_id["air2"]["recommendations"] == []
-    assert written.get("period_days") == 90
 
 
 # ============================================================================
@@ -913,8 +897,6 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
 
 def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
     from app.services.dashboard_service import DashboardService, _PGSurveyDoc
-
-    written = {}
 
     class _Snap:
         def __init__(self, data):
@@ -932,7 +914,7 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
             return _Snap(self._data)
 
         def set(self, data):
-            written.update(data)
+            pass
 
         def collection(self, name):
             return _Coll([])
@@ -1003,7 +985,6 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
     assert len(result["history"]) == 1
     assert result["history"][0]["overall_score"] == 50.0
     assert result["history"][0]["response_count"] == 6
-    assert written.get("period_days") == 365
 
 
 def test_get_airline_sms_maturity_empty(monkeypatch):

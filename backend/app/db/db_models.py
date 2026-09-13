@@ -24,6 +24,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    func,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -1489,26 +1490,28 @@ class Regulator(Base):
 class UserProfile(Base):
     __tablename__ = "users"
 
-    uid: Mapped[str] = mapped_column(Text, primary_key=True)
-    email: Mapped[object] = mapped_column(Text, nullable=True)
+    # Flat projection of the live Supabase `users` table. Firestore's
+    # schemaless `claims`/`data` JSONB bags are NOT stored: role/tenant_id/
+    # department/is_developer are first-class columns (tenant_id is the
+    # deterministic uuid5('tenant:'+slug) FK to tenants.id, NOT the slug).
+    id: Mapped[object] = _uuid_pk()
+    uid: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
     display_name: Mapped[object] = mapped_column(Text, nullable=True)
-    role: Mapped[object] = mapped_column(Text, nullable=True)
-    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False, default="USER")
+    tenant_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True
+    )
     department: Mapped[object] = mapped_column(Text, nullable=True)
     phone: Mapped[object] = mapped_column(Text, nullable=True)
     phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    claims: Mapped[object] = mapped_column(JSONB, nullable=True)
-    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
+    is_developer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    last_login: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
-    )
-
-    __table_args__ = (
-        Index("ix_users_email", "email"),
-        Index("ix_users_tenant", "tenant_id"),
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
 

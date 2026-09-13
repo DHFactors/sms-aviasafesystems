@@ -37,6 +37,26 @@ from app.models.tenant_profile import OperationalScope
 from app.services.audit_service import log_audit, request_context
 from app.services.users import upsert_user_doc
 
+_FIRESTORE_OFFLINE_WARNED: set = set()
+
+
+def _registration_db():
+    """Transitional no-op stub for the legacy Firestore tenant write.
+
+    get_db() now raises NotImplementedError (Firestore removed from the data
+    plane). Self-service registration is Postgres-primary, so a missing
+    Firestore must not block tenant creation: return None (warn-once) and the
+    call site skips the legacy mirror writes. Test mocks that patch this
+    module's get_db still flow through unchanged.
+    """
+    try:
+        return get_db()
+    except NotImplementedError:
+        if "register" not in _FIRESTORE_OFFLINE_WARNED:
+            logger.warning("[tenant_registration] Firestore removed; tenant created in Postgres only")
+            _FIRESTORE_OFFLINE_WARNED.add("register")
+        return None
+
 # Classifications a self-registering organization may select. Regulators and
 # ground-handling providers are not exposed on the public form.
 REGISTRATION_SCOPES = (
@@ -323,7 +343,7 @@ def register_tenant(
                 "request access."
             )
 
-    db = get_db()
+    db = _registration_db()
     auth = get_auth()
     now = datetime.now(timezone.utc)
     tid = _unique_tenant_id(organization_name)
@@ -343,7 +363,7 @@ def register_tenant(
     applicable_departments = list(scope.departments)
     invite_code = generate_invite_code()
 
-    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid)
+    tenant_ref = db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tid) if db is not None else None
     sandbox_tags = {}
     if is_beta_env:
         # Beta sandbox marker: self-service tenants created on the beta portal
@@ -370,36 +390,32 @@ def register_tenant(
         "updated_at": now,
         **sandbox_tags,
     }
-    tenant_ref.set(dict(tenant_doc))
+    if tenant_ref is not None:
+        tenant_ref.set(dict(tenant_doc))
+        tenant_ref.collection("profile").document("operational").set(
+            {
+                "tenant_id": tid,
+                "slug": tid,
+                "tenant_name": organization_name,
+                "email": email,
+                "category": CATEGORY_LABELS.get(scope, scope.value),
+                "scope": scope.value,
+                "tenant_type": scope.value,
+                "operates_flights": operates_flights,
+                "applicable_departments": applicable_departments,
+                "created_at": now,
+            }
+        )
     pg.upsert(Tenant, "slug", tid, dict(tenant_doc))
 
-    tenant_ref.collection("profile").document("operational").set(
-        {
-            "tenant_id": tid,
-            "slug": tid,
-            "tenant_name": organization_name,
-            "email": email,
-            "category": CATEGORY_LABELS.get(scope, scope.value),
-            "scope": scope.value,
-            "tenant_type": scope.value,
-            "operates_flights": operates_flights,
-            "applicable_departments": applicable_departments,
-            "created_at": now,
-        }
-    )
-
     upsert_user_doc(
-        user.uid,
-        {
-            "uid": user.uid,
-            "email": email,
-            "display_name": admin_full_name,
-            "role": "AIRLINE_ADMIN",
-            "tenant_id": tid,
-            "department": "safety",
-            "created_at": now,
-            "updated_at": now,
-        },
+        uid=user.uid,
+        email=email,
+        display_name=admin_full_name,
+        role="AIRLINE_ADMIN",
+        tenant_id=tid,
+        department="safety",
+        created_at=now,
     )
 
     ip, request_id = request_context(request)
@@ -602,22 +618,16 @@ def join_team(
         {"role": assigned_role, "tenant_id": tid, "department": label},
     )
 
-    user_doc = {
-        "uid": user.uid,
-        "email": email,
-        "display_name": full_name,
-        "role": assigned_role,
-        "tenant_id": tid,
-        "department": label,
-        "status": "ACTIVE",
-        "phone": phone.strip() if phone and phone.strip() else None,
-        "phone_verified": False,
-        "created_at": now,
-        "updated_at": now,
-    }
-    if operational_role:
-        user_doc["operational_role"] = operational_role.strip()[:100]
-    upsert_user_doc(user.uid, user_doc)
+    upsert_user_doc(
+        uid=user.uid,
+        email=email,
+        display_name=full_name,
+        role=assigned_role,
+        tenant_id=tid,
+        department=label,
+        phone=phone.strip() if phone and phone.strip() else None,
+        created_at=now,
+    )
 
     ip, request_id = request_context(request)
     log_audit(

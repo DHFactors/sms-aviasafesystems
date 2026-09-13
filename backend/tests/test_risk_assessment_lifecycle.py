@@ -209,7 +209,6 @@ def mock_firebase_and_gemini(monkeypatch):
     monkeypatch.setattr("app.firebase.is_firebase_ready", lambda: True)
     monkeypatch.setattr("app.firebase.get_tenant_metadata",
                         lambda tid: {"risk_matrix": {"thresholds": {"low_max": 5, "medium_max": 9, "high_max": 15}}})
-    monkeypatch.setattr("app.firebase._db", fs_client)
 
     # -- Token verification: return decoded token based on a simple "token" string --
     import app.firebase as fb_mod
@@ -322,6 +321,7 @@ class TestSubmissionAutoCalculation:
             "location": "KTM",
             "occurrence_date": datetime.now(timezone.utc).isoformat(),
             "report_type": "mandatory",
+            "occurrence_category": "CFIT",
             "severity_level": 5,
             "probability_level": 5,
         }
@@ -345,7 +345,8 @@ class TestSubmissionAutoCalculation:
                            headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
         assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data["risk_index"] == 1, f"Expected risk_index=1, got {data.get('risk_index')}"
+        assert data["severity_level"] == 3, f"Expected auto-severity 3, got {data.get('severity_level')}"
+        assert data["risk_index"] == 3, f"Expected risk_index=3 (3\u00d71), got {data.get('risk_index')}"
         assert data["risk_level"] == "Low", f"Expected Low, got {data.get('risk_level')}"
 
     def test_submission_without_icao_fields_backward_compat(self, client):
@@ -359,7 +360,7 @@ class TestSubmissionAutoCalculation:
                            headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
         assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        assert data.get("severity_level") is None, f"Expected None, got {data.get('severity_level')}"
+        assert data.get("severity_level") == 3, f"Expected auto-severity 3, got {data.get('severity_level')}"
         assert data.get("risk_index") is None, f"Expected None, got {data.get('risk_index')}"
 
     def test_submission_with_invalid_severity_rejected(self, client):
@@ -487,7 +488,8 @@ class TestSafetyManagerOverride:
                            headers=_auth_header("AIRLINE_ADMIN_TOKEN"))
         assert resp.status_code == 201
         report = resp.json()
-        assert report["risk_index"] == 6  # 2×3
+        assert report["severity_level"] == 3
+        assert report["risk_index"] == 9  # auto-severity 3×3
         assert report["risk_level"] == "High"
 
         report_id = report["id"]

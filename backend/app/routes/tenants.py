@@ -24,6 +24,7 @@ from app.services.tenant_service import (
     save_tenant_config,
 )
 from app.services.users import list_tenant_users
+from app.schemas.user import TenantUserListResponse
 
 router = APIRouter()
 
@@ -171,15 +172,16 @@ async def get_tenant_summary(
     })
 
 
-@router.get("/{tenant_id}/users", status_code=status.HTTP_200_OK)
+@router.get("/{tenant_id}/users", status_code=status.HTTP_200_OK, response_model=TenantUserListResponse)
 async def list_users(
     tenant_id: str,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """List the authorized users for a tenant (view-only).
 
-    AIRLINE_ADMIN of the target tenant or SUPER_ADMIN. Returns uid, email, role,
-    createdAt and lastLogin (when available) from the mirrored users collection.
+    AIRLINE_ADMIN of the target tenant or SUPER_ADMIN. Returns uid, email,
+    display_name, role, department, phone and tenant_id from the mirrored
+    users table (typed as ``UserProfileRead``).
     """
     tenant_id = tenant_id.strip()
     _require_tenant_viewer(user, tenant_id)

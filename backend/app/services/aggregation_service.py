@@ -1,45 +1,108 @@
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
-from collections import Counter, defaultdict
+from collections import Counter
 import io
 
 from loguru import logger
 
-from app.db.abstract_repository import AbstractRepository
-from app.db.firestore_repository import FirestoreRepository
+from app.db import pg
+from app.db.db_models import Hazard, Survey, Tenant
+from app.db.isolation import demo_scope
+from app.db.ids import tenant_uuid
 
 
 class AggregationService:
-    """Industry aggregation for regulator dashboard. Uses AbstractRepository, anonymized, min 3 tenants."""
+    """Industry aggregation for regulator dashboard.
 
-    def __init__(self, repository: Optional[AbstractRepository] = None):
-        self.repository: AbstractRepository = repository or FirestoreRepository()
+    Reads straight from Postgres (hazards + survey maturity per tenant),
+    anonymized, min 3 tenants. The optional `repository` argument is accepted
+    for backward compatibility but is no longer used for reads.
+    """
+
+    def __init__(self, repository: Optional[Any] = None):
+        self.repository = repository
 
     async def _get_tenant_ids(self, tenant_ids: Optional[List[str]] = None) -> List[str]:
         if tenant_ids:
             return tenant_ids
-        # Discover via tenants collection if available, else return empty
+        # Discover via tenants table if available, else return empty
         try:
-            tenants = await self.repository.query("tenants", limit=100)
-            return [t.get("id") or t.get("tenant_id") for t in tenants if t.get("id") or t.get("tenant_id")]
+            tenants = pg.fetch_all(Tenant, limit=100)
+            slugs = [t.get("slug") or t.get("tenant_id") or t.get("id") for t in tenants]
+            return [s for s in slugs if s]
         except Exception:
             return []
+
+    def _latest_maturity(self, tid: str) -> Optional[Dict[str, Any]]:
+        """Latest survey maturity for a tenant, mapped to the Firestore-era
+        maturity-assessment shape the aggregation code reads."""
+        try:
+            uid = tenant_uuid(tid)
+        except Exception:
+            uid = None
+        if uid is None:
+            return None
+        rows = pg.fetch_all(
+            Survey,
+            where=[Survey.tenant_id == uid, Survey.is_demo == demo_scope()],
+            order_by=Survey.submitted_at.desc(),
+            limit=1,
+        )
+        if not rows:
+            return None
+        d = rows[0]
+        overall = d.get("overall_sms_maturity")
+        level = int(overall) if overall is not None else None
+        return {
+            "overall_maturity": overall,
+            "component_scores": {
+                "component_1": d.get("safety_policy"),
+                "component_2": d.get("safety_risk_management"),
+                "component_3": d.get("safety_assurance"),
+                "component_4": d.get("safety_promotion"),
+            },
+            "level": level,
+            "level_name": f"Level {level}" if level is not None else None,
+            "created_at": d.get("submitted_at"),
+        }
+
+    def _hazards(self, tid: str) -> List[Dict[str, Any]]:
+        """Hazards for a tenant mapped to the Firestore-era hazard shape the
+        aggregation code reads (created_at as ISO string for [:10] slicing)."""
+        try:
+            uid = tenant_uuid(tid)
+        except Exception:
+            uid = None
+        if uid is None:
+            return []
+        rows = pg.fetch_all(
+            Hazard,
+            where=[Hazard.tenant_id == uid, Hazard.is_demo == demo_scope()],
+            order_by=Hazard.created_at.desc(),
+            limit=100,
+        )
+        docs = []
+        for d in rows:
+            created = d.get("created_at")
+            docs.append({
+                "adrep_code": d.get("adrep_category"),
+                "hfacs_code": None,
+                "category": d.get("adrep_category") or d.get("taxonomy") or d.get("occurrence_type"),
+                "title": d.get("title") or "",
+                "risk_level": d.get("risk_level"),
+                "initial_risk_level": d.get("risk_level"),
+                "initial_risk_level_value": d.get("risk_index"),
+                "created_at": created.isoformat() if created is not None else "",
+            })
+        return docs
 
     async def collect_maturity_scores(self, tenant_ids: List[str]) -> List[Dict[str, Any]]:
         """Collect latest maturity assessment per tenant, anonymized."""
         anonymized = []
         for idx, tid in enumerate(tenant_ids, 1):
             try:
-                # Latest assessment for this tenant
-                assessments = await self.repository.query(
-                    f"tenants/{tid}/maturity_assessments",
-                    filters=[("tenant_id", "==", tid)],
-                    order_by=[("created_at", "desc")],
-                    limit=1
-                )
-                if not assessments:
+                latest = self._latest_maturity(tid)
+                if not latest:
                     continue
-                latest = assessments[0]
                 # Anonymize: remove tenant_id, name
                 anon = {
                     "anonymized_id": f"Operator-{idx}",
@@ -85,11 +148,7 @@ class AggregationService:
         all_categories = []
         for tid in tenant_ids:
             try:
-                hazards = await self.repository.query(
-                    f"tenants/{tid}/hazards",
-                    filters=[("tenant_id", "==", tid)],
-                    limit=100
-                )
+                hazards = self._hazards(tid)
                 for h in hazards:
                     cat = h.get("adrep_code") or h.get("hfacs_code") or h.get("category") or "Unknown"
                     all_categories.append(cat)
@@ -111,7 +170,7 @@ class AggregationService:
         trends = []
         for tid in tenant_ids:
             try:
-                hazards = await self.repository.query(f"tenants/{tid}/hazards", filters=[("tenant_id", "==", tid)], limit=50)
+                hazards = self._hazards(tid)
                 for h in hazards:
                     trends.append({
                         "date": h.get("created_at", "")[:10],
@@ -134,11 +193,7 @@ class AggregationService:
         risks = []
         for tid in tenant_ids:
             try:
-                hazards = await self.repository.query(
-                    f"tenants/{tid}/hazards",
-                    filters=[("tenant_id", "==", tid)],
-                    limit=50
-                )
+                hazards = self._hazards(tid)
                 for h in hazards:
                     if h.get("initial_risk_level") in ("High", "Very High"):
                         risks.append({
@@ -163,13 +218,8 @@ class AggregationService:
             return industry
         # Operator's own latest
         try:
-            own = await self.repository.query(
-                f"tenants/{tenant_id}/maturity_assessments",
-                filters=[("tenant_id", "==", tenant_id)],
-                order_by=[("created_at", "desc")],
-                limit=1
-            )
-            own_score = own[0].get("overall_maturity") if own else None
+            own = self._latest_maturity(tenant_id)
+            own_score = own.get("overall_maturity") if own else None
         except Exception:
             own_score = None
         return {

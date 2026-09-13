@@ -7,6 +7,8 @@ and assignee scoping).
 
 from datetime import datetime, timedelta, timezone
 
+from app.db.db_models import Can, Cap, Tenant
+from app.db.ids import tenant_uuid
 from app.services import escalation_service
 from app.services import master_register
 
@@ -129,99 +131,139 @@ class _AuditColl:
         self._entries.append(entry)
 
 
+class _FakePg:
+    """Minimal stub for the Postgres query layer used by escalation_service.
+
+    ``fetch_all`` returns rows keyed by model table name. When a ``where`` clause
+    carries a tenant UUID (``Can.tenant_id == <uuid>``) and a matching entry
+    exists in ``tenant_rows``, the per-tenant (cans, caps) rows are returned so
+    ``check_all_overdue`` sees isolated tenant data just like real Postgres.
+    """
+
+    def __init__(self, rows_by_model, tenant_rows=None):
+        self._static = {m.__tablename__: list(r) for m, r in rows_by_model.items()}
+        self._tenant_rows = tenant_rows or {}
+
+    @staticmethod
+    def _tenant_of(where):
+        for cond in where or []:
+            try:
+                return str(cond.right.value)
+            except Exception:
+                continue
+        return None
+
+    def fetch_all(self, model, where=None):
+        name = model.__tablename__
+        tid = self._tenant_of(where)
+        if tid is not None and tid in self._tenant_rows:
+            cans, caps = self._tenant_rows[tid]
+            rows = cans if name == "cans" else caps if name == "caps" else []
+            return [dict(r) for r in rows]
+        return [dict(r) for r in self._static.get(name, [])]
+
+    def update(self, model, key_col, key, data):
+        name = model.__tablename__
+        if name in ("cans", "caps"):
+            stores = [pair[0] if name == "cans" else pair[1]
+                      for pair in self._tenant_rows.values()]
+            if not stores:
+                stores = [self._static.get(name)]
+        else:
+            stores = [self._static.get(name)]
+        for store in stores:
+            if not store:
+                continue
+            for r in store:
+                if str(r.get(key_col)) == str(key):
+                    r.update(data)
+                    return
+
+
 def test_can_escalated_when_past_due(monkeypatch):
     cans = [
-        _Snap("can1", {
-            "can_reference": "CAN-001",
-            "status": "Open",
-            "target_completion_date": _dt(5),
-        }),
-        _Snap("can2", {
-            "can_reference": "CAN-002",
-            "status": "Closed",
-            "target_completion_date": _dt(5),
-        }),
-        _Snap("can3", {
-            "can_reference": "CAN-003",
-            "status": "Open",
-            "target_completion_date": _dt(-5),
-        }),
+        {"id": "can1", "can_reference": "CAN-001", "status": "Open",
+         "target_completion_date": _dt(5)},
+        {"id": "can2", "can_reference": "CAN-002", "status": "Closed",
+         "target_completion_date": _dt(5)},
+        {"id": "can3", "can_reference": "CAN-003", "status": "Open",
+         "target_completion_date": _dt(-5)},
     ]
-    db = _FakeDB([_TenantSnap("t1", cans)])
-    monkeypatch.setattr("app.services.escalation_service.get_db", lambda: db)
-    monkeypatch.setattr("app.services.escalation_service.log_audit", _FakeAudit())
+    audit = _FakeAudit()
+    monkeypatch.setattr(escalation_service, "pg", _FakePg({Can: cans}))
+    monkeypatch.setattr(escalation_service, "log_audit", audit)
 
     result = escalation_service.check_tenant_overdue("t1")
     assert result["cans_escalated"] == 1
     # only the past-due open CAN gets the new status; the future one stays Open,
     # and the Closed CAN is never touched
-    assert cans[0]._data["status"] == "Escalated"
-    assert cans[2]._data["status"] == "Open"
-    assert cans[1]._data["status"] == "Closed"
+    assert cans[0]["status"] == "Escalated"
+    assert cans[2]["status"] == "Open"
+    assert cans[1]["status"] == "Closed"
 
 
 def test_can_escalated_idempotent(monkeypatch):
     cans = [
-        _Snap("can1", {
-            "can_reference": "CAN-001",
-            "status": "Escalated",
-            "target_completion_date": _dt(5),
-        }),
+        {"id": "can1", "can_reference": "CAN-001", "status": "Escalated",
+         "target_completion_date": _dt(5)},
     ]
-    db = _FakeDB([_TenantSnap("t1", cans)])
-    monkeypatch.setattr("app.services.escalation_service.get_db", lambda: db)
     audit = _FakeAudit()
-    monkeypatch.setattr("app.services.escalation_service.log_audit", audit)
+    monkeypatch.setattr(escalation_service, "pg", _FakePg({Can: cans}))
+    monkeypatch.setattr(escalation_service, "log_audit", audit)
 
     result = escalation_service.check_tenant_overdue("t1")
     assert result["cans_escalated"] == 1
     # status unchanged because it was already Escalated
-    assert cans[0]._data["status"] == "Escalated"
+    assert cans[0]["status"] == "Escalated"
     # no duplicate audit entry for the already-escalated CAN
     can_audits = [a for a in audit.entries if a["action"] == "CAN_ESCALATED"]
     assert can_audits == []
 
 
 def test_cap_overdue_when_past_due(monkeypatch):
-    cap_past = _CapSnap("cap1", {
-        "cap_reference": "CAN-001-CAP-001",
-        "status": "In Progress",
-        "target_completion_date": _dt(4),
-    })
-    cap_future = _CapSnap("cap2", {
-        "cap_reference": "CAN-001-CAP-002",
-        "status": "In Progress",
-        "target_completion_date": _dt(-4),
-    })
-    can = _Snap("can1", {
-        "can_reference": "CAN-001",
-        "status": "Under Review",
-        "target_completion_date": _dt(4),
-    }, caps=[cap_past, cap_future])
-    db = _FakeDB([_TenantSnap("t1", [can])])
-    monkeypatch.setattr("app.services.escalation_service.get_db", lambda: db)
-    monkeypatch.setattr("app.services.escalation_service.log_audit", _FakeAudit())
+    caps = [
+        {"id": "cap1", "can_id": "can1", "cap_reference": "CAN-001-CAP-001",
+         "status": "In Progress", "target_completion_date": _dt(4)},
+        {"id": "cap2", "can_id": "can1", "cap_reference": "CAN-001-CAP-002",
+         "status": "In Progress", "target_completion_date": _dt(-4)},
+    ]
+    cans = [
+        {"id": "can1", "can_reference": "CAN-001", "status": "Under Review",
+         "target_completion_date": _dt(4)},
+    ]
+    monkeypatch.setattr(escalation_service, "pg", _FakePg({Can: cans, Cap: caps}))
+    monkeypatch.setattr(escalation_service, "log_audit", _FakeAudit())
 
     result = escalation_service.check_tenant_overdue("t1")
     assert result["caps_overdue"] == 1
-    assert cap_past._data["status"] == "Overdue"
-    assert cap_future._data["status"] == "In Progress"
+    assert caps[0]["status"] == "Overdue"
+    assert caps[1]["status"] == "In Progress"
 
 
 def test_check_all_overdue_returns_summary(monkeypatch):
-    cans = [_Snap("can1", {
-        "can_reference": "CAN-001",
-        "status": "Open",
-        "target_completion_date": _dt(3),
-    })]
-    db = _FakeDB([_TenantSnap("t1", cans), _TenantSnap("t2", [])])
-    monkeypatch.setattr("app.services.escalation_service.get_db", lambda: db)
-    monkeypatch.setattr("app.services.escalation_service.log_audit", _FakeAudit())
+    cans_t1 = [
+        {"id": "can1", "can_reference": "CAN-001", "status": "Open",
+         "target_completion_date": _dt(3)},
+    ]
+    tenants = [
+        {"id": "t1", "slug": "t1"},
+        {"id": "t2", "slug": "t2"},
+    ]
+    audit = _FakeAudit()
+    monkeypatch.setattr(escalation_service, "pg", _FakePg(
+        {Tenant: tenants},
+        tenant_rows={
+            str(tenant_uuid("t1")): (cans_t1, []),
+            str(tenant_uuid("t2")): ([], []),
+        },
+    ))
+    monkeypatch.setattr(escalation_service, "log_audit", audit)
 
     result = escalation_service.check_all_overdue()
     assert result["tenants_processed"] == 2
     assert result["cans_escalated"] == 1
     assert result["caps_overdue"] == 0
+    assert any(a["action"] == "OVERDUE_CHECK_RUN" for a in audit.entries)
 
 
 # ============================================================================
@@ -293,8 +335,16 @@ def _patch_mr(monkeypatch, db, user):
     def _cross_tenant_collection(name):
         return db.collection(name)
 
+    def _group_db():
+        class _Group:
+            def collection_group(self, coll):
+                assert coll == "caps"
+                return _MRColl([])
+        return _Group()
+
     monkeypatch.setattr("app.services.master_register.get_tenant_collection", _tenant_collection)
     monkeypatch.setattr("app.services.master_register.get_cross_tenant_collection", _cross_tenant_collection)
+    monkeypatch.setattr("app.services.master_register.get_db", lambda: _group_db())
 
 
 def test_master_register_combines_types(monkeypatch):

@@ -1,10 +1,17 @@
 """Firebase Admin — Auth-only.
 
-Firestore data plane has been migrated to Postgres (Batches 0-3). This module
-now exposes ONLY Auth utilities (token verification, custom claims, app init).
-Firestore helpers (get_db, get_tenant_collection, etc.) are retained as
-deprecated no-op stubs so best-effort mirror writes do not crash, but they log
-a warning and return a dummy client. New code must use app.db.pg.
+Firestore data plane has been migrated to Postgres (Batches 0-3 and the
+A-series cleanup). This module exposes ONLY Auth utilities (token verification,
+custom claims, app init). The Firestore data-access helpers (get_db,
+get_tenant_collection, get_cross_tenant_collection, get_tenant_metadata) are
+fully removed and now raise NotImplementedError — the dummy Firestore client was
+deleted in A1.
+
+Ambiguous callers were given transitional stubs (routes/demo.py, routes/admin.py,
+services/admin_data_service.py, workers/tenant_scheduler.py) that degrade to a
+no-op / empty result instead of crashing. Any OTHER call that reaches these
+functions is legacy Firestore wiring that must be cleaned up in the A-series
+(A2/A3b/A5/A7/A8).
 """
 
 import firebase_admin
@@ -15,52 +22,6 @@ from loguru import logger
 from app.core.config import settings
 
 _firebase_app = None
-
-
-class _DummyFirestoreDoc:
-    exists = False
-    id = "dummy"
-    def to_dict(self): return {}
-    def get(self, *a, **kw): return self
-    def set(self, *a, **kw): return None
-    def update(self, *a, **kw): return None
-    def delete(self, *a, **kw): return None
-    def collection(self, *a, **kw): return _DummyFirestoreCollection()
-    @property
-    def reference(self): return self
-
-
-class _DummyFirestoreCollection:
-    def document(self, *a, **kw): return _DummyFirestoreDoc()
-    def collection(self, *a, **kw): return _DummyFirestoreCollection()
-    def collection_group(self, *a, **kw): return _DummyFirestoreCollection()
-    def where(self, *a, **kw): return self
-    def order_by(self, *a, **kw): return self
-    def limit(self, *a, **kw): return self
-    def start_after(self, *a, **kw): return self
-    def stream(self, *a, **kw): return []
-    def get(self, *a, **kw): return []
-    def add(self, *a, **kw): return (None, _DummyFirestoreDoc())
-    def count(self): 
-        class _C: 
-            def get(self): return []
-        return _C()
-
-
-class _DummyFirestoreClient:
-    def collection(self, *a, **kw): return _DummyFirestoreCollection()
-    def collection_group(self, *a, **kw): return _DummyFirestoreCollection()
-    def document(self, *a, **kw): return _DummyFirestoreDoc()
-    def batch(self):
-        class _B:
-            def set(self, *a, **kw): pass
-            def update(self, *a, **kw): pass
-            def delete(self, *a, **kw): pass
-            def commit(self): pass
-        return _B()
-
-
-_dummy_db = _DummyFirestoreClient()
 
 
 def initialize_firebase():
@@ -85,7 +46,7 @@ def initialize_firebase():
 
             cred = credentials.Certificate(cred_dict)
             _firebase_app = firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin SDK initialized (Auth-only, Firestore deprecated)")
+            logger.info("Firebase Admin SDK initialized (Auth-only, Firestore removed)")
 
         except Exception as e:
             logger.error(f"Failed to initialize Firebase: {e}")
@@ -94,14 +55,19 @@ def initialize_firebase():
 
 
 def get_db():
-    """Deprecated: Firestore removed. Returns dummy client that no-ops."""
-    logger.warning("get_db() called — Firestore is deprecated, returning dummy (no-op)")
-    if _firebase_app is None:
-        try:
-            initialize_firebase()
-        except Exception:
-            pass
-    return _dummy_db
+    """Deprecated: Firestore removed from the data plane (A1). Raises.
+
+    No dummy client exists anymore. Transitional stubs in routes/demo.py,
+    routes/admin.py, services/admin_data_service.py and
+    workers/tenant_scheduler.py catch this and degrade. Any other live caller
+    is legacy Firestore wiring to be removed.
+    """
+    raise NotImplementedError(
+        "firebase.get_db() is unavailable: Firestore was removed from the data plane (A1). "
+        "Use app.db.pg for data access. Convert this call site to a transitional stub "
+        "(routes/demo.py, routes/admin.py, services/admin_data_service.py, "
+        "workers/tenant_scheduler.py) or remove it in the A-series cleanup."
+    )
 
 
 def get_auth():
@@ -111,18 +77,27 @@ def get_auth():
 
 
 def get_tenant_collection(tenant_id: str, collection: str):
-    logger.warning(f"get_tenant_collection({tenant_id}/{collection}) — Firestore deprecated, returning dummy")
-    return _dummy_db.collection(settings.FIREBASE_COLLECTION_TENANTS).document(tenant_id).collection(collection)
+    """Deprecated: Firestore removed from the data plane (A1). Raises."""
+    raise NotImplementedError(
+        f"firebase.get_tenant_collection({tenant_id!r}, {collection!r}) is unavailable: "
+        "Firestore was removed from the data plane (A1). Use app.db.pg for data access."
+    )
 
 
 def get_cross_tenant_collection(collection: str):
-    logger.warning(f"get_cross_tenant_collection({collection}) — Firestore deprecated, returning dummy")
-    return _dummy_db.collection_group(collection)
+    """Deprecated: Firestore removed from the data plane (A1). Raises."""
+    raise NotImplementedError(
+        f"firebase.get_cross_tenant_collection({collection!r}) is unavailable: "
+        "Firestore was removed from the data plane (A1). Use app.db.pg for data access."
+    )
 
 
 def get_tenant_metadata(tenant_id: str) -> Optional[Dict[str, Any]]:
-    logger.warning(f"get_tenant_metadata({tenant_id}) — Firestore deprecated")
-    return None
+    """Deprecated: Firestore removed from the data plane (A1). Raises."""
+    raise NotImplementedError(
+        f"firebase.get_tenant_metadata({tenant_id!r}) is unavailable: "
+        "Firestore was removed from the data plane (A1). Use app.db.pg for data access."
+    )
 
 
 def verify_firebase_token(token: str) -> Optional[Dict[str, Any]]:

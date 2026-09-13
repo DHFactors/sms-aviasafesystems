@@ -25,11 +25,23 @@ try:
 except Exception:  # pragma: no cover
     _fb_get_db = lambda: None  # type: ignore
 
+_firestore_shim_warned = False
+
 def get_db():
-    """Firestore handle (dummy) — retained for test mocks that patch this symbol."""
+    """Firestore handle — transitional A1 no-op shim.
+
+    Firestore was removed from the data plane (A1); real (unpatched) calls
+    degrade to None after a one-time deprecation warning and the worker falls
+    back to its Postgres path. Retained so test mocks that patch this symbol
+    keep working.
+    """
     try:
         return _fb_get_db()
     except Exception:
+        global _firestore_shim_warned
+        if not _firestore_shim_warned:
+            logger.warning("tenant_scheduler: Firestore read shim is offline (A1 stub); relying on Postgres")
+            _firestore_shim_warned = True
         return None
 
 
