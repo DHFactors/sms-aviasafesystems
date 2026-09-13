@@ -102,6 +102,36 @@ Not blocking pilot delivery; announced to customers as "coming in the next relea
 | Backlog | Phase 1 Nav Overhaul |
 | Pilot impact | Not blocking — scheduled for post-pilot |
 
+## Phase 1 — Remove `tenant.data.users` Array (Backlog)
+
+Priority: **Medium** — after the delivery stabilizes. Recorded 2026-09-13.
+
+### Context
+The tenant row carries a JSONB `users` array (inside the `data` column, `tenants.data->users`) that
+duplicates the `users` table. It is a Firestore-era denormalization that survived the migration.
+
+### Impact
+- Two sources of truth for user-tenant membership.
+- Delete/create paths must update both or drift (today's bug — a delete removed Auth + PG but not
+  the array; the re-create refused on the stale array entry).
+- Any future user mutation is a candidate for the same class of bug.
+
+### Work
+1. Grep for all reads of `tenant.data.users` (backend + frontend).
+2. Redirect every read to the `users` table:
+   ```sql
+   SELECT u.* FROM users u
+   JOIN tenants t ON u.tenant_id = t.id
+   WHERE t.slug = ?
+   ```
+3. Stop writing to the array on user create/delete.
+4. After a full verification cycle with no writes to the array, drop the `users` key from the
+   `data` JSONB (migration).
+5. Update models and schemas.
+
+### Effort
+~2 days — one source of truth for user-tenant membership; prevents this class of bug permanently.
+
 ## Phase 2A — AE Dashboard Redesign
 
 Dependency for Phase 2B. Details TBD (separate backlog item; recorded 2026-09-13).

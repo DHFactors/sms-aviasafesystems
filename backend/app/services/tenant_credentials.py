@@ -207,7 +207,13 @@ def create_user_for_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[
     email = (data.get("email") or "").strip().lower()
     if not tid or not email:
         raise ValueError("tenant_id and email are required")
-    _read_tenant(tid)  # raises ValueError when the tenant is missing
+
+    # Duplicate check runs BEFORE Auth creation so a failed create never leaks
+    # an orphan Auth user / PG row with an unsurfaced password.
+    doc = _read_tenant(tid)  # raises ValueError when the tenant is missing
+    users = list(doc.get("users") or [])
+    if any((u.get("email") or "").strip().lower() == email for u in users):
+        raise ValueError("email already exists on tenant")
 
     auth = get_auth()
     result = _create_auth_user(auth, {
@@ -233,10 +239,6 @@ def create_user_for_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[
         "last_login": None,
     }
 
-    doc = _read_tenant(tid)
-    users = list(doc.get("users") or [])
-    if any((u.get("email") or "").strip().lower() == email for u in users):
-        raise ValueError("email already exists on tenant")
     users.append(rec)
     prev_audit = doc.get("audit") or {}
     _patch_tenant(tid, {

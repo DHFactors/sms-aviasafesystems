@@ -57,6 +57,40 @@ def _admin_db(call_site: str):
         return None
 
 
+def _strip_tenant_doc_user(tenant_id: str, email: str) -> None:
+    """Best-effort removal of a user from a tenant's `users` list.
+
+    Delete user flows (DELETE + POST aliases) historically removed the Auth
+    record and PG users row but never updated the tenant doc `users` array,
+    leaving a stale entry that blocked re-creating the same email
+    ("email already exists on tenant"). This helper syncs the tenant doc so a
+    deleted user's email is truly freed. Never raises; failures are logged.
+    """
+    if not tenant_id or not email:
+        return
+    try:
+        from app.services.tenant_credentials import _patch_tenant, _read_tenant
+
+        doc = _read_tenant(tenant_id)
+        users = [
+            u for u in (doc.get("users") or [])
+            if (u.get("email") or "").strip().lower() != email.lower()
+        ]
+        if len(users) != len(doc.get("users") or []):
+            prev_audit = doc.get("audit") or {}
+            _patch_tenant(tenant_id, {
+                "users": users,
+                "audit": {
+                    "created_by": prev_audit.get("created_by"),
+                    "created_at": prev_audit.get("created_at"),
+                    "last_modified_by": email,
+                    "last_modified_at": datetime.now(timezone.utc).isoformat(),
+                },
+            })
+    except Exception as e:
+        logger.warning(f"Tenant doc users cleanup failed for {email} on {tenant_id}: {e}")
+
+
 def _verify_admin_setup(setup_key: str) -> None:
     """Second factor for admin provisioning endpoints.
 
@@ -1876,6 +1910,9 @@ async def admin_delete_user(
         except Exception:
             pass
 
+    # Free the email on the tenant doc so the same address can be re-created.
+    _strip_tenant_doc_user(target_tenant, target_email)
+
     ip, request_id = request_context(request)
     log_audit(
         action="USER_DELETED",
@@ -1980,6 +2017,10 @@ async def admin_delete_user_post(
                     pass
         except Exception:
             pass
+
+    # Free the email on the tenant doc so the same address can be re-created.
+    _strip_tenant_doc_user(target_tenant, target_email)
+
     ip, request_id = request_context(request)
     log_audit(
         action="USER_DELETED",
