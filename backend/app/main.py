@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
@@ -300,12 +301,16 @@ async def _database_status() -> str:
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     db = await _database_status()
+    commit = (os.getenv("RENDER_GIT_COMMIT") or "local")
+    if len(commit) > 7:
+        commit = commit[:7]
     return {
         "status": "healthy" if db != "error" else "degraded",
         "firebase": "connected" if is_firebase_ready() else "unavailable",
         "database": db,
         "service": "AviaSAFE SMS API",
         "version": settings.API_VERSION,
+        "commit": commit,
     }
 
 @app.api_route("/live", methods=["GET", "HEAD"])

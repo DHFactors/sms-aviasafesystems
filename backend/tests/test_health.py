@@ -26,6 +26,25 @@ def test_health_endpoint(client):
     data = resp.json()
     assert data["status"] == "healthy"
     assert data["service"] == "AviaSAFE SMS API"
+    # Deployed build identity: short git SHA of the running build (Render sets
+    # RENDER_GIT_COMMIT; local runs report 'local').
+    assert "commit" in data
+
+
+def test_health_commit_shortens_render_commit(monkeypatch, client):
+    """The `/health` commit field must expose the short SHA of the deployed
+    build so a dashboard can tell which of d5f28c8-style builds is live."""
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123456789abcdef0123456789abcdef")
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["commit"] == "0123456"
+
+
+def test_health_commit_falls_back_to_local(monkeypatch, client):
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["commit"] == "local"
 
 
 def test_liveness_endpoint(client):
