@@ -19,6 +19,7 @@ from loguru import logger
 
 from app.db import pg
 from app.db.db_models import Feedback
+from app.db.ids import register_tenant
 from app.middleware.auth import get_current_user
 from app.firebase import get_db
 
@@ -59,8 +60,11 @@ async def submit_feedback(
         "feedback_id": feedback_id,
         "uid": user.get("uid"),
         "email": user.get("email"),
+        "user_email": user.get("email") or "",
         "role": user.get("role"),
-        "tenant_id": user.get("tenant_id"),
+        "tenant_id": (
+            register_tenant(user["tenant_id"]) if user.get("tenant_id") else None
+        ),
         "subject": payload.subject.strip(),
         "message": payload.message.strip(),
         "rating": payload.rating,

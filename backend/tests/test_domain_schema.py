@@ -22,7 +22,7 @@ def _table(name):
         ("users", "uid", []),
         ("audit_logs", "id", []),
         ("sms_dispatches", "id", []),
-        ("invites", "code", []),
+        ("invites", "id", ["code"]),
         ("feedback", "id", []),
         ("caan_reports", "id", []),
         ("sms_maturity", "id", []),
@@ -47,10 +47,10 @@ def test_domain_model_registered(table, key_col, unique_cols):
         ("users", []),
         ("audit_logs", ["metadata_json"]),
         ("sms_dispatches", ["data"]),
-        ("invites", ["data"]),
-        ("feedback", ["data"]),
+        ("invites", []),
+        ("feedback", []),
         ("caan_reports", ["data"]),
-        ("sms_maturity", ["data"]),
+        ("sms_maturity", []),
         ("state_risk_categories", ["data"]),
         ("dead_letter_queue", ["data"]),
     ],
@@ -91,3 +91,34 @@ def test_domain_models_are_collectible():
     for m in models:
         assert m.__tablename__
         assert m.__table__ is not None
+
+
+@pytest.mark.parametrize("table", ["invites", "feedback", "sms_maturity"])
+def test_domain_models_tenant_fk_to_tenants(table):
+    t = _table(table)
+    assert t is not None
+    col = t.columns.get("tenant_id")
+    assert col is not None, f"{table}.tenant_id missing"
+    assert col.foreign_keys, f"{table}.tenant_id has no FK"
+    refs = {fk.column.table.name for fk in col.foreign_keys}
+    assert "tenants" in refs, f"{table}.tenant_id must FK to tenants.id"
+
+
+def test_sms_maturity_level_check_constraint():
+    t = _table("sms_maturity")
+    c = next(
+        (c for c in t.constraints if getattr(c, "name", None) == "sms_maturity_level_check"),
+        None,
+    )
+    assert c is not None
+    assert "BETWEEN 1 AND 5" in str(c.sqltext)
+
+
+def test_feedback_rating_check_constraint():
+    t = _table("feedback")
+    c = next(
+        (c for c in t.constraints if getattr(c, "name", None) == "feedback_rating_check"),
+        None,
+    )
+    assert c is not None
+    assert "BETWEEN 1 AND 5" in str(c.sqltext)

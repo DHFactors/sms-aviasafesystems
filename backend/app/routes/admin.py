@@ -569,33 +569,23 @@ async def admin_create_tenant(
 ):
     """Create one operator tenant (SUPER_ADMIN + setup key).
 
-    When `tenant.users` is provided the tenant is created together with its
-    Firebase Auth users (AIRLINE_ADMIN etc.) and the generated passwords are
-    returned exactly once (never persisted).
+    Tenant-only creation — no Auth users. Single-path user provisioning
+    policy: users are always created one at a time afterwards via
+    POST /api/v1/admin/users (Production Setup Step 3).
     """
     _verify_admin_setup(req.setup_key)
     data = req.tenant.model_dump()
-    if data.get("users"):
-        from app.services.tenant_credentials import create_tenant_with_credentials
-        try:
-            result = create_tenant_with_credentials(data, user)
-        except ValueError as e:
-            raise HTTPException(status_code=409, detail=str(e))
-        except Exception as e:
-            logger.error(f"Create tenant with credentials failed: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-        result["seeded_hazards"] = await _seed_new_tenant_hazards(data, result)
-        return {"success": True, **result}
-
     from app.services.production_seed import create_tenant
     try:
         doc = create_tenant(data, user)
-        return {"success": True, "tenant": doc}
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"Create tenant failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    result = {"tenant": doc}
+    result["seeded_hazards"] = await _seed_new_tenant_hazards(data, result)
+    return {"success": True, **result}
 
 
 @router.post("/tenants/bulk", status_code=status.HTTP_200_OK)
@@ -1516,9 +1506,7 @@ async def list_feedback(
         )
 
     try:
-        where = (
-            [Feedback.data["status"].astext == status_filter] if status_filter else None
-        )
+        where = [Feedback.status == status_filter] if status_filter else None
         rows = pg.fetch_all(
             Feedback,
             where=where,
@@ -1537,9 +1525,9 @@ async def list_feedback(
         ts = x.get("created_at")
         items.append(
             {
-                "id": x.get("feedback_id") or x.get("id"),
+                "id": x.get("id"),
                 "uid": x.get("uid"),
-                "email": x.get("email"),
+                "email": x.get("user_email") or x.get("email"),
                 "role": x.get("role"),
                 "tenant_id": x.get("tenant_id"),
                 "subject": x.get("subject"),
@@ -1751,12 +1739,23 @@ async def admin_list_users(
     """List Firebase Auth users for Super Admin cleanup (SUPER_ADMIN).
 
     Returns email, uid, display_name, role, tenant_id, department, disabled
-    state. Supports optional tenant_id filter and limit. SUPER_ADMIN-only.
+    state, and password_updated_at (from the PG users mirror). Supports
+    optional tenant_id filter and limit. SUPER_ADMIN-only.
     """
     auth = get_auth()
     db = _admin_db("list-users")
     users: List[Dict[str, Any]] = []
     try:
+        # Surface password freshness from the PG users mirror: the Admin SDK
+        # does not expose passwordUpdatedAt, so the per-user marker comes from
+        # the row stamped at password-set time. Best-effort — a PG failure must
+        # never break the Auth listing itself.
+        pg_updated_at: Dict[str, Any] = {}
+        try:
+            for row in pg.fetch_all(UserProfile):
+                pg_updated_at[row.get("uid")] = row.get("password_updated_at")
+        except Exception as e:
+            logger.warning(f"Failed to load password freshness for admin user list: {e}")
         # Iterate with pagination — list_users uses page token internally.
         page = auth.list_users(max_results=min(limit, 1000))
         count = 0
@@ -1778,6 +1777,9 @@ async def admin_list_users(
                 dept = claims.get("department") or ""
                 if tenant_id and str(t).lower() != str(tenant_id).lower():
                     continue
+                _pwd = pg_updated_at.get(uid)
+                if _pwd is not None:
+                    _pwd = _pwd.isoformat() if hasattr(_pwd, "isoformat") else str(_pwd)
                 users.append({
                     "uid": uid,
                     "email": email,
@@ -1787,6 +1789,7 @@ async def admin_list_users(
                     "department": dept,
                     "disabled": bool(getattr(rec, "disabled", False)),
                     "email_verified": bool(getattr(rec, "email_verified", False)),
+                    "password_updated_at": _pwd,
                 })
                 count += 1
             page = page.get_next_page() if hasattr(page, "get_next_page") else None

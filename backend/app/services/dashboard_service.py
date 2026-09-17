@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from app.core.config import settings
 from app.db import pg
 from app.db.db_models import FlightDiversion, Hazard, Report, SmsMaturity, StateRiskRegisterEntry, Survey, SurveyResponse, Tenant
-from app.db.ids import register_tenant, tenant_slug, tenant_uuid, uuid5
+from app.db.ids import register_tenant, tenant_slug, tenant_uuid
 from app.db.isolation import demo_scope
 from app.db.runner import run
 from app.db.session import session_scope
@@ -240,7 +240,7 @@ class DashboardService:
         generated once per tenant+period and shared across scopes.
         """
         recs: List[Dict[str, Any]] = []
-        cached = self._read_sms_maturity(tenant_id, days)
+        cached = self._read_sms_maturity(tenant_id)
         use_cache = (
             not refresh
             and cached is not None
@@ -265,7 +265,7 @@ class DashboardService:
                 "question_averages": op.get("question_averages", {}),
                 "response_count": op["response_count"],
             })
-            self._write_sms_maturity(tenant_id, days, {
+            self._write_sms_maturity(tenant_id, {
                 "period_days": days,
                 "generated_at": generated_at,
                 "pillars": op["pillars"],
@@ -947,27 +947,67 @@ class DashboardService:
             },
         }
 
-    def _read_sms_maturity(self, tenant_id: str, days: int) -> Optional[Dict[str, Any]]:
+    def _read_sms_maturity(self, tenant_id: str) -> Optional[Dict[str, Any]]:
+        """Latest cached SMS maturity assessment for a tenant (by assessment_date).
+
+        Returns the stored fields plus ``generated_at`` (the assessment write
+        timestamp) so the cache TTL check has an anchor. D2: queries the live
+        assessment shape — the old ``days``/``data`` columns are gone.
+        """
         try:
-            rows = pg.fetch_all(SmsMaturity, where=[SmsMaturity.tenant_id == tenant_id, SmsMaturity.days == days])
-            if rows:
-                row = rows[0]
-                data = row.get("data") or {}
-                # Return data merged with top-level for compatibility
-                out = dict(data)
-                out.setdefault("generated_at", row.get("created_at"))
-                out.setdefault("recommendations", data.get("recommendations", []))
-                return out
-            return None
+            tid = register_tenant(tenant_id)
+
+            async def _fetch() -> Optional[Dict[str, Any]]:
+                async with session_scope() as session:
+                    row = (await session.execute(
+                        select(SmsMaturity)
+                        .where(SmsMaturity.tenant_id == tid)
+                        .order_by(SmsMaturity.assessment_date.desc().nullslast())
+                        .limit(1)
+                    )).scalar_one_or_none()
+                    if row is None:
+                        return None
+                    return {
+                        "generated_at": row.updated_at or row.assessment_date or row.created_at,
+                        "overall_sms_maturity": row.overall_score,
+                        "pillars": row.pillar_scores,
+                        "level": row.level,
+                        "recommendations": row.recommendations or [],
+                    }
+
+            return run(_fetch())
         except Exception as e:
             logger.warning(f"Failed to read sms_maturity cache for {tenant_id}: {e}")
             return None
 
-    def _write_sms_maturity(self, tenant_id: str, days: int, data: Dict[str, Any]) -> None:
+    def _write_sms_maturity(self, tenant_id: str, payload: Dict[str, Any]) -> None:
+        """Persist one SMS maturity assessment row (D2 live shape).
+
+        A new row is inserted per assessment (no ``days``/unique key remains —
+        the read takes the latest by ``assessment_date``). The old caller
+        payload (``pillars``/``pcts``/``tiers``/``overall_sms_maturity``/
+        ``question_averages``/``low_pillars``/``recommendations``) is translated
+        onto the new columns.
+        """
         try:
-            did = uuid5("sms-maturity", tenant_id, days)
-            doc = {"id": did, "tenant_id": tenant_id, "days": days, "data": dict(data)}
-            pg.upsert(SmsMaturity, "id", did, doc)
+            tid = register_tenant(tenant_id)
+            overall = payload.get("overall_sms_maturity")
+            level = None
+            if isinstance(overall, (int, float)) and 1 <= overall <= 5:
+                level = int(round(overall))
+            now = datetime.now(timezone.utc)
+            doc = {
+                "tenant_id": tid,
+                "assessment_date": now,
+                "overall_score": overall,
+                "level": level,
+                "pillar_scores": payload.get("pillars"),
+                "element_scores": payload.get("question_averages"),
+                "gap_analysis": payload.get("low_pillars"),
+                "recommendations": payload.get("recommendations"),
+                "updated_at": now,
+            }
+            pg.insert(SmsMaturity, doc)
         except Exception as e:
             logger.warning(f"Failed to write sms_maturity cache for {tenant_id}: {e}")
 

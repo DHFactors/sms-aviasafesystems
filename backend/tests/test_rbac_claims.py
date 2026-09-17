@@ -137,6 +137,17 @@ def test_department_roles_route_to_responsible_manager(token, op_id, expected_em
 # Claim assignment in the Auth-provisioning layer (seed.users.create_user)
 # ============================================================================
 
+@pytest.fixture(autouse=True)
+def _stub_seed_audit(monkeypatch):
+    """seed.users.create_user writes AUTH_BATCH_RESET audit rows when it
+    re-syncs a password; stub the writer so these unit tests stay hermetic
+    (no real Postgres connection attempted by production_seed._audit)."""
+    monkeypatch.setattr(
+        "seed.users._audit",
+        lambda action, actor, target, detail, result="success", tenant_id=None, metadata=None: None,
+    )
+
+
 class _FakeAuth:
     def __init__(self):
         self.records = {}

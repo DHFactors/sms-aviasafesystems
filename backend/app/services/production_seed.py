@@ -98,8 +98,15 @@ def _tenant_modules_from_regulator(reg: Optional[Dict[str, Any]]) -> Dict[str, b
 # ============================================================================
 
 def _audit(action: str, actor: Dict[str, Any], target: str, detail: str,
-           result: str = "success") -> None:
-    """Persist one audit entry to Postgres (`audit_logs`)."""
+           result: str = "success", tenant_id: Optional[str] = None,
+           metadata: Optional[Dict[str, Any]] = None) -> None:
+    """Persist one audit entry to Postgres (`audit_logs`).
+
+    ``tenant_id`` maps onto the flat ``tenant_id`` column and ``metadata`` onto
+    ``metadata_json``; unknown keys inside ``metadata`` are dropped by the pg
+    insert column filter. Never raises — audit writes must not block the
+    operation they describe.
+    """
     try:
         now = datetime.now(timezone.utc)
         doc = {
@@ -111,9 +118,12 @@ def _audit(action: str, actor: Dict[str, Any], target: str, detail: str,
             "actor": (actor or {}).get("uid"),
             "detail": detail,
             "result": result,
+            "tenant_id": tenant_id,
             "timestamp": now.isoformat(),
             "created_at": now,
         }
+        if metadata:
+            doc["metadata_json"] = metadata
         pg.insert(AuditLog, doc)
     except Exception as e:
         logger.error(f"Audit log pg write failed ({action}): {e}")

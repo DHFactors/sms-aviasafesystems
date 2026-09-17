@@ -68,6 +68,9 @@ class UserProfileRead(UserProfileBase):
 
     uid: str = Field(..., description="Firebase Auth UID")
     tenant_id: Optional[str] = Field(None, description="Tenant slug or UUID the user belongs to")
+    password_updated_at: Optional[datetime] = Field(
+        None, description="When the Firebase Auth password was last set/reset (PG mirror)"
+    )
 
 
 class UserProfileAdminRead(UserProfileRead):

@@ -34,6 +34,7 @@ EXPECTED_ORDER = [
     "bow_tie_analyses",
     "risk_register",
     "barrier_register",
+    "sram_risk_register",
     "state_risk_register",
     "regulatory_reports",
     "regulators",
@@ -93,12 +94,16 @@ def test_purge_reports_counts_and_success(fake_scope):
 
 
 def test_purge_covers_every_is_demo_table(fake_scope):
+    # Global reference banks are never purged (they are shared, not tenant
+    # data). The ORM intentionally does not map live `psoe_questions.is_demo`;
+    # listing it here keeps the guard explicit if that mapping is ever re-added.
+    global_reference_tables = {"psoe_questions"}
     tables_with_is_demo = {
         mapper.class_.__tablename__
         for mapper in dm.Base.registry.mappers
         for col in mapper.columns
         if col.name == "is_demo"
-    }
+    } - global_reference_tables
     result = asyncio.run(
         purge_all_demo_data({"uid": "u1", "email": "admin@aviasafe.test"})
     )

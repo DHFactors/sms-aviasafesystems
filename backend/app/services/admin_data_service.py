@@ -57,8 +57,9 @@ from app.db.db_models import (
     Regulator,
     RegulatoryReport,
     Report,
-    RiskRegisterEntry,
+    RiskRegisterLegacyEntry,
     SafetyDeficiency,
+    SramRiskRegisterEntry,
     StateRiskRegisterEntry,
     Survey,
     SurveyResponse,
@@ -1009,9 +1010,13 @@ def demo_data_scope(tenant_ids: Optional[List[str]] = None, all_tenants: bool = 
 # of demo parents, so real (is_demo=false) tenant data is never touched.
 #
 # Tables with an is_demo column: hazards, reports, cans, caps, surveys,
-# survey_responses, psoe_assessments, state_risk_register, regulatory_reports,
-# regulators, bow_tie_analyses, risk_register, barrier_register.
-# psoe_questions is GLOBAL reference data with no is_demo flag — never purged.
+# survey_responses, psoe_assessments, state_risk_register, sram_risk_register,
+# regulatory_reports, regulators, bow_tie_analyses, risk_register,
+# barrier_register.
+# psoe_questions is GLOBAL reference data (21 shared questionnaire definitions,
+# not tenant data) and is NEVER purged — the ORM intentionally does not map its
+# live `is_demo` column (see SCHEMA_RECONCILIATION_PLAN.md §5 Deferred Items).
+# Do not add it to the purge steps.
 
 
 async def _build_purge_steps(tenant_uuids: Optional[List[uuid.UUID]] = None):
@@ -1099,8 +1104,9 @@ async def _build_purge_steps(tenant_uuids: Optional[List[uuid.UUID]] = None):
         ("bow_tie_analyses", delete(BowTieAnalysis).where(parent_scope(BowTieAnalysis))),
         # Registers (risk_register FK to bow_tie is SET NULL; barrier_register
         # FKs to bow_tie/controls are SET NULL — already handled above)
-        ("risk_register", delete(RiskRegisterEntry).where(parent_scope(RiskRegisterEntry))),
+        ("risk_register", delete(RiskRegisterLegacyEntry).where(parent_scope(RiskRegisterLegacyEntry))),
         ("barrier_register", delete(BarrierRegisterEntry).where(parent_scope(BarrierRegisterEntry))),
+        ("sram_risk_register", delete(SramRiskRegisterEntry).where(parent_scope(SramRiskRegisterEntry))),
         ("state_risk_register", delete(StateRiskRegisterEntry).where(parent_scope(StateRiskRegisterEntry))),
         ("regulatory_reports", delete(RegulatoryReport).where(parent_scope(RegulatoryReport))),
     ]
@@ -1384,7 +1390,7 @@ async def _purge_counts() -> List[Dict[str, Any]]:
         ("bow_tie_consequences", select(func.count()).select_from(BowTieConsequence).where(BowTieConsequence.bowtie_id.in_(demo_bowties))),
         ("bow_tie_threats", select(func.count()).select_from(BowTieThreat).where(BowTieThreat.bowtie_id.in_(demo_bowties))),
         ("bow_tie_analyses", select(func.count()).select_from(BowTieAnalysis).where(BowTieAnalysis.is_demo == True)),
-        ("risk_register", select(func.count()).select_from(RiskRegisterEntry).where(RiskRegisterEntry.is_demo == True)),
+        ("risk_register", select(func.count()).select_from(RiskRegisterLegacyEntry).where(RiskRegisterLegacyEntry.is_demo == True)),
         ("barrier_register", select(func.count()).select_from(BarrierRegisterEntry).where(BarrierRegisterEntry.is_demo == True)),
         ("state_risk_register", select(func.count()).select_from(StateRiskRegisterEntry).where(StateRiskRegisterEntry.is_demo == True)),
         ("regulatory_reports", select(func.count()).select_from(RegulatoryReport).where(RegulatoryReport.is_demo == True)),

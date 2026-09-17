@@ -281,12 +281,17 @@ _DOMAIN_DDL = [
     "CREATE INDEX IF NOT EXISTS ix_caan_reports_created ON caan_reports (created_at);",
     """
     CREATE TABLE IF NOT EXISTS sms_maturity (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        tenant_id  TEXT NOT NULL,
-        days       INTEGER,
-        data       JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        CONSTRAINT ux_sms_maturity_tenant_days UNIQUE (tenant_id, days)
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id        UUID NOT NULL REFERENCES tenants (id),
+        assessment_date  TIMESTAMPTZ DEFAULT now(),
+        overall_score    DOUBLE PRECISION,
+        level            INTEGER CHECK (level BETWEEN 1 AND 5),
+        pillar_scores    JSONB,
+        element_scores   JSONB,
+        gap_analysis     JSONB,
+        recommendations  JSONB,
+        created_at       TIMESTAMPTZ DEFAULT now(),
+        updated_at       TIMESTAMPTZ DEFAULT now()
     );
     """,
     "CREATE INDEX IF NOT EXISTS ix_sms_maturity_tenant ON sms_maturity (tenant_id);",
@@ -309,6 +314,50 @@ _DOMAIN_DDL = [
     """,
     "CREATE INDEX IF NOT EXISTS ix_dead_letter_queue_created ON dead_letter_queue (created_at);",
     "CREATE INDEX IF NOT EXISTS ix_dead_letter_queue_status ON dead_letter_queue (status);",
+    """
+    CREATE TABLE IF NOT EXISTS sram_risk_register (
+        id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id                UUID NOT NULL,
+        bowtie_id                UUID REFERENCES bow_tie_analyses (id) ON DELETE SET NULL,
+        hazard_id                TEXT NOT NULL,
+        hazard_title             TEXT,
+        probability_current      INTEGER NOT NULL,
+        severity_current         INTEGER NOT NULL,
+        risk_index_current       INTEGER NOT NULL,
+        tolerability_current     TEXT NOT NULL,
+        probability_resultant    INTEGER,
+        severity_resultant       INTEGER,
+        risk_index_resultant     INTEGER,
+        tolerability_resultant   TEXT,
+        status                   TEXT NOT NULL DEFAULT 'open',
+        accepted                 BOOLEAN NOT NULL DEFAULT FALSE,
+        alarp_justification      TEXT,
+        accepted_by              UUID,
+        accepted_on              TIMESTAMPTZ,
+        review_date              TIMESTAMPTZ,
+        is_demo                  BOOLEAN DEFAULT TRUE,
+        created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT ck_sram_risk_register_probability_current
+            CHECK (probability_current BETWEEN 1 AND 5),
+        CONSTRAINT ck_sram_risk_register_probability_resultant
+            CHECK (probability_resultant IS NULL OR probability_resultant BETWEEN 1 AND 5),
+        CONSTRAINT ck_sram_risk_register_severity_current
+            CHECK (severity_current BETWEEN 1 AND 5),
+        CONSTRAINT ck_sram_risk_register_severity_resultant
+            CHECK (severity_resultant IS NULL OR severity_resultant BETWEEN 1 AND 5),
+        CONSTRAINT ck_sram_risk_register_index_current
+            CHECK (risk_index_current BETWEEN 1 AND 25),
+        CONSTRAINT ck_sram_risk_register_index_resultant
+            CHECK (risk_index_resultant IS NULL OR risk_index_resultant BETWEEN 1 AND 25),
+        CONSTRAINT ck_sram_risk_register_status
+            CHECK (status IN ('open', 'in_progress', 'closed'))
+    );
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_sram_risk_register_tenant_hazard "
+    "ON sram_risk_register (tenant_id, hazard_id);",
+    "CREATE INDEX IF NOT EXISTS ix_sram_risk_register_tenant "
+    "ON sram_risk_register (tenant_id);",
 ]
 
 

@@ -87,6 +87,7 @@ def test_list_tenant_users_maps_doc_shape(monkeypatch):
         "department": "Flight Operations",
         "tenant_id": None,
         "phone": None,
+        "password_updated_at": None,
         "created_at": "2026-01-01T00:00:00+00:00",
         "last_login": "2026-02-01T00:00:00+00:00",
     }

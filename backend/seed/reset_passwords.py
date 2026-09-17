@@ -26,6 +26,10 @@ from pathlib import Path
 
 from loguru import logger
 
+from app.services.production_seed import _audit
+
+RESET_ACTOR = {"uid": "system", "email": "seed@aviasafesystems.com"}
+
 logger.remove()
 logger.add(sys.stdout, format="{time:HH:mm:ss} | {level:<7} | {message}", level="INFO")
 
@@ -158,6 +162,10 @@ def main():
             logger.info(
                 f"Updated {spec['email']} ({spec['role_label']} / {spec['tenant']})"
             )
+            _audit("AUTH_BATCH_RESET", RESET_ACTOR, spec["tenant"],
+                   f"Password reset for {spec['email']} (uid={spec['uid']})",
+                   tenant_id=spec.get("tenant"),
+                   metadata={"source": "script:seed.reset_passwords", "target_uid": spec["uid"]})
         except Exception as e:
             errors += 1
             logger.error(f"FAILED {spec['email']} ({spec['uid']}): {e}")

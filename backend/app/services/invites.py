@@ -32,6 +32,7 @@ from loguru import logger
 from app.core.config import settings
 from app.db import pg
 from app.db.db_models import Invite, Tenant
+from app.db.ids import register_tenant
 from app.services.audit_service import log_audit, request_context
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
@@ -123,6 +124,18 @@ def resolve_invite(code: Optional[str]) -> Optional[Dict[str, Any]]:
         return None
     if data is None:
         return None
+    tid = data.get("tenant_id")
+    if tid is not None:
+        # invites.tenant_id is the tenant UUID (live FK shape); the join flow
+        # resolves tenants by slug, so project it back to the slug.
+        try:
+            tenant = pg.fetch_by(Tenant, "id", tid)
+        except Exception as e:
+            logger.warning(f"Tenant slug lookup failed while resolving invite {code}: {e}")
+            tenant = None
+        slug = (tenant or {}).get("id") or (tenant or {}).get("slug")
+        if slug:
+            data["tenant_id"] = slug
     return data
 
 
@@ -197,12 +210,11 @@ def create_invite(
     now = datetime.now(timezone.utc)
     doc = {
         "code": code,
-        "tenant_id": tid,
+        "email": "",
+        "tenant_id": register_tenant(tid),
         "department": dept_code,
-        "department_label": dept_label,
         "role": role,
         "created_by": caller.get("uid") or caller.get("email"),
-        "created_by_email": caller.get("email"),
         "created_at": now,
         "status": "ACTIVE",
     }
@@ -253,7 +265,7 @@ def list_invites(
     if not tid:
         raise PermissionError("An authenticated tenant is required to list invites")
     try:
-        docs = pg.fetch_all(Invite, where=[Invite.tenant_id == tid])
+        docs = pg.fetch_all(Invite, where=[Invite.tenant_id == register_tenant(tid)])
     except Exception as e:
         logger.warning(f"Failed to list invites for tenant {tid}: {e}")
         raise RuntimeError("Failed to list invites")
@@ -270,12 +282,12 @@ def list_invites(
         rows.append(
             {
                 "code": data.get("code") or data.get("id"),
-                "tenant_id": data.get("tenant_id"),
+                "tenant_id": tid,
                 "department": dept,
                 "department_label": department_label(dept),
                 "role": data.get("role"),
                 "role_label": ROLE_LABELS.get(data.get("role"), data.get("role")),
-                "created_by": data.get("created_by_email") or data.get("created_by"),
+                "created_by": data.get("created_by"),
                 "status": data.get("status", "ACTIVE"),
                 "created_at": (
                     data.get("created_at").isoformat()

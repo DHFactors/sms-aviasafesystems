@@ -26,7 +26,8 @@ from app.db.db_models import (
     BowTieControl,
     BowTieThreat,
     Hazard,
-    RiskRegisterEntry,
+    SramRiskRegisterEntry,
+    UserProfile,
 )
 from app.db.ids import register_tenant, tenant_slug
 from app.db.session import session_scope
@@ -336,7 +337,7 @@ async def calculate_risk(hazard_id: str, assessment_data: dict, tenant_id: str) 
             existing.updated_at = datetime.now(timezone.utc)
             row = existing
         else:
-            row = RiskRegisterEntry(
+            row = SramRiskRegisterEntry(
                 tenant_id=uuid.UUID(tid),
                 bowtie_id=bowtie.id if bowtie else None,
                 hazard_id=hazard_id,
@@ -371,6 +372,8 @@ async def accept_risk(risk_id_or_hazard: str, acceptance_data: dict,
     if len(justification) < 10:
         raise ValueError("alarp_justification must be at least 10 characters")
 
+    accepted_by_uuid = await _resolve_user_uuid(user)
+
     async with session_scope() as session:
         row = await _resolve_risk_entry(session, risk_id_or_hazard, data, tid)
         if not row:
@@ -380,7 +383,7 @@ async def accept_risk(risk_id_or_hazard: str, acceptance_data: dict,
 
         row.accepted = True
         row.alarp_justification = justification
-        row.accepted_by = (user or {}).get("email")
+        row.accepted_by = accepted_by_uuid
         row.accepted_on = datetime.now(timezone.utc)
         if data.get("review_date"):
             row.review_date = _parse_dt(data["review_date"])
@@ -454,9 +457,9 @@ async def get_risk_register(tenant_id: str) -> dict:
     tid = _tenant_uuid(tenant_id)
     async with session_scope() as session:
         result = (await session.execute(
-            select(RiskRegisterEntry)
-            .where(RiskRegisterEntry.tenant_id == uuid.UUID(tid))
-            .order_by(RiskRegisterEntry.updated_at.desc())
+            select(SramRiskRegisterEntry)
+            .where(SramRiskRegisterEntry.tenant_id == uuid.UUID(tid))
+            .order_by(SramRiskRegisterEntry.updated_at.desc())
         )).scalars().all()
 
     rows = []
@@ -513,6 +516,39 @@ async def update_barrier(barrier_id: str, update_data: dict, tenant_id: str) -> 
 # Internal query helpers
 # ----------------------------------------------------------------------------
 
+async def _resolve_user_uuid(user: dict) -> Optional[uuid.UUID]:
+    """Resolve the accepting user to a valid users.id UUID for accepted_by.
+
+    The auth user dict carries the Firebase ``uid`` (text) and ``email``; the
+    target column is UUID, so look up the users table row (by uid, then email)
+    and return its uuid ``id``. Falls back to None when unresolved — never
+    writes a non-UUID string.
+    """
+    if not user:
+        return None
+    uid_text = (user.get("uid") or "").strip()
+    email = (user.get("email") or "").strip()
+    if not uid_text and not email:
+        return None
+    async with session_scope() as session:
+        if uid_text:
+            row = (await session.execute(
+                select(UserProfile.id).where(UserProfile.uid == uid_text)
+            )).scalar_one_or_none()
+            if row:
+                return row
+        if email:
+            row = (await session.execute(
+                select(UserProfile.id).where(UserProfile.email == email)
+            )).scalar_one_or_none()
+            if row:
+                return row
+    try:
+        return uuid.UUID(uid_text)
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 async def _get_hazard(hazard_id: str, tid: str) -> Optional[Hazard]:
     async with session_scope() as session:
         row = (await session.execute(
@@ -568,31 +604,31 @@ async def _get_controls(session: AsyncSession, bowtie_id: uuid.UUID) -> List[Bow
 
 
 async def _get_risk_entry_by_hazard(session: AsyncSession, hazard_id: str,
-                                    tid: str) -> Optional[RiskRegisterEntry]:
+                                    tid: str) -> Optional[SramRiskRegisterEntry]:
     return (await session.execute(
-        select(RiskRegisterEntry).where(
-            RiskRegisterEntry.tenant_id == uuid.UUID(tid),
-            RiskRegisterEntry.hazard_id == hazard_id,
+        select(SramRiskRegisterEntry).where(
+            SramRiskRegisterEntry.tenant_id == uuid.UUID(tid),
+            SramRiskRegisterEntry.hazard_id == hazard_id,
         )
     )).scalar_one_or_none()
 
 
 async def _resolve_risk_entry(session: AsyncSession, risk_id_or_hazard: str,
-                              data: dict, tid: str) -> Optional[RiskRegisterEntry]:
+                              data: dict, tid: str) -> Optional[SramRiskRegisterEntry]:
     if data.get("risk_id"):
         return (await session.execute(
-            select(RiskRegisterEntry).where(
-                RiskRegisterEntry.id == uuid.UUID(data["risk_id"]),
-                RiskRegisterEntry.tenant_id == uuid.UUID(tid),
+            select(SramRiskRegisterEntry).where(
+                SramRiskRegisterEntry.id == uuid.UUID(data["risk_id"]),
+                SramRiskRegisterEntry.tenant_id == uuid.UUID(tid),
             )
         )).scalar_one_or_none()
     if data.get("hazard_id"):
         return await _get_risk_entry_by_hazard(session, data["hazard_id"], tid)
     try:
         return (await session.execute(
-            select(RiskRegisterEntry).where(
-                RiskRegisterEntry.id == uuid.UUID(risk_id_or_hazard),
-                RiskRegisterEntry.tenant_id == uuid.UUID(tid),
+            select(SramRiskRegisterEntry).where(
+                SramRiskRegisterEntry.id == uuid.UUID(risk_id_or_hazard),
+                SramRiskRegisterEntry.tenant_id == uuid.UUID(tid),
             )
         )).scalar_one_or_none()
     except (ValueError, TypeError):

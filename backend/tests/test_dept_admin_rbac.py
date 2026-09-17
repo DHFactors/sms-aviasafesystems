@@ -13,6 +13,7 @@ Covers (2026-08):
 
 from fastapi.testclient import TestClient
 
+from app.db.ids import register_tenant
 from app.main import app
 from app.middleware.auth import get_current_user
 from pg_bridge import patch_pg_through
@@ -240,10 +241,12 @@ def test_tenant_admin_invites_dept_admin_any_department(monkeypatch):
     assert body["success"] is True
     assert body["role"] == "DEPT_ADMIN"
     assert body["department"] == "camo"
+    assert body["tenant_id"] == "yeti-airlines"  # API contract: tenant slug
     code = body["code"]
     assert len(code) == 6
     stored = db.invites[code]
-    assert stored["tenant_id"] == "yeti-airlines"
+    # Storage contract: invites.tenant_id is the tenant UUID FK (tenants.id).
+    assert stored["tenant_id"] == register_tenant("yeti-airlines")
     assert stored["department"] == "camo"
     assert stored["role"] == "DEPT_ADMIN"
     assert stored["status"] == "ACTIVE"

@@ -64,8 +64,9 @@ def user_doc_from_auth_record(record: Any) -> Dict[str, Any]:
     """Map a firebase_admin.auth.UserRecord to the flat Postgres users row.
 
     Keys align with the flat ``users`` columns only (uid/email/role/tenant_id/
-    department/is_developer/phone + timestamps). The schemaless Firestore
-    ``modules``/``claims``/``data`` bags are intentionally not written.
+    department/is_developer/phone + timestamps incl. password_updated_at). The
+    schemaless Firestore ``modules``/``claims``/``data`` bags are intentionally
+    not written.
     """
     claims = record.custom_claims or {}
     meta = getattr(record, "user_metadata", None)
@@ -75,6 +76,14 @@ def user_doc_from_auth_record(record: Any) -> Dict[str, Any]:
         or getattr(meta, "last_sign_in_timestamp", None)
     )
     last_login = _parse_ms_timestamp(last_login)
+    # Firebase Admin SDK does not expose passwordUpdatedAt on UserRecord, so
+    # this is usually None; the freshness marker is stamped explicitly at
+    # password-set time (see tenant_credentials._create_auth_user).
+    password_updated_at = (
+        getattr(meta, "password_updated_at", None)
+        or getattr(meta, "passwordUpdatedAt", None)
+    )
+    password_updated_at = _parse_ms_timestamp(password_updated_at)
     return {
         "uid": record.uid,
         "email": record.email,
@@ -86,6 +95,7 @@ def user_doc_from_auth_record(record: Any) -> Dict[str, Any]:
         "phone": getattr(record, "phone_number", None),
         "created_at": created_at,
         "last_login": last_login,
+        "password_updated_at": password_updated_at,
     }
 
 
@@ -112,6 +122,7 @@ def upsert_user_doc(
     phone: Optional[str] = None,
     created_at: Any = None,
     last_login: Any = None,
+    password_updated_at: Any = None,
 ) -> None:
     """Write/merge a flat user row and verify it landed.
 
@@ -141,6 +152,8 @@ def upsert_user_doc(
         doc["created_at"] = created_at
     if last_login is not None:
         doc["last_login"] = last_login
+    if password_updated_at is not None:
+        doc["password_updated_at"] = password_updated_at
     try:
         pg.upsert(UserProfile, "uid", uid, doc)
     except Exception as e:
@@ -218,6 +231,7 @@ def list_tenant_users(tenant_id: str) -> List[Dict[str, Any]]:
                 "tenant_id": str(data.get("tenant_id")) if data.get("tenant_id") else None,
                 "created_at": _iso(data.get("created_at")),
                 "last_login": _iso(data.get("last_login")),
+                "password_updated_at": _iso(data.get("password_updated_at")),
             }
         )
     results.sort(key=lambda u: (u["created_at"] or "", u["email"] or ""))

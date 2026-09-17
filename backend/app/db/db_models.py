@@ -588,6 +588,8 @@ CA_PRIORITY_CHECK = CheckConstraint(
 class CorrectiveAction(Base):
     __tablename__ = "corrective_actions"
 
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
+
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
 
@@ -658,6 +660,8 @@ SD_SEVERITY_CHECK = CheckConstraint(
 class SafetyDeficiency(Base):
     __tablename__ = "safety_deficiencies"
 
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
+
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
 
@@ -712,6 +716,8 @@ class SafetyDeficiency(Base):
 
 class FlightDiversion(Base):
     __tablename__ = "flight_diversions"
+
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
 
     id: Mapped[object] = _uuid_pk()
     diversion_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -772,6 +778,8 @@ class FlightDiversion(Base):
 class Verification(Base):
     __tablename__ = "verifications"
 
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
+
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
     hazard_id: Mapped[object] = mapped_column(
@@ -814,6 +822,8 @@ class Verification(Base):
 
 class Closure(Base):
     __tablename__ = "closures"
+
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
 
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -960,6 +970,10 @@ PSOE_COMPONENT_CHECK = CheckConstraint(
 class PsoeQuestion(Base):
     __tablename__ = "psoe_questions"
 
+    # NOTE: deliberately NOT modelling live `psoe_questions.is_demo`. The table
+    # is GLOBAL reference data (21 shared questionnaire definitions) and must
+    # never participate in a tenant/demo purge. See SCHEMA_RECONCILIATION_PLAN.md
+    # §5 (Deferred Items) — known ORM/live divergence on purpose.
     id: Mapped[object] = _uuid_pk()
     component: Mapped[str] = mapped_column(Text, nullable=False)
     question_number: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -992,6 +1006,8 @@ PSOE_FINDING_STATUS_CHECK = CheckConstraint(
 
 class PsoeFinding(Base):
     __tablename__ = "psoe_findings"
+
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
 
     id: Mapped[object] = _uuid_pk()
     assessment_id: Mapped[object] = mapped_column(
@@ -1212,13 +1228,49 @@ BARRIER_IMPL_STATUS_CHECK = CheckConstraint(
     "implementation_status IN ('not_started', 'in_progress', 'implemented', 'verified')",
     name="ck_barrier_register_impl_status",
 )
-SEVERITY_CURRENT_CHECK = CheckConstraint(
-    "severity_current IN ('A', 'B', 'C', 'D', 'E')",
-    name="ck_risk_register_severity_current",
+LEGACY_RISK_REGISTER_EXISTING_SEVERITY_CHECK = CheckConstraint(
+    "existing_severity BETWEEN 1 AND 5",
+    name="risk_register_existing_severity_check",
 )
-SEVERITY_RESULTANT_CHECK = CheckConstraint(
-    "severity_resultant IS NULL OR severity_resultant IN ('A', 'B', 'C', 'D', 'E')",
-    name="ck_risk_register_severity_resultant",
+LEGACY_RISK_REGISTER_EXISTING_PROBABILITY_CHECK = CheckConstraint(
+    "existing_probability BETWEEN 1 AND 5",
+    name="risk_register_existing_probability_check",
+)
+LEGACY_RISK_REGISTER_RESULTANT_SEVERITY_CHECK = CheckConstraint(
+    "resultant_severity IS NULL OR resultant_severity BETWEEN 1 AND 5",
+    name="risk_register_resultant_severity_check",
+)
+LEGACY_RISK_REGISTER_RESULTANT_PROBABILITY_CHECK = CheckConstraint(
+    "resultant_probability IS NULL OR resultant_probability BETWEEN 1 AND 5",
+    name="risk_register_resultant_probability_check",
+)
+SRAM_RISK_REGISTER_PROBABILITY_CURRENT_CHECK = CheckConstraint(
+    "probability_current BETWEEN 1 AND 5",
+    name="ck_sram_risk_register_probability_current",
+)
+SRAM_RISK_REGISTER_PROBABILITY_RESULTANT_CHECK = CheckConstraint(
+    "probability_resultant IS NULL OR probability_resultant BETWEEN 1 AND 5",
+    name="ck_sram_risk_register_probability_resultant",
+)
+SRAM_RISK_REGISTER_SEVERITY_CURRENT_CHECK = CheckConstraint(
+    "severity_current BETWEEN 1 AND 5",
+    name="ck_sram_risk_register_severity_current",
+)
+SRAM_RISK_REGISTER_SEVERITY_RESULTANT_CHECK = CheckConstraint(
+    "severity_resultant IS NULL OR severity_resultant BETWEEN 1 AND 5",
+    name="ck_sram_risk_register_severity_resultant",
+)
+SRAM_RISK_REGISTER_INDEX_CURRENT_CHECK = CheckConstraint(
+    "risk_index_current BETWEEN 1 AND 25",
+    name="ck_sram_risk_register_index_current",
+)
+SRAM_RISK_REGISTER_INDEX_RESULTANT_CHECK = CheckConstraint(
+    "risk_index_resultant IS NULL OR risk_index_resultant BETWEEN 1 AND 25",
+    name="ck_sram_risk_register_index_resultant",
+)
+SRAM_RISK_REGISTER_STATUS_CHECK = CheckConstraint(
+    "status IN ('open', 'in_progress', 'closed')",
+    name="ck_sram_risk_register_status",
 )
 
 
@@ -1251,6 +1303,8 @@ class BowTieAnalysis(Base):
 class BowTieThreat(Base):
     __tablename__ = "bow_tie_threats"
 
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
+
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
     bowtie_id: Mapped[object] = mapped_column(
@@ -1271,6 +1325,8 @@ class BowTieThreat(Base):
 
 class BowTieConsequence(Base):
     __tablename__ = "bow_tie_consequences"
+
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
 
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -1293,6 +1349,8 @@ class BowTieConsequence(Base):
 
 class BowTieControl(Base):
     __tablename__ = "bow_tie_controls"
+
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
 
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -1318,8 +1376,62 @@ class BowTieControl(Base):
     )
 
 
-class RiskRegisterEntry(Base):
+class RiskRegisterLegacyEntry(Base):
+    """ORM mapping for the pre-existing `risk_register` table (legacy SRM
+    shape, live in production). SRAM risk assessments live in
+    `sram_risk_register` (SramRiskRegisterEntry); this legacy table is left
+    intact for existing SRM data and reconciled reference."""
+
     __tablename__ = "risk_register"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    hazard_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("hazards.id"), nullable=False
+    )
+    srm_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ultimate_consequence: Mapped[str] = mapped_column(Text, nullable=False)
+    existing_severity: Mapped[object] = mapped_column(Integer, nullable=True)
+    existing_probability: Mapped[object] = mapped_column(Integer, nullable=True)
+    existing_risk_index: Mapped[object] = mapped_column(Integer, nullable=True)
+    existing_risk_tolerability: Mapped[object] = mapped_column(Text, nullable=True)
+    resultant_severity: Mapped[object] = mapped_column(Integer, nullable=True)
+    resultant_probability: Mapped[object] = mapped_column(Integer, nullable=True)
+    resultant_risk_index: Mapped[object] = mapped_column(Integer, nullable=True)
+    resultant_risk_tolerability: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    follow_up_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    date_completed: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    remarks: Mapped[object] = mapped_column(Text, nullable=True)
+    concerned_department: Mapped[object] = mapped_column(Text, nullable=True)
+    created_by: Mapped[object] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[object] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
+
+    __table_args__ = (
+        LEGACY_RISK_REGISTER_EXISTING_SEVERITY_CHECK,
+        LEGACY_RISK_REGISTER_EXISTING_PROBABILITY_CHECK,
+        LEGACY_RISK_REGISTER_RESULTANT_SEVERITY_CHECK,
+        LEGACY_RISK_REGISTER_RESULTANT_PROBABILITY_CHECK,
+        Index("ix_risk_register_tenant_hazard", "tenant_id", "hazard_id"),
+        Index("ix_risk_register_tenant", "tenant_id"),
+        {"extend_existing": True},
+    )
+
+
+class SramRiskRegisterEntry(Base):
+    """SRAM risk register (numeric ICAO severity/probability 1-5, risk index
+    = severity x probability, 1-25). Letter labels A-E are a display
+    convention rendered by the UI layer and are never stored; mapping is
+    documented per CAAN SRM Manual §2.3.6.4 (see risk_calculator)."""
+
+    __tablename__ = "sram_risk_register"
 
     id: Mapped[object] = _uuid_pk()
     tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -1329,20 +1441,20 @@ class RiskRegisterEntry(Base):
     hazard_id: Mapped[str] = mapped_column(Text, nullable=False)
     hazard_title: Mapped[object] = mapped_column(Text, nullable=True)
     probability_current: Mapped[int] = mapped_column(Integer, nullable=False)
-    severity_current: Mapped[str] = mapped_column(Text, nullable=False)
-    risk_index_current: Mapped[str] = mapped_column(Text, nullable=False)
+    severity_current: Mapped[int] = mapped_column(Integer, nullable=False)
+    risk_index_current: Mapped[int] = mapped_column(Integer, nullable=False)
     tolerability_current: Mapped[str] = mapped_column(Text, nullable=False)
     probability_resultant: Mapped[object] = mapped_column(Integer, nullable=True)
-    severity_resultant: Mapped[object] = mapped_column(Text, nullable=True)
-    risk_index_resultant: Mapped[object] = mapped_column(Text, nullable=True)
+    severity_resultant: Mapped[object] = mapped_column(Integer, nullable=True)
+    risk_index_resultant: Mapped[object] = mapped_column(Integer, nullable=True)
     tolerability_resultant: Mapped[object] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
     accepted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     alarp_justification: Mapped[object] = mapped_column(Text, nullable=True)
-    accepted_by: Mapped[object] = mapped_column(Text, nullable=True)
+    accepted_by: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
     accepted_on: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     review_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
-    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
@@ -1351,12 +1463,15 @@ class RiskRegisterEntry(Base):
     )
 
     __table_args__ = (
-        RISK_REGISTER_STATUS_CHECK,
-        SEVERITY_CURRENT_CHECK,
-        SEVERITY_RESULTANT_CHECK,
-        Index("ux_risk_register_tenant_hazard", "tenant_id", "hazard_id", unique=True),
-        Index("ix_risk_register_tenant", "tenant_id"),
-        {"extend_existing": True},
+        SRAM_RISK_REGISTER_STATUS_CHECK,
+        SRAM_RISK_REGISTER_PROBABILITY_CURRENT_CHECK,
+        SRAM_RISK_REGISTER_PROBABILITY_RESULTANT_CHECK,
+        SRAM_RISK_REGISTER_SEVERITY_CURRENT_CHECK,
+        SRAM_RISK_REGISTER_SEVERITY_RESULTANT_CHECK,
+        SRAM_RISK_REGISTER_INDEX_CURRENT_CHECK,
+        SRAM_RISK_REGISTER_INDEX_RESULTANT_CHECK,
+        Index("ux_sram_risk_register_tenant_hazard", "tenant_id", "hazard_id", unique=True),
+        Index("ix_sram_risk_register_tenant", "tenant_id"),
     )
 
 
@@ -1469,6 +1584,14 @@ class Regulator(Base):
     name: Mapped[object] = mapped_column(Text, nullable=True)
     regulator_type: Mapped[object] = mapped_column(Text, nullable=True)
     display_name: Mapped[object] = mapped_column(Text, nullable=True)
+    short_name: Mapped[object] = mapped_column(Text, nullable=True)
+    country_code: Mapped[object] = mapped_column(Text, nullable=True)
+    country_name: Mapped[object] = mapped_column(Text, nullable=True)
+    domain: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    contact_email: Mapped[object] = mapped_column(Text, nullable=True)
+    contact_phone: Mapped[object] = mapped_column(Text, nullable=True)
+    website: Mapped[object] = mapped_column(Text, nullable=True)
     operator_tenant_ids: Mapped[object] = mapped_column(
         JSONB, server_default=text("'[]'::jsonb")
     )
@@ -1503,10 +1626,15 @@ class UserProfile(Base):
         Uuid(as_uuid=True), ForeignKey("tenants.id"), nullable=True, index=True
     )
     department: Mapped[object] = mapped_column(Text, nullable=True)
-    phone: Mapped[object] = mapped_column(Text, nullable=True)
+    phone: Mapped[object] = mapped_column(Text, nullable=True, unique=True)
     phone_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_developer: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_login: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    # When the Firebase Auth password was last set/reset. Firebase Auth does not
+    # expose passwordUpdatedAt via the Admin SDK, so this is stamped explicitly
+    # at password-set time (tenant_credentials) and surfaced in the admin list
+    # to make unexpected rotations visible.
+    password_updated_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -1581,16 +1709,28 @@ class AuditDispatch(Base):
 class Invite(Base):
     __tablename__ = "invites"
 
-    code: Mapped[str] = mapped_column(Text, primary_key=True)
-    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
-    email: Mapped[object] = mapped_column(Text, nullable=True)
-    role: Mapped[object] = mapped_column(Text, nullable=True)
-    status: Mapped[object] = mapped_column(Text, nullable=True)
-    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    # ORM adopts the LIVE shape (D3): id uuid PK, email/role/code NOT NULL,
+    # code UNIQUE (was the old TEXT PK), tenant_id uuid FK→tenants(id). The
+    # old `data` JSONB bag is dropped — callers use first-class columns.
+    id: Mapped[object] = _uuid_pk()
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    tenant_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id"), nullable=True
     )
-    expires_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    department: Mapped[object] = mapped_column(Text, nullable=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    status: Mapped[object] = mapped_column(
+        Text, nullable=True, server_default=text("'pending'")
+    )
+    created_by: Mapped[object] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+        server_default=text("now() + interval '7 days'"),
+    )
+    created_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
+    )
 
     __table_args__ = (Index("ix_invites_tenant", "tenant_id"),)
 
@@ -1598,16 +1738,27 @@ class Invite(Base):
 class Feedback(Base):
     __tablename__ = "feedback"
 
+    # ORM adopts the LIVE shape (D3): user_email/tenant_id (uuid FK)/
+    # rating/subject/message/page/status columns; the old email/category/data
+    # bag is gone.
     id: Mapped[object] = _uuid_pk()
-    email: Mapped[object] = mapped_column(Text, nullable=True)
-    tenant_id: Mapped[object] = mapped_column(Text, nullable=True)
-    category: Mapped[object] = mapped_column(Text, nullable=True)
-    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    user_email: Mapped[str] = mapped_column(Text, nullable=False)
+    tenant_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id"), nullable=True
+    )
+    rating: Mapped[object] = mapped_column(Integer, nullable=True)
+    subject: Mapped[object] = mapped_column(Text, nullable=True)
+    message: Mapped[object] = mapped_column(Text, nullable=True)
+    page: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[object] = mapped_column(
+        Text, nullable=True, server_default=text("'new'")
+    )
+    created_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
     )
 
     __table_args__ = (
+        CheckConstraint("rating BETWEEN 1 AND 5", name="feedback_rating_check"),
         Index("ix_feedback_tenant", "tenant_id"),
         Index("ix_feedback_created", "created_at"),
     )
@@ -1633,16 +1784,31 @@ class CaanReport(Base):
 class SmsMaturity(Base):
     __tablename__ = "sms_maturity"
 
+    # ORM adopts the LIVE assessment shape (D2): one row per periodic maturity
+    # assessment, read as the latest by assessment_date. `days`/`data` and the
+    # unique(tenant_id, days) constraint are gone — live had none.
     id: Mapped[object] = _uuid_pk()
-    tenant_id: Mapped[str] = mapped_column(Text, nullable=False)
-    days: Mapped[object] = mapped_column(Integer, nullable=True)
-    data: Mapped[object] = mapped_column(JSONB, server_default=DEFAULT_JSONB)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    tenant_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tenants.id"), nullable=False
+    )
+    assessment_date: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
+    )
+    overall_score: Mapped[object] = mapped_column(Float, nullable=True)
+    level: Mapped[object] = mapped_column(Integer, nullable=True)
+    pillar_scores: Mapped[object] = mapped_column(JSONB, nullable=True)
+    element_scores: Mapped[object] = mapped_column(JSONB, nullable=True)
+    gap_analysis: Mapped[object] = mapped_column(JSONB, nullable=True)
+    recommendations: Mapped[object] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
+    )
+    updated_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
     )
 
     __table_args__ = (
-        UniqueConstraint("tenant_id", "days", name="ux_sms_maturity_tenant_days"),
+        CheckConstraint("level BETWEEN 1 AND 5", name="sms_maturity_level_check"),
         Index("ix_sms_maturity_tenant", "tenant_id"),
     )
 

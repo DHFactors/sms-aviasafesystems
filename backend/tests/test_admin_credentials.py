@@ -226,40 +226,6 @@ def test_check_email_available(monkeypatch):
     assert check_email_available("taken@x.com")["available"] is False
 
 
-def test_create_tenant_with_credentials(monkeypatch):
-    db, auth = _patch_all(monkeypatch)
-    from app.services.tenant_credentials import create_tenant_with_credentials
-    result = create_tenant_with_credentials(_sample_tenant(), _admin_user())
-
-    assert result["users"][0]["status"] == "ok"
-    assert result["users"][0]["email"] == "admin@newair.com"
-    # Password is returned exactly once and never stored
-    assert result["users"][0]["password"]
-    stored = db._stores["tenants"]["new-air"]
-    assert "password" not in str(stored)
-    assert stored["contact"]["name"] == "Ram Sharma"
-    assert stored["contract"]["reference"] == "AVIA-NEW-2026-001"
-    assert stored["users"][0]["email"] == "admin@newair.com"
-    assert stored["safety_manager"]["email"] == "admin@newair.com"
-    assert stored["audit"]["created_by"] == "super-admin@aviasafesystems.com"
-    assert any(l["action"] == "TENANT_CREDENTIALS_CREATED" for l in db._stores["audit_logs"].values())
-    # Auth user created with claims
-    rec = auth.by_email["admin@newair.com"]
-    assert rec.custom_claims == {"role": "AIRLINE_ADMIN", "tenant_id": "new-air"}
-
-
-def test_create_tenant_with_credentials_duplicate_email(monkeypatch):
-    db, auth = _patch_all(monkeypatch)
-    from app.services.tenant_credentials import create_tenant_with_credentials
-    auth.create_user(email="admin@newair.com", password="secret12345")
-    result = create_tenant_with_credentials(_sample_tenant(), _admin_user())
-    assert result["users"][0]["status"] == "error"
-    assert "already exists" in result["users"][0]["detail"]
-    # tenant doc still created with no stored users
-    stored = db._stores["tenants"]["new-air"]
-    assert "users" not in stored
-
-
 def test_get_tenant_credentials(monkeypatch):
     db, _ = _patch_all(monkeypatch)
     db._stores["tenants"]["new-air"] = {
@@ -311,7 +277,7 @@ def test_send_welcome_email_log_provider(monkeypatch):
     assert result["delivery"]["provider"] == "none"
     assert "Welcome to AviaSAFE SMS" in result["delivery"]["preview"]
     assert auth.by_email["admin@newair.com"].password == result["password"]
-    assert any(l["action"] == "TENANT_WELCOME_EMAIL" for l in db._stores["audit_logs"].values())
+    assert any(l["action"] == "WELCOME_EMAIL_SENT" for l in db._stores["audit_logs"].values())
 
 
 # ============================================================================
@@ -412,7 +378,7 @@ def test_send_welcome_route(monkeypatch):
         _clear_overrides()
 
 
-def test_create_tenant_route_with_users(monkeypatch):
+def test_create_tenant_route_ignores_users(monkeypatch):
     db, auth = _patch_all(monkeypatch)
     try:
         resp = _client().post("/api/v1/admin/tenants", json={
@@ -420,9 +386,11 @@ def test_create_tenant_route_with_users(monkeypatch):
         })
         assert resp.status_code == 200
         body = resp.json()
-        assert body["users"][0]["status"] == "ok"
-        assert body["users"][0]["password"]
-        assert db._stores["tenants"]["new-air"]["contact"]["name"] == "Ram Sharma"
+        assert body["tenant"]["tenant_id"] == "new-air"
+        assert "users" not in body
+        assert "seeded_hazards" in body
+        assert db._stores["tenants"]["new-air"]["tenant_id"] == "new-air"
+        assert auth.by_email == {}
     finally:
         _clear_overrides()
 
@@ -510,6 +478,27 @@ def test_create_user_for_tenant_duplicate_email_in_auth(monkeypatch):
         assert False, "expected ValueError"
     except ValueError as e:
         assert "already exists" in str(e)
+
+
+def test_duplicate_user_insert_does_not_rotate_password(monkeypatch):
+    """FIX-2 guard: a duplicate insert must never rotate the existing password.
+
+    Regression for the 2026-09 password-invalidation investigation — an email
+    that already exists in Firebase Auth must fail fast WITHOUT touching the
+    existing user's password.
+    """
+    from app.services.tenant_credentials import create_user_for_tenant
+    db, auth = _patch_all(monkeypatch)
+    _tenant_with_user(db._stores)
+    auth.create_user(email="taken@x.com", password="secret12345")
+    before = auth.by_email["taken@x.com"].password
+    try:
+        create_user_for_tenant({"tenant_id": "new-air", "email": "taken@x.com"}, _admin_user())
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "already exists" in str(e)
+    assert auth.by_email["taken@x.com"].password == before
+    assert auth.get_user_by_email("taken@x.com").password == before
 
 
 def test_create_user_route(monkeypatch):

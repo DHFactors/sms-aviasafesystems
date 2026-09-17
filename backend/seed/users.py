@@ -1,5 +1,7 @@
 from loguru import logger
 
+from app.services.production_seed import _audit
+
 from seed.config import (
     DEMO_USERS,
     DEVELOPER_ACCOUNT,
@@ -8,6 +10,10 @@ from seed.config import (
     simplified_email,
     simplified_password,
 )
+
+# Audit actor for seed scripts: the action originates from an operator's local
+# run of the seeder, not from an in-app route.
+_SEED_ACTOR = {"uid": "system", "email": "seed@aviasafesystems.com"}
 
 
 def create_user(auth, user_spec: dict) -> dict:
@@ -23,6 +29,10 @@ def create_user(auth, user_spec: dict) -> dict:
             # always have their password re-synced so a stale Auth password can
             # never lock the owner out.
             auth.update_user(uid, password=password)
+            _audit("AUTH_BATCH_RESET", _SEED_ACTOR, user_spec.get("tenant_id") or "global",
+                   f"Password re-synced for existing user {user_spec['email']} (uid={uid})",
+                   tenant_id=user_spec.get("tenant_id"),
+                   metadata={"source": "script:seed.users", "target_uid": uid})
             logger.info(f"Password re-synced for existing user: {user_spec['email']}")
     except Exception:
         try:
@@ -46,6 +56,10 @@ def create_user(auth, user_spec: dict) -> dict:
             )
             if sync_password:
                 auth.update_user(uid, password=password)
+                _audit("AUTH_BATCH_RESET", _SEED_ACTOR, user_spec.get("tenant_id") or "global",
+                       f"Password re-synced for adopted user {user_spec['email']} (uid={uid})",
+                       tenant_id=user_spec.get("tenant_id"),
+                       metadata={"source": "script:seed.users", "target_uid": uid})
 
     claims = {"role": user_spec["role"]}
     if user_spec.get("tenant_id"):

@@ -25,9 +25,13 @@ from typing import Any, Dict, List, Optional
 
 from seeders import BaseSeeder
 from app.core.config import settings
+from app.services.production_seed import _audit
 
 SUPER_ADMIN_EMAIL = "ezondiza.dhf@gmail.com"
 SUPER_ADMIN_UID = "hLXs4mvtf5bb1hRSifnh6HuUHpC2"
+
+# Audit actor for seeder scripts (operator-run, not an in-app route).
+SEEDER_AUDIT_ACTOR = {"uid": "system", "email": "seed@aviasafesystems.com"}
 
 # Keep ONLY production-setup tenants. No tenant outside this set is written.
 PRODUCTION_TENANTS = ["fixedwing", "rotarywing", "demoairport", "demostate", "sita-air", "sourya-air"]
@@ -236,6 +240,10 @@ class TenantSeeder(BaseSeeder):
         if department:
             claims["department"] = department
         self.auth.set_custom_user_claims(record.uid, claims)
+        _audit("USER_CLAIMS_SET", SEEDER_AUDIT_ACTOR, tenant_id,
+               f"Set claims for {email} (role={role}, tenant={tenant_id})",
+               tenant_id=tenant_id,
+               metadata={"source": "script:seeders.tenants.tenant_seeder", "target_uid": record.uid})
 
         self.log_info(f"Created user: {email} ({role}, tenant={tenant_id})")
         return True
@@ -328,6 +336,10 @@ class TenantSeeder(BaseSeeder):
                 self.log_error(f"Failed to delete user {email}: {e}")
                 continue
             removed += 1
+            _audit("USER_DELETED", SEEDER_AUDIT_ACTOR, "system",
+                   f"Seeder unseed deleted user {email} (uid={record.uid})",
+                   metadata={"source": "script:seeders.tenants.tenant_seeder",
+                             "target_uid": record.uid, "batch": True})
             self.log_info(f"Deleted user {email}")
         return removed
 

@@ -22,15 +22,35 @@ from typing import Any, Dict, List, Union
 
 SEVERITY_LETTERS: tuple = ("A", "B", "C", "D", "E")
 
+# CAAN SRM Manual §2.3.6.4 — severity stored numerically (1-5). Letter labels
+# A-E are a display convention rendered by the UI layer and never stored:
+#   value | letter | descriptor
+#    5    |   A    | Catastrophic
+#    4    |   B    | Major / Hazardous
+#    3    |   C    | Moderate / Major
+#    2    |   D    | Minor
+#    1    |   E    | Negligible / Insignificant
 SEVERITY_TO_VALUE: Dict[str, int] = {
-    "A": 1,  # Negligible
-    "B": 2,  # Minor
-    "C": 3,  # Major
-    "D": 4,  # Hazardous
-    "E": 5,  # Catastrophic
+    "A": 5,  # Catastrophic
+    "B": 4,  # Major / Hazardous
+    "C": 3,  # Moderate / Major
+    "D": 2,  # Minor
+    "E": 1,  # Negligible / Insignificant
 }
 
 VALUE_TO_SEVERITY: Dict[int, str] = {v: k for k, v in SEVERITY_TO_VALUE.items()}
+
+# CAAN audit reference: numeric severity -> letter and descriptor.
+CAAN_SEVERITY_REFERENCE: Dict[int, Dict[str, str]] = {
+    value: {"letter": VALUE_TO_SEVERITY[value], "descriptor": descriptor}
+    for value, letter, descriptor in (
+        (5, "A", "Catastrophic"),
+        (4, "B", "Major / Hazardous"),
+        (3, "C", "Moderate / Major"),
+        (2, "D", "Minor"),
+        (1, "E", "Negligible / Insignificant"),
+    )
+}
 
 TOLERABILITY_INTOLERABLE = ("5A", "5B", "5C", "4A", "4B", "3A")
 TOLERABILITY_TOLERABLE = (
@@ -93,10 +113,20 @@ def normalize_probability(probability: Any) -> int:
 
 
 def risk_index(probability: Any, severity: Any) -> str:
-    """Build the risk index string, e.g. '4C' (probability 4, severity C)."""
+    """Build the risk index display string, e.g. '4C' (probability 4, severity C)."""
     prob = normalize_probability(probability)
     sev = normalize_severity(severity)
     return f"{prob}{VALUE_TO_SEVERITY[sev]}"
+
+
+def severity_to_letter(severity: Any) -> str:
+    """Numeric severity 1-5 -> display letter A-E (CAAN §2.3.6.4 mapping)."""
+    return VALUE_TO_SEVERITY[normalize_severity(severity)]
+
+
+def risk_index_to_display(severity: Any, probability: Any) -> str:
+    """UI display form of the numeric risk index, e.g. severity 3, probability 4 -> '4C'."""
+    return f"{normalize_probability(probability)}{severity_to_letter(severity)}"
 
 
 def parse_risk_index(index: str) -> Dict[str, int]:
@@ -125,19 +155,23 @@ def parse_risk_index(index: str) -> Dict[str, int]:
 def get_risk_matrix(probability: Any, severity: Any) -> Dict[str, Any]:
     """Full risk matrix entry for a probability/severity pair.
 
-    Returns the parsed cell with index string, tolerability and colour, e.g.
-    probability 4, severity C -> '4C' / 'Tolerable' / 'yellow'.
+    Returns numeric severity (1-5) and risk_index (severity × probability,
+    1-25) per the corrected ICAO/CAAN numeric storage convention. Letter labels
+    are available as ``severity_letter`` / ``risk_index_display`` for the UI
+    layer (CAAN §2.3.6.4).
     """
     prob = normalize_probability(probability)
     sev_value = normalize_severity(severity)
     sev_letter = VALUE_TO_SEVERITY[sev_value]
-    index = f"{prob}{sev_letter}"
-    tolerability = get_tolerability(index)
+    index_str = f"{prob}{sev_letter}"
+    tolerability = get_tolerability(index_str)
     return {
         "probability": prob,
-        "severity": sev_letter,
+        "severity": sev_value,
+        "severity_letter": sev_letter,
         "severity_value": sev_value,
-        "risk_index": index,
+        "risk_index": prob * sev_value,
+        "risk_index_display": index_str,
         "tolerability": tolerability,
         "color": get_color(tolerability),
     }
@@ -146,9 +180,10 @@ def get_risk_matrix(probability: Any, severity: Any) -> Dict[str, Any]:
 def get_tolerability(risk_index: Union[str, int]) -> str:
     """Tolerability level for a risk matrix cell, e.g. '4C' -> 'Tolerable'.
 
-    Numeric indices are rejected: the SRAM register stores probability/severity
-    pairs as strings (e.g. '4C') rather than legacy product indices. Convert
-    legacy product indices to (probability, severity) before calling.
+    Numeric indices are rejected: classification runs on the display grid cell
+    ('<probability><severity-letter>', e.g. '4C'). The SRAM register stores
+    probability/severity numerically (1-5); convert to the display form with
+    ``risk_index_to_display`` before calling.
     """
     if isinstance(risk_index, int) and not isinstance(risk_index, bool):
         raise ValueError(
@@ -182,19 +217,25 @@ def get_color(tolerability: str) -> str:
 
 
 def build_risk_matrix() -> List[Dict[str, Any]]:
-    """Materialise the full 5x5 matrix as probability-major rows of cells."""
+    """Materialise the full 5x5 matrix as probability-major rows of cells.
+
+    Each cell carries numeric severity/risk_index (per the corrected storage
+    contract) plus display-letter fields for the UI layer.
+    """
     rows: List[Dict[str, Any]] = []
     for probability in range(1, 6):
         cells: List[Dict[str, Any]] = []
         for sev_value in range(1, 6):
             sev_letter = VALUE_TO_SEVERITY[sev_value]
-            index = f"{probability}{sev_letter}"
-            tolerability = get_tolerability(index)
+            index_str = f"{probability}{sev_letter}"
+            tolerability = get_tolerability(index_str)
             cells.append({
                 "probability": probability,
-                "severity": sev_letter,
+                "severity": sev_value,
+                "severity_letter": sev_letter,
                 "severity_value": sev_value,
-                "risk_index": index,
+                "risk_index": probability * sev_value,
+                "risk_index_display": index_str,
                 "tolerability": tolerability,
                 "color": get_color(tolerability),
             })

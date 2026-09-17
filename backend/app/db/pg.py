@@ -70,6 +70,7 @@ _ID_COLUMNS: Dict[str, str] = {
     "bow_tie_consequences": "id",
     "bow_tie_controls": "id",
     "risk_register": "id",
+    "sram_risk_register": "id",
     "barrier_register": "id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
