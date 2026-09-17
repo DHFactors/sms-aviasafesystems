@@ -797,23 +797,47 @@ class TestTenantAuditRepo:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+def _effective_router_paths(router):
+    """Return effective URL paths registered on a router or FastAPI app.
+
+    FastAPI >= 0.140 stores sub-routers added via ``include_router()`` as
+    ``_IncludedRouter`` wrappers (surfacing ``include_context.prefix`` and
+    ``original_router``) instead of flattening them into ``APIRoute`` objects,
+    so iterating ``router.routes`` for ``.path`` misses included prefixes.
+    """
+    paths = []
+    for route in router.routes:
+        context = getattr(route, "include_context", None)
+        sub_router = getattr(route, "original_router", None)
+        if hasattr(route, "path"):
+            paths.append(route.path)
+        elif context is not None and sub_router is not None:
+            prefix = context.prefix or ""
+            for sub_path in _effective_router_paths(sub_router):
+                paths.append(prefix + sub_path)
+        elif sub_router is not None:
+            paths.extend(_effective_router_paths(sub_router))
+    return paths
+
+
 class TestV1RouterRegistration:
     def test_tenant_reports_routes_registered(self):
         from app.api.v1.router import router
 
-        routes = [r.path for r in router.routes]
+        routes = _effective_router_paths(router)
         assert any("/tenants" in p for p in routes)
 
     def test_v1_router_includes_all_sub_routers(self):
         from app.api.v1.router import router
 
-        prefixes = []
-        for r in router.routes:
-            if hasattr(r, "path"):
-                prefixes.append(r.path)
-        assert any("state-risk" in p for p in prefixes)
-        assert any("cron" in p for p in prefixes)
-        assert any("tenants" in p for p in prefixes)
+        prefixes = [
+            route.include_context.prefix
+            for route in router.routes
+            if hasattr(route, "include_context")
+        ]
+        assert "/state-risk" in prefixes
+        assert "/cron" in prefixes
+        assert "/tenants" in prefixes
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -825,8 +849,8 @@ class TestAppMountsV1Router:
     def test_v1_prefix_exists(self):
         from app.main import app as main_app
 
-        prefixes = [r.path for r in main_app.routes if hasattr(r, "path")]
-        assert any("/api/v1" in p for p in prefixes)
+        routes = _effective_router_paths(main_app)
+        assert any(p.startswith("/api/v1") for p in routes)
 
     def test_health_endpoint_accessible(self):
         client = TestClient(app)
