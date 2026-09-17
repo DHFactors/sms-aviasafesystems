@@ -75,6 +75,12 @@ Completed, committed, and deployed in the previous cycle (report of 2026-08-31):
 
 ## 1b. Recent Work (Sep 2026)
 
+* **Single-path user provisioning (2026-09-14)** — the tenant onboarding
+  wizard no longer creates Auth users; it is a 5-step tenant-only flow. Users
+  are always created via Step 3 (`POST /api/v1/admin/users`, one at a time).
+  `create_tenant_with_credentials` (the legacy batch path) was removed on
+  2026-09-17 per `PASSWORD_RESET_BUG_INVESTIGATION.md`.
+
 Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
 (this cycle):
 

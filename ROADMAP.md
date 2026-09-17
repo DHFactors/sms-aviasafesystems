@@ -12,6 +12,20 @@ the latest dated report is [docs/PROJECT_STATUS_REPORT_2026-08-24.md](./docs/PRO
 > Phase 2B to make the platform authoritative for their operation. Disclose this clearly in the
 > delivery scope email.
 
+## Single-Path User Provisioning (Policy — Implemented 2026-09-14)
+
+**Users are always created via Step 3.** There is exactly one way to provision a tenant user:
+Production Setup Step 3 (`POST /api/v1/admin/users`, one user at a time).
+
+- The tenant onboarding wizard (`public/admin/tenant-credentials.html`) no longer creates users — it
+  is a 5-step tenant-only flow (Tenant Info → Contact → Contract → Review → Done).
+- `POST /api/v1/admin/tenants` (`admin_create_tenant`) creates the tenant only; the legacy
+  `if data.get("users")` branch was removed.
+- `create_tenant_with_credentials` (batch tenant+users) was removed on 2026-09-17
+  (see `PASSWORD_RESET_BUG_INVESTIGATION.md`); it no longer exists in the codebase.
+- Rationale: a single path is easier to test, monitor, and trust, and matches the real customer
+  workflow (create the tenant, then add users one at a time after hand-over).
+
 ## Milestones Reached
 
 | Phase | Status | Notes |
