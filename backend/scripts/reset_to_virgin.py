@@ -71,6 +71,7 @@ PRIMARY_SCOPE = [
     "nhrc_calculations",     # *
     "sram_assessments",      # *
     "risk_register",
+    "sram_risk_register",
     "barriers",              # mapped -> barrier_register
     "bowties",               # mapped -> bow_tie_* family
     "state_risk_categories",
@@ -95,6 +96,10 @@ DEPENDENT_SCOPE = [
     "state_risk_register",
     "caan_reports",
     "sms_maturity",
+    "invites",
+    "feedback",
+    "sms_dispatches",
+    "audit_dispatches",
 ]
 
 # Never touched. Only reported (counts must remain unchanged).
@@ -136,6 +141,7 @@ _FALLBACK_ORDER = [
     "caps",
     "cans",
     "risk_register",
+    "sram_risk_register",
     "flight_diversions",
     "survey_responses",
     "surveys",
@@ -150,6 +156,10 @@ _FALLBACK_ORDER = [
     "hazards",
     "reports",
     "audit_logs",
+    "invites",
+    "feedback",
+    "sms_dispatches",
+    "audit_dispatches",
     "tenants",
     "users",
     "psoe_responses",
