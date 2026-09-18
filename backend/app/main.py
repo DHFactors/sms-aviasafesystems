@@ -43,8 +43,25 @@ def _allowed_origins() -> list[str]:
     return configured
 
 
+def _validate_production_config() -> None:
+    """Refuse to boot in production when a required secret is unset.
+
+    BETA_ACCESS_KEY gates public registration and enterprise onboarding. It has
+    no hardcoded fallback (removed 2026-09-18 after the prior value was exposed
+    in git history), so production must provide it via the environment
+    (Render dashboard) before the service accepts traffic.
+    """
+    if (settings.ENVIRONMENT or "").strip().lower() == "production" and not settings.BETA_ACCESS_KEY:
+        raise RuntimeError(
+            "BETA_ACCESS_KEY is not set. Production requires a non-empty value "
+            "(configure it in the Render dashboard; never commit it)."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _validate_production_config()
+
     try:
         initialize_firebase()
     except Exception as e:

@@ -12,16 +12,19 @@
 #   4. log_audit()             — TENANT_ONBOARDED audit record.
 #
 # Error mapping (contract with the route layer):
-#   PermissionError -> 403    (beta access key mismatch)
+#   HTTPException    -> 403    (missing/mismatched caller-supplied beta key)
+#   PermissionError -> 403    (beta access key mismatch in register_tenant)
 #   ValueError      -> 422    (validation / classification failures)
 #   DuplicateEmailError -> 409 (existing admin account)
 #   LookupError     -> 404
 #   RuntimeError    -> 500
 # ============================================================================
 
+import secrets
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+from fastapi import HTTPException
 from loguru import logger
 
 from app.core.config import settings
@@ -46,19 +49,31 @@ async def onboard_tenant(
     seed_count: int = DEFAULT_SEED_COUNT,
     seed_function: Optional[str] = None,
     priority_override: Optional[str] = None,
+    beta_access_key: Optional[str] = None,
     request=None,
 ) -> Dict[str, Any]:
     """Provision a tenant, seed its ICAO hazard register, and welcome the admin.
 
     Re-uses the self-service `register_tenant` flow (so validation, invite-code
-    and audit behaviour stay consistent) but passes the configured enterprise
-    access key so the CAAN/enterprise onboarding path is gated by configuration
-    rather than the public registration form.
+    and audit behaviour stay consistent) but requires the caller to supply the
+    deployment's enterprise access key. The service never self-supplies it, so
+    a caller who does not know BETA_ACCESS_KEY is rejected before any tenant is
+    created.
 
     Returns a dict with `tenant_id`, seed status and email status. Never raises
     for email delivery; seeding and registration errors propagate for the route
     layer to map to HTTP statuses.
     """
+    configured_key = settings.BETA_ACCESS_KEY
+    provided_key = (beta_access_key or "").strip()
+    if (
+        not configured_key
+        or not provided_key
+        or not secrets.compare_digest(provided_key, configured_key)
+    ):
+        logger.warning("Tenant onboarding rejected: invalid or missing beta access key")
+        raise HTTPException(status_code=403, detail="Invalid or missing beta access key")
+
     registered = register_tenant(
         organization_name=organization_name,
         classification=classification,
@@ -66,9 +81,9 @@ async def onboard_tenant(
         admin_title=admin_title,
         email=email,
         password=password,
-        # Enterprise/CAAN onboarding gate: configured on the deployment. In
-        # dev/beta the key check is lenient (any matching provided key).
-        beta_access_key=settings.BETA_ACCESS_KEY,
+        # Caller-supplied key (already verified above) satisfies the
+        # register_tenant gate without the service self-supplying it.
+        beta_access_key=provided_key,
         request=request,
     )
     tid = registered["tenant_id"]

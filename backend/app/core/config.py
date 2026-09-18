@@ -190,10 +190,15 @@ class Settings(BaseSettings):
     DISABLE_DESTRUCTIVE_ENDPOINTS: bool = True
 
     # ── Self-service onboarding ──
-    # Access key required for public tenant registration on the beta portal.
-    # A blank / missing field on the form falls back to this default; a
-    # provided key must match exactly.
-    BETA_ACCESS_KEY: str = "AVIASAFE-BETA-2026"
+    # Access key required for public tenant registration and enterprise
+    # onboarding. No hardcoded fallback: the value must be supplied by the
+    # environment and a provided key must match exactly.
+    #
+    # Rotated 2026-09-18 due to public exposure in git history. The old value
+    # must be treated as compromised; the new value is set in the Render
+    # dashboard (render.yaml: sync: false) and never committed. Production
+    # refuses to start when this is unset (see app.main._validate_production_config).
+    BETA_ACCESS_KEY: Optional[str] = None
 
     # ── Tenant credentials / welcome email ──
     # When True (default), tenant onboarding seeds the ICAO hazard register

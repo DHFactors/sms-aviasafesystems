@@ -382,8 +382,10 @@ def test_register_tenant_blank_access_key_uses_default(monkeypatch):
 
 def test_register_tenant_production_requires_access_key(monkeypatch):
     # Production gate: self-service registration is by invitation only — a valid
-    # enterprise access code is mandatory, blank is rejected.
+    # enterprise access code is mandatory, blank is rejected. The access key is
+    # supplied by the environment (C2 — no committed default).
     monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "BETA_ACCESS_KEY", "TEST-PROD-KEY-2026")
     _patch(monkeypatch, _FakeDB(), _FakeAuth())
     resp = TestClient(app).post(
         "/api/v1/auth/register-tenant",
@@ -419,6 +421,7 @@ def test_register_tenant_beta_tags_sandbox(monkeypatch):
 
 def test_register_tenant_production_not_sandbox_tagged(monkeypatch):
     monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(settings, "BETA_ACCESS_KEY", "TEST-PROD-KEY-2026")
     db = _FakeDB()
     _patch(monkeypatch, db, _FakeAuth())
     resp = TestClient(app).post(

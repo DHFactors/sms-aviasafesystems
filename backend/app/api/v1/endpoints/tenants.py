@@ -15,9 +15,13 @@
 #   -> 409, LookupError -> 404, ValueError -> 422, RuntimeError -> 500.
 # ============================================================================
 
-from fastapi import APIRouter, HTTPException, Request
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.middleware.auth import get_admin_user
+from app.middleware.rate_limit import rate_limit
 from app.services.onboarding_service import onboard_tenant
 from app.services.tenant_registration import (
     DisposableEmailError,
@@ -37,11 +41,24 @@ class OnboardTenantRequest(BaseModel):
     seed_count: int = Field(6, ge=0, le=50)
     seed_function: str | None = Field(None, max_length=8)
     priority_override: str | None = Field(None, pattern="^[HML]$")
+    # Enterprise access key supplied by the caller. Verified against the
+    # deployment's configured BETA_ACCESS_KEY — the service no longer
+    # self-supplies it (C1/C2 remediation, 2026-09-18).
+    beta_access_key: Optional[str] = Field(None, max_length=128)
 
 
 @router.post("/onboard", status_code=201)
-async def onboard(request: Request, body: OnboardTenantRequest):
-    """Provision a tenant end-to-end and seed its ICAO hazard register."""
+@rate_limit("register_tenant")
+async def onboard(
+    request: Request,
+    body: OnboardTenantRequest,
+    user: Dict[str, Any] = Depends(get_admin_user),
+):
+    """Provision a tenant end-to-end and seed its ICAO hazard register.
+
+    Requires a SUPER_ADMIN Firebase ID token AND a caller-supplied enterprise
+    access key matching the deployment's BETA_ACCESS_KEY.
+    """
     try:
         result = await onboard_tenant(
             organization_name=body.organization_name.strip(),
@@ -53,6 +70,7 @@ async def onboard(request: Request, body: OnboardTenantRequest):
             seed_count=body.seed_count,
             seed_function=body.seed_function,
             priority_override=body.priority_override,
+            beta_access_key=body.beta_access_key,
             request=request,
         )
     except DisposableEmailError as e:

@@ -79,6 +79,11 @@ services:
         sync: false
       - key: DEFAULT_SEED_PASSWORD
         sync: false
+      # Gates public registration + enterprise onboarding. No hardcoded
+      # fallback (rotated 2026-09-18 after git exposure); production refuses
+      # to start until this is set in the Render dashboard.
+      - key: BETA_ACCESS_KEY
+        sync: false
 
       # ── AI / reporting integrations ───────────────────────────────────────
       - key: GEMINI_API_KEY
