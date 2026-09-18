@@ -18,12 +18,20 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.config import settings
+from app.middleware.app_check import verify_app_check_strict
 from app.services.tenant_registration import (
     DEPARTMENT_LABELS,
     slugify_organization,
     MIN_PASSWORD_LENGTH,
 )
 from pg_bridge import patch_pg_through
+
+
+def _allow_app_check_strict():
+    """Bypass the strict App Check dependency (H3) on GET /tenant-lookup so
+    these tests exercise the lookup logic, not the attestation gate. Cleared
+    by conftest after the test."""
+    app.dependency_overrides[verify_app_check_strict] = lambda: None
 
 
 # ============================================================================
@@ -652,6 +660,7 @@ def test_tenant_lookup_by_invite_code(monkeypatch):
     db = _FakeDB()
     _patch(monkeypatch, db, _FakeAuth())
     _seed_tenant(db, invite_code="ABC123")
+    _allow_app_check_strict()
 
     resp = TestClient(app).get("/api/v1/auth/tenant-lookup?code=abc123")
     assert resp.status_code == 200
@@ -673,6 +682,7 @@ def test_tenant_lookup_by_tenant_id(monkeypatch):
     _seed_tenant(db, tid="pokhara-aerodrome", name="Pokhara Aerodrome",
                 classification="AERODROME",
                 departments=["safety", "airside_ops", "arff"], invite_code="AERO00")
+    _allow_app_check_strict()
 
     resp = TestClient(app).get("/api/v1/auth/tenant-lookup?tenant_id=pokhara-aerodrome")
     assert resp.status_code == 200
@@ -684,12 +694,14 @@ def test_tenant_lookup_by_tenant_id(monkeypatch):
 
 def test_tenant_lookup_unknown_invite_code(monkeypatch):
     _patch(monkeypatch, _FakeDB(), _FakeAuth())
+    _allow_app_check_strict()
     resp = TestClient(app).get("/api/v1/auth/tenant-lookup?code=ZZZZZZ")
     assert resp.status_code == 404
 
 
 def test_tenant_lookup_requires_locator(monkeypatch):
     _patch(monkeypatch, _FakeDB(), _FakeAuth())
+    _allow_app_check_strict()
     resp = TestClient(app).get("/api/v1/auth/tenant-lookup")
     assert resp.status_code == 422
 

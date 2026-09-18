@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 import io
 
 from app.services.aggregation_service import AggregationService
-from app.middleware.auth import get_current_user
+from app.middleware.auth import get_caan_user
 
 router = APIRouter()
 
@@ -26,7 +26,7 @@ def _service() -> AggregationService:
 @router.get("/industry-averages")
 async def industry_averages(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     # Regulator sees aggregated data only - tenant isolation via aggregated view
     tids = _default_tenant_ids(tenant_ids)
@@ -37,7 +37,7 @@ async def industry_averages(
 @router.get("/top-hazards")
 async def top_hazards(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
@@ -46,7 +46,7 @@ async def top_hazards(
 @router.get("/risk-trends")
 async def risk_trends(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
@@ -55,7 +55,7 @@ async def risk_trends(
 @router.get("/risk-register")
 async def risk_register(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
@@ -65,7 +65,7 @@ async def risk_register(
 async def benchmarking(
     tenant_id: str,
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
@@ -74,7 +74,7 @@ async def benchmarking(
 @router.get("/export/pdf")
 async def export_pdf(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
@@ -85,7 +85,7 @@ async def export_pdf(
 @router.get("/export/excel")
 async def export_excel(
     tenant_ids: Optional[str] = Query(None),
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_caan_user),
 ):
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()

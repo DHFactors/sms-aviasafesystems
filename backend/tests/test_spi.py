@@ -6,8 +6,36 @@ import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
 
+from app.main import app
+from app.middleware.auth import get_current_user
 from app.models.spi import SPIDomain, SPIType, SPIStatus
 from app.services.spi_service import SPIService
+
+
+def _override_auth():
+    """A normal tenant user — the H1 gate requires a valid token on /api/v1/spi."""
+    app.dependency_overrides[get_current_user] = lambda: {
+        "uid": "u-fw",
+        "email": "safety@fixedwing.com.np",
+        "role": "AIRLINE_ADMIN",
+        "tenant_id": "fixedwing",
+        "department": "safety",
+        "claims": {"role": "AIRLINE_ADMIN", "tenant_id": "fixedwing"},
+    }
+    return get_current_user
+
+
+def _override_caan_auth():
+    """CAAN aggregator — /api/v1/spi/state/* is CAAN-role gated (H1)."""
+    app.dependency_overrides[get_current_user] = lambda: {
+        "uid": "u-caan",
+        "email": "smd@caanepal.gov.np",
+        "role": "CAAN_SMD",
+        "tenant_id": None,
+        "department": None,
+        "claims": {"role": "CAAN_SMD", "tenant_id": None},
+    }
+    return get_current_user
 
 
 def test_definitions_include_leading_and_lagging():
@@ -91,12 +119,14 @@ def test_state_values():
 
 
 def test_api_definitions(client: TestClient):
+    _override_auth()
     r = client.get("/api/v1/spi/definitions")
     assert r.status_code == 200
     assert len(r.json()) == 8
 
 
 def test_api_tenant_values(client: TestClient):
+    _override_auth()
     r = client.get("/api/v1/spi/tenant/fixedwing/values")
     assert r.status_code == 200
     body = r.json()
@@ -105,18 +135,21 @@ def test_api_tenant_values(client: TestClient):
 
 
 def test_api_tenant_status(client: TestClient):
+    _override_auth()
     r = client.get("/api/v1/spi/tenant/fixedwing/status")
     assert r.status_code == 200
     assert len(r.json()["status"]) == 8
 
 
 def test_api_trend(client: TestClient):
+    _override_auth()
     r = client.get("/api/v1/spi/tenant/fixedwing/trend?months=6")
     assert r.status_code == 200
     assert len(r.json()) == 8
 
 
 def test_api_state_values(client: TestClient):
+    _override_caan_auth()
     r = client.get("/api/v1/spi/state/values")
     assert r.status_code == 200
     assert len(r.json()["values"]) == 8
@@ -166,6 +199,7 @@ def test_diversion_rate_zero_flights_guard():
 
 
 def test_api_update_targets(client: TestClient):
+    _override_auth()
     r = client.post(
         "/api/v1/spi/tenant/fixedwing/targets",
         json={"hazard_id_rate": 12.0, "can_closure_rate": 95.0},

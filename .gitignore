@@ -41,6 +41,9 @@ final_credential.txt
 # ─── Client Data ───────────────────────────────────────────────────────────
 # Master Logsheets and other client-provided data
 
+# Copyrighted ICAO documents must never be committed
+data/*.pdf
+
 # ─── Session & Working Artifacts ───────────────────────────────────────────
 session*.md
 session-*.md

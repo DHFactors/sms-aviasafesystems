@@ -25,7 +25,7 @@ from app.middleware.rate_limit import (
     clear_login_failures,
 )
 from app.middleware.auth import resolve_user_context, get_current_user
-from app.middleware.app_check import verify_app_check
+from app.middleware.app_check import verify_app_check, verify_app_check_strict
 from app.models.tenant_profile import OperationalScope
 from app.schemas.user import UserProfileRead, UserProfileSelfUpdate
 from app.services.audit_service import log_audit, request_context
@@ -69,7 +69,7 @@ class LoginResponse(BaseModel):
 async def login_endpoint(
     request: Request,
     body: LoginCredentials,
-    _app_check: None = Depends(verify_app_check),
+    _app_check: None = Depends(verify_app_check_strict),
 ):
     """Server-side credential verification with anti-credential-stuffing lockout.
 
@@ -151,7 +151,7 @@ async def verify_token(request: Request, body: LoginRequest):
 async def register_user(
     request: Request,
     body: RegisterRequest,
-    _app_check: None = Depends(verify_app_check),
+    _app_check: None = Depends(verify_app_check_strict),
 ):
     try:
         allowed_roles = {settings.ROLE_DEFAULT_REGISTRATION}
@@ -433,7 +433,7 @@ async def tenant_lookup_endpoint(
     request: Request,
     code: Optional[str] = Query(None, description="Team invite code"),
     tenant_id: Optional[str] = Query(None, description="Tenant id / slug"),
-    _app_check: None = Depends(verify_app_check),
+    _app_check: None = Depends(verify_app_check_strict),
 ):
     """Public tenant lookup for /join.html.
 

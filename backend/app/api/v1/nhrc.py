@@ -7,9 +7,11 @@
 #          router.
 # ============================================================================
 
-from fastapi import APIRouter
-from typing import List
+from fastapi import APIRouter, Depends
+from typing import Any, Dict, List
 
+from app.middleware.auth import get_caan_user, get_current_user
+from app.api.v1.spi import require_tenant_access
 from ...services.nhrc_service import NHRCService, NHRC_MAPPING_RULES
 from ...models.nhrc import NHRCKPI, NHRCCategory, NHRCMappingRule
 
@@ -17,16 +19,22 @@ router = APIRouter(prefix="/nhrc", tags=["N-HRC National High-Risk Categories"])
 
 
 @router.get("/tenant/{tenant_id}/kpis", response_model=List[NHRCKPI])
-async def get_tenant_nhrc_kpis(tenant_id: str) -> List[NHRCKPI]:
+async def get_tenant_nhrc_kpis(
+    tenant_id: str,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[NHRCKPI]:
     """
     Get N-HRC KPIs for a specific tenant.
     """
+    require_tenant_access(user, tenant_id)
     service = NHRCService(tenant_id)
     return service.calculate_nhrc_kpis(tenant_id)
 
 
 @router.get("/state/kpis", response_model=List[NHRCKPI])
-async def get_state_nhrc_kpis() -> List[NHRCKPI]:
+async def get_state_nhrc_kpis(
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> List[NHRCKPI]:
     """
     Get aggregated N-HRC KPIs for the State (CAAN view).
     """
@@ -35,7 +43,9 @@ async def get_state_nhrc_kpis() -> List[NHRCKPI]:
 
 
 @router.get("/mapping-rules", response_model=List[NHRCMappingRule])
-async def get_mapping_rules() -> List[NHRCMappingRule]:
+async def get_mapping_rules(
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[NHRCMappingRule]:
     """
     Get all N-HRC mapping rules.
     """
@@ -43,7 +53,10 @@ async def get_mapping_rules() -> List[NHRCMappingRule]:
 
 
 @router.get("/seis/{nhrc}", response_model=List[str])
-async def get_nhrc_seis(nhrc: NHRCCategory) -> List[str]:
+async def get_nhrc_seis(
+    nhrc: NHRCCategory,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[str]:
     """
     Get SEIs for a specific N-HRC.
     """
@@ -52,7 +65,10 @@ async def get_nhrc_seis(nhrc: NHRCCategory) -> List[str]:
 
 
 @router.get("/contributing-factors/{nhrc}", response_model=List[str])
-async def get_contributing_factors(nhrc: NHRCCategory) -> List[str]:
+async def get_contributing_factors(
+    nhrc: NHRCCategory,
+    user: Dict[str, Any] = Depends(get_current_user),
+) -> List[str]:
     """
     Get contributing factors for a specific N-HRC.
     """

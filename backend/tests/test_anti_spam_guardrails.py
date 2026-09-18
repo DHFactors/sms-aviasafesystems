@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.config import settings
+from app.middleware.app_check import verify_app_check_strict
 from app.services.tenant_registration import (
     DISPOSABLE_EMAIL_MESSAGE,
     DisposableEmailError,
@@ -32,6 +33,13 @@ from app.services.tenant_registration import (
     validate_corporate_email,
 )
 from pg_bridge import patch_pg_through
+
+
+def _allow_app_check_strict():
+    """Bypass the strict App Check dependency (H3) so these tests exercise the
+    handler logic, not the attestation gate. Cleared by conftest after the
+    test."""
+    app.dependency_overrides[verify_app_check_strict] = lambda: None
 
 
 # ============================================================================
@@ -480,6 +488,7 @@ def test_legacy_register_disposable_email_rejected(monkeypatch):
     db = _FakeDB()
     auth = _FakeAuth()
     _patch(monkeypatch, db, auth)
+    _allow_app_check_strict()
     resp = TestClient(app).post(
         "/api/v1/auth/register",
         json={
@@ -527,6 +536,7 @@ def test_legacy_register_consumer_webmail_rejected(monkeypatch):
     db = _FakeDB()
     auth = _FakeAuth()
     _patch(monkeypatch, db, auth)
+    _allow_app_check_strict()
 
     resp = TestClient(app).post(
         "/api/v1/auth/register",
@@ -568,6 +578,7 @@ def test_login_success_returns_custom_token(monkeypatch):
     monkeypatch.setattr("app.services.login_service.verify_credentials", _good_credentials)
     monkeypatch.setattr("app.services.login_service.get_auth", lambda: _TokenAuth())
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
+    _allow_app_check_strict()
 
     resp = TestClient(app).post(
         "/api/v1/auth/login",
@@ -584,6 +595,7 @@ def test_login_bad_credentials_returns_401(monkeypatch):
     _enable_rate_limit(monkeypatch)
     monkeypatch.setattr("app.services.login_service.verify_credentials", _bad_credentials)
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
+    _allow_app_check_strict()
 
     resp = TestClient(app).post(
         "/api/v1/auth/login",
@@ -597,6 +609,7 @@ def test_login_sixth_failure_returns_429_with_retry_after(monkeypatch):
     _enable_rate_limit(monkeypatch)
     monkeypatch.setattr("app.services.login_service.verify_credentials", _bad_credentials)
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
+    _allow_app_check_strict()
 
     client = TestClient(app)
     for i in range(settings.LOGIN_FAILURE_RATE_LIMIT):
@@ -622,6 +635,7 @@ def test_login_success_clears_failure_window(monkeypatch):
     fake = _enable_rate_limit(monkeypatch)
     monkeypatch.setattr("app.services.login_service.verify_credentials", _bad_credentials)
     monkeypatch.setattr("app.services.audit_service.log_audit", lambda *a, **k: None)
+    _allow_app_check_strict()
 
     client = TestClient(app)
     # 4 failures (window capacity is settings.LOGIN_FAILURE_RATE_LIMIT): the

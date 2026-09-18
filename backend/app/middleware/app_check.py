@@ -16,7 +16,7 @@
 import asyncio
 from typing import Optional
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from loguru import logger
 
 APP_CHECK_HEADER = "X-Firebase-AppCheck"
@@ -55,9 +55,24 @@ async def verify_app_check(request: Request) -> None:
         )
     except Exception as e:  # noqa: BLE001 - deliberate degradation
         logger.warning("App Check verification failed: %s", e)
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=401, detail="App Check verification failed") from e
+
+
+async def verify_app_check_strict(request: Request) -> None:
+    """FastAPI dependency: enforce App Check on sensitive public endpoints.
+
+    Unlike ``verify_app_check`` (absent header -> allow), a request that omits
+    the ``X-Firebase-AppCheck`` header is rejected outright (403) because the
+    endpoint is one that genuine browsers must always attest. Present-but-
+    invalid / expired / malformed tokens are still rejected with 401 by the
+    shared verifier below.
+    """
+    token = request.headers.get(APP_CHECK_HEADER)
+    if not token:
+        raise HTTPException(
+            status_code=403, detail="App Check token required"
+        )
+    return await verify_app_check(request)
 
 
 async def verify_app_check_lenient(request: Request) -> None:
