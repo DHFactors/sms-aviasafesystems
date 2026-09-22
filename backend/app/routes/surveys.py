@@ -343,6 +343,17 @@ async def submit_survey(
         },
     )
 
+    # P2-1/P2-2: a new submission invalidates the cached maturity assessment
+    # and queues a background LLM re-analysis. Never block the submission on
+    # the LLM — failures here must not fail the survey write.
+    try:
+        from app.services import sms_maturity_service
+
+        sms_maturity_service.invalidate_sms_maturity(tenant_id)
+        sms_maturity_service.enqueue_sms_maturity_analysis(tenant_id)
+    except Exception as e:
+        logger.warning(f"SMS maturity cache invalidation/enqueue failed for {tenant_id}: {e}")
+
     return {
         "status": "success",
         "data": {

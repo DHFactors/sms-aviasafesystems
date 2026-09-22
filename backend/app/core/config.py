@@ -148,6 +148,15 @@ class Settings(BaseSettings):
     DASHBOARD_ADMIN_SYSTEM_DAYS: int = 7
     DASHBOARD_ADMIN_TENANT_DAYS: int = 30
 
+    # ── Module A — SMS maturity assessment cache (MODULE_A_CONTRACT.md §7) ──
+    # TTL for the cached LLM assessment; survey submission / manual refresh
+    # invalidate it, and a stale read triggers a background re-analysis (P2-1).
+    SMS_MATURITY_CACHE_TTL: int = 6 * 3600  # seconds
+    # Survey look-back window for the background analysis job (P2-2).
+    SMS_MATURITY_ANALYSIS_WINDOW_DAYS: int = 365
+    # Bounded retries for a failed background LLM analysis (P2-2).
+    SMS_MATURITY_ANALYSIS_MAX_RETRIES: int = 3
+
     # ── Roles ──
     ROLE_DEFAULT: str = "USER"
     ROLE_DEFAULT_REGISTRATION: str = "AIRLINE_ADMIN"

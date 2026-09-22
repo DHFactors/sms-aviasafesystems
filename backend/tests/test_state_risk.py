@@ -873,6 +873,24 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
         },
     ]
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
+    # P2-2: recommendations now come from the cache, not an inline LLM call.
+    import app.services.sms_maturity_service as sms_mod
+
+    def _fake_read(tid, **kwargs):
+        if tid == "air1":
+            return {
+                "is_fresh": True,
+                "generated_at": datetime.now(timezone.utc),
+                "recommendations": [
+                    {"pillar": "safety_policy", "score_pct": 25.0},
+                    {"pillar": "safety_risk_management", "score_pct": 25.0},
+                ],
+            }
+        return None
+
+    monkeypatch.setattr(sms_mod, "read_sms_maturity", _fake_read)
+    monkeypatch.setattr(sms_mod, "enqueue_sms_maturity_analysis", lambda *a, **k: True)
+
     svc = DashboardService({"uid": "caan-user", "role": "CAAN_SMD"})
     monkeypatch.setattr(
         svc, "_survey_docs",
@@ -881,7 +899,7 @@ def test_get_caan_sms_maturity_assessment_low_pillars(monkeypatch):
 
     assert result["period_days"] == 90
     by_id = {op["tenant_id"]: op for op in result["operators"]}
-    # air1: policy & SRM below 70% -> mock recommendations generated
+    # air1: policy & SRM below 70% -> cached recommendations returned
     low_pillars = {lp["pillar"] for lp in by_id["air1"]["low_pillars"]}
     assert low_pillars == {"safety_policy", "safety_risk_management"}
     assert len(by_id["air1"]["recommendations"]) == 2
@@ -962,6 +980,17 @@ def test_get_airline_sms_maturity_tenant_scoped(monkeypatch):
     })
 
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
+    # P2-2: recommendations come from the cache, not an inline LLM call.
+    import app.services.sms_maturity_service as sms_mod
+    monkeypatch.setattr(sms_mod, "read_sms_maturity", lambda tid, **k: {
+        "is_fresh": True,
+        "generated_at": datetime.now(timezone.utc),
+        "recommendations": [
+            {"pillar": "safety_risk_management", "score_pct": 0.0},
+            {"pillar": "safety_assurance", "score_pct": 25.0},
+        ],
+    })
+    monkeypatch.setattr(sms_mod, "enqueue_sms_maturity_analysis", lambda *a, **k: True)
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
     monkeypatch.setattr(
         svc, "_survey_docs",
@@ -1103,9 +1132,10 @@ def test_get_airline_sms_maturity_missing_pillars(monkeypatch):
             "submitted_at": datetime.now(timezone.utc),
         })
     monkeypatch.setattr("app.firebase.get_db", lambda: _DB(surveys))
-    monkeypatch.setattr(
-        "app.services.dashboard_service.recommend_sms_maturity_actions",
-        lambda *a, **k: [{"action": "Mock action A"}, {"action": "Mock action B"}])
+    # P2-2: the dashboard no longer calls the LLM inline; the background job
+    # owns analysis, so the enqueue is stubbed out here.
+    import app.services.sms_maturity_service as sms_mod
+    monkeypatch.setattr(sms_mod, "enqueue_sms_maturity_analysis", lambda *a, **k: True)
     svc = DashboardService({"uid": "air-officer", "role": "AIRLINE_ADMIN", "tenant_id": "air1"})
     monkeypatch.setattr(
         svc, "_survey_docs",

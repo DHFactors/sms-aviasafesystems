@@ -26,7 +26,7 @@ from app.db.session import session_scope
 from app.services.repository import ReportRepository, ReportFilter
 from app.services.metrics_service import MetricsService
 from app.services import sms_maturity_service
-from app.services.gemini import recommend_sms_maturity_actions, sms_maturity_tier, SURVEY_PILLAR_NAMES
+from app.services.gemini import sms_maturity_tier, SURVEY_PILLAR_NAMES
 from app.services.pg_cache import get_or_set, set as pg_cache_set
 from app.services.risk_matrix import normalize_tolerability
 from seed.config import FLIGHT_OPERATOR_TYPES
@@ -34,7 +34,7 @@ from seed.config import FLIGHT_OPERATOR_TYPES
 DIVERSION_COLLECTION = "flight_diversions"
 
 SURVEY_PILLARS = ["safety_policy", "safety_risk_management", "safety_assurance", "safety_promotion"]
-SMS_MATURITY_CACHE_TTL = 6 * 3600  # seconds
+SMS_MATURITY_CACHE_TTL = settings.SMS_MATURITY_CACHE_TTL  # seconds (P2-1)
 
 # Friendly labels for the SMS maturity tiers produced by the shared engine.
 TIER_LABELS = {
@@ -235,49 +235,24 @@ class DashboardService:
         self, tenant_id: str, days: int, op: Dict[str, Any],
         model: Dict[str, Any], generated_at: datetime, refresh: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Cache-aware SMS maturity assessment actions for a single tenant.
+        """Cache-only SMS maturity assessment actions for a single tenant.
 
-        Reused by both the CAAN and Airline dashboards so the AI assessment is
-        generated once per tenant+period and shared across scopes.
+        P2-2: the LLM analysis runs in a background job; the dashboard NEVER
+        calls it inline. A fresh cache is returned as-is; a stale/absent cache
+        queues a background re-analysis and returns whatever is cached (an
+        empty list means "analysis pending").
         """
-        recs: List[Dict[str, Any]] = []
-        cached = sms_maturity_service.read_sms_maturity(tenant_id)
-        use_cache = (
-            not refresh
-            and cached is not None
-            and cached.get("generated_at") is not None
-        )
-        if use_cache:
-            try:
-                gen_dt = cached["generated_at"]
-                if hasattr(gen_dt, "timestamp"):
-                    use_cache = (generated_at - gen_dt).total_seconds() < SMS_MATURITY_CACHE_TTL
-                else:
-                    use_cache = False
-            except Exception:
-                use_cache = False
-        if use_cache:
-            recs = cached.get("recommendations", [])
-        elif model["low_pillars"]:
-            recs = recommend_sms_maturity_actions(tenant_id, {
-                "pillars": op["pillars"],
-                "pcts": model["pcts"],
-                "tiers": model["tiers"],
-                "question_averages": op.get("question_averages", {}),
-                "response_count": op["response_count"],
-            })
-            sms_maturity_service.write_sms_maturity(tenant_id, {
-                "period_days": days,
-                "generated_at": generated_at,
-                "pillars": op["pillars"],
-                "pcts": model["pcts"],
-                "tiers": model["tiers"],
-                "overall_sms_maturity": op["overall_sms_maturity"],
-                "question_averages": op.get("question_averages", {}),
-                "low_pillars": model["low_pillars"],
-                "recommendations": recs,
-            })
-        return recs
+        cached = None
+        if refresh:
+            sms_maturity_service.invalidate_sms_maturity(tenant_id)
+        else:
+            cached = sms_maturity_service.read_sms_maturity(tenant_id)
+            if cached is not None and cached.get("is_fresh"):
+                return cached.get("recommendations", [])
+
+        # Stale, absent, or forced refresh: queue analysis and return now.
+        sms_maturity_service.enqueue_sms_maturity_analysis(tenant_id)
+        return cached.get("recommendations", []) if cached else []
 
     def _tenant_name(self, tenant_id: str) -> str:
         try:

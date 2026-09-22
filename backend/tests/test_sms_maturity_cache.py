@@ -11,11 +11,14 @@
 import asyncio
 import inspect
 import uuid
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from app.db.db_models import Survey
 from app.db.ids import register_tenant, tenant_uuid
+from app.db.isolation import demo_scope
 from app.db.session import session_scope
 from app.services import dashboard_service, sms_maturity_service
 
@@ -260,3 +263,167 @@ def test_cache_endpoint_requires_auth():
     r = c.post(f"/api/v1/sms-maturity/{slug}/cache",
                json={"overall_sms_maturity": 4.0})
     assert r.status_code in (401, 403)
+
+
+# ---------------------------------------------------------------------------
+# P2-1 — TTL cache + invalidation
+# ---------------------------------------------------------------------------
+
+def test_cache_fresh_returns_without_llm(monkeypatch):
+    """A fresh cache is served as-is; the dashboard never calls the LLM."""
+    slug = _unique_slug("smfresh")
+    _create_tenant(slug)
+    llm_calls = []
+    monkeypatch.setattr(
+        sms_maturity_service, "recommend_sms_maturity_actions",
+        lambda *a, **k: llm_calls.append(1) or [],
+    )
+    try:
+        sms_maturity_service.write_sms_maturity(
+            slug, {"overall_sms_maturity": 4.0,
+                   "recommendations": [{"action": "cached"}]})
+        cached = sms_maturity_service.read_sms_maturity(slug)
+        assert cached is not None
+        assert cached["is_fresh"] is True
+        assert cached["age_seconds"] < sms_maturity_service.SMS_MATURITY_CACHE_TTL
+
+        # Dashboard read path: fresh cache -> cached recs, no LLM call.
+        svc = dashboard_service.DashboardService(
+            {"role": "AIRLINE_ADMIN", "tenant_id": slug})
+        recs = svc._tenant_recommendations(
+            slug, 365, {}, {}, datetime.now(timezone.utc))
+        assert recs == [{"action": "cached"}]
+        assert llm_calls == []
+    finally:
+        _delete_tenant(slug)
+
+
+def test_cache_stale_triggers_regeneration(monkeypatch):
+    """A cache older than the TTL is stale and queues a background analysis."""
+    slug = _unique_slug("smstale")
+    tid = _create_tenant(slug)
+    try:
+        sms_maturity_service.write_sms_maturity(
+            slug, {"overall_sms_maturity": 3.0,
+                   "recommendations": [{"action": "old"}]})
+
+        async def _age():
+            async with session_scope() as s:
+                await s.execute(text(
+                    "UPDATE public.sms_maturity "
+                    "SET assessment_date = now() - interval '7 hours', "
+                    "    updated_at = now() - interval '7 hours' "
+                    "WHERE tenant_id = :id"
+                ), {"id": tid})
+
+        _run(_age())
+
+        cached = sms_maturity_service.read_sms_maturity(slug)
+        assert cached is not None
+        assert cached["is_fresh"] is False
+
+        enqueued = []
+        monkeypatch.setattr(
+            sms_maturity_service, "enqueue_sms_maturity_analysis",
+            lambda t, **k: enqueued.append(t) or True,
+        )
+        svc = dashboard_service.DashboardService(
+            {"role": "AIRLINE_ADMIN", "tenant_id": slug})
+        recs = svc._tenant_recommendations(
+            slug, 365, {}, {}, datetime.now(timezone.utc))
+        assert enqueued == [slug], "stale cache must queue a re-analysis"
+        # Stale recommendations are returned while regeneration is queued.
+        assert recs == [{"action": "old"}]
+    finally:
+        _delete_tenant(slug)
+
+
+def test_cache_invalidation_on_new_survey():
+    """invalidate_sms_maturity drops the cached assessment."""
+    slug = _unique_slug("sminval")
+    _create_tenant(slug)
+    try:
+        sms_maturity_service.write_sms_maturity(
+            slug, {"overall_sms_maturity": 3.0, "recommendations": []})
+        assert sms_maturity_service.read_sms_maturity(slug) is not None
+
+        deleted = sms_maturity_service.invalidate_sms_maturity(slug)
+        assert deleted == 1
+        assert sms_maturity_service.read_sms_maturity(slug) is None
+    finally:
+        _delete_tenant(slug)
+
+
+# ---------------------------------------------------------------------------
+# P2-2 — async LLM analysis pipeline
+# ---------------------------------------------------------------------------
+
+def test_survey_submit_enqueues_analysis(monkeypatch):
+    """A survey submission invalidates the cache and queues analysis without
+    waiting for the LLM."""
+    from app.main import app
+    from app.routes import surveys as surveys_route
+    from test_surveys import VALID_ANSWERS, _FakeDB, _patch_db
+
+    db = _FakeDB(tenant_known=True)
+    _patch_db(monkeypatch, db)
+    monkeypatch.setattr(
+        surveys_route, "_persist_tenant_survey", lambda *a, **k: "survey-123")
+    monkeypatch.setattr(surveys_route, "log_audit", lambda *a, **k: None)
+
+    invalidated, enqueued = [], []
+    monkeypatch.setattr(
+        sms_maturity_service, "invalidate_sms_maturity",
+        lambda t: invalidated.append(t) or 0,
+    )
+    monkeypatch.setattr(
+        sms_maturity_service, "enqueue_sms_maturity_analysis",
+        lambda t, **k: enqueued.append(t) or True,
+    )
+
+    resp = TestClient(app).post(
+        "/api/v1/surveys/", json={"tenantId": "tara-air", "answers": VALID_ANSWERS})
+    assert resp.status_code == 201, resp.text
+    assert invalidated == ["tara-air"]
+    assert enqueued == ["tara-air"]
+
+
+def test_llm_analysis_writes_to_cache(monkeypatch):
+    """The background job aggregates surveys, runs the LLM and caches the result."""
+    slug = _unique_slug("smanalyze")
+    tid = _create_tenant(slug)
+    now = datetime.now(timezone.utc)
+
+    async def _seed():
+        async with session_scope() as s:
+            s.add(Survey(
+                tenant_id=tid, submitted_at=now,
+                safety_policy=2, safety_risk_management=2,
+                safety_assurance=4, safety_promotion=4,
+                overall_sms_maturity=3, survey_version="4.0.0",
+                answers={}, question_scores={"q1": 2.0}, is_demo=demo_scope(),
+            ))
+
+    _run(_seed())
+    monkeypatch.setattr(
+        sms_maturity_service, "recommend_sms_maturity_actions",
+        lambda tenant, data: [{"pillar": "safety_policy", "score_pct": 25.0}],
+    )
+    try:
+        result = sms_maturity_service.analyze_sms_maturity(slug)
+        assert result is not None
+        cached = sms_maturity_service.read_sms_maturity(slug)
+        assert cached is not None
+        assert cached["recommendations"] == [
+            {"pillar": "safety_policy", "score_pct": 25.0}]
+        assert cached["level"] == 3
+    finally:
+        async def _wipe():
+            async with session_scope() as s:
+                await s.execute(
+                    text("DELETE FROM public.surveys WHERE tenant_id = :id"),
+                    {"id": tid},
+                )
+
+        _run(_wipe())
+        _delete_tenant(slug)
