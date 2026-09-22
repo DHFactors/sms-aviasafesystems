@@ -156,6 +156,21 @@ async def submit_mor(
     payload["longitude"] = payload.pop("occurrence_longitude", None)
 
     stored = service.create_report(payload, user)
+
+    # P2-11 / SN15: compute + persist the category-tiered MOR regulatory timer.
+    try:
+        from datetime import datetime, timezone as _tz
+
+        from app.services import regulatory_timer_service
+
+        regulatory_timer_service.set_mor_deadline(
+            stored["id"], tenant_id,
+            category=payload.get("regulatory_category"),
+            submitted_at=datetime.now(_tz.utc),
+        )
+    except Exception as e:
+        logger.warning(f"MOR deadline computation failed for {stored.get('id')}: {e}")
+
     background_tasks.add_task(service.run_ai_analysis, stored["id"], report.narrative)
     _auto_create_hazard_from_report(stored, user)
     ip, request_id = request_context(request)

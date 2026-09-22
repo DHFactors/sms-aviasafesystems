@@ -929,6 +929,15 @@ class CanCapService:
                 await session.execute(select(Can).where(Can.id == row.can_id))
             ).scalars().first()
 
+            # Module B §22: an AE-decided CAP has no recall to Revision Required.
+            if row.ae_signed_at is not None and review.get("status") == "Revision Required":
+                raise ValueError(
+                    "An AE-decided CAP cannot be recalled to Revision Required (Module B §22)"
+                )
+            # Module B §21/§16: EIP resolves to Closed when the CAP is completed.
+            if row.status == "EIP" and review.get("status") == "Completed":
+                review = {**review, "status": "Closed"}
+
             changes: Dict[str, Any] = {
                 "status": review["status"],
                 "reviewed_by": user.get("email", user["uid"]),
@@ -1026,6 +1035,68 @@ class CanCapService:
                 await self._set_hazard_status(
                     session, can_row.hazard_id, "Under Review", now
                 )
+            await session.flush()
+            if can_row is not None:
+                return _cap_to_dict(
+                    row, can_row=can_row, hazard_id_ref=await _hazard_ref(session, can_row)
+                )
+            return _cap_to_dict(row)
+
+    # ── AE terminal decision (Module B §22) ──
+
+    def ae_decide(self, cap_id: str, decision_type: str, user: dict,
+                  notes: Optional[str] = None) -> Optional[dict]:
+        return run(self._ae_decide_async(cap_id, decision_type, user, notes))
+
+    async def _ae_decide_async(self, cap_id, decision_type, user, notes):
+        """Accountable Executive terminal decision on an escalated CAP.
+
+        decision_type ∈ {acknowledge, direct, continue}. Immutable after this
+        call — the AE decision is terminal and cannot be re-decided, and the CAP
+        cannot be recalled to Revision Required.
+        """
+        if (user or {}).get("role") != "ACCOUNTABLE_EXECUTIVE":
+            raise PermissionError(
+                "AE terminal decision requires the ACCOUNTABLE_EXECUTIVE role"
+            )
+        if decision_type not in ("acknowledge", "direct", "continue"):
+            raise ValueError(
+                "decision_type must be one of ('acknowledge', 'direct', 'continue')"
+            )
+        tid = register_tenant(self.tenant_id)
+        now = datetime.now(timezone.utc)
+        async with session_scope() as session:
+            row = (await session.execute(_cap_lookup_stmt(tid, cap_id))).scalars().first()
+            if not row:
+                return None
+            # Immutability: the AE decision is terminal (Module B §22).
+            if row.ae_signed_at is not None:
+                raise ValueError(
+                    "AE decision already recorded; it is terminal and immutable"
+                )
+
+            changes: Dict[str, Any] = {
+                "escalated_to_ae": True,
+                "ae_signature": _signature_block({
+                    "name": user.get("email") or user.get("uid"),
+                    "decision": decision_type,
+                    "notes": notes,
+                    "signed_by": user.get("email") or user.get("uid"),
+                    "signed_at": now.isoformat(),
+                }),
+                "ae_signed_at": now,
+            }
+            if decision_type == "acknowledge":
+                # §21: EIP = Escalated-In Progress (no time limit).
+                changes["status"] = "EIP"
+            for key, value in changes.items():
+                if key in _CAP_MUTABLE_COLUMNS:
+                    setattr(row, key, value)
+            row.updated_at = now
+
+            can_row = (
+                await session.execute(select(Can).where(Can.id == row.can_id))
+            ).scalars().first()
             await session.flush()
             if can_row is not None:
                 return _cap_to_dict(

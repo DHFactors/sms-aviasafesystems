@@ -59,6 +59,18 @@ def _run_dlq_replay() -> None:
         logger.error(f"DLQ replay sweep failed: {e}")
 
 
+def _run_mor_deadline_check() -> None:
+    """Entry point for APScheduler: daily MOR regulatory-deadline scan (P2-11)."""
+    logger.info("APScheduler trigger: MOR deadline scan starting")
+    try:
+        from app.services.regulatory_timer_service import check_overdue_mors
+
+        overdue = check_overdue_mors()
+        logger.info(f"MOR deadline scan found {len(overdue)} breach(es)")
+    except Exception as e:
+        logger.error(f"MOR deadline scan failed: {e}")
+
+
 def get_scheduler() -> BackgroundScheduler:
     """Return the module-level scheduler, creating it on first access."""
     global _SCHEDULER
@@ -126,6 +138,20 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
     logger.info("Scheduled job: daily_dlq_replay (03:00 NPT)")
+
+    # Daily MOR regulatory-deadline scan — 04:00 Asia/Kathmandu (P2-11 / SN15)
+    scheduler.add_job(
+        _run_mor_deadline_check,
+        trigger=CronTrigger(
+            hour=4,
+            minute=0,
+            timezone="Asia/Kathmandu",
+        ),
+        id="daily_mor_deadline_check",
+        name="Daily MOR Regulatory Deadline Scan",
+        replace_existing=True,
+    )
+    logger.info("Scheduled job: daily_mor_deadline_check (04:00 NPT)")
 
     if not scheduler.running:
         scheduler.start()
