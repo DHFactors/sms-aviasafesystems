@@ -322,15 +322,26 @@ class SPIService:
     def get_state_status(
         self, hours: float = 1000, flights: int = 1000
     ) -> List[Dict[str, Any]]:
-        """Compute status + trend for every SPI at the state level."""
+        """Compute status + REAL period-over-period trend for every state SPI.
+
+        P2-18 / SLI-1: the previous "previous_value = value / trend = stable"
+        placeholder is replaced by a real month-over-month comparison across
+        operators (minimum 3 tenants).
+        """
         values = self.get_state_values(hours, flights)
         now = datetime.now(timezone.utc)
+        state_rows = self._state_trend_rows(months=2)
         rows = []
         for spi in SPI_DEFINITIONS:
             key = _SPI_KEY_BY_ID[spi["id"]]
             domain = spi["domain"]
             lower = domain in _LOWER_IS_BETTER
             value = values[key]
+            series = (state_rows or {}).get(spi["id"], {}).get("values") or []
+            if len(series) >= 2:
+                previous, trend = series[-2], self.get_trend(series[-1], series[-2], lower)
+            else:
+                previous, trend = None, "insufficient data"
             rows.append(
                 {
                     "key": key,
@@ -340,7 +351,7 @@ class SPIService:
                     "type": spi["type"].value,
                     "unit": spi["unit"],
                     "value": value,
-                    "previous_value": value,
+                    "previous_value": previous,
                     "target_value": spi["target_value"],
                     "status": self.get_status(
                         value,
@@ -349,13 +360,86 @@ class SPIService:
                         spi["alert_threshold"],
                         lower_is_better=lower,
                     ).value,
-                    "trend": "stable",
+                    "trend": trend,
                     "period_start": (now - timedelta(days=30)),
                     "period_end": now,
                     "data_points": max(int(value), 0),
                 }
             )
         return rows
+
+    # ------------------------------------------------------------------
+    # State-level SPI computation (P2-18 / SLI-1)
+    # ------------------------------------------------------------------
+
+    def _state_tenant_slugs(self) -> List[str]:
+        """All operator tenant slugs (excluding the state pseudo-tenant)."""
+        from app.db import pg
+        from app.db.db_models import Tenant
+
+        try:
+            rows = pg.fetch_all(Tenant, limit=200)
+        except Exception as e:  # pragma: no cover - defensive
+            logger.warning(f"State tenant discovery failed: {e}")
+            return []
+        return [t.get("slug") for t in rows if t.get("slug") and t.get("slug") != "demostate"]
+
+    def _state_trend_rows(self, months: int = 2) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Aggregate each tenant's monthly SPI series into a state series.
+
+        Returns {spi_id: {"months": [...], "values": [...]}} or None when there
+        are fewer than 3 tenants (state aggregation minimum).
+        """
+        tenants = self._state_tenant_slugs()
+        if len(tenants) < 3:
+            return None
+        per_spi: Dict[str, Dict[str, List[float]]] = {spi["id"]: {} for spi in SPI_DEFINITIONS}
+        for tid in tenants:
+            try:
+                for row in self.get_tenant_trend(tid, months):
+                    buckets = per_spi.setdefault(row["spi_id"], {})
+                    for m, v in zip(row["months"], row["values"]):
+                        buckets.setdefault(m, []).append(v)
+            except Exception as e:
+                logger.warning(f"State trend failed for tenant {tid}: {e}")
+        out: Dict[str, Dict[str, Any]] = {}
+        for spi in SPI_DEFINITIONS:
+            buckets = per_spi.get(spi["id"], {})
+            months_sorted = sorted(buckets)
+            values = [
+                round(sum(buckets[m]) / len(buckets[m]), 2) if buckets[m] else None
+                for m in months_sorted
+            ]
+            out[spi["id"]] = {"months": months_sorted, "values": values}
+        return out
+
+    def compute_state_spi(self, spi_id: str, months: int = 12) -> Optional[float]:
+        """Aggregate one SPI across tenants over the trailing window (min 3)."""
+        state_rows = self._state_trend_rows(months=months)
+        if state_rows is None:
+            return None
+        values = state_rows.get(spi_id, {}).get("values") or []
+        return values[-1] if values else None
+
+    def compute_state_trend(self, spi_id: str, months: int = 2) -> Dict[str, Any]:
+        """Real period-over-period trend for one SPI across operators."""
+        state_rows = self._state_trend_rows(months=months)
+        if state_rows is None:
+            return {"trend": "insufficient data", "previous_value": None,
+                    "current_value": None, "tenant_count": 0}
+        values = state_rows.get(spi_id, {}).get("values") or []
+        if len(values) < 2:
+            return {"trend": "insufficient data", "previous_value": None,
+                    "current_value": values[-1] if values else None,
+                    "tenant_count": len(self._state_tenant_slugs())}
+        domain = next((d["domain"] for d in SPI_DEFINITIONS if d["id"] == spi_id), None)
+        lower = domain in _LOWER_IS_BETTER
+        return {
+            "trend": self.get_trend(values[-1], values[-2], lower),
+            "previous_value": values[-2],
+            "current_value": values[-1],
+            "tenant_count": len(self._state_tenant_slugs()),
+        }
 
     # ------------------------------------------------------------------
     # Status / trend helpers (public per the service contract)
@@ -387,13 +471,11 @@ class SPIService:
     def get_trend(
         self, current: float, previous: float, lower_is_better: bool = False
     ) -> str:
-        """Get trend direction."""
-        if current > previous:
-            return "improving"
-        elif current < previous:
-            return "deteriorating"
-        else:
+        """Get trend direction (``lower_is_better`` inverts the meaning)."""
+        if current == previous:
             return "stable"
+        improving = current < previous if lower_is_better else current > previous
+        return "improving" if improving else "deteriorating"
 
     # ------------------------------------------------------------------
     # Snapshot loader

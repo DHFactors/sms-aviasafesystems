@@ -279,6 +279,16 @@ class Report(Base):
     regulatory_submitted_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     regulatory_submission_ref: Mapped[object] = mapped_column(Text, nullable=True)
 
+    # DP-4 (P2-25) — confidential / voluntary reporting class. Reporter identity
+    # is visible only to the designated custodian; downstream processing uses
+    # the de-identified projection.
+    is_confidential: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    confidential_custodian_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_by: Mapped[str] = mapped_column(Text, nullable=False)

@@ -71,6 +71,18 @@ def _run_mor_deadline_check() -> None:
         logger.error(f"MOR deadline scan failed: {e}")
 
 
+def _run_daily_materialization() -> None:
+    """Entry point for APScheduler: daily module_c_aggregates materialization (P2-17)."""
+    logger.info("APScheduler trigger: daily aggregation materialization starting")
+    try:
+        from app.services.aggregation_materializer import AggregationMaterializer
+
+        rows = AggregationMaterializer().materialize_all()
+        logger.info(f"Materialization complete: {len(rows)} metric(s)")
+    except Exception as e:
+        logger.error(f"Daily materialization failed: {e}")
+
+
 def get_scheduler() -> BackgroundScheduler:
     """Return the module-level scheduler, creating it on first access."""
     global _SCHEDULER
@@ -152,6 +164,20 @@ def start_scheduler() -> None:
         replace_existing=True,
     )
     logger.info("Scheduled job: daily_mor_deadline_check (04:00 NPT)")
+
+    # Daily module_c_aggregates materialization — 03:00 Asia/Kathmandu (P2-17)
+    scheduler.add_job(
+        _run_daily_materialization,
+        trigger=CronTrigger(
+            hour=3,
+            minute=0,
+            timezone="Asia/Kathmandu",
+        ),
+        id="daily_materialization",
+        name="Daily Module C Aggregation Materialization",
+        replace_existing=True,
+    )
+    logger.info("Scheduled job: daily_materialization (03:00 NPT)")
 
     if not scheduler.running:
         scheduler.start()

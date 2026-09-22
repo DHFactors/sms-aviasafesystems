@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 import io
 
 from app.services.aggregation_service import AggregationService
+from app.services import caan_audit
 from app.middleware.auth import get_caan_user
 
 router = APIRouter()
@@ -29,6 +30,7 @@ async def industry_averages(
     user: dict = Depends(get_caan_user),
 ):
     # Regulator sees aggregated data only - tenant isolation via aggregated view
+    caan_audit.log_caan_read(user, "industry_averages", metadata={"tenant_ids": _default_tenant_ids(tenant_ids)})
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     result = await svc.calculate_industry_averages(tids)
@@ -39,6 +41,7 @@ async def top_hazards(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "top_hazards")
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     return await svc.get_top_hazards(tids)
@@ -48,6 +51,7 @@ async def risk_trends(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "risk_trends")
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     return await svc.get_risk_trends(tids)
@@ -57,6 +61,7 @@ async def risk_register(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "risk_register")
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     return await svc.get_state_risk_register(tids)
@@ -67,6 +72,7 @@ async def benchmarking(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "benchmark", target_id=tenant_id, tenant_id=tenant_id)
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     return await svc.get_benchmarking(tenant_id, tids)
@@ -76,6 +82,7 @@ async def export_pdf(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "export_pdf")
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     data = await svc.calculate_industry_averages(tids)
@@ -87,6 +94,7 @@ async def export_excel(
     tenant_ids: Optional[str] = Query(None),
     user: dict = Depends(get_caan_user),
 ):
+    caan_audit.log_caan_read(user, "export_excel")
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     data = await svc.calculate_industry_averages(tids)
