@@ -1,7 +1,8 @@
 # IMPLEMENTATION_ROADMAP.md — Sequenced Schema-Note Implementation Plan
 
 AviaSAFE SMS Platform
-Status: FINAL — planning closed; implementation begins
+Status: PHASE 1 COMPLETE — all Phase 0 + Phase 1 items (P1-1..P1-31) DONE;
+Phase 2 implementation begins next.
 Purpose: A dependency-ordered plan to implement every schema note and
 compliance remediation defined across the six contracts.
 
@@ -34,8 +35,8 @@ All items are **PENDING** unless marked DONE.
 | `regulators` 8 columns | D5 | DONE |
 | `users.phone` UNIQUE | D6 | DONE |
 | `tenants.safety_manager` varchar→jsonb | D4 | DONE (migration) |
-| `invites`/`feedback` ORM rewrite | D3 | IN PROGRESS — verify before Phase 1 |
-| `sms_maturity` ORM rewrite + RLS | D2 | **PENDING → P1-1** |
+| `invites`/`feedback` ORM rewrite | D3 | DONE (ORM + call sites) |
+| `sms_maturity` ORM rewrite + RLS | D2 | DONE (ORM + RLS; P1-1/P1-2/P1-3) |
 | ADREP/HFACS 6 vestigial tables | D8 | DONE — no action (vestigial) |
 | `caps` nullability divergence | D9 | DONE — no action (documented) |
 
@@ -48,73 +49,100 @@ All items are **PENDING** unless marked DONE.
 **Purpose.** Land every `SN#`/`SN-C#` schema change in dependency order, one
 migration per table cluster, with rollback.
 
+**Phase 1 completion (2026-09-22).** All items P1-1..P1-31 **DONE**.
+
+| Module | Commit | Scope |
+|---|---|---|
+| Module A | `846913d` | P1-1..P1-3 — `sms_maturity` ORM/RLS/service boundary |
+| Module B | `3a68f38` | P1-4..P1-19 — hazards columns, sram register, new tables, reports |
+| Module C | `ce7102a` | P1-20..P1-28 — aggregates, SPT, taxonomy, RLS |
+| RBAC | `d15ebd3` | P1-29..P1-31 — role literals, EIP status, AE uniqueness |
+
+- **Migrations:** **16** applied to live (1 Module A RLS + 7 Module B + 7 Module C
+  + 1 RBAC), each idempotent.
+- **Test baseline at Phase 1 close:** 990 collected → **988 passed, 2 failed**.
+  The 2 failures are `test_admin_credentials.py::test_create_user_route_caan_smd_allowed`
+  (a Phase-1 regression — see below) and the pre-existing
+  `test_tenant_sms.py::TestV1RouterRegistration::test_v1_router_includes_all_sub_routers`
+  (unrelated).
+- **Known Phase-1 regression (unfixed, reported):**
+  `test_create_user_route_caan_smd_allowed` (`backend/tests/test_admin_credentials.py:550`)
+  expects a `CAAN_SMD` user to be creatable on a tenant; the P1-31 validator
+  now rejects `CAAN_SMD` + `tenant_id` (RBAC §7) and the admin route's broad
+  `except Exception` maps the resulting `HTTPException(400)` to a 500.
+- **Deferred:** `state_safety_performance_targets.spi_definition_id` carries no
+  DB-level FK — SPI definitions are code constants (Q9.1 hybrid; logical
+  reference only) — Module C Deviation 2. Runtime seeding of
+  `taxonomy_mappings`/`metric_definitions` on a fresh deploy is deferred to
+  P6-3.
+
 **Content.**
 
 ### 1A — Module A (Survey)
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-1 | Rewrite `SmsMaturity` ORM to live shape (drop `days`/`data`); rewrite `_read/_write_sms_maturity`; replace `schema_init.py:283-292` | Module A §7/§8 (App 2 §3.1 persistence) | D2 | Phase 0 | M | `test_sms_maturity_cache.py` round-trip |
-| P1-2 | `ENABLE ROW LEVEL SECURITY` on `sms_maturity` + `p_sms_maturity_tenant_isolation` | Module A §7.2; App 3 | D2 | P1-1 | S | RLS policy present; cross-tenant read denied |
-| P1-3 | Resolve dashboard→`sms_maturity` boundary (expose `POST /sms-maturity/{tenant_id}/cache` or move cache) | Module A §7.1 | D2 | P1-1 | M | ownership test (only Module A writes) |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-1 | Rewrite `SmsMaturity` ORM to live shape (drop `days`/`data`); rewrite `_read/_write_sms_maturity`; replace `schema_init.py:283-292` | Module A §7/§8 (App 2 §3.1 persistence) | D2 | Phase 0 | M | `test_sms_maturity_cache.py` round-trip | DONE |
+| P1-2 | `ENABLE ROW LEVEL SECURITY` on `sms_maturity` + `p_sms_maturity_tenant_isolation` | Module A §7.2; App 3 | D2 | P1-1 | S | RLS policy present; cross-tenant read denied | DONE |
+| P1-3 | Resolve dashboard→`sms_maturity` boundary (expose `POST /sms-maturity/{tenant_id}/cache` or move cache) | Module A §7.1 | D2 | P1-1 | M | ownership test (only Module A writes) | DONE |
 
 ### 1B — Module B: `hazards` columns
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-4 | Add `hazards.identified_at` (tz-aware) | Module B §3, §2.1 | SN1 | Phase 0 | S | column + create-populate |
-| P1-5 | Add `hazards.equipment`/`area` free-text | Module B §3 (CAAN field ii) | SN2 | P1-4 | XS | nullable round-trip |
-| P1-6 | Add `hazards.first_priority_at`, set once at create | Module B §3; AE KPI | SN7 | P1-4 | S | not re-stamped on priority change |
-| P1-7 | Add `ck_hazards_status` CHECK (6 enum values) | Module B §3; SN8 | SN8 | P1-4 | S | invalid status rejected |
-| P1-8 | Add `hazards.imported_at`/`import_batch_id`/`original_row_ref`/`legacy_hazard_code` | Module B §25 | SN12 | P1-4 | S | import provenance columns |
-| P1-9 | Add `hazards.enrichment_data` JSONB + `enrichment_sources` JSONB | Module B §27 | SN14 | P1-4 | S | JSONB round-trip |
-| P1-10 | Retire the `verification_service.py:122-124` no-op (no schema; code) | Module B §18; SN4 | SN4 | — | XS | no write to non-existent column |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-4 | Add `hazards.identified_at` (tz-aware) | Module B §3, §2.1 | SN1 | Phase 0 | S | column + create-populate | DONE |
+| P1-5 | Add `hazards.equipment`/`area` free-text | Module B §3 (CAAN field ii) | SN2 | P1-4 | XS | nullable round-trip | DONE |
+| P1-6 | Add `hazards.first_priority_at`, set once at create | Module B §3; AE KPI | SN7 | P1-4 | S | not re-stamped on priority change | DONE |
+| P1-7 | Add `ck_hazards_status` CHECK (6 enum values) | Module B §3; SN8 | SN8 | P1-4 | S | invalid status rejected | DONE |
+| P1-8 | Add `hazards.imported_at`/`import_batch_id`/`original_row_ref`/`legacy_hazard_code` | Module B §25 | SN12 | P1-4 | S | import provenance columns | DONE |
+| P1-9 | Add `hazards.enrichment_data` JSONB + `enrichment_sources` JSONB | Module B §27 | SN14 | P1-4 | S | JSONB round-trip | DONE |
+| P1-10 | Retire the `verification_service.py:122-124` no-op (no schema; code) | Module B §18; SN4 | SN4 | — | XS | no write to non-existent column | DONE |
 
 ### 1C — Module B: `sram_risk_register`
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-11 | Add process-conformance signer block (`process_by`/`process_signed_at`) | Module B §17; §2.3.3 | SN5 | Phase 0 | S | two signer blocks persist |
-| P1-12 | Add `initial_authority`/`resultant_authority` snapshot columns | Module B §16 | SN6 | P1-11 | XS | snapshot on accept |
-| P1-13 | Add `consequence_id` FK → `bow_tie_consequences.id`; change unique key to (tenant_id, hazard_id, consequence_id) | Module B §11; §2.3.5 | SN10 | P1-11 | M | per-consequence register rows |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-11 | Add process-conformance signer block (`process_by`/`process_signed_at`) | Module B §17; §2.3.3 | SN5 | Phase 0 | S | two signer blocks persist | DONE |
+| P1-12 | Add `initial_authority`/`resultant_authority` snapshot columns | Module B §16 | SN6 | P1-11 | XS | snapshot on accept | DONE |
+| P1-13 | Add `consequence_id` FK → `bow_tie_consequences.id`; change unique key to (tenant_id, hazard_id, consequence_id) | Module B §11; §2.3.5 | SN10 | P1-11 | M | per-consequence register rows | DONE |
 
 ### 1D — Module B: new tables
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-14 | Create `hazard_triage` (+ reversal fields) | Module B §26 | SN13 | P1-4 | M | triage + reversal + audit rows |
-| P1-15 | Create `import_batches`/`import_rows`/`import_mappings`/`import_links` | Module B §25 | SN12 | P1-8 | L | staged import round-trip |
-| P1-16 | Create `sag_meetings` + `srb_meetings` (dependency for `action_items`) | Module B §28/§29 | SN16 | — | M | meeting CRUD |
-| P1-17 | Create `action_items` (`meeting_type` discriminator; polymorphic `meeting_id`) | Module B §28/§29 | SN16 | P1-16 | M | SAG/SRB action item |
-| P1-18 | Create `safety_communications` with status enum | Module B §31 | SN17 | — | M | draft→published lifecycle |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-14 | Create `hazard_triage` (+ reversal fields) | Module B §26 | SN13 | P1-4 | M | triage + reversal + audit rows | DONE |
+| P1-15 | Create `import_batches`/`import_rows`/`import_mappings`/`import_links` | Module B §25 | SN12 | P1-8 | L | staged import round-trip | DONE |
+| P1-16 | Create `sag_meetings` + `srb_meetings` (dependency for `action_items`) | Module B §28/§29 | SN16 | — | M | meeting CRUD | DONE |
+| P1-17 | Create `action_items` (`meeting_type` discriminator; polymorphic `meeting_id`) | Module B §28/§29 | SN16 | P1-16 | M | SAG/SRB action item | DONE |
+| P1-18 | Create `safety_communications` with status enum | Module B §31 | SN17 | — | M | draft→published lifecycle | DONE |
 
 ### 1E — Module B: `reports`
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-19 | Add `regulatory_category` + `regulatory_deadline_at`/`regulatory_submitted_at`/`regulatory_submission_ref` | Module B §30 | SN15 | — | M | category-tiered deadline math (A=24h/B=72h/C=7d/D=30d) |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-19 | Add `regulatory_category` + `regulatory_deadline_at`/`regulatory_submitted_at`/`regulatory_submission_ref` | Module B §30 | SN15 | — | M | category-tiered deadline math (A=24h/B=72h/C=7d/D=30d) | DONE |
 
 ### 1F — Module C (Regulator / SDCPS)
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-20 | Create `module_c_aggregates` (`payload` jsonb, `ttl_seconds`, unique key) | Module C §7.4; SN-C5 | SN-C1/C5 | — | M | materialized row round-trip |
-| P1-21 | Create `state_safety_performance_targets` (`spi_definition_id` FK, `target_period`, `approved_by`) | Module C §9.4; SN-C6 | SN-C2/C6 | — | M | SPT persist + read |
-| P1-22 | Create `metric_definitions` (`window_type`, `window_days`, `min_periods`) | Module C §10.4; SN-C7 | SN-C3/C7 | — | S | window config seeded |
-| P1-23 | Create `taxonomy_mappings` (ICAO↔ADREP↔HFACS↔N-HRC), read-only seeded | Module C §8.4; SN-C8 | SN-C4/C8 | — | M | seed from CSVs |
-| P1-24 | Add `hazards.nhrc_category` (auto-derive + manual override) | Module C §8.4; SN-C9 | SN-C9 | P1-23 | S | derivation + override |
-| P1-25 | Add `psoe_findings.cap_id` FK + `caps.source_psoe_finding_id` FK | Module C §14 (Q4.1b) | SN-C10 | — | S | bidirectional nullable linkage |
-| P1-26 | Enable RLS on `caan_reports`, `state_risk_categories`; document `sms_maturity` (P1-2) | Module C §5 (DP-6) | DP-6 | P1-2 | M | RLS on or exempted |
-| P1-27 | NULL-tenant aggregate RLS policy `USING (tenant_id IS NULL AND role='CAAN_SMD')` | Module C SN-C5 / Q7.2 | SN-C5 | P1-20 | M | CAAN-only national rows |
-| P1-28 | Enable CAAN/SUPER_ADMIN cross-tenant RLS policy (uncomment) | RBAC §4; Module C §5.2.5 | — | P1-26 | M | cross-tenant read allowed for CAAN only |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-20 | Create `module_c_aggregates` (`payload` jsonb, `ttl_seconds`, unique key) | Module C §7.4; SN-C5 | SN-C1/C5 | — | M | materialized row round-trip | DONE |
+| P1-21 | Create `state_safety_performance_targets` (`spi_definition_id` FK, `target_period`, `approved_by`) | Module C §9.4; SN-C6 | SN-C2/C6 | — | M | SPT persist + read | DONE |
+| P1-22 | Create `metric_definitions` (`window_type`, `window_days`, `min_periods`) | Module C §10.4; SN-C7 | SN-C3/C7 | — | S | window config seeded | DONE |
+| P1-23 | Create `taxonomy_mappings` (ICAO↔ADREP↔HFACS↔N-HRC), read-only seeded | Module C §8.4; SN-C8 | SN-C4/C8 | — | M | seed from CSVs | DONE |
+| P1-24 | Add `hazards.nhrc_category` (auto-derive + manual override) | Module C §8.4; SN-C9 | SN-C9 | P1-23 | S | derivation + override | DONE |
+| P1-25 | Add `psoe_findings.cap_id` FK + `caps.source_psoe_finding_id` FK | Module C §14 (Q4.1b) | SN-C10 | — | S | bidirectional nullable linkage | DONE |
+| P1-26 | Enable RLS on `caan_reports`, `state_risk_categories`; document `sms_maturity` (P1-2) | Module C §5 (DP-6) | DP-6 | P1-2 | M | RLS on or exempted | DONE |
+| P1-27 | NULL-tenant aggregate RLS policy `USING (tenant_id IS NULL AND role='CAAN_SMD')` | Module C SN-C5 / Q7.2 | SN-C5 | P1-20 | M | CAAN-only national rows | DONE |
+| P1-28 | Enable CAAN/SUPER_ADMIN cross-tenant RLS policy (uncomment) | RBAC §4; Module C §5.2.5 | — | P1-26 | M | cross-tenant read allowed for CAAN only | DONE |
 
 ### 1G — RBAC / platform
 
-| ID | What | Why | SN | Depends | Effort | Test |
-|---|---|---|---|---|---|---|
-| P1-29 | Add literal roles `ACCOUNTABLE_EXECUTIVE`, `SAG_MEMBER` (no `REGULATORY_LIAISON` — folded into `SAFETY_OFFICER` per RBAC Q-R3) to `config.py` role lists/aliases | RBAC §1; Module B §22/§28 | — | — | S | normalization maps |
-| P1-30 | Add `"EIP"` to `CAPStatus` | Module B §21 (Decision 1) | — | — | XS | EIP status round-trip |
-| P1-31 | Role-assignment validator + conflict constraints (AE exclusive, CAAN vs tenant) | RBAC §7 | — | P1-29 | M | conflicting combos rejected |
+| ID | What | Why | SN | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|---|
+| P1-29 | Add literal roles `ACCOUNTABLE_EXECUTIVE`, `SAG_MEMBER` (no `REGULATORY_LIAISON` — folded into `SAFETY_OFFICER` per RBAC Q-R3) to `config.py` role lists/aliases | RBAC §1; Module B §22/§28 | — | — | S | normalization maps | DONE |
+| P1-30 | Add `"EIP"` to `CAPStatus` | Module B §21 (Decision 1) | — | — | XS | EIP status round-trip | DONE |
+| P1-31 | Role-assignment validator + conflict constraints (AE exclusive, CAAN vs tenant) | RBAC §7 | — | P1-29 | M | conflicting combos rejected | DONE |
 
 **Dependency-critical notes.**
 - `P1-4` (identified_at) gates SN3/SN7/SN14/SN12.
@@ -329,6 +357,6 @@ capacity assumption.
 
 ---
 
-*End of IMPLEMENTATION_ROADMAP.md. Status: FINAL — planning closed;
-implementation begins. All schema notes remain PENDING; this document sequences
-them and does not itself implement anything.*
+*End of IMPLEMENTATION_ROADMAP.md. Status: PHASE 1 COMPLETE — P1-1..P1-31 DONE
+(Module A `846913d`, Module B `3a68f38`, Module C `ce7102a`, RBAC `d15ebd3`;
+16 migrations applied). Phase 2 begins next; all Phase 2+ items remain PENDING.*

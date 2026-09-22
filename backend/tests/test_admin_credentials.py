@@ -539,7 +539,9 @@ def test_create_user_route_custom_role_allowed(monkeypatch):
         _clear_overrides()
 
 
-def test_create_user_route_caan_smd_allowed(monkeypatch):
+def test_create_user_route_caan_smd_with_tenant_rejected(monkeypatch):
+    """RBAC §7: CAAN_SMD cannot hold a tenant role — the create route must
+    reject it with 400 (not swallow the validator's HTTPException into a 500)."""
     db, _ = _patch_all(monkeypatch)
     _tenant_with_user(db._stores)
     try:
@@ -547,8 +549,8 @@ def test_create_user_route_caan_smd_allowed(monkeypatch):
             "setup_key": "test-setup-key",
             "email": "smd@newair.com", "role": "CAAN_SMD", "tenant_id": "new-air",
         })
-        assert resp.status_code == 200
-        assert resp.json()["role"] == "CAAN_SMD"
+        assert resp.status_code == 400
+        assert "CAAN_SMD" in resp.json().get("detail", "")
     finally:
         _clear_overrides()
 

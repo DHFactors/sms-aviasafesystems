@@ -2092,6 +2092,10 @@ async def admin_create_user(
         return {"success": True, **result}
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except HTTPException:
+        # RBAC §7 role-conflict validation (400) must surface as-is, never be
+        # swallowed into a 500 by the broad handler below.
+        raise
     except Exception as e:
         logger.error(f"Create user failed for {req.email}: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
