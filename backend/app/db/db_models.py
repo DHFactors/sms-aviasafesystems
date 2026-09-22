@@ -2202,6 +2202,16 @@ class UserProfile(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
+    __table_args__ = (
+        # RBAC §7 (P1-31): at most one Accountable Executive per tenant.
+        Index(
+            "ux_users_one_ae_per_tenant",
+            "tenant_id",
+            unique=True,
+            postgresql_where=text("role = 'ACCOUNTABLE_EXECUTIVE'"),
+        ),
+    )
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

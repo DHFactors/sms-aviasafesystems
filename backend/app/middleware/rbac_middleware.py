@@ -40,7 +40,10 @@ async def rbac_middleware(request: Request, call_next):
     role = user.get("role", "employee")
     # Normalize legacy roles
     from app.core.rbac import normalize_legacy_role
-    normalized = normalize_legacy_role(role) if role in ["AIRLINE_ADMIN", "CAAN_SMD", "DEPT_ADMIN", "USER", "STAFF"] else role
+    normalized = normalize_legacy_role(role) if role in [
+        "AIRLINE_ADMIN", "CAAN_SMD", "DEPT_ADMIN", "USER", "STAFF",
+        "ACCOUNTABLE_EXECUTIVE", "SAG_MEMBER",
+    ] else role
     
     if not has_permission(normalized, module):
         raise HTTPException(status_code=403, detail=f"Insufficient permissions: role {role} cannot access {module}")
@@ -75,5 +78,8 @@ class RBACMiddleware(BaseHTTPMiddleware):
 def has_permission_for_user(user: Dict, module: str) -> bool:
     from app.core.rbac import has_permission, normalize_legacy_role
     role = user.get("role", "employee")
-    normalized = normalize_legacy_role(role) if role in ["AIRLINE_ADMIN", "CAAN_SMD", "DEPT_ADMIN", "USER", "STAFF"] else role
+    normalized = normalize_legacy_role(role) if role in [
+        "AIRLINE_ADMIN", "CAAN_SMD", "DEPT_ADMIN", "USER", "STAFF",
+        "ACCOUNTABLE_EXECUTIVE", "SAG_MEMBER",
+    ] else role
     return has_permission(normalized, module)

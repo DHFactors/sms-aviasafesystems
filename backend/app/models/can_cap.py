@@ -53,6 +53,10 @@ class CAPStatus(str, Enum):
     COMPLETED = "Completed"
     REVISION_REQUIRED = "Revision Required"
     OVERDUE = "Overdue"
+    # EIP = Escalated-In Progress (Module B §21): set when the Accountable
+    # Executive acknowledges an escalated CAP. Has no time limit; resolves to
+    # Closed or Escalated.
+    EIP = "EIP"
 
 
 class CANPriority(str, Enum):

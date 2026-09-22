@@ -7,6 +7,11 @@ PERMISSIONS = {
     'department_head': ['module2'],
     'employee': ['module2'],
     'regulator': ['module5'],
+    # Accountable Executive: tenant-wide read/oversight (Modules 1-3); the
+    # narrow terminal writes are enforced by dedicated route gates, not here.
+    'accountable_executive': ['module1', 'module2', 'module3'],
+    # Safety Action Group member: Module B review.
+    'sag_member': ['module2'],
 }
 
 # Human-readable role definitions
@@ -16,6 +21,8 @@ ROLES = {
     'department_head': 'Module 2 only (hazards, CAN/CAP)',
     'employee': 'Submit reports, view own submissions (Module 2 limited)',
     'regulator': 'Module 5 only (aggregated view)',
+    'accountable_executive': 'Tenant-wide oversight (Modules 1-3); terminal CAP/EIP + risk acceptance',
+    'sag_member': 'Module 2 safety review (SAG)',
 }
 
 # Module mapping for endpoints
@@ -44,7 +51,10 @@ def is_regulator(role: str) -> bool:
     return role == 'regulator'
 
 def is_tenant_user(role: str) -> bool:
-    return role in ('tenant_admin', 'safety_manager', 'department_head', 'employee')
+    return role in (
+        'tenant_admin', 'safety_manager', 'department_head', 'employee',
+        'accountable_executive', 'sag_member',
+    )
 
 def normalize_legacy_role(legacy_role: str) -> str:
     """Map legacy roles to new RBAC roles."""
@@ -57,5 +67,7 @@ def normalize_legacy_role(legacy_role: str) -> str:
         'DEPT_ADMIN': 'department_head',
         'USER': 'employee',
         'STAFF': 'employee',
+        'ACCOUNTABLE_EXECUTIVE': 'accountable_executive',
+        'SAG_MEMBER': 'sag_member',
     }
     return mapping.get(legacy_role, 'employee')

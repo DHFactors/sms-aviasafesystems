@@ -139,6 +139,12 @@ def create_user_for_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[
     if any((u.get("email") or "").strip().lower() == email for u in users):
         raise ValueError("email already exists on tenant")
 
+    # RBAC_MODEL.md §7: reject conflicting role assignments (AE exclusivity,
+    # CAAN vs tenant, SUPER_ADMIN) before an Auth user is ever created.
+    from app.services.role_validation import validate_role_assignment
+
+    validate_role_assignment(data.get("role") or "AIRLINE_ADMIN", tid)
+
     auth = get_auth()
     result = _create_auth_user(auth, {
         "email": email,

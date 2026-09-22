@@ -743,6 +743,18 @@ async def admin_update_user(
         claims = getattr(rec, "custom_claims", None) or {}
         if isinstance(claims, dict):
             existing = claims
+        if req.role is not None:
+            # RBAC_MODEL.md §7: reject conflicting role changes (AE exclusivity,
+            # CAAN vs tenant, SUPER_ADMIN) before writing the claim.
+            from app.services.role_validation import validate_role_assignment
+
+            validate_role_assignment(
+                req.role,
+                req.tenant_id if req.tenant_id is not None else existing.get("tenant_id"),
+                existing_role=existing.get("role"),
+                is_developer=bool(existing.get("is_developer")),
+                exclude_uid=uid,
+            )
         new_claims = dict(existing)
         if req.role is not None:
             new_claims["role"] = req.role
@@ -1724,7 +1736,7 @@ class UserCreateRequest(UserProfileCreate):
 
 # Roles recognized by the app RBAC for tenant-scoped operator users. Custom
 # roles are accepted for future RBAC additions but logged for awareness.
-ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "STAFF", "CAAN_SMD"}
+ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "STAFF", "CAAN_SMD", "ACCOUNTABLE_EXECUTIVE", "SAG_MEMBER"}
 
 
 SUPER_ADMIN_PROTECTED_EMAILS = {"ezondiza.dhf@gmail.com", "ghanshyamacharya@outlook.com"}

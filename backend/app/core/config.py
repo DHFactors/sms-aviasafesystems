@@ -26,6 +26,12 @@ class AuthRole(str, Enum):
     STAFF = "STAFF"
     CAAN_SMD = "CAAN_SMD"
     SUPER_ADMIN = "SUPER_ADMIN"
+    # Accountable Executive (Doc 9859); one per tenant; terminal CAP/EIP +
+    # risk acceptance. New literal (no legacy alias).
+    ACCOUNTABLE_EXECUTIVE = "ACCOUNTABLE_EXECUTIVE"
+    # Safety Action Group member; SAG review + Acceptable-tier risk acceptance.
+    # New literal (no legacy alias).
+    SAG_MEMBER = "SAG_MEMBER"
 
 
 class Settings(BaseSettings):
@@ -152,12 +158,28 @@ class Settings(BaseSettings):
     ROLE_DEPT_ADMIN: str = "DEPT_ADMIN"
     ROLE_SAFETY_OFFICER: str = "SAFETY_OFFICER"
     ROLE_STAFF: str = "STAFF"
+    ROLE_ACCOUNTABLE_EXECUTIVE: str = "ACCOUNTABLE_EXECUTIVE"
+    ROLE_SAG_MEMBER: str = "SAG_MEMBER"
+    # Canonical platform roles (RBAC_MODEL.md §1). REGULATORY_LIAISON is
+    # deliberately absent — folded into SAFETY_OFFICER per RBAC Q-R3.
+    CANONICAL_ROLES: List[str] = [
+        "SUPER_ADMIN",
+        "CAAN_SMD",
+        "TENANT_ADMIN",
+        "ACCOUNTABLE_EXECUTIVE",
+        "DEPT_ADMIN",
+        "SAFETY_OFFICER",
+        "STAFF",
+        "SAG_MEMBER",
+    ]
     # Role-alias groups so existing AIRLINE_ADMIN/USER checks recognize the new
     # canonical names (TENANT_ADMIN == AIRLINE_ADMIN, STAFF == USER).
     TENANT_ADMIN_ROLES: List[str] = ["AIRLINE_ADMIN", "TENANT_ADMIN"]
     DEPT_ADMIN_ROLES: List[str] = ["DEPT_ADMIN"]
     SAFETY_OFFICER_ROLES: List[str] = ["SAFETY_OFFICER"]
     STAFF_ROLES: List[str] = ["USER", "STAFF"]
+    ACCOUNTABLE_EXECUTIVE_ROLES: List[str] = ["ACCOUNTABLE_EXECUTIVE"]
+    SAG_MEMBER_ROLES: List[str] = ["SAG_MEMBER"]
     # Roles permitted to act across the whole tenant (tenant admins + cross-tenant).
     TENANT_WIDE_ROLES: List[str] = ["AIRLINE_ADMIN", "TENANT_ADMIN", "CAAN_SMD", "SUPER_ADMIN"]
 

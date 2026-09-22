@@ -907,6 +907,17 @@ _MODULE_C_DDL = [
 ]
 
 
+# ----------------------------------------------------------------------------
+# RBAC — PHASE 1 (P1-31): role-conflict DB constraints.
+# ----------------------------------------------------------------------------
+
+_RBAC_DDL = [
+    # RBAC §7: at most one Accountable Executive per tenant.
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_one_ae_per_tenant "
+    "ON users (tenant_id) WHERE role = 'ACCOUNTABLE_EXECUTIVE';",
+]
+
+
 async def ensure_domain_schema_async(engine: Optional[AsyncEngine] = None) -> None:
     """Create the Firestore-migration domain tables (idempotent)."""
     engine = engine or get_engine()
@@ -916,6 +927,8 @@ async def ensure_domain_schema_async(engine: Optional[AsyncEngine] = None) -> No
         for ddl in _MODULE_B_DDL:
             await conn.execute(text(ddl))
         for ddl in _MODULE_C_DDL:
+            await conn.execute(text(ddl))
+        for ddl in _RBAC_DDL:
             await conn.execute(text(ddl))
 
 

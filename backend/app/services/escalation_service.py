@@ -27,8 +27,9 @@ CAN_COLLECTION = "can_cap"
 CAP_SUBCOLLECTION = "caps"
 
 # Statuses that are considered finished and must never be escalated/overdue'd.
+# EIP (Escalated-In Progress) has no time limit (Module B §21).
 CAN_TERMINAL_STATUSES = {"Closed"}
-CAP_TERMINAL_STATUSES = {"Completed", "Overdue"}
+CAP_TERMINAL_STATUSES = {"Completed", "Overdue", "EIP"}
 
 
 def _parse_dt(value: Any) -> Optional[datetime]:

@@ -338,3 +338,13 @@ def test_cap_source_psoe_finding_fk():
     assert col is not None and col.foreign_keys
     refs = {fk.column.table.name for fk in col.foreign_keys}
     assert "psoe_findings" in refs
+
+
+# ============================================================================
+# RBAC — Phase 1 (P1-31)
+# ============================================================================
+
+def test_users_one_ae_per_tenant_index():
+    t = _table("users")
+    names = {i.name for i in t.indexes}
+    assert "ux_users_one_ae_per_tenant" in names

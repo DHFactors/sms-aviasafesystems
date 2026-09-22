@@ -45,10 +45,13 @@ ROLE_TENANT_ADMIN = settings.ROLE_TENANT_ADMIN
 ROLE_DEPT_ADMIN = settings.ROLE_DEPT_ADMIN
 ROLE_SAFETY_OFFICER = settings.ROLE_SAFETY_OFFICER
 ROLE_STAFF = settings.ROLE_STAFF
+ROLE_SAG_MEMBER = settings.ROLE_SAG_MEMBER
 
-# Roles a tenant admin (or SUPER_ADMIN) may assign via invite.
+# Roles a tenant admin (or SUPER_ADMIN) may assign via invite. The Accountable
+# Executive is deliberately NOT invite-assignable — one per tenant, provisioned
+# by SUPER_ADMIN / tenant provisioning (RBAC_MODEL.md §1).
 TENANT_ADMIN_ASSIGNABLE_ROLES = frozenset(
-    {ROLE_DEPT_ADMIN, ROLE_SAFETY_OFFICER, ROLE_STAFF}
+    {ROLE_DEPT_ADMIN, ROLE_SAFETY_OFFICER, ROLE_STAFF, ROLE_SAG_MEMBER}
 )
 # Roles a department admin (HOD) may assign via invite.
 DEPT_ADMIN_ASSIGNABLE_ROLES = frozenset({ROLE_STAFF})
@@ -68,6 +71,8 @@ ROLE_LABELS = {
     "STAFF": "Staff / Employee",
     "USER": "Staff / Employee",
     "CAAN_SMD": "State Safety Regulator",
+    "ACCOUNTABLE_EXECUTIVE": "Accountable Executive",
+    "SAG_MEMBER": "Safety Action Group Member",
 }
 
 
