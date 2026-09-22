@@ -9,7 +9,8 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.middleware.auth import get_caan_user, get_current_user
@@ -124,6 +125,104 @@ async def get_state_spi_status(
         "status": rows,
         "timestamp": datetime.now().isoformat(),
     }
+
+
+@router.get("/state/trend")
+async def get_state_spi_trend(
+    months: int = 2,
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> Dict[str, Any]:
+    """Period-over-period State SPI trends (CAAN-only, P3-10)."""
+    service = SPIService("state")
+    service.get_state_values()
+    rows = []
+    for spi in service.get_spi_definitions():
+        rows.append({
+            "spi_id": spi.id,
+            "key": spi.id,
+            "name": spi.name,
+            **service.compute_state_trend(spi.id, months=max(2, min(months, 24))),
+        })
+    return {
+        "tenant_id": "state",
+        "trends": rows,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+class StateSPTCreate(BaseModel):
+    spi_definition_id: str = Field(..., min_length=1)
+    target_value: float = Field(..., ge=0)
+    target_period: str = Field("annual")
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+
+
+@router.get("/state/targets")
+async def list_state_targets(
+    period: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> Dict[str, Any]:
+    """List national-scope State SPTs (CAAN-only, P3-10)."""
+    from app.services.state_spt_service import StateSPTService
+
+    return {
+        "targets": StateSPTService().list_state_spts(period),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.post("/state/targets", status_code=201)
+async def create_state_target(
+    payload: StateSPTCreate,
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> Dict[str, Any]:
+    """Create a State SPT draft (CAAN-only, P3-10)."""
+    from app.services.state_spt_service import StateSPTService
+
+    try:
+        result = StateSPTService().set_state_spt(
+            payload.spi_definition_id, payload.target_value, payload.target_period,
+            user, valid_from=payload.valid_from, valid_to=payload.valid_to)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "success", "data": result}
+
+
+@router.post("/state/targets/{spt_id}/approve")
+async def approve_state_target(
+    spt_id: str,
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> Dict[str, Any]:
+    """Approve a State SPT (CAAN-only, P3-10)."""
+    from app.services.state_spt_service import StateSPTService
+
+    try:
+        result = StateSPTService().approve_state_spt(spt_id, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"status": "success", "data": result}
+
+
+@router.delete("/state/targets/{spt_id}")
+async def delete_state_target(
+    spt_id: str,
+    user: Dict[str, Any] = Depends(get_caan_user),
+) -> Dict[str, Any]:
+    """Delete a State SPT (CAAN-only, P3-10)."""
+    from app.services.state_spt_service import StateSPTService
+
+    try:
+        deleted = StateSPTService().delete_state_spt(spt_id, user)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="State SPT not found")
+    return {"status": "success", "data": {"id": spt_id, "deleted": True}}
 
 
 @router.post("/tenant/{tenant_id}/targets")

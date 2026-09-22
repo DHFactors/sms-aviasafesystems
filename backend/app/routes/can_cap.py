@@ -390,6 +390,21 @@ async def ae_decision(
             "data": _to_cap_response(updated)}
 
 
+@router.get("/caps/{cap_id}/linked-findings", response_model=dict)
+async def get_linked_findings(
+    cap_id: str,
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """Return PSOE findings linked to this CAP (Module C Q4.1b / P3-14)."""
+    if not user.get("tenant_id"):
+        raise HTTPException(status_code=403, detail="Tenant access required")
+    from app.services.psoe_cap_link_service import PsoeCapLinkService
+
+    link = PsoeCapLinkService(user["tenant_id"]).list_links_for_cap(cap_id)
+    return {"status": "success", "timestamp": datetime.now(timezone.utc),
+            "data": {"cap_id": cap_id, "finding_id": link.get("finding_id")}}
+
+
 @router.patch("/caps/{cap_id}/status", response_model=dict)
 async def update_cap_status(
     cap_id: str,

@@ -278,3 +278,58 @@ async def delete_finding(finding_id: str, user: dict = Depends(get_current_user)
     except Exception as exc:
         _handle_psoe_errors(exc)
     return {"success": True, "data": result}
+
+
+# ----------------------------------------------------------------------------
+# P3-14 — PSOE finding ↔ CAP linkage (Q4.1b; optional, manual, bidirectional)
+# ----------------------------------------------------------------------------
+
+class LinkCapRequest(BaseModel):
+    cap_id: str = Field(..., min_length=1)
+
+
+def _require_safety_manager_link(user: dict) -> None:
+    allowed = settings.TENANT_ADMIN_ROLES + ["SUPER_ADMIN", "CAAN_SMD"]
+    if (user.get("role") or "") not in allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Safety Manager role required")
+
+
+@router.post("/findings/{finding_id}/link-cap", response_model=dict)
+async def link_finding_to_cap(finding_id: str, payload: LinkCapRequest,
+                              user: dict = Depends(get_current_user)):
+    """Link a PSOE finding to a CAP (bidirectional, optional)."""
+    _require_safety_manager_link(user)
+    from app.services.psoe_cap_link_service import PsoeCapLinkService
+
+    try:
+        result = PsoeCapLinkService(_resolve_scope(user)).link_finding_to_cap(
+            finding_id, payload.cap_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"success": True, "data": result}
+
+
+@router.delete("/findings/{finding_id}/link-cap", response_model=dict)
+async def unlink_finding_from_cap(finding_id: str,
+                                  user: dict = Depends(get_current_user)):
+    """Remove a PSOE finding's CAP link (both sides)."""
+    _require_safety_manager_link(user)
+    from app.services.psoe_cap_link_service import PsoeCapLinkService
+
+    try:
+        result = PsoeCapLinkService(_resolve_scope(user)).unlink_finding_from_cap(
+            finding_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"success": True, "data": result}
+
+
+@router.get("/findings/{finding_id}/links", response_model=dict)
+async def list_finding_links(finding_id: str,
+                             user: dict = Depends(get_current_user)):
+    """List the CAP link for a PSOE finding."""
+    from app.services.psoe_cap_link_service import PsoeCapLinkService
+
+    return {"success": True, "data": PsoeCapLinkService(
+        _resolve_scope(user)).list_links_for_finding(finding_id)}

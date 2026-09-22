@@ -10,7 +10,7 @@
 # CODE OWNER: AviaSafeSystems
 # ============================================================================
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -18,9 +18,24 @@ from app.core.config import settings
 from app.core.perf import timed as _perf_timed
 from app.middleware.auth import get_current_user, get_tenant_user, get_caan_user, get_admin_user
 from app.services.dashboard_service import DashboardService
+from app.routes.dashboard_params import dashboard_params
 from loguru import logger
 
 router = APIRouter()
+
+
+def _resolve_days(days: Optional[int], params: Dict[str, Any],
+                  default: int) -> int:
+    """Reconcile the legacy `days` query with the standard `period` param.
+
+    The dashboard standard params (P3-13) take precedence when a `period` token
+    is supplied; otherwise the legacy `days` value (or the endpoint default) is
+    used, preserving existing response shapes."""
+    if params.get("period") is not None and params.get("days") is not None:
+        return params["days"]
+    if days is not None:
+        return days
+    return default
 
 
 def _envelope(data: Any) -> Dict[str, Any]:
@@ -64,8 +79,10 @@ def _empty_org_kpis():
 @router.get("/overview")
 async def get_dashboard_overview(
     days: Optional[int] = Query(90, ge=0),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 90)
     logger.info(f"Dashboard overview request: user={user.get('email')}, role={user.get('role')}, tenant_id={user.get('tenant_id')}, days={days}")
     svc = DashboardService(user)
     try:
@@ -101,8 +118,10 @@ async def get_recent_reports(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1),
     cursor: Optional[str] = Query(None),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 90)
     clamped = min(page_size, settings.REPO_MAX_PAGE_SIZE)
     if clamped != page_size:
         logger.info(f"page_size clamped from {page_size} to {clamped} for tenant {user.get('tenant_id')}")
@@ -114,8 +133,10 @@ async def get_recent_reports(
 @router.get("/risk")
 async def get_risk_distribution(
     days: Optional[int] = Query(90, ge=0),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 90)
     svc = DashboardService(user)
     data = _safe_airline("get_risk_distribution", svc, days=days)
     return _envelope(data)
@@ -124,8 +145,10 @@ async def get_risk_distribution(
 @router.get("/trends")
 async def get_monthly_trends(
     days: int = Query(180, ge=0, le=730),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 180)
     svc = DashboardService(user)
     data = _safe_airline("get_monthly_trends", svc, days=days)
     return _envelope(data)
@@ -134,6 +157,7 @@ async def get_monthly_trends(
 @router.get("/risk-trends")
 async def get_ssp_risk_trends(
     days: int = Query(730, ge=30, le=1825),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
     """Tenant-scoped quarterly SSP risk trend (avg risk-index per SSP category).
@@ -141,6 +165,7 @@ async def get_ssp_risk_trends(
     Operators see only their own aggregated, anonymized risk evolution —
     never another tenant's data and never individual report content.
     """
+    days = _resolve_days(days, params, 730)
     svc = DashboardService(user)
     data = _safe_airline("get_ssp_risk_trends", svc, days=days)
     return _envelope(data)
@@ -149,8 +174,10 @@ async def get_ssp_risk_trends(
 @router.get("/hazards")
 async def get_hazard_frequency(
     days: Optional[int] = Query(90, ge=0),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 90)
     svc = DashboardService(user)
     data = _safe_airline("get_hazard_frequency", svc, days=days)
     return _envelope(data)
@@ -159,8 +186,10 @@ async def get_hazard_frequency(
 @router.get("/actions")
 async def get_actions_summary(
     days: Optional[int] = Query(90, ge=0),
+    params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
+    days = _resolve_days(days, params, 90)
     svc = DashboardService(user)
     data = _safe_airline("get_actions_summary", svc, days=days)
     return _envelope(data)
@@ -177,6 +206,9 @@ async def get_master_register(
     page_size: Optional[int] = Query(50, ge=1, le=200, description="Page size (1-200, default 50)"),
     cursor: Optional[str] = Query(None, description="Opaque pagination cursor from previous response"),
     days: Optional[int] = Query(None, ge=0, description="Date range filter: last N days, 0 or omitted = all time"),
+    surface: Optional[str] = Query(
+        None, description="P3-15: 'eip' surfaces EIP CAPs, 'overdue' surfaces overdue CAPs"),
+    params: Dict[str, Any] = Depends(dashboard_params),
     archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
@@ -246,6 +278,92 @@ async def get_master_register(
                 cursor=cursor,
                 days=days,
             )
+
+    # P3-15: surface EIP / overdue CAP rows explicitly (Module B §21/§18).
+    if isinstance(data, dict) and surface:
+        surface_lower = surface.strip().lower()
+        rows = data.get("rows", [])
+        if surface_lower == "eip":
+            data["rows"] = [r for r in rows if str(r.get("status") or "") == "EIP"]
+            data["surface"] = "eip"
+        elif surface_lower == "overdue":
+            data["rows"] = [
+                r for r in rows
+                if str(r.get("status") or "") == "Overdue"
+                or r.get("risk_overdue") is True
+            ]
+            data["surface"] = "overdue"
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail="surface must be 'eip' or 'overdue'",
+            )
+        data["surface_count"] = len(data["rows"])
+    elif isinstance(data, dict):
+        # Always expose the EIP/overdue counts in the envelope so dashboards can
+        # render the queues without a second call.
+        data["eip_count"] = sum(
+            1 for r in data.get("rows", []) if str(r.get("status") or "") == "EIP")
+        data["overdue_count"] = sum(
+            1 for r in data.get("rows", []) if str(r.get("status") or "") == "Overdue")
+    return _envelope(data)
+
+
+@router.get("/ae/kpis")
+async def get_ae_kpis(
+    days: Optional[int] = Query(None, ge=0),
+    params: Dict[str, Any] = Depends(dashboard_params),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Accountable Executive KPI strip (Dashboard §4.3 / P3-11).
+
+    Numeric values only (no colour band): average days from registration to
+    first action, hazards received/total, and the two AE action queues."""
+    if user.get("role") != "ACCOUNTABLE_EXECUTIVE":
+        raise HTTPException(status_code=403,
+                            detail="Accountable Executive role required")
+    tenant_id = user.get("tenant_id")
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="Tenant access required")
+
+    from app.services.ae_kpi_service import AEKPIService
+    from app.services.can_cap_service import CanCapService
+    from app.services import sram_service
+
+    period_days = _resolve_days(days, params, 90)
+    kpi = AEKPIService(tenant_id).compute_hazard_response_time(tenant_id)
+
+    eip_awaiting_ae = 0
+    acceptances_pending = 0
+    try:
+        caps = CanCapService(tenant_id).list_all_caps(
+            user, {"escalated_to_ae": True, "limit": 500})
+        # Escalated CAPs awaiting an AE decision (not yet acknowledged).
+        eip_awaiting_ae = sum(
+            1 for c in caps
+            if c.get("escalated_to_ae") and not c.get("ae_signed_at"))
+    except Exception as e:
+        logger.warning(f"AE EIP queue count failed for {tenant_id}: {e}")
+    try:
+        from app.db.runner import run as _run
+        reg = _run(sram_service.get_risk_register(tenant_id))
+        rows = reg.get("rows", []) if isinstance(reg, dict) else []
+        acceptances_pending = sum(
+            1 for r in rows
+            if not r.get("accepted") and str(r.get("status") or "").lower() != "closed")
+    except Exception as e:
+        logger.warning(f"AE acceptance-queue count failed for {tenant_id}: {e}")
+
+    data = {
+        "avg_days_registration_to_first_action": kpi.get("avg_days"),
+        "hazards_received": kpi.get("received_count"),
+        "hazards_total": kpi.get("hazards_total"),
+        "received_rate": kpi.get("received_rate"),
+        "eip_awaiting_ae": eip_awaiting_ae,
+        "acceptances_pending": acceptances_pending,
+        "period_days": period_days,
+        "granularity": params.get("granularity"),
+    }
     return _envelope(data)
 
 
