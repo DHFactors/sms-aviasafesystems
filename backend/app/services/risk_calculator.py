@@ -78,8 +78,6 @@ BSV_ELEMENT_WEIGHTS: Dict[str, int] = {
     "disinclination": 2,
 }
 
-BSV_TOTAL_WEIGHT: int = sum(BSV_ELEMENT_WEIGHTS.values())  # 10
-
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -244,70 +242,9 @@ def build_risk_matrix() -> List[Dict[str, Any]]:
 
 
 # ----------------------------------------------------------------------------
-# Barrier Strength Value (BSV)
+# Barrier Strength Value (BSV) — RETIRED (SN11 / P2-7)
 # ----------------------------------------------------------------------------
-
-def calculate_bsv(barrier_scores: Any) -> Dict[str, Any]:
-    """Barrier Strength Value on a 1-5 scale from the 7 element scores.
-
-    ``barrier_scores`` is either a dict keyed by element name (only the 7
-    BSW elements are read) or an iterable of 7 numeric scores in the
-    documented order.
-
-    Weighted total = sum(score * weight); BSV = clamp(total / 10, 1, 5),
-    rounded to one decimal place.
-    """
-    if isinstance(barrier_scores, dict):
-        scores: Dict[str, int] = {}
-        for element, weight in BSV_ELEMENT_WEIGHTS.items():
-            if element not in barrier_scores or barrier_scores.get(element) is None:
-                raise ValueError(f"Missing barrier element score: {element}")
-            score = barrier_scores[element]
-            scores[element] = _validate_score(score, element)
-    else:
-        items = list(barrier_scores or [])
-        if len(items) != len(BSV_ELEMENT_WEIGHTS):
-            raise ValueError(
-                f"Expected {len(BSV_ELEMENT_WEIGHTS)} barrier element scores, "
-                f"got {len(items)}"
-            )
-        element_names = list(BSV_ELEMENT_WEIGHTS.keys())
-        scores = {
-            element_names[i]: _validate_score(items[i], element_names[i])
-            for i in range(len(items))
-        }
-
-    weighted_total = sum(
-        scores[element] * weight for element, weight in BSV_ELEMENT_WEIGHTS.items()
-    )
-    bsv = max(1.0, min(5.0, round(weighted_total / BSV_TOTAL_WEIGHT, 1)))
-    return {
-        "bsv": bsv,
-        "weighted_total": weighted_total,
-        "total_weight": BSV_TOTAL_WEIGHT,
-        "max_bsv": 5,
-        "correlation": _bsv_tier(bsv),
-        "scores": scores,
-    }
-
-
-def _validate_score(value: Any, element: str) -> int:
-    try:
-        score = int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"{element} score must be an integer 1-5, got {value!r}")
-    if not 1 <= score <= 5:
-        raise ValueError(f"{element} score must be between 1 and 5, got {score}")
-    return score
-
-
-def _bsv_tier(bsv: float) -> str:
-    if bsv >= 4.8:
-        return "Strong"
-    if bsv >= 4.0:
-        return "Satisfactory"
-    if bsv >= 3.0:
-        return "Moderate"
-    if bsv >= 2.0:
-        return "Weak"
-    return "Very Weak"
+# The continuous `calculate_bsv` model (weighted mean, 1 dp) was retired in
+# Phase 2. The discrete CAAN Fig-b banded BSV from `srm_engine.calculate_bqv`
+# is the single canonical BSV (0-5: Ineffective..Excellent). `BSV_ELEMENT_WEIGHTS`
+# is retained as the canonical element-name/order registry used by sram_service.

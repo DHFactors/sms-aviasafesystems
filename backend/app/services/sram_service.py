@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +33,7 @@ from app.db.db_models import (
 from app.db.ids import register_tenant, tenant_slug
 from app.db.session import session_scope
 from app.db.isolation import demo_scope
-from app.services import risk_calculator
+from app.services import risk_calculator, srm_engine
 
 
 class SramNotFoundError(Exception):
@@ -44,6 +45,38 @@ RISK_REGISTER_STATUSES = ("open", "in_progress", "closed")
 BARRIER_IMPL_STATUSES = ("not_started", "in_progress", "implemented", "verified")
 
 _BSV_ELEMENTS = tuple(risk_calculator.BSV_ELEMENT_WEIGHTS.keys())
+
+# Module B §16 / CAAN SRM Manual §2.3.6.6 — the accepting authority is graded
+# on the INITIAL risk tolerability and is NON-DELEGABLE.
+AUTHORITY_ROLES = {
+    "Intolerable": {"ACCOUNTABLE_EXECUTIVE"},
+    "Tolerable": {"SAFETY_OFFICER", "TENANT_ADMIN", "AIRLINE_ADMIN"},
+    "Acceptable": {"SAFETY_OFFICER", "SAG_MEMBER", "TENANT_ADMIN", "AIRLINE_ADMIN"},
+}
+
+
+def _score_barriers(barrier_scores: Any) -> dict:
+    """Score the 7 barrier elements with the discrete ``srm_engine`` BQV→BSV model.
+
+    SN11 (P2-7): the continuous ``risk_calculator.calculate_bsv`` model is
+    retired; the banded Fig-b BSV (0-5) is canonical. Returns the engine result
+    plus the resolved ``scores`` element map for persistence.
+    """
+    scores = {
+        element: int((barrier_scores or {}).get(element) or 0)
+        for element in _BSV_ELEMENTS
+    }
+    result = srm_engine.calculate_bqv(
+        scores["effectiveness"],
+        scores["cost_benefit"],
+        scores["practicality"],
+        scores["acceptability"],
+        scores["enforceability"],
+        scores["durability"],
+        scores["disinclination"],
+    )
+    result["scores"] = scores
+    return result
 
 
 # ----------------------------------------------------------------------------
@@ -80,6 +113,49 @@ def _tenant_uuid(tenant_slug_or_id: str) -> str:
 
 def is_demo_row() -> bool:
     return demo_scope()
+
+
+def is_risk_overdue(
+    sram_entry: Any,
+    *,
+    now: Optional[datetime] = None,
+    cap_overdue: bool = False,
+) -> bool:
+    """Derived risk-overdue (SN4 / Module B §18).
+
+    A SRAM register entry is overdue when it is **not** accepted/closed AND
+    either its ``review_date`` is in the past or a linked CAP is overdue.
+    Hazards themselves have NO overdue state (a hazard is a condition, not an
+    action) — this derivation is the only risk-overdue signal.
+    """
+    if sram_entry is None:
+        return False
+
+    def _get(key: str) -> Any:
+        if isinstance(sram_entry, dict):
+            return sram_entry.get(key)
+        return getattr(sram_entry, key, None)
+
+    if _get("accepted"):
+        return False
+    if str(_get("status") or "").lower() in ("accepted", "closed"):
+        return False
+    if cap_overdue:
+        return True
+
+    review_date = _get("review_date")
+    if isinstance(review_date, str):
+        try:
+            review_date = datetime.fromisoformat(review_date.replace("Z", "+00:00"))
+        except ValueError:
+            review_date = None
+    if review_date is not None:
+        ref = now or datetime.now(timezone.utc)
+        if review_date.tzinfo is None:
+            review_date = review_date.replace(tzinfo=timezone.utc)
+        if review_date < ref:
+            return True
+    return False
 
 
 # ----------------------------------------------------------------------------
@@ -245,7 +321,8 @@ async def add_control(bowtie_id: str, control: str, control_type: str, tenant_id
         bsv_result: Optional[dict] = None
         element_values: Dict[str, int] = {}
         if barrier_scores:
-            bsv_result = risk_calculator.calculate_bsv(barrier_scores)
+            # SN11 (P2-7): banded srm_engine BSV (was continuous calculate_bsv).
+            bsv_result = _score_barriers(barrier_scores)
             bsv_value = bsv_result["bsv"]
             element_values = bsv_result["scores"]
 
@@ -309,7 +386,8 @@ async def calculate_risk(hazard_id: str, assessment_data: dict, tenant_id: str) 
 
     bsv_calc: Optional[dict] = None
     if data.get("barrier_scores"):
-        bsv_calc = risk_calculator.calculate_bsv(data["barrier_scores"])
+        # SN11 (P2-7): banded srm_engine BSV (was continuous calculate_bsv).
+        bsv_calc = _score_barriers(data["barrier_scores"])
 
     hazard = await _get_hazard(hazard_id, tid)
 
@@ -363,9 +441,112 @@ async def calculate_risk(hazard_id: str, assessment_data: dict, tenant_id: str) 
     }
 
 
+async def sync_consequence_register_rows(
+    hazard_id: str, tenant_id: str, risk_profile: dict, severity_letter: str
+) -> dict:
+    """Create/update one ``sram_risk_register`` row per bow-tie consequence.
+
+    SN10 / P2-8: each ``bow_tie_consequences`` row gets its own register row
+    carrying that consequence's severity (from ``severity_level``) and the
+    profile's resultant probability, exercising the unique key
+    ``(tenant_id, hazard_id, consequence_id)``. When the bow-tie has no
+    consequences, a single whole-hazard row (``consequence_id NULL``) is kept
+    for back-compat.
+    """
+    tid = _tenant_uuid(tenant_id)
+    letter = (severity_letter or "E").upper()
+    resultant = (risk_profile or {}).get("resultant_risk") or {}
+    probability = int(resultant.get("probability_value") or 3)
+    now = datetime.now(timezone.utc)
+
+    async with session_scope() as session:
+        bowtie = await _get_bowtie_by_hazard(session, hazard_id, tid)
+        consequences = await _get_consequences(session, bowtie.id) if bowtie else []
+        hazard = (await session.execute(
+            select(Hazard).where(
+                Hazard.tenant_id == uuid.UUID(tid),
+                Hazard.hazard_id == hazard_id,
+            )
+        )).scalar_one_or_none()
+        hazard_title = hazard.title if hazard else hazard_id
+
+        if consequences:
+            targets = [(c.id, (c.severity_level or letter).upper()) for c in consequences]
+        else:
+            targets = [(None, letter)]
+
+        rows: List[SramRiskRegisterEntry] = []
+        for consequence_id, sev_letter in targets:
+            sev_num = srm_engine.SEVERITY_LETTER_TO_NUMERIC.get(sev_letter, 3)
+            fields = {
+                "severity_current": sev_num,
+                "probability_current": probability,
+                "risk_index_current": sev_num * probability,
+                "tolerability_current": srm_engine._tolerability(probability, sev_letter),
+                "hazard_title": hazard_title,
+            }
+            entry = await _get_risk_entry_by_hazard(
+                session, hazard_id, tid, consequence_id=consequence_id
+            )
+            if entry:
+                for key, value in fields.items():
+                    setattr(entry, key, value)
+                entry.updated_at = now
+            else:
+                entry = SramRiskRegisterEntry(
+                    tenant_id=uuid.UUID(tid),
+                    bowtie_id=bowtie.id if bowtie else None,
+                    hazard_id=hazard_id,
+                    consequence_id=consequence_id,
+                    status="open",
+                    is_demo=is_demo_row(),
+                    **fields,
+                )
+                session.add(entry)
+            await session.flush()
+            rows.append(entry)
+
+    return {
+        "hazard_id": hazard_id,
+        "rows": [_row_to_dict(r) for r in rows],
+    }
+
+
+async def process_sign_acceptance(risk_id_or_hazard: str, tenant_id: str,
+                                  user: dict) -> dict:
+    """Signature 1 — process conformance (Module B §17 / CAAN §2.3.3).
+
+    Records the team-leader / safety-manager sign-off (`process_by` +
+    `process_signed_at`). The risk cannot be accepted until this signature is
+    present.
+    """
+    tid = _tenant_uuid(tenant_id)
+    signer = await _resolve_user_uuid(user)
+    now = datetime.now(timezone.utc)
+    async with session_scope() as session:
+        row = await _resolve_risk_entry(session, risk_id_or_hazard, {}, tid)
+        if not row:
+            raise SramNotFoundError(
+                f"Risk register entry {risk_id_or_hazard!r} not found for tenant {tenant_id}"
+            )
+        row.process_by = signer
+        row.process_signed_at = now
+        row.updated_at = now
+        await session.flush()
+
+    result = _row_to_dict(row)
+    result["tenant_id"] = tenant_slug(result["tenant_id"])
+    return result
+
+
 async def accept_risk(risk_id_or_hazard: str, acceptance_data: dict,
                       tenant_id: str, user: dict) -> dict:
-    """Accept a risk with ALARP justification and sign-off details."""
+    """Accept a risk with ALARP justification and sign-off details.
+
+    Enforces the Module B §16 authority tier (graded on the INITIAL risk
+    tolerability, non-delegable) and the §17 two-signature rule (the
+    process-conformance signature must be present first).
+    """
     tid = _tenant_uuid(tenant_id)
     data = acceptance_data or {}
     justification = (data.get("alarp_justification") or "").strip()
@@ -381,21 +562,56 @@ async def accept_risk(risk_id_or_hazard: str, acceptance_data: dict,
                 f"Risk register entry {risk_id_or_hazard!r} not found for tenant {tenant_id}"
             )
 
+        # §17 two-signature rule: process-conformance signature must exist.
+        if row.process_by is None and row.process_signed_at is None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Process-conformance signature required before risk "
+                    "acceptance (Module B §17 two-signature rule)"
+                ),
+            )
+
+        # §16 / CAAN §2.3.6.6: authority tier graded on the INITIAL risk.
+        initial_tol = row.tolerability_current or "Tolerable"
+        required_roles = AUTHORITY_ROLES.get(initial_tol)
+        if required_roles is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown initial risk tolerability {initial_tol!r}",
+            )
+        acting_role = (user or {}).get("role")
+        if acting_role not in required_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"Accepting a {initial_tol} risk requires one of "
+                    f"{sorted(required_roles)}; {acting_role!r} is not authorised"
+                ),
+            )
+
+        now = datetime.now(timezone.utc)
         row.accepted = True
         row.alarp_justification = justification
         row.accepted_by = accepted_by_uuid
-        row.accepted_on = datetime.now(timezone.utc)
+        row.accepted_on = now
+        # §16 audit snapshot of the initial/resultant authority tiers.
+        row.initial_authority = srm_engine.SIGNOFF_AUTHORITY[initial_tol]
+        resultant_tol = row.tolerability_resultant or initial_tol
+        row.resultant_authority = srm_engine.SIGNOFF_AUTHORITY.get(
+            resultant_tol, row.initial_authority
+        )
         if data.get("review_date"):
             row.review_date = _parse_dt(data["review_date"])
         row.status = data.get("status") or ("closed" if row.status == "in_progress" else row.status)
         if row.status not in RISK_REGISTER_STATUSES:
             raise ValueError(f"status must be one of {RISK_REGISTER_STATUSES}")
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = now
 
         bowtie = await _get_bowtie_by_hazard(session, row.hazard_id, tid)
         if bowtie and bowtie.status != "Accepted":
             bowtie.status = "Accepted"
-            bowtie.updated_at = datetime.now(timezone.utc)
+            bowtie.updated_at = now
 
     result = _row_to_dict(row)
     result["tenant_id"] = tenant_slug(result["tenant_id"])
@@ -490,7 +706,8 @@ async def update_barrier(barrier_id: str, update_data: dict, tenant_id: str) -> 
         scores = update_data.get("barrier_scores")
         element_values: Dict[str, int] = {}
         if scores:
-            bsv_result = risk_calculator.calculate_bsv(scores)
+            # SN11 (P2-7): banded srm_engine BSV (was continuous calculate_bsv).
+            bsv_result = _score_barriers(scores)
             element_values = bsv_result["scores"]
             row.bsv = bsv_result["bsv"]
         for element, value in element_values.items():
@@ -603,14 +820,36 @@ async def _get_controls(session: AsyncSession, bowtie_id: uuid.UUID) -> List[Bow
     )).scalars().all())
 
 
-async def _get_risk_entry_by_hazard(session: AsyncSession, hazard_id: str,
-                                    tid: str) -> Optional[SramRiskRegisterEntry]:
-    return (await session.execute(
-        select(SramRiskRegisterEntry).where(
-            SramRiskRegisterEntry.tenant_id == uuid.UUID(tid),
-            SramRiskRegisterEntry.hazard_id == hazard_id,
+_ANY_CONSEQUENCE = object()
+
+
+async def _get_risk_entry_by_hazard(
+    session: AsyncSession,
+    hazard_id: str,
+    tid: str,
+    consequence_id: Any = _ANY_CONSEQUENCE,
+) -> Optional[SramRiskRegisterEntry]:
+    """Resolve a register entry for a hazard.
+
+    After SN10/P2-8 a hazard may carry one row per bow-tie consequence plus an
+    optional whole-hazard row (``consequence_id IS NULL``). With no explicit
+    ``consequence_id`` the whole-hazard row is preferred (back-compat), else the
+    oldest row — never ``scalar_one_or_none`` (which would raise on multiples).
+    """
+    stmt = select(SramRiskRegisterEntry).where(
+        SramRiskRegisterEntry.tenant_id == uuid.UUID(tid),
+        SramRiskRegisterEntry.hazard_id == hazard_id,
+    )
+    if consequence_id is _ANY_CONSEQUENCE:
+        stmt = stmt.order_by(
+            SramRiskRegisterEntry.consequence_id.asc().nullsfirst(),
+            SramRiskRegisterEntry.created_at.asc(),
         )
-    )).scalar_one_or_none()
+    elif consequence_id is None:
+        stmt = stmt.where(SramRiskRegisterEntry.consequence_id.is_(None))
+    else:
+        stmt = stmt.where(SramRiskRegisterEntry.consequence_id == consequence_id)
+    return (await session.execute(stmt.limit(1))).scalars().first()
 
 
 async def _resolve_risk_entry(session: AsyncSession, risk_id_or_hazard: str,

@@ -22,7 +22,7 @@ from app.models.hazard import (
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.services.hazard_service import HazardService
 from app.services.audit_service import log_audit, request_context
-from app.services import srm_engine
+from app.services import sram_service, srm_engine
 
 router = APIRouter()
 
@@ -331,6 +331,14 @@ async def save_sram(
     updated = service.update_hazard(hazard_id, update_payload, user)
     if not updated:
         raise HTTPException(status_code=404, detail="Hazard not found")
+
+    # SN10 / P2-8: materialise one risk-register row per bow-tie consequence.
+    try:
+        await sram_service.sync_consequence_register_rows(
+            hazard_id, tenant_id, risk_profile, severity["severity_letter"]
+        )
+    except Exception as e:
+        logger.warning(f"Per-consequence register sync failed for {hazard_id}: {e}")
 
     ip, request_id = request_context(request)
     log_audit(

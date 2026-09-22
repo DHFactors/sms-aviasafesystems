@@ -21,7 +21,7 @@
 # ==============================================================================
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -194,6 +194,53 @@ def _serialize_timestamps(data: dict) -> None:
             data[key] = data[key].isoformat()
 
 
+# SN3 / CAAN SRM Manual §2.2 — initial-priority follow-up timelines.
+FOLLOW_UP_WINDOWS = {
+    "H": timedelta(hours=24),
+    "M": timedelta(days=7),
+    "L": timedelta(days=15),
+}
+
+
+def derive_follow_up_date(priority: Optional[str], anchor: Optional[datetime]) -> Optional[datetime]:
+    """follow_up_date = anchor + priority window (H→+24h, M→+7d, L→+15d).
+
+    SN3: anchored on the hazard's identification date (SN1), falling back to
+    created_at. A manual value always overrides (applied by the caller).
+    """
+    if anchor is None:
+        return None
+    delta = FOLLOW_UP_WINDOWS.get(str(priority or "M").upper())
+    if delta is None:
+        return None
+    return anchor + delta
+
+
+def _coerce_dt(value: Any) -> Optional[datetime]:
+    """Coerce a datetime / ISO string to a tz-aware UTC datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return None
+
+
+def _dt_close(a: Optional[datetime], b: Optional[datetime]) -> bool:
+    """True when two timestamps are within 1 second (manual-override detection)."""
+    if a is None or b is None:
+        return a is None and b is None
+    try:
+        return abs((a - b).total_seconds()) < 1.0
+    except TypeError:
+        return False
+
+
 def _lookup_hazard_stmt(tenant_uuid_value: str, value: str):
     conds = [Hazard.hazard_id == str(value)]
     try:
@@ -309,6 +356,18 @@ class HazardService:
             hazard_id = generate_hazard_id(function, priority, year, sequence)
             now = datetime.now(timezone.utc)
             status = payload.get("status", "Open")
+            # SN1: identification date (source date when supplied, else now).
+            identified_at = (
+                _coerce_dt(payload.get("identified_at"))
+                or _coerce_dt(payload.get("created_at"))
+                or now
+            )
+            # SN3 / CAAN §2.2: derive follow_up_date from priority unless the
+            # caller supplied a manual value (manual override wins).
+            follow_up = (
+                _coerce_dt(payload.get("follow_up_date"))
+                or derive_follow_up_date(priority, identified_at)
+            )
 
             row = Hazard(
                 tenant_id=tid,
@@ -353,9 +412,11 @@ class HazardService:
                 analysis_mode=payload.get("analysis_mode", "FISHBONE_ONLY"),
                 sram_data=payload.get("sram_data"),
                 status=status,
+                identified_at=identified_at,
+                first_priority_at=now,
                 priority_date=payload.get("priority_date") or now,
                 status_date=payload.get("status_date") or now,
-                follow_up_date=payload.get("follow_up_date"),
+                follow_up_date=follow_up,
                 closed_at=payload.get("closed_at"),
                 closed_by=payload.get("closed_by"),
                 remarks=payload.get("remarks"),
@@ -463,6 +524,16 @@ class HazardService:
             new_priority = payload.get("priority", row.priority)
             if new_priority and new_priority != row.priority:
                 payload["priority_date"] = now
+                # SN3 / CAAN §2.2: re-derive follow_up_date on priority change
+                # unless the existing value was manually overridden (it no longer
+                # matches the old priority's derived date) or the caller supplies
+                # a new one (manual override wins).
+                if "follow_up_date" not in payload:
+                    anchor = row.identified_at or row.created_at or now
+                    if row.follow_up_date is None or _dt_close(
+                        row.follow_up_date, derive_follow_up_date(row.priority, anchor)
+                    ):
+                        payload["follow_up_date"] = derive_follow_up_date(new_priority, anchor)
 
             # Status change stamps status_date (the date of the latest transition).
             new_status = payload.get("status", row.status)
@@ -496,6 +567,11 @@ class HazardService:
                 new_uid = payload.get("assigned_to_uid", row.assigned_to_uid)
                 new_email = payload.get("assigned_to", row.assigned_to)
                 payload["department"] = get_user_department(uid=new_uid, email=new_email)
+
+            # Coerce ISO-string timestamps so a manual follow_up_date override
+            # (SN3) binds cleanly to the TIMESTAMPTZ column.
+            if isinstance(payload.get("follow_up_date"), str):
+                payload["follow_up_date"] = _coerce_dt(payload["follow_up_date"])
 
             for key, value in payload.items():
                 if key in _HZ_MUTABLE_COLUMNS:

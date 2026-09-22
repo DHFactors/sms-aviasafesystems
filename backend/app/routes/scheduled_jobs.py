@@ -30,9 +30,10 @@ from app.routes.admin import verify_task_auth
 
 router = APIRouter()
 
-# EIP (Escalated-In Progress) has no time limit (Module B §21) — excluded from
-# the overdue scan alongside the terminal statuses.
-CAP_TERMINAL_STATUSES = {"Completed", "Overdue", "Cancelled", "EIP"}
+# Statuses excluded from the overdue scan. Module B §18.3: "Overdue" is a
+# resolving state, NOT terminal, so it is deliberately absent. EIP
+# (Escalated-In Progress) has no time limit (Module B §21).
+CAP_TERMINAL_STATUSES = {"Completed", "Closed", "Escalated", "Cancelled", "EIP"}
 
 
 @router.post("/check-overdue-caps")

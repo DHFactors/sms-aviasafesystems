@@ -86,6 +86,12 @@ class RiskAcceptance(BaseModel):
     review_date: Optional[str] = None
 
 
+class ProcessSignature(BaseModel):
+    """Signature 1 of the Module B §17 two-signature risk-acceptance model."""
+    risk_id: Optional[str] = None
+    hazard_id: Optional[str] = None
+
+
 class BarrierUpdate(BaseModel):
     implementation_status: Optional[str] = Field(
         None, pattern="^(not_started|in_progress|implemented|verified)$"
@@ -209,6 +215,23 @@ async def calculate_risk(payload: RiskCalculation, user: dict = Depends(get_curr
     try:
         result = await sram_service.calculate_risk(
             payload.hazard_id, payload.dict(), _resolve_scope(user)
+        )
+    except Exception as exc:
+        _handle_sram_errors(exc)
+    return {"success": True, "data": result}
+
+
+@router.post("/risk/process-sign", response_model=dict)
+async def process_sign_risk(payload: ProcessSignature, user: dict = Depends(get_current_user)):
+    """Signature 1 — process conformance (Module B §17). Required before accept."""
+    if not payload.risk_id and not payload.hazard_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide either risk_id or hazard_id",
+        )
+    try:
+        result = await sram_service.process_sign_acceptance(
+            payload.risk_id or payload.hazard_id or "", _resolve_scope(user), user,
         )
     except Exception as exc:
         _handle_sram_errors(exc)
