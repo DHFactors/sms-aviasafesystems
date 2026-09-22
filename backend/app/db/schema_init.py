@@ -685,6 +685,228 @@ _MODULE_B_DDL += [
 ]
 
 
+# ----------------------------------------------------------------------------
+# MODULE C — PHASE 1 SCHEMA (P1-20..P1-28)
+#
+# Idempotent ALTER/CREATE mirroring the Module C Phase-1 migrations in
+# supabase/migrations/. RLS follows the platform pattern: per-tenant isolation
+# plus explicit CAAN/Super-Admin cross-tenant access, and a CAAN-only policy
+# for national (NULL-tenant) aggregate rows (SN-C5 / Q7.2).
+# ----------------------------------------------------------------------------
+
+_MODULE_C_ROLE_CLAUSE = (
+    "((auth.jwt() -> 'app_metadata'::text) ->> 'role'::text) "
+    "IN ('CAAN_SMD', 'SUPER_ADMIN')"
+)
+
+_MODULE_C_DDL = [
+    # -- P1-20: module_c_aggregates (SN-C1/SN-C5) ---------------------------
+    """
+    CREATE TABLE IF NOT EXISTS module_c_aggregates (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id      UUID,
+        metric_type    TEXT NOT NULL,
+        metric_key     TEXT,
+        period_start   TIMESTAMPTZ,
+        period_end     TIMESTAMPTZ,
+        payload        JSONB NOT NULL DEFAULT '{}'::jsonb,
+        computed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        ttl_seconds    INTEGER,
+        source_version TEXT
+    );
+    """,
+    # NULLS NOT DISTINCT: NULL tenant_id / metric_key still de-duplicate.
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_module_c_aggregates_key "
+    "ON module_c_aggregates (tenant_id, metric_type, metric_key, period_start) "
+    "NULLS NOT DISTINCT;",
+    "CREATE INDEX IF NOT EXISTS ix_module_c_aggregates_tenant "
+    "ON module_c_aggregates (tenant_id);",
+    "CREATE INDEX IF NOT EXISTS ix_module_c_aggregates_type "
+    "ON module_c_aggregates (metric_type);",
+    "ALTER TABLE module_c_aggregates ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_module_c_aggregates_tenant_isolation "
+    "ON public.module_c_aggregates;",
+    "CREATE POLICY p_module_c_aggregates_tenant_isolation "
+    "ON public.module_c_aggregates FOR ALL TO authenticated "
+    "USING (tenant_id = ((auth.jwt() -> 'app_metadata'::text) "
+    "->> 'tenant_id'::text)::uuid) "
+    "WITH CHECK (tenant_id = ((auth.jwt() -> 'app_metadata'::text) "
+    "->> 'tenant_id'::text)::uuid);",
+    # P1-27: national NULL-tenant rows visible only to CAAN_SMD.
+    "DROP POLICY IF EXISTS p_module_c_aggregates_national "
+    "ON public.module_c_aggregates;",
+    "CREATE POLICY p_module_c_aggregates_national "
+    "ON public.module_c_aggregates FOR SELECT TO authenticated "
+    "USING (tenant_id IS NULL AND ((auth.jwt() -> 'app_metadata'::text) "
+    "->> 'role'::text) = 'CAAN_SMD');",
+    # P1-28: cross-tenant access for CAAN / SUPER_ADMIN.
+    "DROP POLICY IF EXISTS p_module_c_aggregates_cross_tenant "
+    "ON public.module_c_aggregates;",
+    "CREATE POLICY p_module_c_aggregates_cross_tenant "
+    "ON public.module_c_aggregates FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.module_c_aggregates "
+    "TO anon, authenticated, service_role;",
+    # -- P1-21: state_safety_performance_targets (SN-C2/SN-C6) --------------
+    """
+    CREATE TABLE IF NOT EXISTS state_safety_performance_targets (
+        id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        spi_definition_id TEXT NOT NULL,
+        target_value      DOUBLE PRECISION NOT NULL,
+        target_period     TEXT NOT NULL DEFAULT 'annual',
+        set_by            TEXT,
+        set_at            TIMESTAMPTZ,
+        approved_by       TEXT,
+        approved_at       TIMESTAMPTZ,
+        valid_from        TIMESTAMPTZ,
+        valid_to          TIMESTAMPTZ,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_state_spt_spi "
+    "ON state_safety_performance_targets (spi_definition_id);",
+    "ALTER TABLE state_safety_performance_targets ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_state_safety_performance_targets_caan "
+    "ON public.state_safety_performance_targets;",
+    "CREATE POLICY p_state_safety_performance_targets_caan "
+    "ON public.state_safety_performance_targets FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.state_safety_performance_targets "
+    "TO anon, authenticated, service_role;",
+    # -- P1-22: metric_definitions (SN-C3/SN-C7) ----------------------------
+    """
+    CREATE TABLE IF NOT EXISTS metric_definitions (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        metric_type  TEXT NOT NULL,
+        metric_key   TEXT,
+        window_type  TEXT NOT NULL DEFAULT 'rolling_12m',
+        window_days  INTEGER,
+        min_periods  INTEGER,
+        valid_from   TIMESTAMPTZ,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CONSTRAINT ck_metric_definitions_window_type
+            CHECK (window_type IN ('rolling_12m', 'rolling_90d',
+                                   'quarter_over_quarter'))
+    );
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_metric_definitions_type_key "
+    "ON metric_definitions (metric_type, metric_key) NULLS NOT DISTINCT;",
+    "ALTER TABLE metric_definitions ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_metric_definitions_read ON public.metric_definitions;",
+    "CREATE POLICY p_metric_definitions_read ON public.metric_definitions "
+    "FOR SELECT TO authenticated USING (true);",
+    "DROP POLICY IF EXISTS p_metric_definitions_cross_tenant "
+    "ON public.metric_definitions;",
+    "CREATE POLICY p_metric_definitions_cross_tenant "
+    "ON public.metric_definitions FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.metric_definitions "
+    "TO anon, authenticated, service_role;",
+    # -- P1-23: taxonomy_mappings (SN-C4/SN-C8) ----------------------------
+    """
+    CREATE TABLE IF NOT EXISTS taxonomy_mappings (
+        id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        icao_code      TEXT,
+        adrep_code     TEXT,
+        hfacs_nanocode TEXT,
+        nhrc_category  TEXT,
+        valid_from     TIMESTAMPTZ,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS ux_taxonomy_mappings_codes "
+    "ON taxonomy_mappings (icao_code, adrep_code, hfacs_nanocode) "
+    "NULLS NOT DISTINCT;",
+    "CREATE INDEX IF NOT EXISTS ix_taxonomy_mappings_icao "
+    "ON taxonomy_mappings (icao_code);",
+    "CREATE INDEX IF NOT EXISTS ix_taxonomy_mappings_hfacs "
+    "ON taxonomy_mappings (hfacs_nanocode);",
+    "ALTER TABLE taxonomy_mappings ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_taxonomy_mappings_read ON public.taxonomy_mappings;",
+    "CREATE POLICY p_taxonomy_mappings_read ON public.taxonomy_mappings "
+    "FOR SELECT TO authenticated USING (true);",
+    "DROP POLICY IF EXISTS p_taxonomy_mappings_cross_tenant "
+    "ON public.taxonomy_mappings;",
+    "CREATE POLICY p_taxonomy_mappings_cross_tenant "
+    "ON public.taxonomy_mappings FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.taxonomy_mappings "
+    "TO anon, authenticated, service_role;",
+    # -- P1-24: hazards.nhrc_category (Module C addition to a Module B table)
+    "ALTER TABLE hazards ADD COLUMN IF NOT EXISTS nhrc_category TEXT;",
+    # -- P1-25: PSOE finding ↔ CAP bidirectional nullable linkage -----------
+    "ALTER TABLE psoe_findings ADD COLUMN IF NOT EXISTS cap_id UUID;",
+    """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'fk_psoe_findings_cap'
+        ) THEN
+            ALTER TABLE psoe_findings ADD CONSTRAINT fk_psoe_findings_cap
+                FOREIGN KEY (cap_id) REFERENCES caps (id);
+        END IF;
+    END $$;
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_psoe_findings_cap ON psoe_findings (cap_id);",
+    "ALTER TABLE caps ADD COLUMN IF NOT EXISTS source_psoe_finding_id UUID;",
+    """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'fk_caps_source_psoe_finding'
+        ) THEN
+            ALTER TABLE caps ADD CONSTRAINT fk_caps_source_psoe_finding
+                FOREIGN KEY (source_psoe_finding_id) REFERENCES psoe_findings (id);
+        END IF;
+    END $$;
+    """,
+    "CREATE INDEX IF NOT EXISTS ix_caps_source_psoe_finding "
+    "ON caps (source_psoe_finding_id);",
+    # -- P1-26: RLS on caan_reports (text tenant_id) ------------------------
+    "ALTER TABLE caan_reports ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_caan_reports_tenant_isolation ON public.caan_reports;",
+    "CREATE POLICY p_caan_reports_tenant_isolation ON public.caan_reports "
+    "FOR ALL TO authenticated "
+    "USING (tenant_id = ((auth.jwt() -> 'app_metadata'::text) "
+    "->> 'tenant_id'::text)) "
+    "WITH CHECK (tenant_id = ((auth.jwt() -> 'app_metadata'::text) "
+    "->> 'tenant_id'::text));",
+    "DROP POLICY IF EXISTS p_caan_reports_cross_tenant ON public.caan_reports;",
+    "CREATE POLICY p_caan_reports_cross_tenant ON public.caan_reports "
+    "FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.caan_reports "
+    "TO anon, authenticated, service_role;",
+    # -- P1-26: RLS on state_risk_categories (global reference, no tenant) --
+    "ALTER TABLE state_risk_categories ENABLE ROW LEVEL SECURITY;",
+    "DROP POLICY IF EXISTS p_state_risk_categories_read "
+    "ON public.state_risk_categories;",
+    "CREATE POLICY p_state_risk_categories_read ON public.state_risk_categories "
+    "FOR SELECT TO authenticated USING (true);",
+    "DROP POLICY IF EXISTS p_state_risk_categories_cross_tenant "
+    "ON public.state_risk_categories;",
+    "CREATE POLICY p_state_risk_categories_cross_tenant "
+    "ON public.state_risk_categories FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "GRANT ALL ON TABLE public.state_risk_categories "
+    "TO anon, authenticated, service_role;",
+    # -- P1-28: cross-tenant policy on existing Module C tables ------------
+    "DROP POLICY IF EXISTS p_state_risk_register_cross_tenant "
+    "ON public.state_risk_register;",
+    "CREATE POLICY p_state_risk_register_cross_tenant "
+    "ON public.state_risk_register FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+    "DROP POLICY IF EXISTS p_regulatory_reports_cross_tenant "
+    "ON public.regulatory_reports;",
+    "CREATE POLICY p_regulatory_reports_cross_tenant "
+    "ON public.regulatory_reports FOR ALL TO authenticated "
+    f"USING ({_MODULE_C_ROLE_CLAUSE}) WITH CHECK ({_MODULE_C_ROLE_CLAUSE});",
+]
+
+
 async def ensure_domain_schema_async(engine: Optional[AsyncEngine] = None) -> None:
     """Create the Firestore-migration domain tables (idempotent)."""
     engine = engine or get_engine()
@@ -692,6 +914,8 @@ async def ensure_domain_schema_async(engine: Optional[AsyncEngine] = None) -> No
         for ddl in _DOMAIN_DDL:
             await conn.execute(text(ddl))
         for ddl in _MODULE_B_DDL:
+            await conn.execute(text(ddl))
+        for ddl in _MODULE_C_DDL:
             await conn.execute(text(ddl))
 
 

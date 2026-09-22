@@ -83,6 +83,9 @@ class Hazard(Base):
 
     adrep_category: Mapped[object] = mapped_column(Text, nullable=True)
     occurrence_type: Mapped[object] = mapped_column(Text, nullable=True)
+    # SN-C9 (P1-24) — Module C-owned addition on a Module B table: N-HRC
+    # category, auto-derived by nhrc_service with manual CAAN override.
+    nhrc_category: Mapped[object] = mapped_column(Text, nullable=True)
     taxonomy: Mapped[str] = mapped_column(Text, nullable=False)
     taxonomy_specific: Mapped[object] = mapped_column(Text, nullable=True)
     threat: Mapped[object] = mapped_column(Text, nullable=True)
@@ -471,6 +474,20 @@ class Cap(Base):
     action_items: Mapped[object] = mapped_column(JSONB, nullable=True)
     rca_method: Mapped[object] = mapped_column(Text, nullable=True)
     sram_data: Mapped[object] = mapped_column(JSONB, nullable=True)
+
+    # SN-C10 (P1-25) — back-reference to the PSOE finding this CAP was created
+    # from (bidirectional optional manual linkage; no cascade). use_alter breaks
+    # the caps <-> psoe_findings metadata cycle (the DB constraint is applied by
+    # migration/schema_init, matching the ALTER-based form).
+    source_psoe_finding_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "psoe_findings.id",
+            use_alter=True,
+            name="fk_caps_source_psoe_finding",
+        ),
+        nullable=True,
+    )
 
     escalated_to_ae: Mapped[object] = mapped_column(Boolean, nullable=True)
     escalated_by: Mapped[object] = mapped_column(Text, nullable=True)
@@ -1058,6 +1075,10 @@ class PsoeFinding(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
     target_date: Mapped[object] = mapped_column(Date, nullable=True)
     closed_date: Mapped[object] = mapped_column(Date, nullable=True)
+    # SN-C10 (P1-25) — optional manual link to a CAP created from this finding.
+    cap_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("caps.id"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
@@ -1070,6 +1091,7 @@ class PsoeFinding(Base):
         PSOE_FINDING_TYPE_CHECK,
         PSOE_FINDING_STATUS_CHECK,
         Index("ix_psoe_findings_assessment", "assessment_id"),
+        Index("ix_psoe_findings_cap", "cap_id"),
     )
 
 
@@ -1919,6 +1941,139 @@ class SafetyCommunication(Base):
         SAFETY_COMMUNICATION_STATUS_CHECK,
         Index("ix_safety_communications_tenant", "tenant_id"),
         Index("ix_safety_communications_tenant_status", "tenant_id", "status"),
+    )
+
+
+# ============================================================================
+# MODULE C — PHASE 1 SCHEMA (P1-20..P1-28)
+# ============================================================================
+
+class ModuleCAggregate(Base):
+    """SN-C1/SN-C5 (P1-20): materialized SDCPS aggregation row.
+
+    ``tenant_id`` NULL means national/state scope (CAAN-only RLS, SN-C5).
+    """
+
+    __tablename__ = "module_c_aggregates"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    metric_type: Mapped[str] = mapped_column(Text, nullable=False)
+    metric_key: Mapped[object] = mapped_column(Text, nullable=True)
+    period_start: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    period_end: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    payload: Mapped[object] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    ttl_seconds: Mapped[object] = mapped_column(Integer, nullable=True)
+    source_version: Mapped[object] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ux_module_c_aggregates_key",
+            "tenant_id", "metric_type", "metric_key", "period_start",
+            unique=True,
+        ),
+        Index("ix_module_c_aggregates_tenant", "tenant_id"),
+        Index("ix_module_c_aggregates_type", "metric_type"),
+    )
+
+
+class StateSafetyPerformanceTarget(Base):
+    """SN-C2/SN-C6 (P1-21): national-scope SPT set/approved by CAAN.
+
+    ``spi_definition_id`` is a logical FK to the SPI definitions in
+    ``spi_service`` (Q9.1 hybrid: code constants, no reference table), so it is
+    a plain text column with no DB-level FK.
+    """
+
+    __tablename__ = "state_safety_performance_targets"
+
+    id: Mapped[object] = _uuid_pk()
+    spi_definition_id: Mapped[str] = mapped_column(Text, nullable=False)
+    target_value: Mapped[float] = mapped_column(Float, nullable=False)
+    target_period: Mapped[str] = mapped_column(Text, nullable=False, default="annual")
+    set_by: Mapped[object] = mapped_column(Text, nullable=True)
+    set_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_by: Mapped[object] = mapped_column(Text, nullable=True)
+    approved_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_from: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    valid_to: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_state_spt_spi", "spi_definition_id"),
+    )
+
+
+METRIC_DEFINITION_WINDOW_CHECK = CheckConstraint(
+    "window_type IN ('rolling_12m', 'rolling_90d', 'quarter_over_quarter')",
+    name="ck_metric_definitions_window_type",
+)
+
+
+class MetricDefinition(Base):
+    """SN-C3/SN-C7 (P1-22): trend-baseline window registry (read-only, seeded).
+
+    ``metric_key`` NULL means the default window for the ``metric_type``.
+    """
+
+    __tablename__ = "metric_definitions"
+
+    id: Mapped[object] = _uuid_pk()
+    metric_type: Mapped[str] = mapped_column(Text, nullable=False)
+    metric_key: Mapped[object] = mapped_column(Text, nullable=True)
+    window_type: Mapped[str] = mapped_column(Text, nullable=False, default="rolling_12m")
+    window_days: Mapped[object] = mapped_column(Integer, nullable=True)
+    min_periods: Mapped[object] = mapped_column(Integer, nullable=True)
+    valid_from: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        METRIC_DEFINITION_WINDOW_CHECK,
+        Index("ux_metric_definitions_type_key", "metric_type", "metric_key", unique=True),
+    )
+
+
+class TaxonomyMapping(Base):
+    """SN-C4/SN-C8 (P1-23): read-only ICAO ↔ ADREP ↔ HFACS ↔ N-HRC mapping.
+
+    Seeded from ``public/data/hfacs_nanocodes.json`` and
+    ``data/icao_adrep_taxonomies.csv``; complements (does not replace) the
+    denormalized taxonomy columns on hazards/reports.
+    """
+
+    __tablename__ = "taxonomy_mappings"
+
+    id: Mapped[object] = _uuid_pk()
+    icao_code: Mapped[object] = mapped_column(Text, nullable=True)
+    adrep_code: Mapped[object] = mapped_column(Text, nullable=True)
+    hfacs_nanocode: Mapped[object] = mapped_column(Text, nullable=True)
+    nhrc_category: Mapped[object] = mapped_column(Text, nullable=True)
+    valid_from: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index(
+            "ux_taxonomy_mappings_codes",
+            "icao_code", "adrep_code", "hfacs_nanocode",
+            unique=True,
+        ),
+        Index("ix_taxonomy_mappings_icao", "icao_code"),
+        Index("ix_taxonomy_mappings_hfacs", "hfacs_nanocode"),
     )
 
 

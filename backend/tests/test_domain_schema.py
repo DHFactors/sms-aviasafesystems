@@ -7,7 +7,7 @@
 import pytest
 
 from app.db import db_models
-from app.db.schema_init import _DOMAIN_DDL, _MODULE_B_DDL
+from app.db.schema_init import _DOMAIN_DDL, _MODULE_B_DDL, _MODULE_C_DDL
 
 
 def _table(name):
@@ -245,3 +245,96 @@ def test_hazards_import_batch_fk_to_import_batches():
     assert col is not None and col.foreign_keys
     refs = {fk.column.table.name for fk in col.foreign_keys}
     assert "import_batches" in refs
+
+
+# ============================================================================
+# Module C — Phase 1 schema (P1-20..P1-28)
+# ============================================================================
+
+MODULE_C_PHASE1_TABLES = [
+    "module_c_aggregates",
+    "state_safety_performance_targets",
+    "metric_definitions",
+    "taxonomy_mappings",
+]
+
+
+@pytest.mark.parametrize("table", MODULE_C_PHASE1_TABLES)
+def test_module_c_phase1_tables_registered(table):
+    t = _table(table)
+    assert t is not None, f"table {table} missing from db_models"
+    assert "id" in t.columns
+
+
+@pytest.mark.parametrize("table", MODULE_C_PHASE1_TABLES)
+def test_module_c_ddl_creates_table(table):
+    ddl = "\n".join(_MODULE_C_DDL).lower()
+    assert f"create table if not exists {table} " in ddl
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "tenant_id", "metric_type", "metric_key", "period_start", "period_end",
+        "payload", "computed_at", "ttl_seconds", "source_version",
+    ],
+)
+def test_module_c_aggregates_columns_present(col):
+    assert col in _table("module_c_aggregates").columns, f"aggregates.{col} missing"
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "spi_definition_id", "target_value", "target_period", "set_by", "set_at",
+        "approved_by", "approved_at", "valid_from", "valid_to",
+    ],
+)
+def test_state_spt_columns_present(col):
+    assert col in _table("state_safety_performance_targets").columns, f"state_spt.{col} missing"
+
+
+@pytest.mark.parametrize(
+    "col", ["metric_type", "metric_key", "window_type", "window_days", "min_periods"]
+)
+def test_metric_definitions_columns_present(col):
+    assert col in _table("metric_definitions").columns, f"metric_definitions.{col} missing"
+
+
+@pytest.mark.parametrize(
+    "col", ["icao_code", "adrep_code", "hfacs_nanocode", "nhrc_category"]
+)
+def test_taxonomy_mappings_columns_present(col):
+    assert col in _table("taxonomy_mappings").columns, f"taxonomy_mappings.{col} missing"
+
+
+def test_metric_definitions_window_check_constraint():
+    t = _table("metric_definitions")
+    c = next(
+        (c for c in t.constraints
+         if getattr(c, "name", None) == "ck_metric_definitions_window_type"),
+        None,
+    )
+    assert c is not None
+    text = str(c.sqltext)
+    assert "rolling_12m" in text and "rolling_90d" in text
+
+
+def test_hazards_nhrc_category_present():
+    assert "nhrc_category" in _table("hazards").columns
+
+
+def test_psoe_finding_cap_fk():
+    t = _table("psoe_findings")
+    col = t.columns.get("cap_id")
+    assert col is not None and col.foreign_keys
+    refs = {fk.column.table.name for fk in col.foreign_keys}
+    assert "caps" in refs
+
+
+def test_cap_source_psoe_finding_fk():
+    t = _table("caps")
+    col = t.columns.get("source_psoe_finding_id")
+    assert col is not None and col.foreign_keys
+    refs = {fk.column.table.name for fk in col.foreign_keys}
+    assert "psoe_findings" in refs

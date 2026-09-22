@@ -81,6 +81,10 @@ _ID_COLUMNS: Dict[str, str] = {
     "srb_meetings": "id",
     "action_items": "id",
     "safety_communications": "id",
+    "module_c_aggregates": "id",
+    "state_safety_performance_targets": "id",
+    "metric_definitions": "id",
+    "taxonomy_mappings": "id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 
