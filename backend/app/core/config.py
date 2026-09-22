@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     API_PREFIX_FLIGHT_DIVERSIONS: str = "/api/v1/flight-diversions"
     API_PREFIX_STATE_RISK: str = "/api/v1/state-risk"
     API_PREFIX_SURVEYS: str = "/api/v1/surveys"
+    API_PREFIX_SMS_MATURITY: str = "/api/v1/sms-maturity"
     API_PREFIX_TENANTS: str = "/api/v1/tenants"
     API_PREFIX_REGULATORS: str = "/api/v1/regulators"
     API_PREFIX_CONTACT: str = "/api/v1/contact"

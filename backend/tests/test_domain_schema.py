@@ -122,3 +122,22 @@ def test_feedback_rating_check_constraint():
     )
     assert c is not None
     assert "BETWEEN 1 AND 5" in str(c.sqltext)
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "tenant_id", "assessment_date", "overall_score", "level",
+        "pillar_scores", "element_scores", "gap_analysis", "recommendations",
+        "created_at", "updated_at",
+    ],
+)
+def test_sms_maturity_live_columns_present(col):
+    t = _table("sms_maturity")
+    assert col in t.columns, f"sms_maturity.{col} missing from the live shape"
+
+
+@pytest.mark.parametrize("col", ["days", "data"])
+def test_sms_maturity_legacy_columns_dropped(col):
+    t = _table("sms_maturity")
+    assert col not in t.columns, f"sms_maturity.{col} is a legacy column"
