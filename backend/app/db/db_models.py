@@ -27,7 +27,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -58,6 +58,12 @@ PRIORITY_HML_CHECK = CheckConstraint(
 TAXONOMY_ICAO_CHECK = CheckConstraint(
     "taxonomy IN ('Organizational', 'Technical', 'Human', 'Environmental')",
     name="ck_hazards_taxonomy",
+)
+# SN8 (P1-7): constrain the free-text status column to the HazardStatus enum.
+HAZARD_STATUS_CHECK = CheckConstraint(
+    "status IN ('Open', 'Processing', 'Under Review', 'Pending Closure', "
+    "'Closed', 'Reopened')",
+    name="ck_hazards_status",
 )
 
 
@@ -115,6 +121,24 @@ class Hazard(Base):
     closed_by: Mapped[object] = mapped_column(Text, nullable=True)
     remarks: Mapped[object] = mapped_column(Text, nullable=True)
 
+    # SN1 (P1-4) — the date the hazard was identified (not registered).
+    identified_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SN7 (P1-6) — instant the initial priority was assigned; set once at
+    # creation, never re-stamped on priority change.
+    first_priority_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SN2 (P1-5) — CAAN §2.1 field (ii) free-text area/operation/equipment.
+    equipment: Mapped[object] = mapped_column(Text, nullable=True)
+    # SN12 (P1-8) — historical-import provenance.
+    imported_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    import_batch_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("import_batches.id"), nullable=True
+    )
+    original_row_ref: Mapped[object] = mapped_column(Text, nullable=True)
+    legacy_hazard_code: Mapped[object] = mapped_column(Text, nullable=True)
+    # SN14 (P1-9) — enrichment hybrid storage (machine feeds + provenance).
+    enrichment_data: Mapped[object] = mapped_column(JSONB, nullable=True)
+    enrichment_sources: Mapped[object] = mapped_column(JSONB, nullable=True)
+
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_by: Mapped[object] = mapped_column(Text, nullable=True)
@@ -130,11 +154,13 @@ class Hazard(Base):
         PROBABILITY_CHECK,
         PRIORITY_HML_CHECK,
         TAXONOMY_ICAO_CHECK,
+        HAZARD_STATUS_CHECK,
         Index("ux_hazards_tenant_id", "tenant_id", "hazard_id", unique=True),
         Index("ix_hazards_tenant", "tenant_id"),
         Index("ix_hazards_tenant_status", "tenant_id", "status"),
         Index("ix_hazards_tenant_assignee", "tenant_id", "assigned_to"),
         Index("ix_hazards_tenant_created", "tenant_id", "created_at"),
+        Index("ix_hazards_tenant_legacy_code", "tenant_id", "legacy_hazard_code"),
         Index("idx_hazards_tenant_demo", "tenant_id", "is_demo"),
     )
 
@@ -151,6 +177,11 @@ REPORT_LEVEL_CHECK = CheckConstraint(
 )
 REPORT_PROB_CHECK = CheckConstraint(
     "probability_level BETWEEN 1 AND 5", name="ck_reports_probability_level"
+)
+# SN15 (P1-19): ICAO Annex 13 MOR category (A/B/C/D), nullable.
+REPORT_REGULATORY_CATEGORY_CHECK = CheckConstraint(
+    "regulatory_category IS NULL OR regulatory_category IN ('A', 'B', 'C', 'D')",
+    name="ck_reports_regulatory_category",
 )
 
 
@@ -239,6 +270,12 @@ class Report(Base):
     )
     fdr_data_retained: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # SN15 (P1-19) — MOR regulatory timer (category-tiered, ICAO Annex 13).
+    regulatory_category: Mapped[object] = mapped_column(Text, nullable=True)
+    regulatory_deadline_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    regulatory_submitted_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    regulatory_submission_ref: Mapped[object] = mapped_column(Text, nullable=True)
+
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
@@ -253,6 +290,7 @@ class Report(Base):
         REPORT_TYPE_CHECK,
         REPORT_LEVEL_CHECK,
         REPORT_PROB_CHECK,
+        REPORT_REGULATORY_CATEGORY_CHECK,
         Index("ix_reports_tenant", "tenant_id"),
         Index("ix_reports_tenant_status", "tenant_id", "status"),
         Index("ix_reports_tenant_occdate", "tenant_id", "occurrence_date"),
@@ -1453,6 +1491,20 @@ class SramRiskRegisterEntry(Base):
     alarp_justification: Mapped[object] = mapped_column(Text, nullable=True)
     accepted_by: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
     accepted_on: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SN5 (P1-11) — process-conformance signer block (two-signature rule).
+    process_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    process_signed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SN6 (P1-12) — authority-tier snapshot captured at acceptance.
+    initial_authority: Mapped[object] = mapped_column(Text, nullable=True)
+    resultant_authority: Mapped[object] = mapped_column(Text, nullable=True)
+    # SN10 (P1-13) — per-consequence register rows (CAAN §2.3.5).
+    consequence_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("bow_tie_consequences.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     review_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=True, default=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -1470,8 +1522,12 @@ class SramRiskRegisterEntry(Base):
         SRAM_RISK_REGISTER_SEVERITY_RESULTANT_CHECK,
         SRAM_RISK_REGISTER_INDEX_CURRENT_CHECK,
         SRAM_RISK_REGISTER_INDEX_RESULTANT_CHECK,
-        Index("ux_sram_risk_register_tenant_hazard", "tenant_id", "hazard_id", unique=True),
+        Index(
+            "ux_sram_risk_register_tenant_hazard_consequence",
+            "tenant_id", "hazard_id", "consequence_id", unique=True,
+        ),
         Index("ix_sram_risk_register_tenant", "tenant_id"),
+        Index("ix_sram_risk_register_consequence", "consequence_id"),
     )
 
 
@@ -1514,6 +1570,355 @@ class BarrierRegisterEntry(Base):
         BARRIER_IMPL_STATUS_CHECK,
         Index("ix_barrier_register_tenant", "tenant_id"),
         Index("ix_barrier_register_tenant_hazard", "tenant_id", "hazard_id"),
+    )
+
+
+# ============================================================================
+# MODULE B — PHASE 1 SCHEMA (P1-14..P1-18)
+# ============================================================================
+
+# --- P1-14: hazard triage (SN13) -------------------------------------------
+
+HAZARD_TRIAGE_DECISION_CHECK = CheckConstraint(
+    "decision IN ('Accepted', 'Rejected', 'Duplicate', 'Escalated')",
+    name="ck_hazard_triage_decision",
+)
+HAZARD_TRIAGE_PRIORITY_CHECK = CheckConstraint(
+    "initial_priority IS NULL OR initial_priority IN ('H', 'M', 'L')",
+    name="ck_hazard_triage_initial_priority",
+)
+
+
+class HazardTriage(Base):
+    """SN13 (P1-14): human triage decision at hazard intake, with reversal
+    audit (reversible by the safety-manager capability, SN13 Decision 2)."""
+
+    __tablename__ = "hazard_triage"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    hazard_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("hazards.id", ondelete="CASCADE"), nullable=False
+    )
+    triaged_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    triaged_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision: Mapped[str] = mapped_column(Text, nullable=False)
+    notes: Mapped[object] = mapped_column(Text, nullable=True)
+    initial_priority: Mapped[object] = mapped_column(Text, nullable=True)
+    reversal_of: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("hazard_triage.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    reversal_reason: Mapped[object] = mapped_column(Text, nullable=True)
+    reversed_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    reversed_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        HAZARD_TRIAGE_DECISION_CHECK,
+        HAZARD_TRIAGE_PRIORITY_CHECK,
+        Index("ix_hazard_triage_tenant", "tenant_id"),
+        Index("ix_hazard_triage_hazard", "tenant_id", "hazard_id"),
+        Index("ix_hazard_triage_reversal_of", "reversal_of"),
+    )
+
+
+# --- P1-15: historical import infrastructure (SN12, §25) --------------------
+
+IMPORT_BATCH_STATUS_CHECK = CheckConstraint(
+    "status IN ('uploaded', 'parsing', 'staged', 'validated', 'review', "
+    "'promoted', 'failed')",
+    name="ck_import_batches_status",
+)
+IMPORT_BATCH_FORMAT_CHECK = CheckConstraint(
+    "source_format IS NULL OR source_format IN ('xlsx', 'csv', 'xls')",
+    name="ck_import_batches_source_format",
+)
+IMPORT_ENTITY_TYPE_CHECK = CheckConstraint(
+    "entity_type IN ('hazard', 'risk_register', 'sram_risk_register', "
+    "'bow_tie', 'barrier', 'can', 'cap')",
+    name="ck_import_rows_entity_type",
+)
+IMPORT_ROW_STATUS_CHECK = CheckConstraint(
+    "validation_status IS NULL OR validation_status IN "
+    "('pending', 'valid', 'warning', 'error')",
+    name="ck_import_rows_validation_status",
+)
+
+
+class ImportBatch(Base):
+    """SN12 (P1-15): one row per uploaded import file (§25.5)."""
+
+    __tablename__ = "import_batches"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    source_filename: Mapped[object] = mapped_column(Text, nullable=True)
+    source_format: Mapped[object] = mapped_column(Text, nullable=True)
+    source_size_bytes: Mapped[object] = mapped_column(Integer, nullable=True)
+    source_hash: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="uploaded")
+    total_rows: Mapped[object] = mapped_column(Integer, nullable=False, default=0)
+    valid_rows: Mapped[object] = mapped_column(Integer, nullable=False, default=0)
+    error_rows: Mapped[object] = mapped_column(Integer, nullable=False, default=0)
+    uploaded_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        IMPORT_BATCH_STATUS_CHECK,
+        IMPORT_BATCH_FORMAT_CHECK,
+        Index("ix_import_batches_tenant", "tenant_id"),
+        Index("ix_import_batches_tenant_hash", "tenant_id", "source_hash"),
+        Index("ix_import_batches_tenant_status", "tenant_id", "status"),
+    )
+
+
+class ImportRow(Base):
+    """SN12 (P1-15): a staged, validated row from an import batch."""
+
+    __tablename__ = "import_rows"
+
+    id: Mapped[object] = _uuid_pk()
+    batch_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("import_batches.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    sheet_name: Mapped[object] = mapped_column(Text, nullable=True)
+    row_number: Mapped[object] = mapped_column(Integer, nullable=True)
+    original_row_ref: Mapped[object] = mapped_column(Text, nullable=True)
+    raw_data: Mapped[object] = mapped_column(JSONB, nullable=True)
+    normalized_data: Mapped[object] = mapped_column(JSONB, nullable=True)
+    validation_status: Mapped[object] = mapped_column(Text, nullable=True, default="pending")
+    validation_errors: Mapped[object] = mapped_column(JSONB, nullable=True)
+    promoted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    promoted_record_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        IMPORT_ENTITY_TYPE_CHECK,
+        IMPORT_ROW_STATUS_CHECK,
+        Index("ix_import_rows_batch", "batch_id"),
+        Index("ix_import_rows_tenant", "tenant_id"),
+        Index("ix_import_rows_tenant_status", "tenant_id", "validation_status"),
+    )
+
+
+class ImportMapping(Base):
+    """SN12 (P1-15): per-tenant, per-entity/per-sheet saved column map."""
+
+    __tablename__ = "import_mappings"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    sheet_name: Mapped[object] = mapped_column(Text, nullable=True)
+    name: Mapped[object] = mapped_column(Text, nullable=True)
+    column_map: Mapped[object] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_import_mappings_tenant", "tenant_id"),
+        Index("ix_import_mappings_tenant_entity", "tenant_id", "entity_type"),
+    )
+
+
+class ImportLink(Base):
+    """SN12 (P1-15): cross-sheet / cross-batch staged-row linkage."""
+
+    __tablename__ = "import_links"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    batch_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("import_batches.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_row_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("import_rows.id", ondelete="CASCADE"), nullable=True
+    )
+    target_row_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("import_rows.id", ondelete="SET NULL"), nullable=True
+    )
+    target_record_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    link_type: Mapped[object] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_import_links_tenant", "tenant_id"),
+        Index("ix_import_links_batch", "batch_id"),
+    )
+
+
+# --- P1-16 / P1-17: SAG / SRB meetings + shared action items (SN16) ---------
+
+SAG_MEETING_STATUS_CHECK = CheckConstraint(
+    "status IN ('Scheduled', 'Held', 'Cancelled')", name="ck_sag_meetings_status"
+)
+SRB_MEETING_STATUS_CHECK = CheckConstraint(
+    "status IN ('Scheduled', 'Held', 'Cancelled')", name="ck_srb_meetings_status"
+)
+ACTION_ITEM_MEETING_TYPE_CHECK = CheckConstraint(
+    "meeting_type IN ('sag', 'srb')", name="ck_action_items_meeting_type"
+)
+
+
+class SagMeeting(Base):
+    """SN16 (P1-16, §28.5): Safety Action Group meeting record."""
+
+    __tablename__ = "sag_meetings"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    scheduled_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    held_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    attendees: Mapped[object] = mapped_column(JSONB, nullable=True)
+    minutes_ref: Mapped[object] = mapped_column(Text, nullable=True)
+    minutes_summary: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="Scheduled")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        SAG_MEETING_STATUS_CHECK,
+        Index("ix_sag_meetings_tenant", "tenant_id"),
+        Index("ix_sag_meetings_tenant_scheduled", "tenant_id", "scheduled_at"),
+    )
+
+
+class SrbMeeting(Base):
+    """SN16 (P1-16, §29.5): Safety Review Board meeting record (AE-chaired)."""
+
+    __tablename__ = "srb_meetings"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    scheduled_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    held_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    attendees: Mapped[object] = mapped_column(JSONB, nullable=True)
+    minutes_ref: Mapped[object] = mapped_column(Text, nullable=True)
+    minutes_summary: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="Scheduled")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        SRB_MEETING_STATUS_CHECK,
+        Index("ix_srb_meetings_tenant", "tenant_id"),
+        Index("ix_srb_meetings_tenant_scheduled", "tenant_id", "scheduled_at"),
+    )
+
+
+class ActionItem(Base):
+    """SN16 (P1-17): shared SAG/SRB action item (meeting_type discriminator,
+    polymorphic meeting_id)."""
+
+    __tablename__ = "action_items"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    meeting_type: Mapped[str] = mapped_column(Text, nullable=False)
+    meeting_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    hazard_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("hazards.id", ondelete="SET NULL"), nullable=True
+    )
+    cap_id: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("caps.id", ondelete="SET NULL"), nullable=True
+    )
+    assigned_to: Mapped[object] = mapped_column(Text, nullable=True)
+    due_date: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="Open")
+    notes: Mapped[object] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        ACTION_ITEM_MEETING_TYPE_CHECK,
+        Index("ix_action_items_tenant", "tenant_id"),
+        Index("ix_action_items_meeting", "meeting_type", "meeting_id"),
+        Index("ix_action_items_tenant_status", "tenant_id", "status"),
+    )
+
+
+# --- P1-18: safety communications / bulletins (SN17, §31) -------------------
+
+SAFETY_COMMUNICATION_STATUS_CHECK = CheckConstraint(
+    "status IN ('draft', 'review', 'published', 'archived')",
+    name="ck_safety_communications_status",
+)
+
+
+class SafetyCommunication(Base):
+    """SN17 (P1-18, §31): tenant-scoped safety bulletin derived from hazards."""
+
+    __tablename__ = "safety_communications"
+
+    id: Mapped[object] = _uuid_pk()
+    tenant_id: Mapped[object] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[object] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    audience: Mapped[object] = mapped_column(JSONB, nullable=True)
+    derived_from_hazard_ids: Mapped[object] = mapped_column(
+        ARRAY(Uuid(as_uuid=True)), nullable=True
+    )
+    published_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_by: Mapped[object] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        SAFETY_COMMUNICATION_STATUS_CHECK,
+        Index("ix_safety_communications_tenant", "tenant_id"),
+        Index("ix_safety_communications_tenant_status", "tenant_id", "status"),
     )
 
 

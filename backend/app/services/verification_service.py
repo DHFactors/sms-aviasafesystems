@@ -119,9 +119,9 @@ class VerificationService:
             HazardService(self.tenant_id).update_status(hazard_id, "Reopened", svc_user)
             logger.info(f"Hazard {hazard_id} → Reopened (CAP ineffective)")
 
-        elif outcome == "Overdue":
-            pg.update(Hazard, "id", haz_uuid, {"overdue": True, "updated_at": now})
-            logger.warning(f"Hazard {hazard_id} marked overdue (escalation)")
+        # SN4: hazards have NO overdue state — the former no-op write to a
+        # non-existent `hazards.overdue` column is removed. Risk-overdue is
+        # derived at read time; CAP-overdue is its own lifecycle status.
 
         return doc_data
 

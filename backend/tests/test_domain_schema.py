@@ -7,7 +7,7 @@
 import pytest
 
 from app.db import db_models
-from app.db.schema_init import _DOMAIN_DDL
+from app.db.schema_init import _DOMAIN_DDL, _MODULE_B_DDL
 
 
 def _table(name):
@@ -141,3 +141,107 @@ def test_sms_maturity_live_columns_present(col):
 def test_sms_maturity_legacy_columns_dropped(col):
     t = _table("sms_maturity")
     assert col not in t.columns, f"sms_maturity.{col} is a legacy column"
+
+
+# ============================================================================
+# Module B — Phase 1 schema (P1-4..P1-19)
+# ============================================================================
+
+MODULE_B_PHASE1_TABLES = [
+    "hazard_triage", "import_batches", "import_rows", "import_mappings",
+    "import_links", "sag_meetings", "srb_meetings", "action_items",
+    "safety_communications",
+]
+
+
+@pytest.mark.parametrize("table", MODULE_B_PHASE1_TABLES)
+def test_module_b_phase1_tables_registered(table):
+    t = _table(table)
+    assert t is not None, f"table {table} missing from db_models"
+    assert "id" in t.columns
+    assert "tenant_id" in t.columns
+
+
+@pytest.mark.parametrize("table", MODULE_B_PHASE1_TABLES)
+def test_module_b_ddl_creates_table(table):
+    ddl = "\n".join(_MODULE_B_DDL).lower()
+    assert f"create table if not exists {table} " in ddl
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "identified_at", "first_priority_at", "equipment", "imported_at",
+        "import_batch_id", "original_row_ref", "legacy_hazard_code",
+        "enrichment_data", "enrichment_sources",
+    ],
+)
+def test_hazards_phase1_columns_present(col):
+    assert col in _table("hazards").columns, f"hazards.{col} missing"
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "regulatory_category", "regulatory_deadline_at",
+        "regulatory_submitted_at", "regulatory_submission_ref",
+    ],
+)
+def test_reports_regulatory_columns_present(col):
+    assert col in _table("reports").columns, f"reports.{col} missing"
+
+
+@pytest.mark.parametrize(
+    "col",
+    [
+        "process_by", "process_signed_at", "initial_authority",
+        "resultant_authority", "consequence_id",
+    ],
+)
+def test_sram_phase1_columns_present(col):
+    assert col in _table("sram_risk_register").columns, f"sram.{col} missing"
+
+
+def test_hazards_status_check_constraint():
+    t = _table("hazards")
+    c = next(
+        (c for c in t.constraints if getattr(c, "name", None) == "ck_hazards_status"),
+        None,
+    )
+    assert c is not None
+    text = str(c.sqltext)
+    assert "Open" in text and "Reopened" in text
+
+
+def test_reports_regulatory_category_check_constraint():
+    t = _table("reports")
+    c = next(
+        (c for c in t.constraints
+         if getattr(c, "name", None) == "ck_reports_regulatory_category"),
+        None,
+    )
+    assert c is not None
+    assert "'A'" in str(c.sqltext)
+
+
+def test_sram_unique_key_includes_consequence():
+    t = _table("sram_risk_register")
+    names = {i.name for i in t.indexes}
+    assert "ux_sram_risk_register_tenant_hazard_consequence" in names
+    assert "ux_sram_risk_register_tenant_hazard" not in names
+
+
+def test_sram_consequence_fk_to_bow_tie_consequences():
+    t = _table("sram_risk_register")
+    col = t.columns.get("consequence_id")
+    assert col is not None and col.foreign_keys
+    refs = {fk.column.table.name for fk in col.foreign_keys}
+    assert "bow_tie_consequences" in refs
+
+
+def test_hazards_import_batch_fk_to_import_batches():
+    t = _table("hazards")
+    col = t.columns.get("import_batch_id")
+    assert col is not None and col.foreign_keys
+    refs = {fk.column.table.name for fk in col.foreign_keys}
+    assert "import_batches" in refs

@@ -72,6 +72,15 @@ _ID_COLUMNS: Dict[str, str] = {
     "risk_register": "id",
     "sram_risk_register": "id",
     "barrier_register": "id",
+    "hazard_triage": "id",
+    "import_batches": "id",
+    "import_rows": "id",
+    "import_mappings": "id",
+    "import_links": "id",
+    "sag_meetings": "id",
+    "srb_meetings": "id",
+    "action_items": "id",
+    "safety_communications": "id",
 }
 _BOOKKEEPING = {"id", "created_at", "updated_at", "data"}
 
