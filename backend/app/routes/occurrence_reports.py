@@ -24,6 +24,7 @@ from app.models.hazard import (
 )
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.core.config import settings
+from app.db.ids import register_tenant
 from app.services.report_service import ReportService
 from app.services.hazard_service import HazardService
 from app.services.risk_matrix import compute_risk_index, get_risk_level
@@ -269,6 +270,75 @@ async def get_report(
         raise HTTPException(status_code=404, detail="Report not found")
 
     return _to_report_response(doc)
+
+
+class RegulatorySubmitRequest(BaseModel):
+    submission_ref: Optional[str] = Field(
+        None, description="CAA/regulator reference for the transmitted report")
+    submitted_at: Optional[str] = Field(
+        None, description="ISO timestamp when transmitted; defaults to now")
+
+
+@router.post("/{report_id}/regulatory-submit", response_model=dict)
+async def regulatory_submit_mor(
+    report_id: str,
+    payload: RegulatorySubmitRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """Mark a MOR as transmitted to CAAN (Module B §30 / P3-3).
+
+    Stamps `regulatory_submitted_at` + `regulatory_submission_ref`. Operational
+    safety roles only; CAAN inspectors are read-only."""
+    if str(user.get("role") or "") in ("CAAN_SMD", "CAAN_INSPECTOR"):
+        raise HTTPException(status_code=403,
+                            detail="CAAN inspectors have READ-ONLY access to operator records")
+    if not user.get("tenant_id"):
+        raise HTTPException(status_code=403, detail="Tenant access required")
+
+    from datetime import datetime, timezone
+
+    from app.db import pg
+    from app.db.db_models import Report
+
+    report = pg.fetch_by(Report, "id", report_id)
+    if not report or str(report.get("tenant_id")) != str(register_tenant(user["tenant_id"])):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    submitted_at = None
+    if payload.submitted_at:
+        try:
+            submitted_at = datetime.fromisoformat(payload.submitted_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="submitted_at must be ISO-8601")
+    submitted_at = submitted_at or datetime.now(timezone.utc)
+
+    pg.update(Report, "id", report_id, {
+        "regulatory_submitted_at": submitted_at,
+        "regulatory_submission_ref": payload.submission_ref,
+    })
+
+    ip, request_id = request_context(request)
+    log_audit(
+        action="MOR_REGULATORY_SUBMITTED",
+        user=user.get("email"),
+        tenant_id=user["tenant_id"],
+        target_type="report",
+        target_id=report_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"submission_ref": payload.submission_ref,
+                  "submitted_at": submitted_at.isoformat()},
+    )
+    return {
+        "status": "success",
+        "timestamp": datetime.now(timezone.utc),
+        "data": {
+            "id": report_id,
+            "regulatory_submitted_at": submitted_at.isoformat(),
+            "regulatory_submission_ref": payload.submission_ref,
+        },
+    }
 
 
 @router.put("/{report_id}/risk-assessment", response_model=ReportResponse)

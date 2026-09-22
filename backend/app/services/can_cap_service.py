@@ -855,6 +855,15 @@ class CanCapService:
                 stmt = stmt.where(Cap.created_at >= cutoff)
             except (TypeError, ValueError):
                 pass
+        if filters.get("escalated_to_ae"):
+            # AE action queue (Module B §23 / P3-7): escalated, not yet decided.
+            stmt = stmt.where(
+                Cap.escalated_to_ae == True,  # noqa: E712
+                Cap.ae_signed_at.is_(None),
+            )
+        if filters.get("acceptances_pending"):
+            # AE acceptance queue (SRAM register acceptances awaiting signature).
+            stmt = stmt.where(Cap.escalated_to_ae == True)  # noqa: E712
 
         async with session_scope() as session:
             rows = (

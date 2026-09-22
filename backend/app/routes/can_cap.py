@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from loguru import logger
 from datetime import datetime, timezone
@@ -108,11 +109,15 @@ async def list_all_caps(
     department: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     days: Optional[int] = Query(None, ge=0, description="Only CAPs submitted within the last N days. 0 or omitted = All Time."),
+    escalated_to_ae: Optional[bool] = Query(None, description="AE queue: only CAPs escalated to the Accountable Executive (P3-7)."),
     archetypeId: Optional[str] = Query(None, description="Virtual archetype tenant (demo-fixed-wing / demo-rotary-wing)."),
     user: Dict[str, Any] = Depends(get_current_user),
 ):
     """List all CAPs for the current tenant, each joined with the CAN it refers
-    to (reference + issued date) for the CAP register page."""
+    to (reference + issued date) for the CAP register page.
+
+    `escalated_to_ae=true` returns the Accountable Executive action queue
+    (Module B §23 / P3-7)."""
     from app.services.archetype_scope import resolve_data_tenant
 
     effective_tenant = resolve_data_tenant(archetypeId, user)
@@ -128,6 +133,8 @@ async def list_all_caps(
         filters["search"] = search
     if days:
         filters["days"] = days
+    if escalated_to_ae:
+        filters["escalated_to_ae"] = True
 
     # 145 / CAMO accounts are restricted to their own department.
     scope = get_department_scope(user)
@@ -274,6 +281,8 @@ async def update_cap(
     data: CAPUpdate,
     user: Dict[str, Any] = Depends(get_responsible_manager),
 ):
+    """Update a CAP. Department-scoped users (P3-9) may only respond to CAPs in
+    their own department (dept isolation)."""
     if not user.get("tenant_id"):
         raise HTTPException(status_code=403, detail="Tenant access required")
     # CAAN inspectors hold READ-ONLY access to operator records
@@ -285,6 +294,18 @@ async def update_cap(
         )
     tenant_id = user["tenant_id"]
     service = CanCapService(tenant_id)
+    # Department isolation: a department user may only touch its own CAPs.
+    scope = get_department_scope(user)
+    if scope:
+        current = service.get_cap(cap_id, user)
+        if not current:
+            raise HTTPException(status_code=404, detail="CAP not found")
+        cap_dept = (current.get("department") or "").strip()
+        if cap_dept and cap_dept != scope:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Department isolation: this CAP belongs to '{cap_dept}', not '{scope}'",
+            )
     payload = {k: v for k, v in data.model_dump().items() if v is not None}
     updated = service.update_cap(cap_id, payload, user)
     if not updated:
@@ -320,6 +341,53 @@ async def review_cap(
     if not updated:
         raise HTTPException(status_code=404, detail="CAP not found")
     return _to_cap_response(updated)
+
+
+class AEDecisionRequest(BaseModel):
+    decision_type: str = Field(..., description="acknowledge | direct | continue")
+    notes: Optional[str] = None
+
+
+@router.post("/caps/{cap_id}/ae-decision", response_model=dict)
+async def ae_decision(
+    cap_id: str,
+    payload: AEDecisionRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Accountable Executive terminal decision on an escalated CAP (P3-8).
+
+    `acknowledge` sets the CAP to EIP; the decision is terminal and immutable."""
+    if user.get("role") != "ACCOUNTABLE_EXECUTIVE":
+        raise HTTPException(status_code=403,
+                            detail="Accountable Executive role required")
+    if not user.get("tenant_id"):
+        raise HTTPException(status_code=403, detail="Tenant access required")
+    if payload.decision_type not in ("acknowledge", "direct", "continue"):
+        raise HTTPException(status_code=400,
+                            detail="decision_type must be acknowledge, direct or continue")
+    service = CanCapService(user["tenant_id"])
+    try:
+        updated = service.ae_decide(cap_id, payload.decision_type, user, notes=payload.notes)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not updated:
+        raise HTTPException(status_code=404, detail="CAP not found")
+    ip, request_id = request_context(request)
+    log_audit(
+        action="CAP_AE_DECISION",
+        user=user.get("email"),
+        tenant_id=user["tenant_id"],
+        target_type="cap",
+        target_id=cap_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"decision_type": payload.decision_type},
+    )
+    return {"status": "success", "timestamp": datetime.now(timezone.utc),
+            "data": _to_cap_response(updated)}
 
 
 @router.patch("/caps/{cap_id}/status", response_model=dict)

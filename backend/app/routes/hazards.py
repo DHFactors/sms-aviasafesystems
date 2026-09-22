@@ -1,7 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import (
+    APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status,
+)
+from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 from loguru import logger
+
+from app.core.config import settings
 
 from app.models.hazard import (
     HazardCreate,
@@ -22,9 +27,206 @@ from app.models.hazard import (
 from app.middleware.auth import get_current_user, get_tenant_user, get_safety_manager
 from app.services.hazard_service import HazardService
 from app.services.audit_service import log_audit, request_context
-from app.services import sram_service, srm_engine
+from app.services import (
+    hazard_enrichment_service,
+    historical_import_service,
+    hazard_triage_service,
+    sram_service,
+    srm_engine,
+)
 
 router = APIRouter()
+
+# P3-6: default upload cap (50 MB) per the historical-import contract.
+IMPORT_MAX_BYTES = 50 * 1024 * 1024
+_TRIAGE_DECISIONS = {"Accepted", "Rejected", "Duplicate", "Escalated"}
+
+
+class TriageRequest(BaseModel):
+    decision: str = Field(..., description="Accepted | Rejected | Duplicate | Escalated")
+    notes: Optional[str] = None
+    initial_priority: Optional[str] = Field(None, pattern="^[HML]$")
+
+
+class EnrichmentRequest(BaseModel):
+    model_config = {"extra": "allow"}
+
+    description: Optional[str] = None
+    equipment: Optional[str] = None
+    taxonomy: Optional[str] = None
+    top_event: Optional[str] = None
+    consequence: Optional[str] = None
+    recommended_action: Optional[str] = None
+    follow_up_date: Optional[str] = None
+    remarks: Optional[str] = None
+    enrichment_data: Optional[Dict[str, Any]] = None
+    enrichment_sources: Optional[List[Any]] = None
+
+
+def _require_safety_officer(user: Dict[str, Any]) -> None:
+    """Triage/enrich are operational safety roles (§26/§27)."""
+    allowed = (
+        settings.SAFETY_OFFICER_ROLES
+        + settings.TENANT_ADMIN_ROLES
+        + ["SUPER_ADMIN"]
+    )
+    if user.get("role") not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Safety Officer or higher role required",
+        )
+
+
+@router.post("/{hazard_id}/triage", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def triage_hazard(
+    hazard_id: str,
+    payload: TriageRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_tenant_user),
+):
+    """Record a triage decision for a hazard (Module B §26 / P3-1)."""
+    _require_safety_officer(user)
+    if payload.decision not in _TRIAGE_DECISIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"decision must be one of {sorted(_TRIAGE_DECISIONS)}",
+        )
+    service = hazard_triage_service.HazardTriageService(user["tenant_id"])
+    try:
+        result = service.triage_hazard(
+            hazard_id, user, payload.decision,
+            notes=payload.notes, initial_priority=payload.initial_priority,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    ip, request_id = request_context(request)
+    log_audit(
+        action="HAZARD_TRIAGED",
+        user=user.get("email"),
+        tenant_id=user["tenant_id"],
+        target_type="hazard",
+        target_id=hazard_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"decision": payload.decision, "triage_id": result["id"]},
+    )
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": result}
+
+
+@router.get("/{hazard_id}/triage", response_model=dict)
+async def list_hazard_triage(
+    hazard_id: str,
+    user: Dict[str, Any] = Depends(get_tenant_user),
+):
+    """List the triage history for a hazard, newest first (P3-1)."""
+    service = hazard_triage_service.HazardTriageService(user["tenant_id"])
+    rows = service.list_triage(hazard_id)
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": rows}
+
+
+@router.post("/{hazard_id}/enrich", response_model=dict)
+async def enrich_hazard(
+    hazard_id: str,
+    payload: EnrichmentRequest,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_tenant_user),
+):
+    """Enrich a hazard additively (Module B §27 / P3-2).
+
+    Create-only fields are rejected by the service; every change is audited
+    with before/after values."""
+    _require_safety_officer(user)
+    body = payload.model_dump(exclude_none=True)
+    if not body:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="No enrichment fields supplied")
+    service = hazard_enrichment_service.HazardEnrichmentService(user["tenant_id"])
+    try:
+        result = service.enrich_hazard(hazard_id, user, body)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": result}
+
+
+# ─── P3-6: historical import (must precede /{hazard_id} lookups) ───
+
+@router.post("/import", response_model=dict, status_code=status.HTTP_201_CREATED)
+async def import_hazards(
+    request: Request,
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """Upload a historical import file (.xlsx/.csv): parse + stage + validate."""
+    if user.get("role") not in (settings.TENANT_ADMIN_ROLES + ["SUPER_ADMIN"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Tenant admin required to import historical data")
+    raw = await file.read()
+    if len(raw) > IMPORT_MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail=f"File exceeds the {IMPORT_MAX_BYTES // (1024*1024)}MB limit")
+    service = historical_import_service.HistoricalImportService(user["tenant_id"])
+    try:
+        result = service.create_batch(user, raw, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    ip, request_id = request_context(request)
+    log_audit(
+        action="HAZARD_IMPORT_UPLOADED",
+        user=user.get("email"), tenant_id=user["tenant_id"],
+        target_type="import_batch", target_id=result["id"],
+        ip=ip, request_id=request_id,
+        metadata={"filename": file.filename, "total": result.get("total_rows")},
+    )
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": result}
+
+
+@router.get("/import/{batch_id}", response_model=dict)
+async def get_import_batch(
+    batch_id: str,
+    status_filter: Optional[str] = Query(None),
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """List staged rows for an import batch (review view)."""
+    service = historical_import_service.HistoricalImportService(user["tenant_id"])
+    rows = service.list_rows(batch_id, status_filter)
+    return {"status": "success", "timestamp": datetime.now(timezone.utc),
+            "data": {"batch_id": batch_id, "rows": rows}}
+
+
+@router.post("/import/{batch_id}/promote", response_model=dict)
+async def promote_import_batch(
+    batch_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """Promote a batch's valid rows to hazards (operator approval required)."""
+    if user.get("role") not in (settings.TENANT_ADMIN_ROLES + ["SUPER_ADMIN"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Tenant admin required to promote an import")
+    service = historical_import_service.HistoricalImportService(user["tenant_id"])
+    try:
+        result = service.promote_batch(batch_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": result}
+
+
+@router.delete("/import/{batch_id}", response_model=dict)
+async def reject_import_batch(
+    batch_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_safety_manager),
+):
+    """Reject (discard) an import batch."""
+    if user.get("role") not in (settings.TENANT_ADMIN_ROLES + ["SUPER_ADMIN"]):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Tenant admin required to reject an import")
+    service = historical_import_service.HistoricalImportService(user["tenant_id"])
+    try:
+        result = service.reject_batch(batch_id, user, "rejected by operator")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return {"status": "success", "timestamp": datetime.now(timezone.utc), "data": result}
 
 
 @router.post("/", response_model=dict, status_code=status.HTTP_201_CREATED)

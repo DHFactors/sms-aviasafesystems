@@ -14,7 +14,7 @@ from app.core.metrics import router as metrics_router
 from app.core.security import SecurityHeadersMiddleware, RateLimitMiddleware
 from app.core.cors import ManualCORSMiddleware
 from app.firebase import initialize_firebase, is_firebase_ready
-from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, sms_maturity, tenants, regulators, contact, feedback, copilot, psoe, sdc, data, scheduled_jobs, regulator_dashboard
+from app.routes import reports, dashboard, auth, admin, hazards, can_cap, verification, reporting, flight_diversions, state_risk, surveys, sms_maturity, tenants, regulators, contact, feedback, copilot, psoe, sdc, data, scheduled_jobs, regulator_dashboard, meetings, bulletins
 from app.routes import demo as demo_routes
 from app.api.v1.router import router as v1_router
 
@@ -291,6 +291,9 @@ app.include_router(sdc.router, tags=["SDC Ingestion"])
 app.include_router(data.router, tags=["Universal Data Query"])
 app.include_router(scheduled_jobs.router, tags=["Scheduled Jobs"])
 app.include_router(regulator_dashboard.router, prefix="/api/v1/regulator", tags=["Regulator Dashboard"])
+
+app.include_router(meetings.router, prefix="/api/v1", tags=["SAG/SRB Meetings & Action Items"])
+app.include_router(bulletins.router, prefix="/api/v1/bulletins", tags=["Safety Bulletins"])
 
 app.include_router(v1_router, prefix="/api/v1", tags=["API v1 — CAAN Oversight"])
 

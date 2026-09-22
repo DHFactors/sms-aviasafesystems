@@ -292,9 +292,25 @@ async def update_barrier(barrier_id: str, payload: BarrierUpdate,
 
 
 @router.get("/risk-register/{tenant_id}", response_model=dict)
-async def get_risk_register(tenant_id: str, user: dict = Depends(get_current_user)):
+async def get_risk_register(
+    tenant_id: str,
+    acceptances_pending: bool = False,
+    user: dict = Depends(get_current_user),
+):
+    """Risk register for a tenant.
+
+    ``acceptances_pending=true`` returns the Accountable Executive acceptance
+    queue: SRAM entries not yet accepted and not closed (Module B §16 / P3-7).
+    """
     try:
         result = await sram_service.get_risk_register(_resolve_scope(user, tenant_id))
+        if acceptances_pending:
+            rows = result.get("rows", []) if isinstance(result, dict) else []
+            pending = [
+                r for r in rows
+                if not r.get("accepted") and str(r.get("status") or "").lower() != "closed"
+            ]
+            result = {"rows": pending, "pending_count": len(pending)}
     except Exception as exc:
         _handle_sram_errors(exc)
     return {"success": True, "data": result}
