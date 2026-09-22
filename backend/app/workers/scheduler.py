@@ -110,16 +110,20 @@ class ScheduledReportWorker:
 
         period = f"{year} Q{quarter}"
         subject = f"CAAN SSP Oversight Report — {period}"
+        from app.services.data_governance import limitation_html, limitation_text
+
         html_body = (
             f"<h2>CAAN State Safety Programme Oversight Report</h2>"
             f"<p>Reporting Period: {period}</p>"
             f"<p>Please find the attached SSP oversight report for your review.</p>"
             f"<p>This report was generated automatically by the AviaSAFE SMS Platform.</p>"
+            f"{limitation_html()}"
         )
         text_body = (
             f"CAAN State Safety Programme Oversight Report\n"
             f"Reporting Period: {period}\n\n"
             f"Please find the attached SSP oversight report for your review.\n"
+            f"{limitation_text()}"
         )
 
         all_sent = True

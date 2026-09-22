@@ -117,17 +117,21 @@ class TenantReportWorker:
 
         operator_name = tenant_data.get("operator_name") or tenant_data.get("name", tenant_id)
         subject = f"Monthly SRB Safety Report — {operator_name} ({year}-{month:02d})"
+        from app.services.data_governance import limitation_html, limitation_text
+
         html_body = (
             f"<h2>Monthly Safety Review Board Report</h2>"
             f"<p><strong>Operator:</strong> {operator_name}</p>"
             f"<p><strong>Period:</strong> {year}-{month:02d}</p>"
             f"<p>Please find the attached SRB safety report for your review.</p>"
+            f"{limitation_html()}"
         )
         text_body = (
             f"Monthly Safety Review Board Report\n"
             f"Operator: {operator_name}\n"
             f"Period: {year}-{month:02d}\n\n"
             f"Please find the attached SRB safety report for your review.\n"
+            f"{limitation_text()}"
         )
 
         all_sent = True

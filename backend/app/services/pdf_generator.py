@@ -423,6 +423,11 @@ class CaanPdfGenerator:
             Paragraph("Date: ___________________________", sig_label),
         ]))
 
+        # ── Use-limitation statement (DP-7 / SS-6) ──
+        from app.services.data_governance import USE_LIMITATION_STATEMENT
+        story.append(Spacer(1, 0.25 * inch))
+        story.append(Paragraph(f"<i>{USE_LIMITATION_STATEMENT}</i>", small))
+
         from app.services.pdf_canvas import NumberedCanvas
         doc.build(story, canvasmaker=NumberedCanvas)
         buffer.seek(0)

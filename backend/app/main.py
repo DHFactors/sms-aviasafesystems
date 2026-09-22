@@ -120,6 +120,12 @@ app.add_middleware(RequestLoggingMiddleware)
 from app.core.perf import PerfTimingMiddleware  # noqa: E402
 app.add_middleware(PerfTimingMiddleware)
 
+# RBAC module-access + tenant-isolation gate (P2-26). Registered last so it runs
+# outermost; it no-ops for unauthenticated/unknown requests and lets the route
+# dependencies own per-endpoint authorisation.
+from app.middleware.rbac_middleware import RBACMiddleware  # noqa: E402
+app.add_middleware(RBACMiddleware)
+
 
 def _req_id(request: Request) -> str:
     return getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")

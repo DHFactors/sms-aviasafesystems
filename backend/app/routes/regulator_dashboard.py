@@ -5,6 +5,10 @@ import io
 
 from app.services.aggregation_service import AggregationService
 from app.services import caan_audit
+from app.services.data_governance import (
+    USE_LIMITATION_STATEMENT,
+    classification_header,
+)
 from app.middleware.auth import get_caan_user
 
 router = APIRouter()
@@ -34,6 +38,9 @@ async def industry_averages(
     tids = _default_tenant_ids(tenant_ids)
     svc = _service()
     result = await svc.calculate_industry_averages(tids)
+    if isinstance(result, dict):
+        result.setdefault("classification", "public")
+        result.setdefault("use_limitation", USE_LIMITATION_STATEMENT)
     return result
 
 @router.get("/top-hazards")
@@ -87,7 +94,10 @@ async def export_pdf(
     svc = _service()
     data = await svc.calculate_industry_averages(tids)
     pdf_bytes = svc.export_pdf_data(data)
-    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=regulator-report.pdf"})
+    headers = {"Content-Disposition": "attachment; filename=regulator-report.pdf"}
+    headers.update(classification_header("aggregate"))
+    headers["X-Use-Limitation"] = USE_LIMITATION_STATEMENT
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf", headers=headers)
 
 @router.get("/export/excel")
 async def export_excel(
@@ -99,4 +109,7 @@ async def export_excel(
     svc = _service()
     data = await svc.calculate_industry_averages(tids)
     excel_bytes = svc.export_excel_data(data)
-    return StreamingResponse(io.BytesIO(excel_bytes), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=regulator-data.xlsx"})
+    headers = {"Content-Disposition": "attachment; filename=regulator-data.xlsx"}
+    headers.update(classification_header("aggregate"))
+    headers["X-Use-Limitation"] = USE_LIMITATION_STATEMENT
+    return StreamingResponse(io.BytesIO(excel_bytes), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
