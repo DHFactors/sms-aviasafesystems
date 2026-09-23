@@ -17,8 +17,17 @@ from _mbb import create_tenant, run, unique_slug
 
 def _cleanup(slug, tid):
     """Best-effort teardown: per-statement commits, never raises (see
-    backend/tests/_mbb.py::cleanup)."""
+    backend/tests/_mbb.py::cleanup).
+    Permanent pilot tenants — must never be purged. See
+    PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py."""
     import logging
+
+    from app.db.isolation import is_permanent_tenant_slug
+
+    if is_permanent_tenant_slug(slug):
+        logging.getLogger(__name__).warning(
+            "SKIP (permanent pilot tenant): %s — refusing test cleanup", slug)
+        return
 
     async def _go():
         async with session_scope() as s:

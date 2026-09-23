@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from app.db.db_models import UserProfile
 from app.db.ids import register_tenant
+from app.db.isolation import is_permanent_tenant_slug
 from app.db.session import session_scope
 
 log = logging.getLogger(__name__)
@@ -63,7 +64,13 @@ def cleanup(slug: str, extra_tables=()) -> None:
     back earlier deletes (session_scope commits once at exit by default);
     (2) every statement is attempted and this function NEVER raises, so one
     dropped statement cannot strand the rest.
+    (3) Permanent pilot tenants — must never be purged. See
+    PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py.
     """
+    if is_permanent_tenant_slug(slug):
+        log.warning("SKIP (permanent pilot tenant): %s — refusing test cleanup",
+                    slug)
+        return
     tid = register_tenant(slug)
 
     async def _go():

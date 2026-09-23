@@ -82,7 +82,7 @@ AUTHOR: AviaSAFE Systems
                 <p class="card-sub">Create tenant users or purge test accounts. Requires SUPER_ADMIN + setup key. New users receive a generated password (shown once) and a welcome email. Protected super-admin accounts cannot be deleted and self-deletion is blocked. Every create/delete is audit-logged.</p>
                 <div class="btn-row" style="margin-bottom:12px;">
                     <select id="userTenantFilter" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;min-width:160px;" onchange="renderUserTable()"><option value="">All tenants</option></select>
-                    <input type="text" id="userSearch" placeholder="Filter by email…" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
+                    <input type="search" id="userSearch" placeholder="Filter by email…" autocomplete="off" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:.82rem;flex:1;min-width:180px;" oninput="filterUserTable(this.value)">
                     <button class="btn btn-primary btn-sm" onclick="openCreateUserModal()"><i class="fas fa-user-plus"></i> Create User</button>
                     <button class="btn btn-outline btn-sm" onclick="loadUsers()"><i class="fas fa-rotate"></i> Refresh</button>
                     <small style="margin-left:2px;color:#94a3b8;font-size:.72rem;">Generated password shown once.</small>

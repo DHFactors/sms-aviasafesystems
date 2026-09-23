@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     # Empty by default so the app boots on Firestore-only deployments; the async
     # SQLAlchemy engine is created lazily in app/db/session.py.
     DATABASE_URL: Optional[str] = None
+    # Client-side asyncpg command timeout (seconds). A slow query fails fast with
+    # a client-side timeout instead of waiting for the server-side
+    # statement_timeout. Bounds the Supabase pooler handshake/query stalls.
+    DB_COMMAND_TIMEOUT: int = 30
 
     # ── Firebase (Auth-only; Firestore removed B4) ──
     FIREBASE_PROJECT_ID: Optional[str] = None

@@ -53,9 +53,17 @@ def _create_tenant(slug: str) -> str:
 def _delete_tenant(slug: str) -> None:
     """Best-effort throwaway-tenant teardown. Commits each DELETE
     independently and never raises, so a mid-cleanup connection drop cannot
-    strand the tenant row (see backend/tests/_mbb.py::cleanup)."""
+    strand the tenant row (see backend/tests/_mbb.py::cleanup).
+    Permanent pilot tenants — must never be purged. See
+    PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py."""
     import logging
 
+    from app.db.isolation import is_permanent_tenant_slug
+
+    if is_permanent_tenant_slug(slug):
+        logging.getLogger(__name__).warning(
+            "SKIP (permanent pilot tenant): %s — refusing test cleanup", slug)
+        return
     tid = register_tenant(slug)
 
     async def _go():

@@ -11,6 +11,10 @@
 #     such as CAAN are shared reference data, not tenant-scoped, and are
 #     never purgeable. If the regulators table lacks an is_demo column,
 #     ALL regulator rows are preserved.
+#   * PRESERVES permanent pilot tenants (sita-air, air-dynasty,
+#     saurya-airlines, caan) and their users/rows in every phase, including
+#     Firebase Auth. See PERMANENT_TENANT_SLUGS in app/db/isolation.py.
+#     Every guarded delete logs "SKIP (permanent pilot tenant)".
 #   * Keeps: super-admin users row (tenant_id NULL), all static reference
 #     tables (psoe_questions, ADREP/HFACS taxonomies + mappings), and - by
 #     design - does NOT touch Firestore (deprecated).
@@ -49,6 +53,11 @@ os.chdir(BACKEND)
 
 import psycopg2  # noqa: E402
 import psycopg2.errors  # noqa: E402
+
+from app.db.isolation import (  # noqa: E402
+    PERMANENT_PILOT_EMAILS,
+    PERMANENT_TENANT_SLUGS,
+)
 
 DEFAULT_SUPER_ADMIN_UID = "hLXs4mvtf5bb1hRSifnh6HuUHpC2"
 DEFAULT_SUPER_ADMIN_EMAIL = "ezondiza.dhf@gmail.com"
@@ -367,6 +376,27 @@ def main(argv=None) -> int:
         conn.close()
         return 0
 
+    # -- Permanent pilot tenants: resolve ids + tenant_id column map --------
+    # Permanent pilot tenants — must never be purged. See
+    # PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py.
+    pilot_slugs = sorted(PERMANENT_TENANT_SLUGS)
+    with conn.cursor() as cur:
+        if "tenants" in existing:
+            cur.execute("SELECT id FROM tenants WHERE slug = ANY(%s)",
+                        (pilot_slugs,))
+            pilot_ids = [r[0] for r in cur.fetchall()]
+        else:
+            pilot_ids = []
+        cur.execute(
+            "SELECT table_name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND column_name = 'tenant_id'")
+        has_tenant_id = {r[0] for r in cur.fetchall()}
+    print(f"[preserve] permanent pilot tenants: {', '.join(pilot_slugs)} "
+          f"({len(pilot_ids)} id(s) resolved) — guarded in every delete phase")
+
+    def _pilot_id_list():
+        return pilot_ids
+
     # -- Executable path: DB wipe inside one transaction -------------------------
     order = [t for t in _FALLBACK_ORDER if t in present_delete] + ["users"]
     use_replica = False
@@ -383,14 +413,53 @@ def main(argv=None) -> int:
         with conn.cursor() as cur:
             for table in order:
                 if table == "users":
-                    cur.execute("DELETE FROM users WHERE uid <> %s", (args.super_admin_uid,))
+                    cur.execute(
+                        "DELETE FROM users WHERE uid <> %s "
+                        "AND email NOT IN (SELECT unnest(%s::text[])) "
+                        "AND (tenant_id IS NULL OR tenant_id NOT IN "
+                        "(SELECT unnest(%s::uuid[])))",
+                        (args.super_admin_uid, sorted(PERMANENT_PILOT_EMAILS),
+                         _pilot_id_list()),
+                    )
+                    print("  SKIP (permanent pilot tenant): pilot users preserved "
+                          f"({len(PERMANENT_PILOT_EMAILS)} emails + pilot tenant ids)")
                 elif table == "regulators":
                     if has_reg_is_demo:
-                        cur.execute('DELETE FROM "public"."regulators" WHERE is_demo = TRUE')
+                        cur.execute(
+                            'DELETE FROM "public"."regulators" WHERE is_demo = TRUE '
+                            "AND slug NOT IN (SELECT unnest(%s::text[]))",
+                            (pilot_slugs,),
+                        )
+                    print("  SKIP (permanent pilot tenant): regulator 'caan' preserved")
+                elif table == "tenants":
+                    cur.execute(
+                        'DELETE FROM "public"."tenants" '
+                        "WHERE slug NOT IN (SELECT unnest(%s::text[]))",
+                        (pilot_slugs,),
+                    )
+                    print("  SKIP (permanent pilot tenant): "
+                          f"{', '.join(pilot_slugs)} preserved")
+                elif table == "psoe_findings":
+                    if "psoe_assessments" in existing:
+                        cur.execute(
+                            'DELETE FROM "public"."psoe_findings" WHERE assessment_id IN '
+                            "(SELECT id FROM psoe_assessments WHERE tenant_id NOT IN "
+                            "(SELECT unnest(%s::uuid[])) OR tenant_id IS NULL)",
+                            (_pilot_id_list(),),
+                        )
+                    else:
+                        cur.execute('DELETE FROM "public"."psoe_findings"')
+                elif table in has_tenant_id and _pilot_id_list():
+                    # NULL tenant_id rows are not pilot-linked: delete them.
+                    cur.execute(
+                        'DELETE FROM "public"."%s" WHERE (tenant_id NOT IN '
+                        "(SELECT unnest(%%s::uuid[])) OR tenant_id IS NULL)" % table,
+                        (_pilot_id_list(),),
+                    )
                 else:
                     cur.execute('DELETE FROM "public"."%s"' % table)
         conn.commit()
-        print("\n[wiped] DB transaction committed.")
+        print("\n[wiped] DB transaction committed (pilot tenants preserved).")
     except Exception as e:  # noqa: BLE001
         conn.rollback()
         print(f"ABORT: DB wipe failed, transaction rolled back: {e}")
@@ -427,6 +496,11 @@ def main(argv=None) -> int:
         print(f"\n[auth] deleting {auth_before} Firebase Auth user(s), keeping {args.super_admin_uid}...")
         failed = 0
         for u in pool:
+            # Permanent pilot tenants — must never be purged. See
+            # PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py.
+            if (u.email or "").strip().lower() in PERMANENT_PILOT_EMAILS:
+                print(f"  SKIP (permanent pilot tenant): {u.email} (uid={u.uid})")
+                continue
             try:
                 auth.delete_user(u.uid)
             except Exception as e:  # noqa: BLE001
@@ -443,22 +517,59 @@ def main(argv=None) -> int:
                         for t in ["users"] + present_delete])
 
     # -- Verification block ------------------------------------------------------
+    # Pilot tenants/users are preserved by design: "virgin" means no NON-pilot
+    # rows remain. users expectation = super-admin + preserved pilot users.
     verify_tables = ["users"] + present_delete
     verification = []
     for tbl in verify_tables:
         cnt = count_rows(conn, tbl)
         verification.append((tbl, cnt))
-    print("\n--- VERIFICATION (virgin state) ---")
+    print("\n--- VERIFICATION (virgin state, pilot tenants preserved) ---")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COUNT(*) FROM users WHERE uid <> %s "
+            "AND email NOT IN (SELECT unnest(%s::text[])) "
+            "AND (tenant_id IS NULL OR tenant_id NOT IN (SELECT unnest(%s::uuid[])))",
+            (args.super_admin_uid, sorted(PERMANENT_PILOT_EMAILS), pilot_ids),
+        )
+        stray_users = cur.fetchone()[0]
     virgin = True
     for tbl, cnt in verification:
         if tbl == "users":
-            ok = cnt == 1
+            ok = stray_users == 0
+            print(f"  {tbl:>28} count={cnt:<5} non-pilot-non-super={stray_users} "
+                  f"[{'OK' if ok else 'CHECK'}]")
         elif tbl == "regulators":
             ok = cnt == reg_preserved_before
+            print(f"  {tbl:>28} count={cnt:<5} [{'OK' if ok else 'CHECK'}]")
+        elif tbl == "tenants":
+            # Slug-keyed: checked before the generic tenant_id branch
+            # (the tenants table itself carries a tenant_id column).
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT COUNT(*) FROM tenants "
+                    "WHERE slug NOT IN (SELECT unnest(%s::text[]))",
+                    (pilot_slugs,),
+                )
+                stray = cur.fetchone()[0]
+            ok = stray == 0
+            print(f"  {tbl:>28} count={cnt:<5} non-pilot={stray} "
+                  f"[{'OK' if ok else 'CHECK'}]")
+        elif tbl in has_tenant_id:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT COUNT(*) FROM "public"."%s" WHERE (tenant_id NOT IN '
+                    "(SELECT unnest(%%s::uuid[])) AND tenant_id IS NOT NULL)" % tbl,
+                    (pilot_ids,),
+                )
+                stray = cur.fetchone()[0]
+            ok = stray == 0
+            print(f"  {tbl:>28} count={cnt:<5} non-pilot={stray} "
+                  f"[{'OK' if ok else 'CHECK'}]")
         else:
             ok = cnt == 0
+            print(f"  {tbl:>28} count={cnt:<5} [{'OK' if ok else 'CHECK'}]")
         virgin = virgin and ok
-        print(f"  {tbl:>28} count={cnt:<5} [{'OK' if ok else 'CHECK'}]")
     preserved_after = {t: count_rows(conn, t) for t in PRESERVED if t in existing}
     for t in PRESERVED:
         if t in existing:

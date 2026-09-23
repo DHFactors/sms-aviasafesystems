@@ -2,8 +2,16 @@
 # FILE: seed_demo_data.py
 # PATH: backend/scripts/seed_demo_data.py
 # PURPOSE: Seed realistic, temporally distributed demo data for the three
-#          demo tenants (sita-air fixed wing, air-dynasty rotor wing).
-#          CAAN reads aggregates — no CAAN rows are seeded.
+#          pilot tenants (sita-air fixed wing, air-dynasty rotor wing,
+#          saurya-airlines fixed wing). CAAN reads aggregates — no CAAN rows
+#          are seeded.
+#
+# PILOT FLAG POLICY (owner decision): pilot tenants are PERMANENT with
+#          is_demo=FALSE (visible in production). Every row this script
+#          writes for a pilot tenant carries is_demo=FALSE; an enforcement
+#          step re-asserts it after seeding (services stamp demo_scope(),
+#          which is TRUE in dev environments). is_demo=TRUE is reserved for
+#          ephemeral test artifacts.
 #
 # TEMPORAL DISTRIBUTION (relative to run date):
 #   A: 395-455d ago (13-15mo, OUTSIDE 1y)   E: 35-90d ago (INSIDE 90d)
@@ -331,11 +339,11 @@ def main():
                     safety_policy=p[0], safety_risk_management=p[1],
                     safety_assurance=p[2], safety_promotion=p[3],
                     overall_sms_maturity=overall, overall_score_pct=pct,
-                    is_demo=True)))
+                    is_demo=False)))
                 pending.append(("r", RModel(
                     tenant_id=tid, respondent_id=f"demo-{slug}-{m}-{i}",
                     answers={}, department="Safety",
-                    submitted_at=dt, survey_version="4.0.0", is_demo=True)))
+                    submitted_at=dt, survey_version="4.0.0", is_demo=False)))
         run(_go(pending))
         return len([1 for k, _ in pending if k == "s"])
 
@@ -346,6 +354,14 @@ def main():
     #   cans description LIKE '[DEMO]%', caps action_plan LIKE '[DEMO]%',
     #   surveys/survey_responses respondent_id LIKE 'demo-%'.
     def wipe_demo(slug, tid):
+        # Permanent pilot tenants — must never be purged. See
+        # PERMANENT_TENANT_SLUGS in backend/app/db/isolation.py.
+        # This wipe is explicitly scoped: it deletes ONLY this tenant's own
+        # [DEMO]-marked seed rows. The tenant row itself is never touched.
+        from app.db.isolation import is_permanent_tenant_slug
+        if is_permanent_tenant_slug(slug):
+            print(f"SKIP (permanent pilot tenant): {slug} — tenant row preserved; "
+                  f"wiping only its own [DEMO] rows")
         async def _go():
             async with session_scope() as s:
                 from sqlalchemy import delete
@@ -372,6 +388,44 @@ def main():
                     SModel.respondent_id.like("demo-%")))
 
         run(_go())
+
+    # Pilot flag enforcement: services stamp is_demo=demo_scope() (TRUE in
+    # dev), but pilot rows must be is_demo=FALSE (owner decision). Runs after
+    # each tenant's seeding; idempotent.
+    PILOT_FLAG_TABLES = [
+        "hazards", "reports", "cans", "caps", "surveys", "survey_responses",
+        "sram_risk_register", "risk_register", "verifications", "closures",
+        "corrective_actions", "bow_tie_analyses", "barrier_register",
+        "flight_diversions",
+    ]
+
+    def enforce_pilot_flags(slug, tid):
+        async def _go():
+            async with session_scope() as s:
+                await s.execute(
+                    text("UPDATE public.tenants SET is_demo=false WHERE id = :id"),
+                    {"id": tid},
+                )
+                await s.commit()
+                for table in PILOT_FLAG_TABLES:
+                    try:
+                        await s.execute(
+                            text(f"UPDATE public.{table} SET is_demo=false "
+                                 "WHERE tenant_id = :id"),
+                            {"id": tid},
+                        )
+                        await s.commit()
+                    except Exception:
+                        # One statement's failure must not roll back the rest.
+                        try:
+                            await s.rollback()
+                        except Exception:
+                            pass
+                        # Table may not exist in this schema — skip (verified
+                        # present-or-absent at seed time).
+
+        run(_go())
+        print(f"{slug}: pilot flags enforced (is_demo=false)")
 
     plans = [
         ("sita-air", SITA_REPORTS, SITA_HAZARDS, SITA_CAN_HAZARDS,
@@ -622,6 +676,7 @@ def main():
                         "saurya-airlines": [3, 4]}
         n_s = seed_surveys(slug, tid, survey_bands[slug], rng)
         print(f"{slug}: surveys={n_s}")
+        enforce_pilot_flags(slug, tid)
 
     print("SEED-COMPLETE")
 

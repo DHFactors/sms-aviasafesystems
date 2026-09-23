@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<!-- ============================================================================
+     FILE: dept-head-dashboard.html
+     PATH: public/dashboard/dept-head-dashboard.html
+     PHASE: P4-3 (Wave 3 — Department Head dashboard)
+     PURPOSE: CAP-only cockpit for DEPT_ADMIN (DASHBOARD_CONTRACT.md §3;
+              RBAC_MODEL.md §5; IMPLEMENTATION_ROADMAP.md P4-3).
+     LAYOUT (§3.7): shared-shell header → 3-counter KPI strip
+       (CANs | CAPs | EIP, dept-filtered) → drill-down panel →
+       CAN list (my dept) + CAP list (my dept) + CAP detail/response view
+       + EIP panel (read-only).
+     DEPT FILTERING: SERVER-SIDE ONLY. Every list passes
+       ?department=<dept> (from the token's department claim) AND the
+       backend enforces it: list_cans / list_all_caps force
+       filters["department"] = get_department_scope(user) for dept accounts
+       (routes/can_cap.py:84-87,139-142), and PATCH /cans/caps/{id}
+       rejects cross-dept writes with 403 (P3-9, can_cap.py:297-308).
+       The page NEVER client-filters cross-dept rows (would leak data).
+     WORKFLOW ACTIONS — WIRED in this wave (§3.5):
+       - CAP create (POST /api/v1/cans/{can_id}/caps, can_cap.py:218)
+       - CAP edit   (PATCH /api/v1/cans/caps/{cap_id}, can_cap.py:278)
+       - CAP submit (PATCH /api/v1/cans/caps/{cap_id}/status → Under Review,
+                     can_cap.py:408; CAPStatus UNDER_REVIEW, models/can_cap.py:50)
+     DEFERRED (§3.4/§3.5 + Module B §27):
+       - Evidence upload (attachments — UNKNOWN / not built)
+       - Response to review (PATCH .../review is safety-manager-only)
+       - Status change beyond submit (review/close/AE decision)
+     BUCKETS: same §2.3 mapping as the Safety Manager dashboard via
+       window.SafetyHelpers (canBucket/capBucket; unknown → In Process).
+     ROLE GATE (§3.1): DEPT_ADMIN only. Non-DEPT_ADMIN are redirected to
+       their appropriate dashboard via getRoleDestination (js/firebase.js)
+       with a nav-config role-mapping fallback.
+     PERIOD: Shell period selector maps to `days` on the list endpoints
+       (30d→30, 90d→90, 1y→365); the stats endpoint takes no period param
+       so KPI counters are all-time — documented, not a bug.
+     ============================================================================ -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Head Dashboard — AviaSAFE</title>
+    <link rel="stylesheet" href="shared/shell.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .dash-workspace { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--dash-space) * 2.5); align-items: start; }
+        .dash-rail { display: flex; flex-direction: column; gap: calc(var(--dash-space) * 2.5); }
+        .dash-row-clickable { cursor: pointer; }
+        .dash-modal { position: fixed; inset: 0; z-index: 300; display: none; align-items: flex-start; justify-content: center; padding: 5vh 12px; background: rgba(7,37,53,0.5); overflow-y: auto; }
+        .dash-modal.open { display: flex; }
+        .dash-modal-box { background: #fff; border-radius: 14px; max-width: 620px; width: 100%; padding: 1.5rem; box-shadow: 0 16px 48px rgba(0,0,0,0.25); }
+        .dash-modal-box h2 { margin: 0 0 1rem; font-size: 1.05rem; color: var(--dash-teal-900); }
+        .dash-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .dash-form-grid .full { grid-column: 1 / -1; }
+        .dash-field label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dash-slate-500); margin-bottom: 4px; }
+        .dash-field input, .dash-field select, .dash-field textarea { width: 100%; border: 1px solid var(--dash-slate-200); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; font-family: inherit; box-sizing: border-box; }
+        .dash-field textarea { min-height: 76px; resize: vertical; }
+        .dash-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+        .dash-form-error { color: var(--dash-red); font-size: 0.8rem; min-height: 1.2em; margin-top: 6px; }
+        .dash-kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; font-size: 0.82rem; margin-bottom: 1rem; }
+        .dash-kv dt { color: var(--dash-slate-500); font-weight: 600; }
+        .dash-kv dd { margin: 0; }
+        .dash-dept-badge { display: inline-block; font-size: 0.72rem; font-weight: 700; background: var(--dash-slate-100); border-radius: 999px; padding: 2px 10px; margin-left: 8px; }
+        @media (max-width: 1024px) { .dash-workspace { grid-template-columns: 1fr; } }
+        @media (max-width: 560px) { .dash-form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div class="dash-shell" id="dash-shell" data-shell="shared">
+        <header class="dash-header" id="dash-header">
+            <div class="dash-brand">
+                <a class="dash-brand-link" href="/safety.html" aria-label="AviaSAFE home">
+                    <span class="dash-logo" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                    <span class="dash-brand-text">Avia<em>SAFE</em><span class="dash-brand-sms">SMS</span></span>
+                </a>
+                <span class="dash-role-badge" id="dash-role-badge">—</span>
+            </div>
+            <div class="dash-header-meta">
+                <span class="dash-tenant" id="dash-tenant-name">—</span>
+                <span class="dash-module-badges" id="dash-module-badges" aria-label="Enabled modules"></span>
+                <span class="dash-user" id="dash-user-email">—</span>
+                <button type="button" class="dash-logout" id="dash-logout-btn">Logout</button>
+                <button type="button" class="dash-nav-toggle" id="dash-nav-toggle"
+                        aria-label="Toggle navigation" aria-expanded="false" aria-controls="dash-sidebar">
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar" id="dash-sidebar" aria-label="Dashboard navigation">
+                <nav id="dash-nav" aria-label="Primary"></nav>
+            </aside>
+            <div class="dash-sidebar-scrim" id="dash-sidebar-scrim" aria-hidden="true"></div>
+
+            <main class="dash-main" id="dash-main">
+                <div class="dash-toolbar" id="dash-toolbar">
+                    <h1 class="dash-title" id="dash-title">Department Head Dashboard<span class="dash-dept-badge" id="dash-dept-badge">—</span></h1>
+                    <div class="dash-period" role="group" aria-label="Reporting period">
+                        <button type="button" class="dash-period-btn" data-period="30d" aria-pressed="true">30d</button>
+                        <button type="button" class="dash-period-btn" data-period="90d" aria-pressed="false">90d</button>
+                        <button type="button" class="dash-period-btn" data-period="1y" aria-pressed="false">1y</button>
+                    </div>
+                </div>
+
+                <!-- KPI strip: 3 dept-filtered counters (§3.3). -->
+                <section class="dash-kpi-strip" id="dash-kpi-strip" aria-label="Key indicators"></section>
+
+                <!-- Drill-down panel (hidden until a KPI is clicked). -->
+                <section class="dash-card" id="drill-card" hidden aria-label="KPI drill-down">
+                    <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Drill-down <span class="dash-tag" id="drill-metric">—</span></h2>
+                    <div id="drill-panel"></div>
+                </section>
+
+                <section class="dash-content" id="dash-content" aria-live="polite">
+                    <div class="dash-workspace">
+                        <div class="dash-rail">
+                            <div class="dash-card" id="card-cans">
+                                <h2><i class="fa-solid fa-file-circle-exclamation"></i> CANs — my department <span class="dash-tag">Module B</span></h2>
+                                <div id="can-list"></div>
+                            </div>
+                            <div class="dash-card" id="card-eip">
+                                <h2><i class="fa-solid fa-bell"></i> EIP — my department <span class="dash-tag">read-only</span></h2>
+                                <div id="eip-panel"></div>
+                            </div>
+                        </div>
+                        <div class="dash-rail">
+                            <div class="dash-card" id="card-caps">
+                                <h2><i class="fa-solid fa-list-check"></i> CAPs — my department <span class="dash-tag">draft / submit</span></h2>
+                                <div id="cap-list"></div>
+                            </div>
+                            <div class="dash-card" id="card-cap-detail">
+                                <h2><i class="fa-solid fa-file-lines"></i> CAP detail / response <span class="dash-tag">select a CAP</span></h2>
+                                <div id="cap-detail"><p style="font-size:0.82rem;color:var(--dash-slate-500);margin:0;">Select a CAP to view details and respond.</p></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dash-overlay" id="dash-loading" hidden>
+                    <div class="dash-spinner" aria-hidden="true"></div>
+                    <p class="dash-overlay-text" id="dash-loading-text">Loading…</p>
+                </div>
+                <div class="dash-overlay" id="dash-empty" hidden></div>
+                <div class="dash-overlay dash-overlay-error" id="dash-error" hidden></div>
+            </main>
+        </div>
+
+        <footer class="dash-footer">
+            <span>Made with <span aria-hidden="true">❤️</span> from Nepal</span>
+        </footer>
+    </div>
+</div>
+
+<!-- CAP create/edit modal (wired: POST /api/v1/cans/{can_id}/caps, PATCH /api/v1/cans/caps/{id}). -->
+<div class="dash-modal" id="modal-cap" role="dialog" aria-modal="true" aria-labelledby="modal-cap-title">
+    <div class="dash-modal-box">
+        <h2 id="modal-cap-title">New CAP response</h2>
+        <form id="form-cap">
+            <div class="dash-form-grid">
+                <div class="dash-field full"><label for="cap-can">CAN</label>
+                    <select id="cap-can" name="can_id" required></select></div>
+                <div class="dash-field full"><label for="cap-action">Action plan (min 10 chars)</label>
+                    <textarea id="cap-action" name="action_plan" required minlength="10" placeholder="Corrective actions for this department"></textarea></div>
+                <div class="dash-field"><label for="cap-timeline">Timeline</label>
+                    <input id="cap-timeline" name="timeline" required placeholder="e.g. 14 days"></div>
+                <div class="dash-field"><label for="cap-due">Target completion date</label>
+                    <input id="cap-due" name="target_completion_date" type="date" required></div>
+                <div class="dash-field full"><label for="cap-resources">Resources required (optional)</label>
+                    <input id="cap-resources" name="resources_required" placeholder="Personnel, parts, tools"></div>
+                <div class="dash-field full"><label for="cap-plan">Implementation plan (optional)</label>
+                    <textarea id="cap-plan" name="implementation_plan" placeholder="Step-by-step implementation"></textarea></div>
+            </div>
+            <p class="dash-form-error" id="cap-error"></p>
+            <div class="dash-modal-actions">
+                <button type="button" class="dash-btn" data-close-modal>Cancel</button>
+                <button type="submit" class="dash-btn dash-btn-primary" id="cap-submit-btn">Save CAP</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/nav-config.js"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="shared/shell.js"></script>
+<script src="shared/drilldown.js"></script>
+<script src="shared/empty-state.js"></script>
+<script src="shared/module-flag.js"></script>
+<script src="shared/safety-helpers.js"></script>
+<script>
+(function () {
+    'use strict';
+    var H = window.SafetyHelpers;
+    var session = null;
+    var tenantId = null;
+    var tenantName = null;
+    var dept = null;          // server-side department scope (token claim)
+    var drillInstance = null;
+    var kpiState = {};        // cans | caps | eip -> { buckets, total, tone }
+    var canCache = [];        // current dept CAN list (for CAP create select)
+    var capCache = [];        // current dept CAP list (for detail view)
+    var editingCapId = null;  // null = create, set = edit
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function qs(params) {
+        return Object.keys(params || {})
+            .filter(function (k) { return params[k] != null && params[k] !== ''; })
+            .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); })
+            .join('&');
+    }
+    function withQs(path, params) {
+        var s = qs(params);
+        return s ? path + (path.indexOf('?') === -1 ? '?' : '&') + s : path;
+    }
+    function unwrap(body) {
+        if (body == null) return null;
+        if (Array.isArray(body)) return body;
+        if (typeof body === 'object' && body.data !== undefined) return body.data;
+        return body;
+    }
+    function pill(status) {
+        var b = H.bucketizeStatus('caps', status);
+        var cls = b === 'Open' ? 'red' : b === 'Closed' ? 'green' : 'yellow';
+        if (/revision|escalat|overdue/i.test(String(status || ''))) cls = 'red';
+        return '<span class="dash-pill ' + cls + '">' + esc(status || '—') + '</span>';
+    }
+    // Shell period (30d|90d|1y) → list-endpoint `days` (stats has no period).
+    function periodDays() {
+        try {
+            var p = window.Shell.getPeriod();
+            if (p === '90d') return 90;
+            if (p === '1y') return 365;
+            return 30;
+        } catch (e) { return 30; }
+    }
+    // Every dept-scoped list passes ?department= explicitly; the backend
+    // additionally forces the token scope server-side (can_cap.py:84-87,
+    // 139-142). No client-side cross-dept filtering anywhere.
+    function deptParams(extra) {
+        var p = { department: dept };
+        Object.keys(extra || {}).forEach(function (k) { p[k] = extra[k]; });
+        return p;
+    }
+
+    // ---- Role gate (§3.1: DEPT_ADMIN only) -------------------------------------
+    // Uses the token's role claim. Non-DEPT_ADMIN are sent to their own
+    // dashboard via getRoleDestination (js/firebase.js) with a nav-config
+    // role-mapping fallback. Returns true when the caller may proceed.
+    function roleAllowed(role) {
+        return String(role || '').toUpperCase() === 'DEPT_ADMIN';
+    }
+    function redirectFor(role) {
+        try {
+            if (typeof window.getRoleDestination === 'function') {
+                return window.getRoleDestination({ role: role });
+            }
+        } catch (e) {}
+        var r = String(role || '').toUpperCase();
+        if (r === 'SUPER_ADMIN') return '/admin/production-setup.html';
+        if (r === 'CAAN_SMD') return '/caan.html';
+        if (r === 'ACCOUNTABLE_EXECUTIVE') return '/dashboard/ae-dashboard.html';
+        if (r === 'TENANT_ADMIN' || r === 'SAFETY_OFFICER' || r === 'AIRLINE_ADMIN') return '/safety.html';
+        return '/safety.html';
+    }
+
+    // ---- KPI strip (§3.3: CANs | CAPs | EIP, dept-filtered) ---------------------
+    var KPI_DEFS = [
+        { metric: 'cans', label: 'CANs' },
+        { metric: 'caps', label: 'CAPs' },
+        { metric: 'eip', label: 'EIP' },
+    ];
+
+    function renderKpis() {
+        var strip = $('dash-kpi-strip');
+        strip.innerHTML = KPI_DEFS.map(function (k) {
+            var st = kpiState[k.metric] || { total: '—', tone: null };
+            var val = st.total;
+            if (k.metric === 'eip') val = H.eipDisplay(st.total === '—' ? 0 : st.total).text;
+            var tone = st.tone ? ' data-tone="' + st.tone + '"' : '';
+            return '<div class="dash-kpi clickable" data-kpi="' + k.metric + '"' + tone +
+                ' role="button" tabindex="0" aria-label="' + esc(k.label) + ': ' + esc(val) + '">' +
+                '<div class="dash-kpi-value">' + esc(val) + '</div>' +
+                '<div class="dash-kpi-label">' + esc(k.label) + '</div></div>';
+        }).join('');
+        Array.prototype.forEach.call(strip.querySelectorAll('[data-kpi]'), function (card) {
+            card.addEventListener('click', function () { openDrill(card.getAttribute('data-kpi')); });
+        });
+    }
+
+    async function loadKpis() {
+        // Stats endpoint is server-scoped to the caller's department
+        // (get_department_scope, can_cap.py:98-101) — no period param.
+        var rawCans = null, rawCaps = null;
+        try {
+            var cs = unwrap(await window.ApiClient.get('/api/v1/cans/stats'));
+            rawCans = ((cs || {}).cans || {}).by_status;
+            rawCaps = ((cs || {}).caps || {}).by_status;
+            var cb = H.bucketizeCounts('cans', rawCans);
+            var pb = H.bucketizeCounts('caps', rawCaps);
+            kpiState.cans = { buckets: cb, total: ((cs || {}).cans || {}).total != null ? cs.cans.total : sum(cb) };
+            kpiState.caps = { buckets: pb, total: ((cs || {}).caps || {}).total != null ? cs.caps.total : sum(pb) };
+        } catch (e) {
+            kpiState.cans = { buckets: null, total: '—', tone: null };
+            kpiState.caps = { buckets: null, total: '—', tone: null };
+        }
+        // EIP (read-only): escalated_to_ae && !ae_signature, or status EIP.
+        try {
+            var caps = unwrap(await window.ApiClient.get(withQs('/api/v1/cans/caps', deptParams({ escalated_to_ae: true })))) || [];
+            var list = Array.isArray(caps) ? caps : (caps.items || caps.records || []);
+            var eips = H.deriveEIP(list);
+            var disp = H.eipDisplay(eips.length);
+            kpiState.eip = { buckets: { Open: 0, 'In Process': eips.length, Closed: 0 }, total: eips.length, tone: disp.tone === 'neutral' ? null : disp.tone, records: eips };
+        } catch (e) { kpiState.eip = { buckets: null, total: '—', tone: null, records: [] }; }
+
+        var red = H.redSignalsFrom(null, rawCans, rawCaps);
+        if ((kpiState.eip.total || 0) > 0) red.escalated += kpiState.eip.total;
+        ['cans', 'caps'].forEach(function (m) {
+            if (kpiState[m] && kpiState[m].buckets) kpiState[m].tone = H.toneFor(kpiState[m].buckets, red);
+        });
+        renderKpis();
+    }
+
+    function sum(buckets) {
+        if (!buckets) return 0;
+        return (Number(buckets.Open) || 0) + (Number(buckets['In Process']) || 0) + (Number(buckets.Closed) || 0);
+    }
+
+    // ---- Drill-down (counter → breakdown → records, dept lists) ------------------
+    async function openDrill(metric) {
+        var card = $('drill-card');
+        card.hidden = false;
+        $('drill-metric').textContent = metric.toUpperCase();
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        var panel = $('drill-panel');
+        panel.innerHTML = window.EmptyState.loading('Loading breakdown…');
+        try {
+            if (metric === 'eip') {
+                drillInstance = window.DrillDown.mount(panel, { metric: 'EIP' });
+                drillInstance.render(kpiState.eip.records || []);
+                await drillInstance.drill('In Progress');
+                return;
+            }
+            var path = metric === 'cans' ? '/api/v1/cans/' : '/api/v1/cans/caps';
+            var rows = unwrap(await window.ApiClient.get(withQs(path, deptParams()))) || [];
+            var arr = Array.isArray(rows) ? rows : (rows.items || []);
+            drillInstance = window.DrillDown.mount(panel, { metric: metric.toUpperCase() });
+            drillInstance.render(arr);
+            await drillInstance.drill(null);
+        } catch (e) {
+            panel.innerHTML = window.EmptyState.error('Breakdown unavailable.', function () { openDrill(metric); });
+        }
+    }
+
+    // ---- Workspace: CAN list (my dept) --------------------------------------------
+    async function loadCanList() {
+        var box = $('can-list');
+        try {
+            var rows = unwrap(await window.ApiClient.get(withQs('/api/v1/cans/', deptParams({ days: periodDays() })))) || [];
+            canCache = Array.isArray(rows) ? rows : (rows.items || []);
+            if (!canCache.length) { box.innerHTML = window.EmptyState.noData('No CANs', 'No CANs assigned to ' + dept + ' in this period.'); return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>Hazard</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>' +
+                canCache.map(function (c) {
+                    return '<tr class="dash-row-clickable" data-can="' + esc(c.id) + '"><td>' + esc(c.can_reference || c.id) +
+                        '</td><td>' + esc(c.hazard_id || '—') + '</td><td>' + pill(c.status) +
+                        '</td><td>' + esc((c.target_completion_date || '').slice(0, 10) || '—') +
+                        '</td><td><button type="button" class="dash-btn dash-btn-small" data-newcap="' + esc(c.id) + '">New CAP</button></td></tr>';
+                }).join('') + '</tbody></table>';
+            Array.prototype.forEach.call(box.querySelectorAll('[data-can]'), function (tr) {
+                tr.addEventListener('click', function (ev) {
+                    if (ev.target && ev.target.hasAttribute('data-newcap')) return;
+                    openCanDetail(tr.getAttribute('data-can'));
+                });
+            });
+            Array.prototype.forEach.call(box.querySelectorAll('[data-newcap]'), function (btn) {
+                btn.addEventListener('click', function (ev) { ev.stopPropagation(); openCapModal(btn.getAttribute('data-newcap'), null); });
+            });
+        } catch (e) { box.innerHTML = window.EmptyState.error('CAN list unavailable.', loadCanList); }
+    }
+
+    async function openCanDetail(id) {
+        var box = $('can-list');
+        try {
+            var c = unwrap(await window.ApiClient.get('/api/v1/cans/' + encodeURIComponent(id))) || {};
+            box.innerHTML = '<dl class="dash-kv">' +
+                '<dt>Reference</dt><dd>' + esc(c.can_reference || c.id) + '</dd>' +
+                '<dt>Hazard</dt><dd>' + esc(c.hazard_id || '—') + '</dd>' +
+                '<dt>Status</dt><dd>' + pill(c.status) + '</dd>' +
+                '<dt>Department</dt><dd>' + esc(c.department || '—') + '</dd>' +
+                '<dt>Due</dt><dd>' + esc((c.target_completion_date || '').slice(0, 10) || '—') + '</dd>' +
+                '</dl><p>' + esc(c.description || c.required_action || '') + '</p>' +
+                '<div style="display:flex;gap:8px;"><button type="button" class="dash-btn" id="can-back">Back to list</button>' +
+                '<button type="button" class="dash-btn dash-btn-primary" id="can-newcap">New CAP</button></div>';
+            $('can-back').addEventListener('click', loadCanList);
+            $('can-newcap').addEventListener('click', function () { openCapModal(id, null); });
+        } catch (e) { box.innerHTML = window.EmptyState.error('CAN detail unavailable.', loadCanList); }
+    }
+
+    // ---- Workspace: CAP list (my dept) ----------------------------------------------
+    async function loadCapList() {
+        var box = $('cap-list');
+        try {
+            var rows = unwrap(await window.ApiClient.get(withQs('/api/v1/cans/caps', deptParams({ days: periodDays() })))) || [];
+            capCache = Array.isArray(rows) ? rows : (rows.items || []);
+            if (!capCache.length) { box.innerHTML = window.EmptyState.noData('No CAPs', 'No CAPs for ' + dept + ' in this period.'); return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>CAN</th><th>Status</th><th>Due</th><th>Actions</th></tr></thead><tbody>' +
+                capCache.map(function (c) {
+                    var id = esc(c.id);
+                    return '<tr class="dash-row-clickable" data-cap="' + id + '"><td>' + esc(c.cap_reference || c.id) +
+                        '</td><td>' + esc(c.can_reference || c.can_id || '—') + '</td><td>' + pill(c.status) +
+                        '</td><td>' + esc((c.target_completion_date || '').slice(0, 10) || '—') +
+                        '</td><td><button type="button" class="dash-btn dash-btn-small" data-act="view" data-id="' + id + '">View</button> ' +
+                        '<button type="button" class="dash-btn dash-btn-small" data-act="edit" data-id="' + id + '">Edit</button> ' +
+                        '<button type="button" class="dash-btn dash-btn-small dash-btn-primary" data-act="submit" data-id="' + id + '">Submit</button></td></tr>';
+                }).join('') + '</tbody></table>';
+            Array.prototype.forEach.call(box.querySelectorAll('[data-cap]'), function (tr) {
+                tr.addEventListener('click', function (ev) {
+                    var btn = ev.target && ev.target.closest ? ev.target.closest('[data-act]') : null;
+                    var id = btn ? btn.getAttribute('data-id') : tr.getAttribute('data-cap');
+                    var act = btn ? btn.getAttribute('data-act') : 'view';
+                    if (act === 'edit') openCapModal(null, id);
+                    else if (act === 'submit') submitCap(id);
+                    else openCapDetail(id);
+                });
+            });
+        } catch (e) { box.innerHTML = window.EmptyState.error('CAP list unavailable.', loadCapList); }
+    }
+
+    // ---- Workspace: CAP detail / response view -----------------------------------------
+    async function openCapDetail(id) {
+        var box = $('cap-detail');
+        box.innerHTML = window.EmptyState.loading('Loading CAP…');
+        try {
+            var c = unwrap(await window.ApiClient.get('/api/v1/cans/caps/' + encodeURIComponent(id))) || {};
+            box.innerHTML = '<dl class="dash-kv">' +
+                '<dt>Reference</dt><dd>' + esc(c.cap_reference || c.id) + '</dd>' +
+                '<dt>CAN</dt><dd>' + esc(c.can_reference || c.can_id || '—') + '</dd>' +
+                '<dt>Status</dt><dd>' + pill(c.status) + '</dd>' +
+                '<dt>Department</dt><dd>' + esc(c.department || '—') + '</dd>' +
+                '<dt>Due</dt><dd>' + esc((c.target_completion_date || '').slice(0, 10) || '—') + '</dd>' +
+                '</dl><p><strong>Action plan</strong><br>' + esc(c.action_plan || '—') + '</p>' +
+                '<p><strong>Timeline</strong><br>' + esc(c.timeline || '—') + '</p>' +
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                '<button type="button" class="dash-btn" data-dact="edit">Edit draft</button>' +
+                '<button type="button" class="dash-btn dash-btn-primary" data-dact="submit">Submit for review</button></div>' +
+                '<p style="font-size:0.75rem;color:var(--dash-slate-500);">Evidence upload and review responses are deferred (Module B §27).</p>';
+            box.querySelector('[data-dact="edit"]').addEventListener('click', function () { openCapModal(null, id); });
+            box.querySelector('[data-dact="submit"]').addEventListener('click', function () { submitCap(id); });
+        } catch (e) { box.innerHTML = window.EmptyState.error('CAP detail unavailable.', function () { openCapDetail(id); }); }
+    }
+
+    // ---- Workspace: EIP panel (read-only, my dept) ---------------------------------------
+    async function loadEipPanel() {
+        var box = $('eip-panel');
+        try {
+            var rows = unwrap(await window.ApiClient.get(withQs('/api/v1/cans/caps', deptParams({ escalated_to_ae: true })))) || [];
+            var list = Array.isArray(rows) ? rows : (rows.items || rows.records || []);
+            var eips = H.deriveEIP(list);
+            if (!eips.length) { var d = H.eipDisplay(0); box.innerHTML = '<p style="font-size:0.85rem;margin:0;">' + esc(d.text) + ' — no escalated items awaiting acknowledgement.</p>'; return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>CAN</th><th>Status</th></tr></thead><tbody>' +
+                eips.map(function (c) {
+                    return '<tr><td>' + esc(c.cap_reference || c.id) + '</td><td>' + esc(c.can_reference || c.can_id || '—') + '</td><td>' + pill(c.status) + '</td></tr>';
+                }).join('') + '</tbody></table>';
+        } catch (e) { box.innerHTML = window.EmptyState.error('EIP unavailable.', loadEipPanel); }
+    }
+
+    // ---- Workflow: CAP create / edit / submit (§3.5; P3-9 dept isolation) -------------------
+    function openCapModal(canId, capId) {
+        editingCapId = capId || null;
+        $('modal-cap-title').textContent = capId ? 'Edit CAP draft' : 'New CAP response';
+        $('cap-error').textContent = '';
+        var sel = $('cap-can');
+        sel.innerHTML = canCache.map(function (c) {
+            return '<option value="' + esc(c.id) + '"' + (String(c.id) === String(canId) ? ' selected' : '') + '>' +
+                esc((c.can_reference || c.id) + ' — ' + (c.title || c.hazard_id || '')) + '</option>';
+        }).join('') || '<option value="">No CANs available</option>';
+        if (capId) {
+            var cur = null;
+            capCache.forEach(function (c) { if (String(c.id) === String(capId)) cur = c; });
+            $('cap-can').value = (cur && cur.can_id) || canId || '';
+            $('cap-can').disabled = true;
+            $('cap-action').value = (cur && cur.action_plan) || '';
+            $('cap-timeline').value = (cur && cur.timeline) || '';
+            $('cap-due').value = ((cur && cur.target_completion_date) || '').slice(0, 10);
+            $('cap-resources').value = (cur && cur.resources_required) || '';
+            $('cap-plan').value = (cur && cur.implementation_plan) || '';
+        } else {
+            $('cap-can').disabled = false;
+            if (canId) sel.value = canId;
+            $('form-cap').reset();
+            if (canId) sel.value = canId;
+        }
+        $('modal-cap').classList.add('open');
+    }
+
+    function buildCapPayload() {
+        var action = $('cap-action').value.trim();
+        var timeline = $('cap-timeline').value.trim();
+        var due = $('cap-due').value;
+        var missing = [];
+        if (action.length < 10) missing.push('action_plan (min 10 chars)');
+        if (!timeline) missing.push('timeline');
+        if (!due) missing.push('target_completion_date');
+        if (!editingCapId && !$('cap-can').value) missing.push('can_id');
+        if (missing.length) throw new Error('Missing/invalid CAP fields: ' + missing.join(', '));
+        var out = {
+            action_plan: action,
+            timeline: timeline,
+            target_completion_date: new Date(due + 'T00:00:00Z').toISOString(),
+            resources_required: $('cap-resources').value.trim() || undefined,
+            implementation_plan: $('cap-plan').value.trim() || undefined,
+        };
+        if (!editingCapId) out.can_id = $('cap-can').value;
+        return out;
+    }
+
+    async function saveCapModal(ev) {
+        if (ev) ev.preventDefault();
+        var err = $('cap-error');
+        err.textContent = '';
+        try {
+            var payload = buildCapPayload();
+            if (editingCapId) {
+                await window.ApiClient.patch('/api/v1/cans/caps/' + encodeURIComponent(editingCapId), payload);
+            } else {
+                await window.ApiClient.post('/api/v1/cans/' + encodeURIComponent(payload.can_id) + '/caps', payload);
+            }
+            $('modal-cap').classList.remove('open');
+            await reloadAll();
+        } catch (ex) { err.textContent = (ex && ex.message) || 'Save failed.'; }
+    }
+
+    async function submitCap(id) {
+        if (!window.confirm('Submit this CAP for review (→ Under Review)?')) return;
+        try {
+            await window.ApiClient.patch('/api/v1/cans/caps/' + encodeURIComponent(id) + '/status', { status: 'Under Review' });
+            await reloadAll();
+            openCapDetail(id);
+        } catch (ex) { window.alert('Submit failed: ' + ((ex && ex.message) || ex)); }
+    }
+
+    // ---- Chrome + reload ----------------------------------------------------------------------
+    function bindChrome() {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-close-modal]'), function (btn) {
+            btn.addEventListener('click', function () { btn.closest('.dash-modal').classList.remove('open'); });
+        });
+        $('form-cap').addEventListener('submit', saveCapModal);
+        var logout = $('dash-logout-btn');
+        if (logout) logout.addEventListener('click', function () {
+            try { if (window.firebase && window.firebase.auth) window.firebase.auth().signOut(); } catch (e) {}
+            window.location.href = '/login.html';
+        });
+    }
+
+    async function reloadAll() {
+        await loadKpis();
+        await Promise.all([loadCanList(), loadCapList(), loadEipPanel()]);
+    }
+
+    // ---- Boot ------------------------------------------------------------------------------------
+    async function boot(user) {
+        if (!user) { window.location.href = '/login.html'; return; }
+        var u = await window.getCurrentUser().catch(function () { return null; });
+        session = u || { email: user.email, role: 'USER', tenantId: null, claims: {} };
+        var role = String((session.claims && session.claims.role) || session.role || 'USER').toUpperCase();
+        tenantId = (session.claims && (session.claims.tenant_id || session.claims.tenantId)) || session.tenantId || null;
+        dept = (session.claims && (session.claims.department || session.claims.dept)) || session.department || null;
+
+        if (!roleAllowed(role)) {
+            window.location.href = redirectFor(role);
+            return;
+        }
+
+        tenantName = tenantId ? tenantId.replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : '—';
+        try {
+            if (window.TenantResolver && tenantId) {
+                var t = await window.TenantResolver.resolveTenantTitle(tenantId);
+                if (t) tenantName = t;
+            }
+        } catch (e) {}
+        if (dept) {
+            var badge = $('dash-dept-badge');
+            if (badge) badge.textContent = dept;
+        }
+
+        try {
+            var claimsModules = (session.claims && (session.claims.modules || session.claims.module_access)) || null;
+            if (claimsModules) window.ModuleFlag.set(claimsModules);
+            await window.ModuleFlag.refresh(tenantId);
+        } catch (e) {}
+        if (!window.ModuleFlag.requires('module_b_can_cap', { container: null })) {
+            window.Shell.init({
+                role: role, roleLabel: 'Department Head', tenantName: tenantName,
+                userEmail: session.email, title: 'Department Head Dashboard',
+                modules: { module_b_can_cap: false },
+                activeNav: 'my-tasks', period: '30d', navUser: session,
+            });
+            var overlay = $('dash-empty');
+            overlay.innerHTML = window.EmptyState.noModule('CAN / CAP');
+            overlay.hidden = false;
+            return;
+        }
+
+        window.Shell.init({
+            role: role,
+            roleLabel: 'Department Head',
+            tenantName: tenantName,
+            userEmail: session.email || '—',
+            title: 'Department Head Dashboard',
+            modules: {
+                module_a_survey: window.ModuleFlag.has('module_a_survey'),
+                module_b_srm: window.ModuleFlag.has('module_b_srm'),
+                module_b_can_cap: true,
+                module_c_regulator: window.ModuleFlag.has('module_c_regulator'),
+            },
+            activeNav: 'my-tasks',
+            period: '30d',
+            navUser: session,
+            onPeriodChange: function () { reloadAll(); },
+        });
+
+        bindChrome();
+        await reloadAll();
+    }
+
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(boot);
+    } else {
+        document.addEventListener('DOMContentLoaded', function () {
+            boot(null);
+        });
+    }
+})();
+</script>
+
+</body>
+</html>
