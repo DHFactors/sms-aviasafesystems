@@ -1,11 +1,16 @@
 /* ============================================================================
    FILE: firebase.js
    PATH: public/js/firebase.js
-   VERSION: 2.0.0
+   VERSION: 2.0.2
    DATE CREATED: 2026-07-26
-   DATE REVISED: 2026-07-26
+   DATE REVISED: 2026-09-23
    PURPOSE: Firebase client SDK initialization.
             Loads Firebase SDK dynamically and initializes services.
+            2.0.1 — fix App Check guard so ?appcheck=false and /admin/
+            skip work on the static-load path.
+            2.0.2 — support the v9 compat namespace
+            (firebase.appCheck().activate) in initAppCheckSafe;
+            the compat SDK exposes no bare modular globals.
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
@@ -221,28 +226,69 @@ function initServices() {
 // ============================================================================
 
 function initAppCheckSafe(app) {
-  try {
-    const siteKey = RECAPTCHA_SITE_KEY || window.RECAPTCHA_SITE_KEY || "";
-    // Only attempt App Check if an explicit site key exists
-    if (!siteKey || siteKey === "YOUR_RECAPTCHA_SITE_KEY") {
-      console.warn("[AppCheck] No valid reCAPTCHA site key found; bypassing App Check.");
-      // Clear any stored throttle timestamp from prior runs
-    clearAppCheckThrottle();
-    return null;
-  }
+    try {
+      // Guard 1: explicit bypass via query param
+      var urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('appcheck') === 'false') {
+        console.log('[AppCheck] Skipped via ?appcheck=false');
+        if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
+        return null;
+      }
 
-    const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(siteKey),
-      isTokenAutoRefreshEnabled: false // Prevent continuous 403 retry spam
-    });
-    return appCheck;
-  } catch (err) {
-    console.warn("[AppCheck] Safe fallback activated; proceeding without App Check:", err);
-    // Clear any stored throttle timestamp on failure
-    clearAppCheckThrottle();
-    return null;
+      // Guard 2: skip on /admin/ pages
+      if (window.location.pathname.indexOf('/admin/') === 0) {
+        console.log('[AppCheck] Skipped (admin pages)');
+        if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
+        return null;
+      }
+
+      // Guard 3: at least one App Check API must be available
+      var hasModularApi =
+        typeof initializeAppCheck === 'function' &&
+        typeof ReCaptchaV3Provider === 'function';
+      var hasCompatApi =
+        typeof firebase !== 'undefined' &&
+        firebase.appCheck &&
+        typeof firebase.appCheck === 'function' &&
+        firebase.appCheck.ReCaptchaV3Provider;
+      if (!hasModularApi && !hasCompatApi) {
+        console.warn('[AppCheck] SDK not loaded (neither modular nor compat API present) — App Check disabled.');
+        if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
+        return null;
+      }
+
+      // Guard 4: site key must be present
+      var siteKey = RECAPTCHA_SITE_KEY || window.RECAPTCHA_SITE_KEY || "";
+      if (!siteKey || siteKey === "YOUR_RECAPTCHA_SITE_KEY") {
+        console.warn('[AppCheck] No valid reCAPTCHA site key; bypassing.');
+        if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
+        return null;
+      }
+
+      // Initialize using whichever API is available
+      var appCheck;
+      if (hasModularApi) {
+        appCheck = initializeAppCheck(app, {
+          provider: new ReCaptchaV3Provider(siteKey),
+          isTokenAutoRefreshEnabled: false
+        });
+        console.log('[AppCheck] Initialized successfully (modular API)');
+      } else {
+        // Compat namespace (v9 compat SDK)
+        appCheck = firebase.appCheck();
+        appCheck.activate(
+          new firebase.appCheck.ReCaptchaV3Provider(siteKey),
+          false
+        );
+        console.log('[AppCheck] Initialized successfully (compat API)');
+      }
+      return appCheck;
+    } catch (err) {
+      console.warn('[AppCheck] Fallback activated:', err);
+      if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
+      return null;
+    }
   }
-}
 
 // Attach to window for global access
 window.initAppCheckSafe = initAppCheckSafe;
@@ -334,8 +380,10 @@ window.getAppCheckToken = getAppCheckToken;
     // Check if Firebase is already available (from CDN in HTML)
     if (typeof firebase !== 'undefined' && firebase.initializeApp) {
         initializeFirebase();
-        // Use safe App Check initialization — never blocks Auth/Firestore
-        initAppCheckSafe(firebase.app());
+        // Use guarded path so ?appcheck=false and /admin/ skip work
+        if (typeof initAppCheck === 'function') {
+          initAppCheck();
+        }
         initServices().then(function() {
             window.firebase = firebase;
             window.auth = auth;
