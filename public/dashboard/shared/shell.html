@@ -1,0 +1,92 @@
+<!-- ============================================================================
+     FILE: shell.html
+     PATH: public/dashboard/shared/shell.html
+     PHASE: P4-1 (Wave 1 — shared shell template fragment)
+     PURPOSE: HTML template fragment mounted by shared/shell.js into each of the
+              four role-scoped dashboards (Safety Manager, Department Head,
+              Accountable Executive, State Regulator).
+              DASHBOARD_CONTRACT.md §1 (layout blueprint), §6 (shared
+              components), §8 (visual design system).
+     USAGE: Each dashboard page includes shell.css + shell.js (+ empty-state.js,
+            drilldown.js, module-flag.js as needed) and calls:
+              window.Shell.init({ role, tenantName, ... })
+            The shell renders header / sidebar / period selector / main and
+            leaves #dash-content empty for the dashboard to fill.
+     NOTE: No build step. No new dependencies. Font Awesome already in use
+           (nav-config.js icons). Palette matches the landing page
+           (public/index.html): deep teal #072535/#0A3A50 hero, slate #F8FAFC
+           content, oceanic blue #0284C7 accents, Inter font family.
+     ============================================================================ -->
+<div class="dash-shell" id="dash-shell" data-shell="shared">
+  <!-- ================= HEADER ================= -->
+  <header class="dash-header" id="dash-header">
+    <div class="dash-brand">
+      <a class="dash-brand-link" href="/safety.html" aria-label="AviaSAFE home">
+        <span class="dash-logo" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+        <span class="dash-brand-text">Avia<em>SAFE</em><span class="dash-brand-sms">SMS</span></span>
+      </a>
+      <span class="dash-role-badge" id="dash-role-badge" title="Active role">—</span>
+    </div>
+    <div class="dash-header-meta">
+      <span class="dash-tenant" id="dash-tenant-name" title="Active tenant">—</span>
+      <span class="dash-module-badges" id="dash-module-badges" aria-label="Enabled modules"></span>
+      <span class="dash-user" id="dash-user-email" title="Signed-in user">—</span>
+      <button type="button" class="dash-logout" id="dash-logout-btn">Logout</button>
+      <button type="button" class="dash-nav-toggle" id="dash-nav-toggle"
+              aria-label="Toggle navigation" aria-expanded="false" aria-controls="dash-sidebar">
+        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="dash-body">
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="dash-sidebar" id="dash-sidebar" aria-label="Dashboard navigation">
+      <nav id="dash-nav" aria-label="Primary"></nav>
+    </aside>
+    <div class="dash-sidebar-scrim" id="dash-sidebar-scrim" aria-hidden="true"></div>
+
+    <!-- ================= MAIN ================= -->
+    <main class="dash-main" id="dash-main">
+      <!-- Period selector bar (30d / 90d / 1y / custom). Backed by the `period`
+           query parameter; legacy numeric `days` preserved for back-compat
+           (DASHBOARD_CONTRACT.md §7; P3-14). -->
+      <div class="dash-toolbar" id="dash-toolbar">
+        <h1 class="dash-title" id="dash-title">Dashboard</h1>
+        <div class="dash-period" role="group" aria-label="Reporting period">
+          <button type="button" class="dash-period-btn" data-period="30d" aria-pressed="true">30d</button>
+          <button type="button" class="dash-period-btn" data-period="90d" aria-pressed="false">90d</button>
+          <button type="button" class="dash-period-btn" data-period="1y" aria-pressed="false">1y</button>
+          <button type="button" class="dash-period-btn" data-period="custom" aria-pressed="false">Custom</button>
+          <span class="dash-period-custom" id="dash-period-custom" hidden>
+            <input type="date" id="dash-period-start" aria-label="Custom period start">
+            <span aria-hidden="true">–</span>
+            <input type="date" id="dash-period-end" aria-label="Custom period end">
+            <button type="button" id="dash-period-apply" class="dash-btn dash-btn-small">Apply</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- KPI strip: dashboards render their counters here
+           (5-column Safety Manager, 3-column Department Head,
+           numeric-only AE, national-aggregate Regulator — §8). -->
+      <section class="dash-kpi-strip" id="dash-kpi-strip" aria-label="Key indicators"></section>
+
+      <!-- Dashboard workspace (panels, queues, charts). Filled by each page. -->
+      <section class="dash-content" id="dash-content" aria-live="polite"></section>
+
+      <!-- Loading / empty / error overlays rendered by Shell.showLoading(),
+           Shell.showEmpty(), Shell.showError() and window.EmptyState. -->
+      <div class="dash-overlay" id="dash-loading" hidden>
+        <div class="dash-spinner" aria-hidden="true"></div>
+        <p class="dash-overlay-text" id="dash-loading-text">Loading…</p>
+      </div>
+      <div class="dash-overlay" id="dash-empty" hidden></div>
+      <div class="dash-overlay dash-overlay-error" id="dash-error" hidden></div>
+    </main>
+  </div>
+
+  <footer class="dash-footer">
+    <span>Made with <span aria-hidden="true">❤️</span> from Nepal</span>
+  </footer>
+</div>
