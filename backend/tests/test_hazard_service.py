@@ -78,6 +78,10 @@ def _create_user(tid: str, uid: str) -> str:
 
 
 def _cleanup(slug: str) -> None:
+    """Best-effort teardown: per-statement commits, never raises (see
+    backend/tests/_mbb.py::cleanup)."""
+    import logging
+
     tid = register_tenant(slug)
 
     async def _go():
@@ -90,9 +94,23 @@ def _cleanup(slug: str) -> None:
                 "DELETE FROM public.users WHERE tenant_id = :id",
                 "DELETE FROM public.tenants WHERE id = :id",
             ):
-                await s.execute(text(stmt), {"id": tid})
+                try:
+                    await s.execute(text(stmt), {"id": tid})
+                    await s.commit()
+                except Exception as e:
+                    try:
+                        await s.rollback()
+                    except Exception:
+                        pass
+                    logging.getLogger(__name__).warning(
+                        "test cleanup: %s failed for %s: %s",
+                        stmt.split()[2], slug, e)
 
-    _run(_go())
+    try:
+        _run(_go())
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "test cleanup: session failed for %s: %s", slug, e)
 
 
 # ---------------------------------------------------------------------------

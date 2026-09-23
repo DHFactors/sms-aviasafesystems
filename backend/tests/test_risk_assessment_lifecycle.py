@@ -25,6 +25,10 @@ from app.db.session import session_scope
 from app.main import app
 from app.core.config import settings
 
+# Live-DB tests here write the fixed `test-airline`/`test_airline` slugs; keep
+# them in one worker to avoid cross-worker hazards/CAN/CAP FK collisions.
+pytestmark = pytest.mark.serial
+
 
 # ============================================================================
 # Firestore Mock Infrastructure

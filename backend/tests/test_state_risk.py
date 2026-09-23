@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 import asyncio
 
+import pytest
+
 from pg_bridge import patch_pg_through
 from app.db.isolation import demo_scope
 from app.services.state_risk_service import (
@@ -15,6 +17,9 @@ from app.services.state_risk_service import (
     ICAO_TOP_RISK_CATEGORIES,
     _risk_id,
 )
+
+# Live-DB tests here seed fixed slugs (air1/air2); keep them in one worker.
+pytestmark = pytest.mark.serial
 
 
 # ============================================================================

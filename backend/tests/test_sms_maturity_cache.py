@@ -51,19 +51,37 @@ def _create_tenant(slug: str) -> str:
 
 
 def _delete_tenant(slug: str) -> None:
+    """Best-effort throwaway-tenant teardown. Commits each DELETE
+    independently and never raises, so a mid-cleanup connection drop cannot
+    strand the tenant row (see backend/tests/_mbb.py::cleanup)."""
+    import logging
+
     tid = register_tenant(slug)
 
     async def _go():
         async with session_scope() as session:
-            await session.execute(
-                text("DELETE FROM public.sms_maturity WHERE tenant_id = :id"),
-                {"id": tid},
-            )
-            await session.execute(
-                text("DELETE FROM public.tenants WHERE id = :id"), {"id": tid}
-            )
+            for stmt in (
+                "DELETE FROM public.sms_maturity WHERE tenant_id = :id",
+                "DELETE FROM public.surveys WHERE tenant_id = :id",
+                "DELETE FROM public.tenants WHERE id = :id",
+            ):
+                try:
+                    await session.execute(text(stmt), {"id": tid})
+                    await session.commit()
+                except Exception as e:
+                    try:
+                        await session.rollback()
+                    except Exception:
+                        pass
+                    logging.getLogger(__name__).warning(
+                        "test cleanup: %s failed for %s: %s",
+                        stmt.split()[2], slug, e)
 
-    _run(_go())
+    try:
+        _run(_go())
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "test cleanup: session failed for %s: %s", slug, e)
 
 
 def _unique_slug(prefix: str) -> str:
@@ -426,4 +444,5 @@ def test_llm_analysis_writes_to_cache(monkeypatch):
                 )
 
         _run(_wipe())
+        _delete_tenant(slug)
         _delete_tenant(slug)

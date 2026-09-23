@@ -111,6 +111,34 @@ def _resolve_async_url(url: str) -> str:
     return url
 
 
+_TRANSIENT_CONN_NAMES = {
+    "ConnectionDoesNotExistError",
+    "InterfaceError",
+    "ProtocolError",
+    "AdminShutdownError",
+    "ConnectionResetError",
+    "PipeError",
+    "BrokenPipeError",
+}
+
+
+def is_transient_conn_error(exc: Exception) -> bool:
+    """True when `exc` is a transient connection error safe to retry.
+
+    Mirrors the allowlist used by the sync bridge (pg.py `_run_on_bridge`):
+    a dropped/reassigned PgBouncer backend or a severed TCP socket. Falls back
+    to checking ``connection_invalidated`` and a wrapped ``__cause__``.
+    """
+    if type(exc).__name__ in _TRANSIENT_CONN_NAMES:
+        return True
+    if getattr(exc, "connection_invalidated", False):
+        return True
+    cause = getattr(exc, "__cause__", None)
+    if cause is not None and type(cause).__name__ in _TRANSIENT_CONN_NAMES:
+        return True
+    return False
+
+
 def get_engine() -> AsyncEngine:
     """Return the shared async engine, constructing it on first access."""
     global _engine
@@ -135,9 +163,13 @@ def get_engine() -> AsyncEngine:
             # statement_cache_size=0 disables asyncpg's cache; the SQLAlchemy
             # adapter still prepares named statements, so give it globally-unique
             # names that cannot collide on a shared backend.
+            # command_timeout is an asyncpg connect() kwarg: fail fast on a
+            # stalled pooler query rather than waiting for the server-side
+            # statement_timeout.
             connect_args={
                 "statement_cache_size": 0,
                 "prepared_statement_name_func": _unique_prepared_stmt_name,
+                "command_timeout": settings.DB_COMMAND_TIMEOUT,
             },
         )
     return _engine
@@ -270,6 +302,34 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
         raise
     finally:
         await session.close()
+
+
+@asynccontextmanager
+async def session_scope_retry() -> AsyncGenerator[AsyncSession, None]:
+    """Like ``session_scope`` but retries once on a transient connection drop.
+
+    SAFE ONLY FOR READ-HEAVY / IDEMPOTENT call sites. ``session_scope`` commits
+    at context exit and callers may run several writes inside one block, so a
+    blanket retry there could re-run already-committed work and double-write.
+    This variant is opt-in: it disposes the pool and re-enters once on a
+    transient error (bounded — never an infinite retry).
+    """
+    try:
+        async with session_scope() as session:
+            yield session
+    except Exception as exc:  # noqa: BLE001 - re-raised unless transient
+        if not is_transient_conn_error(exc):
+            raise
+        logger.warning(
+            f"Transient DB error in session_scope_retry; retrying once: "
+            f"{type(exc).__name__}: {exc}"
+        )
+        try:
+            await get_engine().dispose()
+        except Exception:
+            pass
+        async with session_scope() as session:
+            yield session
 
 
 async def check_db_health() -> bool:

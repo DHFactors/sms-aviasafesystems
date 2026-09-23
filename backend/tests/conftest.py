@@ -11,6 +11,19 @@ from app.core.config import settings
 sys.path.insert(0, str(Path(__file__).parent))
 
 
+def pytest_configure(config):
+    """Register the `serial` marker.
+
+    Tests marked `serial` share fixed tenant slugs / live-DB state and must run
+    in a single worker (or a separate non-parallel pass) to avoid cross-worker
+    write collisions under pytest-xdist.
+    """
+    config.addinivalue_line(
+        "markers",
+        "serial: live-DB test that must not run in parallel (shared tenant state)",
+    )
+
+
 @pytest.fixture
 def client():
     return TestClient(app)

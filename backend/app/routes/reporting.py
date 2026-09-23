@@ -50,31 +50,49 @@ def _report_id(effective_tenant: Optional[str], report_type: str, year: int, qua
     return uuid5("caan-report", *parts)
 
 
+def _write_report(doc_data: Dict[str, Any], rid: str,
+                  effective_tenant: Optional[str]) -> None:
+    """Persist the report row (deterministic id -> idempotent upsert)."""
+    if effective_tenant:
+        stored = dict(doc_data)
+        stored["tenant_id"] = tenant_uuid(effective_tenant)
+        pg.upsert(RegulatoryReport, "id", rid, stored)
+        try:
+            get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(rid).set(dict(doc_data))
+        except Exception as mirror_e:
+            logger.warning(f"Report mirror write failed ({rid}): {mirror_e}")
+    else:
+        try:
+            ensure_domain_schema()
+        except Exception as ensure_e:
+            logger.warning(f"Domain schema ensure failed ({rid}): {ensure_e}")
+        stored = dict(doc_data)
+        stored["report_id"] = rid
+        pg.upsert(CaanReport, "report_id", rid, stored)
+        try:
+            get_db().collection("caan_reports").document(rid).set(dict(doc_data))
+        except Exception as mirror_e:
+            logger.warning(f"CAAN report mirror write failed ({rid}): {mirror_e}")
+
+
 def _save_report(doc_data: Dict[str, Any], effective_tenant: Optional[str]) -> Dict[str, Any]:
     rid = _report_id(effective_tenant, doc_data["report_type"], doc_data.get("year"), doc_data.get("quarter"))
     doc_data["id"] = rid
     try:
-        if effective_tenant:
-            stored = dict(doc_data)
-            stored["tenant_id"] = tenant_uuid(effective_tenant)
-            pg.upsert(RegulatoryReport, "id", rid, stored)
-            try:
-                get_tenant_collection(effective_tenant, REPORT_COLLECTION).document(rid).set(dict(doc_data))
-            except Exception as mirror_e:
-                logger.warning(f"Report mirror write failed ({rid}): {mirror_e}")
-        else:
-            try:
-                ensure_domain_schema()
-            except Exception as ensure_e:
-                logger.warning(f"Domain schema ensure failed ({rid}): {ensure_e}")
-            stored = dict(doc_data)
-            stored["report_id"] = rid
-            pg.upsert(CaanReport, "report_id", rid, stored)
-            try:
-                get_db().collection("caan_reports").document(rid).set(dict(doc_data))
-            except Exception as mirror_e:
-                logger.warning(f"CAAN report mirror write failed ({rid}): {mirror_e}")
+        _write_report(doc_data, rid, effective_tenant)
     except Exception as e:
+        # A transient connection drop is retried once: the write is an upsert by
+        # the deterministic report id, so replaying it is idempotent (no
+        # double-insert). Anything else surfaces as a 500.
+        from app.db.session import is_transient_conn_error
+        if is_transient_conn_error(e):
+            logger.warning(f"Transient DB error saving report {rid}; retrying once: {e}")
+            try:
+                _write_report(doc_data, rid, effective_tenant)
+                return doc_data
+            except Exception as retry_e:
+                logger.error(f"Failed to save report after retry: {retry_e}")
+                raise HTTPException(500, "Failed to save report")
         logger.error(f"Failed to save report: {e}")
         raise HTTPException(500, "Failed to save report")
     return doc_data

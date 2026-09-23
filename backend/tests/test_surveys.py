@@ -19,6 +19,9 @@ from app.main import app
 from app.services import survey_scoring as sc
 from pg_bridge import patch_pg_through
 
+# Live-DB tests here write the fixed `tara-air` slug; keep them in one worker.
+pytestmark = pytest.mark.serial
+
 
 # ============================================================================
 # Scoring service (pure functions, no Firestore)

@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<!-- ============================================================================
+     FILE: safety-dashboard.html
+     PATH: public/dashboard/safety-dashboard.html
+     PHASE: P4-2 (Wave 2 — Safety Manager dashboard)
+     PURPOSE: Primary operational cockpit for TENANT_ADMIN / SAFETY_OFFICER
+              (DASHBOARD_CONTRACT.md §2; IMPLEMENTATION_ROADMAP.md P4-2).
+     LAYOUT (§2.8): shared-shell header → 5-counter KPI strip
+       (Reports | Hazards | CANs | CAPs | EIP) → drill-down panel →
+       left rail (hazard list, SRM queue, CAN-CAP register, EIP monitor,
+       SAG/SRB) + main workspace (risk distribution, trends, recent
+       reports, SMS maturity).
+     WIRING: shared Shell / DrillDown / EmptyState / ModuleFlag /
+       SafetyHelpers (public/dashboard/shared/*) + window.ApiClient
+       (public/js/api/client.js). No build step, no new dependencies.
+     WORKFLOW ACTIONS — WIRED in this wave:
+       - Create hazard  (POST /api/v1/hazards/, hazards.py:232)
+       - View hazard    (GET  /api/v1/hazards/{id}, hazards.py:320)
+       - Triage hazard  (POST /api/v1/hazards/{id}/triage, hazards.py:80)
+     DEFERRED to Wave 3+ / follow-up (documented §2.6 full scope):
+       - Enrich, status update, assign, SRAM save, CAN issue, CAP create/
+         review/status, bulletin publish, import, SAG/SRB authoring.
+     PERIOD BEHAVIOR: the Shell period selector drives the overview /
+       recent / trends endpoints (which accept period+days). The stats
+       endpoints (hazards/stats, cans/stats) accept NO period param in the
+       backend, so those counters are all-time and re-render unchanged on
+       period switch — documented, not a bug.
+     SRM QUEUE: no dedicated backend endpoint exists (contract §2 gap), so
+       the queue is derived client-side (open hazards with srm_flag=true
+       and no srm_date; detail fetch capped at 25 most-recent open).
+     SAG/SRB: no dedicated pages exist in public/ yet — the card links to
+       the Master Register and notes the dedicated surfaces as deferred.
+     ============================================================================ -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Manager Dashboard — AviaSAFE</title>
+    <link rel="stylesheet" href="shared/shell.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Page-specific: workspace grid + modals (shell tokens reused). */
+        .dash-workspace {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: calc(var(--dash-space) * 2.5);
+            align-items: start;
+        }
+        .dash-rail { display: flex; flex-direction: column; gap: calc(var(--dash-space) * 2.5); }
+        .dash-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .dash-filter-row input, .dash-filter-row select {
+            border: 1px solid var(--dash-slate-200); border-radius: 8px;
+            padding: 6px 8px; font-size: 0.78rem; font-family: inherit;
+            max-width: 100%;
+        }
+        .dash-row-clickable { cursor: pointer; }
+        .dash-bar { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; margin-top: 6px; }
+        .dash-bar-track { flex: 1; height: 8px; background: var(--dash-slate-100); border-radius: 999px; overflow: hidden; }
+        .dash-bar-fill { display: block; height: 100%; background: var(--dash-brand-500); }
+        .dash-bar-label { width: 130px; color: var(--dash-slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dash-bar-num { width: 36px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+        /* Modals (create hazard / hazard detail + triage). */
+        .dash-modal { position: fixed; inset: 0; z-index: 300; display: none; align-items: flex-start; justify-content: center; padding: 5vh 12px; background: rgba(7,37,53,0.5); overflow-y: auto; }
+        .dash-modal.open { display: flex; }
+        .dash-modal-box { background: #fff; border-radius: 14px; max-width: 620px; width: 100%; padding: 1.5rem; box-shadow: 0 16px 48px rgba(0,0,0,0.25); }
+        .dash-modal-box h2 { margin: 0 0 1rem; font-size: 1.05rem; color: var(--dash-teal-900); }
+        .dash-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .dash-form-grid .full { grid-column: 1 / -1; }
+        .dash-field label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dash-slate-500); margin-bottom: 4px; }
+        .dash-field input, .dash-field select, .dash-field textarea {
+            width: 100%; border: 1px solid var(--dash-slate-200); border-radius: 8px;
+            padding: 8px 10px; font-size: 0.85rem; font-family: inherit; box-sizing: border-box;
+        }
+        .dash-field textarea { min-height: 76px; resize: vertical; }
+        .dash-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+        .dash-form-error { color: var(--dash-red); font-size: 0.8rem; min-height: 1.2em; margin-top: 6px; }
+        .dash-kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 10px; font-size: 0.82rem; margin-bottom: 1rem; }
+        .dash-kv dt { color: var(--dash-slate-500); font-weight: 600; }
+        .dash-kv dd { margin: 0; }
+        @media (max-width: 1024px) { .dash-workspace { grid-template-columns: 1fr; } }
+        @media (max-width: 560px) { .dash-form-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <!-- Shared shell chrome (structure mirrors shared/shell.html; painted by Shell.init). -->
+    <div class="dash-shell" id="dash-shell" data-shell="shared">
+        <header class="dash-header" id="dash-header">
+            <div class="dash-brand">
+                <a class="dash-brand-link" href="/safety.html" aria-label="AviaSAFE home">
+                    <span class="dash-logo" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                    <span class="dash-brand-text">Avia<em>SAFE</em><span class="dash-brand-sms">SMS</span></span>
+                </a>
+                <span class="dash-role-badge" id="dash-role-badge">—</span>
+            </div>
+            <div class="dash-header-meta">
+                <span class="dash-tenant" id="dash-tenant-name">—</span>
+                <span class="dash-module-badges" id="dash-module-badges" aria-label="Enabled modules"></span>
+                <span class="dash-user" id="dash-user-email">—</span>
+                <button type="button" class="dash-logout" id="dash-logout-btn">Logout</button>
+                <button type="button" class="dash-nav-toggle" id="dash-nav-toggle"
+                        aria-label="Toggle navigation" aria-expanded="false" aria-controls="dash-sidebar">
+                    <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="dash-body">
+            <aside class="dash-sidebar" id="dash-sidebar" aria-label="Dashboard navigation">
+                <nav id="dash-nav" aria-label="Primary"></nav>
+            </aside>
+            <div class="dash-sidebar-scrim" id="dash-sidebar-scrim" aria-hidden="true"></div>
+
+            <main class="dash-main" id="dash-main">
+                <div class="dash-toolbar" id="dash-toolbar">
+                    <h1 class="dash-title" id="dash-title">Safety Manager Dashboard</h1>
+                    <div class="dash-period" role="group" aria-label="Reporting period">
+                        <button type="button" class="dash-period-btn" data-period="30d" aria-pressed="true">30d</button>
+                        <button type="button" class="dash-period-btn" data-period="90d" aria-pressed="false">90d</button>
+                        <button type="button" class="dash-period-btn" data-period="1y" aria-pressed="false">1y</button>
+                        <button type="button" class="dash-period-btn" data-period="custom" aria-pressed="false">Custom</button>
+                        <span class="dash-period-custom" id="dash-period-custom" hidden>
+                            <input type="date" id="dash-period-start" aria-label="Custom period start">
+                            <span aria-hidden="true">–</span>
+                            <input type="date" id="dash-period-end" aria-label="Custom period end">
+                            <button type="button" id="dash-period-apply" class="dash-btn dash-btn-small">Apply</button>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- KPI strip: 5 counters rendered by renderKpis() (§2.3). -->
+                <section class="dash-kpi-strip" id="dash-kpi-strip" aria-label="Key indicators"></section>
+
+                <!-- Drill-down panel (hidden until a KPI is clicked, §2.4). -->
+                <section class="dash-card" id="drill-card" hidden aria-label="KPI drill-down">
+                    <h2><i class="fa-solid fa-magnifying-glass-chart"></i> Drill-down <span class="dash-tag" id="drill-metric">—</span></h2>
+                    <div id="drill-panel"></div>
+                </section>
+
+                <section class="dash-content" id="dash-content" aria-live="polite">
+                    <div class="dash-workspace">
+                        <!-- ============ LEFT RAIL ============ -->
+                        <div class="dash-rail">
+                            <div class="dash-card" id="card-hazards">
+                                <h2><i class="fa-solid fa-triangle-exclamation"></i> Hazard list <span class="dash-tag">Module B</span></h2>
+                                <div class="dash-filter-row">
+                                    <input type="search" id="hz-search" placeholder="Search…" aria-label="Search hazards">
+                                    <select id="hz-status" aria-label="Filter by status">
+                                        <option value="">All statuses</option>
+                                        <option>Open</option><option>Processing</option>
+                                        <option>Under Review</option><option>Pending Closure</option>
+                                        <option>Closed</option><option>Reopened</option>
+                                    </select>
+                                    <select id="hz-priority" aria-label="Filter by priority">
+                                        <option value="">All priorities</option>
+                                        <option value="H">High</option><option value="M">Medium</option><option value="L">Low</option>
+                                    </select>
+                                </div>
+                                <div style="margin-bottom:10px;">
+                                    <button type="button" class="dash-btn dash-btn-primary" id="btn-new-hazard">
+                                        <i class="fa-solid fa-plus"></i> New hazard
+                                    </button>
+                                </div>
+                                <div id="hazard-list"></div>
+                            </div>
+
+                            <div class="dash-card" id="card-srm">
+                                <h2><i class="fa-solid fa-diagram-project"></i> SRM queue <span class="dash-tag">srm_flag, no date</span></h2>
+                                <div id="srm-queue"></div>
+                            </div>
+
+                            <div class="dash-card" id="card-register">
+                                <h2><i class="fa-solid fa-book"></i> CAN-CAP register <span class="dash-tag">master</span></h2>
+                                <div id="master-register"></div>
+                                <div style="margin-top:8px;">
+                                    <a class="dash-btn" href="/dashboard/master-register.html">Open full register</a>
+                                </div>
+                            </div>
+
+                            <div class="dash-card" id="card-eip">
+                                <h2><i class="fa-solid fa-bell"></i> EIP monitor <span class="dash-tag">attention</span></h2>
+                                <div id="eip-monitor"></div>
+                            </div>
+
+                            <div class="dash-card" id="card-sagsrb">
+                                <h2><i class="fa-solid fa-users"></i> SAG / SRB <span class="dash-tag">deferred</span></h2>
+                                <div id="sag-srb">
+                                    <p style="font-size:0.82rem;color:var(--dash-slate-500);margin:0 0 8px;">
+                                        Dedicated SAG/SRB meeting surfaces are deferred to a follow-up wave.
+                                        Action items flow through the Master Register today.
+                                    </p>
+                                    <a class="dash-btn" href="/dashboard/master-register.html">Action items in register</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ============ MAIN WORKSPACE ============ -->
+                        <div class="dash-rail">
+                            <div class="dash-card" id="card-risk">
+                                <h2><i class="fa-solid fa-chart-column"></i> Risk distribution <span class="dash-tag">reports</span></h2>
+                                <div id="risk-dist"></div>
+                            </div>
+                            <div class="dash-card" id="card-trends">
+                                <h2><i class="fa-solid fa-chart-line"></i> Reporting trends <span class="dash-tag" id="trends-period">30d</span></h2>
+                                <div id="trends"></div>
+                            </div>
+                            <div class="dash-card" id="card-recent">
+                                <h2><i class="fa-solid fa-clock-rotate-left"></i> Recent reports <span class="dash-tag">MOR / VSR</span></h2>
+                                <div id="recent-reports"></div>
+                            </div>
+                            <div class="dash-card" id="card-maturity">
+                                <h2><i class="fa-solid fa-heart-pulse"></i> SMS maturity <span class="dash-tag">Module A</span></h2>
+                                <div id="sms-maturity"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dash-overlay" id="dash-loading" hidden>
+                    <div class="dash-spinner" aria-hidden="true"></div>
+                    <p class="dash-overlay-text" id="dash-loading-text">Loading…</p>
+                </div>
+                <div class="dash-overlay" id="dash-empty" hidden></div>
+                <div class="dash-overlay dash-overlay-error" id="dash-error" hidden></div>
+            </main>
+        </div>
+
+        <footer class="dash-footer">
+            <span>Made with <span aria-hidden="true">❤️</span> from Nepal</span>
+        </footer>
+    </div>
+</div>
+
+<!-- Create-hazard modal (wired: POST /api/v1/hazards/). -->
+<div class="dash-modal" id="modal-create" role="dialog" aria-modal="true" aria-labelledby="modal-create-title">
+    <div class="dash-modal-box">
+        <h2 id="modal-create-title">New hazard</h2>
+        <form id="form-create-hazard">
+            <div class="dash-form-grid">
+                <div class="dash-field full"><label for="ch-title">Title</label>
+                    <input id="ch-title" name="title" required minlength="3" maxlength="200" placeholder="Brief hazard title"></div>
+                <div class="dash-field full"><label for="ch-desc">Description</label>
+                    <textarea id="ch-desc" name="description" required minlength="10" placeholder="What happened / what could happen (min 10 chars)"></textarea></div>
+                <div class="dash-field"><label for="ch-source">Source</label><select id="ch-source" name="source"></select></div>
+                <div class="dash-field"><label for="ch-source-id">Source ID</label>
+                    <input id="ch-source-id" name="source_id" required placeholder="e.g. VSR-2026-014"></div>
+                <div class="dash-field"><label for="ch-taxonomy">Taxonomy</label><select id="ch-taxonomy" name="taxonomy"></select></div>
+                <div class="dash-field"><label for="ch-priority">Priority</label>
+                    <select id="ch-priority" name="priority"><option value="H">High (H)</option><option value="M" selected>Medium (M)</option><option value="L">Low (L)</option></select></div>
+                <div class="dash-field"><label for="ch-dept">Department (optional)</label>
+                    <input id="ch-dept" name="department" placeholder="e.g. Flight Operations"></div>
+                <div class="dash-field"><label for="ch-action">Recommended action (optional)</label>
+                    <input id="ch-action" name="recommended_action" placeholder="Immediate mitigation"></div>
+                <div class="dash-field full"><label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:0.82rem;">
+                    <input type="checkbox" id="ch-srm" name="srm_flag" style="width:auto;"> Flag for SRM review</label></div>
+            </div>
+            <p class="dash-form-error" id="create-error"></p>
+            <div class="dash-modal-actions">
+                <button type="button" class="dash-btn" data-close-modal>Cancel</button>
+                <button type="submit" class="dash-btn dash-btn-primary">Create hazard</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hazard detail + triage modal (wired: GET detail, POST triage). -->
+<div class="dash-modal" id="modal-detail" role="dialog" aria-modal="true" aria-labelledby="modal-detail-title">
+    <div class="dash-modal-box">
+        <h2 id="modal-detail-title">Hazard detail</h2>
+        <div id="hazard-detail"></div>
+        <h2 style="font-size:0.9rem;margin-top:1rem;">Triage decision</h2>
+        <form id="form-triage">
+            <div class="dash-form-grid">
+                <div class="dash-field"><label for="tr-decision">Decision</label>
+                    <select id="tr-decision" name="decision">
+                        <option>Accepted</option><option>Rejected</option>
+                        <option>Duplicate</option><option>Escalated</option>
+                    </select></div>
+                <div class="dash-field"><label for="tr-priority">Initial priority (optional)</label>
+                    <select id="tr-priority" name="initial_priority">
+                        <option value="">— keep —</option><option value="H">High (H)</option>
+                        <option value="M">Medium (M)</option><option value="L">Low (L)</option>
+                    </select></div>
+                <div class="dash-field full"><label for="tr-notes">Notes</label>
+                    <textarea id="tr-notes" name="notes" placeholder="Rationale for the decision"></textarea></div>
+            </div>
+            <p class="dash-form-error" id="triage-error"></p>
+            <div class="dash-modal-actions">
+                <button type="button" class="dash-btn" data-close-modal>Close</button>
+                <button type="submit" class="dash-btn dash-btn-primary">Submit triage</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/api/client.js"></script>
+<script src="/js/nav-config.js"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="shared/shell.js"></script>
+<script src="shared/drilldown.js"></script>
+<script src="shared/empty-state.js"></script>
+<script src="shared/module-flag.js"></script>
+<script src="shared/safety-helpers.js"></script>
+<script>
+(function () {
+    'use strict';
+    var H = window.SafetyHelpers;
+    var session = null;
+    var tenantId = null;
+    var tenantName = null;
+    var drillInstance = null;
+    var kpiState = {};   // metric -> { buckets, total, tone }
+    var currentDetailId = null;
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function qs(params) {
+        return Object.keys(params || {})
+            .filter(function (k) { return params[k] != null && params[k] !== ''; })
+            .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); })
+            .join('&');
+    }
+    function withQs(path, params) {
+        var s = qs(params);
+        return s ? path + (path.indexOf('?') === -1 ? '?' : '&') + s : path;
+    }
+    function unwrap(body) {
+        if (body == null) return null;
+        if (Array.isArray(body)) return body;
+        if (typeof body === 'object' && body.data !== undefined) return body.data;
+        return body;
+    }
+    function pill(status) {
+        var b = H.bucketizeStatus('caps', status);
+        var cls = b === 'Open' ? 'red' : b === 'Closed' ? 'green' : 'yellow';
+        if (/revision|escalat|overdue/i.test(String(status || ''))) cls = 'red';
+        return '<span class="dash-pill ' + cls + '">' + esc(status || '—') + '</span>';
+    }
+
+    // ---- KPI strip (§2.3) ------------------------------------------------------
+    var KPI_DEFS = [
+        { metric: 'reports', label: 'Reports' },
+        { metric: 'hazards', label: 'Hazards' },
+        { metric: 'cans', label: 'CANs' },
+        { metric: 'caps', label: 'CAPs' },
+        { metric: 'eip', label: 'EIP' },
+    ];
+
+    function renderKpis() {
+        var strip = $('dash-kpi-strip');
+        strip.innerHTML = KPI_DEFS.map(function (k) {
+            var st = kpiState[k.metric] || { total: '—', tone: null };
+            var val = st.total;
+            if (k.metric === 'eip') val = H.eipDisplay(st.total === '—' ? 0 : st.total).text;
+            var tone = st.tone ? ' data-tone="' + st.tone + '"' : '';
+            return '<div class="dash-kpi clickable" data-kpi="' + k.metric + '"' + tone +
+                ' role="button" tabindex="0" aria-label="' + esc(k.label) + ': ' + esc(val) + '">' +
+                '<div class="dash-kpi-value">' + esc(val) + '</div>' +
+                '<div class="dash-kpi-label">' + esc(k.label) + '</div></div>';
+        }).join('');
+        Array.prototype.forEach.call(strip.querySelectorAll('[data-kpi]'), function (card) {
+            card.addEventListener('click', function () { openDrill(card.getAttribute('data-kpi')); });
+        });
+    }
+
+    async function loadKpis(periodParams) {
+        // Reports (period-aware) — overview kpis block.
+        try {
+            var ov = unwrap(await window.ApiClient.get(withQs(H.ENDPOINTS.overview, periodParams)));
+            var buckets = H.reportsBuckets((ov || {}).kpis);
+            kpiState.reports = { buckets: buckets, total: buckets.total, tone: 'green' };
+            if (buckets.Open > 0) kpiState.reports.tone = 'yellow';
+        } catch (e) { kpiState.reports = { buckets: null, total: '—', tone: null }; }
+
+        // Hazards / CANs / CAPs (all-time stats endpoints — no period param).
+        var hb = null, rawHaz = null, rawCans = null, rawCaps = null;
+        try {
+            var hs = unwrap(await window.ApiClient.get(H.ENDPOINTS.hazardStats));
+            rawHaz = (hs || {}).by_status;
+            hb = H.bucketizeCounts('hazards', rawHaz);
+            kpiState.hazards = { buckets: hb, total: (hs || {}).total != null ? hs.total : sum(hb) };
+        } catch (e) { kpiState.hazards = { buckets: null, total: '—', tone: null }; }
+        try {
+            var cs = unwrap(await window.ApiClient.get(H.ENDPOINTS.canCapStats));
+            rawCans = ((cs || {}).cans || {}).by_status;
+            rawCaps = ((cs || {}).caps || {}).by_status;
+            cb = H.bucketizeCounts('cans', rawCans);
+            pb = H.bucketizeCounts('caps', rawCaps);
+            kpiState.cans = { buckets: cb, total: ((cs || {}).cans || {}).total != null ? cs.cans.total : sum(cb) };
+            kpiState.caps = { buckets: pb, total: ((cs || {}).caps || {}).total != null ? cs.caps.total : sum(pb) };
+        } catch (e) {
+            kpiState.cans = { buckets: null, total: '—', tone: null };
+            kpiState.caps = { buckets: null, total: '—', tone: null };
+        }
+
+        // EIP (derived: escalated_to_ae && !ae_signature, or status EIP).
+        try {
+            var caps = unwrap(await window.ApiClient.get(H.ENDPOINTS.caps + '?escalated_to_ae=true')) || [];
+            var eips = H.deriveEIP(Array.isArray(caps) ? caps : (caps.items || caps.records || []));
+            var disp = H.eipDisplay(eips.length);
+            kpiState.eip = { buckets: { Open: 0, 'In Process': eips.length, Closed: 0 }, total: eips.length, tone: disp.tone === 'neutral' ? null : disp.tone, records: eips };
+        } catch (e) { kpiState.eip = { buckets: null, total: '—', tone: null, records: [] }; }
+
+        // Tones (§2.4 hardcoded defaults): red signals harvested from the
+        // stats payloads already fetched above — no second round-trip.
+        var red = H.redSignalsFrom(rawHaz, rawCans, rawCaps);
+        if ((kpiState.eip.total || 0) > 0) red.escalated += kpiState.eip.total;
+        ['reports', 'hazards', 'cans', 'caps'].forEach(function (m) {
+            if (kpiState[m] && kpiState[m].buckets) kpiState[m].tone = H.toneFor(kpiState[m].buckets, red);
+        });
+        renderKpis();
+    }
+
+    function sum(buckets) {
+        if (!buckets) return 0;
+        return (Number(buckets.Open) || 0) + (Number(buckets['In Process']) || 0) + (Number(buckets.Closed) || 0);
+    }
+
+    // ---- Drill-down (§2.4: counter → breakdown → records) -------------------------
+    var DRILL_LIST = { hazards: 'hazards', cans: 'cans', caps: 'caps', eip: 'caps', reports: null };
+
+    async function openDrill(metric) {
+        var card = $('drill-card');
+        card.hidden = false;
+        $('drill-metric').textContent = metric.toUpperCase();
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        var panel = $('drill-panel');
+        panel.innerHTML = window.EmptyState.loading('Loading breakdown…');
+        try {
+            if (metric === 'eip') {
+                drillInstance = window.DrillDown.mount(panel, { metric: 'EIP' });
+                drillInstance.render(kpiState.eip.records || []);
+                await drillInstance.drill('In Progress');
+                return;
+            }
+            if (metric === 'reports') {
+                // No per-status records endpoint for reports: L1/L2/L3 run
+                // over the recent-reports period sample (page_size 100).
+                var params = window.Shell.getPeriodParams();
+                var query = { page_size: 100 };
+                Object.keys(params).forEach(function (k) { query[k] = params[k]; });
+                var rec = unwrap(await window.ApiClient.get(withQs(H.ENDPOINTS.recent, query))) || [];
+                var list = Array.isArray(rec) ? rec : (rec.items || rec.reports || []);
+                drillInstance = window.DrillDown.mount(panel, { metric: 'Reports · period sample' });
+                drillInstance.render(list);
+                await drillInstance.drill(null);
+                return;
+            }
+            // Hazards / CANs / CAPs: full tenant lists → exact client-side L2+L3.
+            var path = metric === 'hazards' ? H.ENDPOINTS.hazards : metric === 'cans' ? H.ENDPOINTS.cans : H.ENDPOINTS.caps;
+            var rows = unwrap(await window.ApiClient.get(path)) || [];
+            var arr = Array.isArray(rows) ? rows : (rows.items || []);
+            drillInstance = window.DrillDown.mount(panel, { metric: metric.toUpperCase() });
+            drillInstance.render(arr);
+            await drillInstance.drill(null);
+        } catch (e) {
+            panel.innerHTML = window.EmptyState.error('Breakdown unavailable.', function () { openDrill(metric); });
+        }
+    }
+
+    // ---- Workspace panels -------------------------------------------------------------
+    async function loadHazardList() {
+        var box = $('hazard-list');
+        try {
+            var q = {};
+            var s = $('hz-search').value.trim(); if (s) q.search = s;
+            if ($('hz-status').value) q.status = $('hz-status').value;
+            if ($('hz-priority').value) q.priority = $('hz-priority').value;
+            var rows = unwrap(await window.ApiClient.get(withQs(H.ENDPOINTS.hazards, q))) || [];
+            var arr = (Array.isArray(rows) ? rows : []).slice(0, 15);
+            if (!arr.length) { box.innerHTML = window.EmptyState.noData('No hazards', 'No hazards match the current filters.'); return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>Title</th><th>Status</th></tr></thead><tbody>' +
+                arr.map(function (h) {
+                    return '<tr class="dash-row-clickable" data-hz="' + esc(h.id) + '"><td>' + esc(h.hazard_id || h.id) +
+                        '</td><td>' + esc(h.title || '—') + '</td><td>' + pill(h.status) + '</td></tr>';
+                }).join('') + '</tbody></table>';
+            Array.prototype.forEach.call(box.querySelectorAll('[data-hz]'), function (tr) {
+                tr.addEventListener('click', function () { openHazardDetail(tr.getAttribute('data-hz')); });
+            });
+        } catch (e) { box.innerHTML = window.EmptyState.error('Hazard list unavailable.', loadHazardList); }
+    }
+
+    async function loadSrmQueue() {
+        var box = $('srm-queue');
+        try {
+            var rows = unwrap(await window.ApiClient.get(H.ENDPOINTS.hazards)) || [];
+            var open = (Array.isArray(rows) ? rows : []).filter(function (h) {
+                return ['Closed', 'Completed'].indexOf(h.status) === -1;
+            }).slice(0, 25);
+            var details = await Promise.all(open.map(function (h) {
+                return window.ApiClient.get(H.ENDPOINTS.hazardDetail(h.id)).catch(function () { return null; });
+            }));
+            var queue = details.filter(function (d) { return d && d.srm_flag && !d.srm_date; });
+            if (!queue.length) {
+                box.innerHTML = window.EmptyState.noData('SRM queue clear', 'No hazards awaiting SRM (srm_flag with no srm_date).');
+                return;
+            }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>Title</th><th></th></tr></thead><tbody>' +
+                queue.map(function (h) {
+                    return '<tr><td>' + esc(h.hazard_id || h.id) + '</td><td>' + esc(h.title || '—') +
+                        '</td><td><a class="dash-btn dash-btn-small" href="/sram/index.html?hazard=' + esc(h.id) + '">SRAM</a></td></tr>';
+                }).join('') + '</tbody></table>';
+        } catch (e) { box.innerHTML = window.EmptyState.error('SRM queue unavailable.', loadSrmQueue); }
+    }
+
+    async function loadMasterRegister() {
+        var box = $('master-register');
+        try {
+            var data = unwrap(await window.ApiClient.get(H.ENDPOINTS.masterRegister + '?page_size=15')) || {};
+            var rows = Array.isArray(data) ? data : (data.items || data.records || data.rows || []);
+            if (!rows.length) { box.innerHTML = window.EmptyState.noData('Register empty', 'No CAN/CAP entries yet.'); return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>Type</th><th>Status</th></tr></thead><tbody>' +
+                rows.slice(0, 15).map(function (r) {
+                    return '<tr><td>' + esc(r.reference || r.ref || r.id) + '</td><td>' + esc(r.type || r.kind || '—') +
+                        '</td><td>' + pill(r.status) + '</td></tr>';
+                }).join('') + '</tbody></table>';
+        } catch (e) { box.innerHTML = window.EmptyState.error('Register unavailable.', loadMasterRegister); }
+    }
+
+    function loadEipMonitor() {
+        var box = $('eip-monitor');
+        var recs = (kpiState.eip && kpiState.eip.records) || [];
+        if (!recs.length) {
+            box.innerHTML = '<p style="font-size:0.85rem;color:var(--dash-slate-500);margin:0;">None — no escalated CAPs awaiting acknowledgement.</p>';
+            return;
+        }
+        box.innerHTML = '<table class="dash-table"><thead><tr><th>CAP</th><th>Reason</th></tr></thead><tbody>' +
+            recs.slice(0, 10).map(function (c) {
+                return '<tr><td>' + esc(c.cap_reference || c.id) + '</td><td>' + esc(c.escalation_reason || '—') + '</td></tr>';
+            }).join('') + '</tbody></table>';
+    }
+
+    async function loadRiskDist() {
+        var box = $('risk-dist');
+        try {
+            var data = unwrap(await window.ApiClient.get(H.ENDPOINTS.risk)) || {};
+            var entries = [];
+            if (Array.isArray(data)) entries = data.map(function (d, i) { return [d.label || d.name || ('#' + (i + 1)), Number(d.count || d.value) || 0]; });
+            else if (data.distribution && typeof data.distribution === 'object') entries = Object.keys(data.distribution).map(function (k) { return [k, Number(data.distribution[k]) || 0]; });
+            else if (typeof data === 'object') entries = Object.keys(data).filter(function (k) { return typeof data[k] === 'number'; }).map(function (k) { return [k, data[k]]; });
+            if (!entries.length) { box.innerHTML = window.EmptyState.noData('No risk data', 'Nothing to show for this period.'); return; }
+            var max = Math.max.apply(null, entries.map(function (e) { return e[1]; }).concat([1]));
+            box.innerHTML = entries.slice(0, 8).map(function (e) {
+                var pct = Math.round((e[1] / max) * 100);
+                return '<div class="dash-bar"><span class="dash-bar-label">' + esc(e[0]) + '</span>' +
+                    '<span class="dash-bar-track"><i class="dash-bar-fill" style="width:' + pct + '%;"></i></span>' +
+                    '<span class="dash-bar-num">' + e[1] + '</span></div>';
+            }).join('');
+        } catch (e) { box.innerHTML = window.EmptyState.error('Risk distribution unavailable.', loadRiskDist); }
+    }
+
+    async function loadTrends(periodParams) {
+        var box = $('trends');
+        $('trends-period').textContent = window.Shell.getPeriod();
+        try {
+            var data = unwrap(await window.ApiClient.get(withQs(H.ENDPOINTS.trends, periodParams))) || [];
+            var pts = Array.isArray(data) ? data : (data.points || data.months || data.series || []);
+            if (!pts.length) { box.innerHTML = window.EmptyState.noData('No trend data', 'Insufficient data for the selected period.'); return; }
+            var max = 1;
+            pts.forEach(function (p) { max = Math.max(max, Number(p.count || p.value || p.total) || 0); });
+            box.innerHTML = pts.slice(-12).map(function (p) {
+                var label = p.label || p.month || p.period || p.date || '';
+                var v = Number(p.count || p.value || p.total) || 0;
+                return '<div class="dash-bar"><span class="dash-bar-label">' + esc(label) + '</span>' +
+                    '<span class="dash-bar-track"><i class="dash-bar-fill" style="width:' + Math.round((v / max) * 100) + '%;"></i></span>' +
+                    '<span class="dash-bar-num">' + v + '</span></div>';
+            }).join('');
+        } catch (e) { box.innerHTML = window.EmptyState.error('Trends unavailable.', function () { loadTrends(periodParams); }); }
+    }
+
+    async function loadRecent(periodParams) {
+        var box = $('recent-reports');
+        try {
+            var data = unwrap(await window.ApiClient.get(withQs(H.ENDPOINTS.recent, Object.assign({ page_size: 8 }, periodParams)))) || [];
+            var rows = Array.isArray(data) ? data : (data.items || data.reports || []);
+            if (!rows.length) { box.innerHTML = window.EmptyState.noData('No recent reports', 'No MOR/VSR reports in this period.'); return; }
+            box.innerHTML = '<table class="dash-table"><thead><tr><th>Ref</th><th>Type</th><th>Date</th></tr></thead><tbody>' +
+                rows.slice(0, 8).map(function (r) {
+                    return '<tr><td>' + esc(r.reference || r.report_id || r.id) + '</td><td>' + esc(r.report_type || r.type || '—') +
+                        '</td><td>' + esc((r.created_at || r.date || '')).slice(0, 10) + '</td></tr>';
+                }).join('') + '</tbody></table>';
+        } catch (e) { box.innerHTML = window.EmptyState.error('Recent reports unavailable.', function () { loadRecent(periodParams); }); }
+    }
+
+    async function loadMaturity() {
+        var box = $('sms-maturity');
+        try {
+            var data = unwrap(await window.ApiClient.get(H.ENDPOINTS.smsMaturity)) || {};
+            if (data.overall_score == null) {
+                box.innerHTML = window.EmptyState.noData('No maturity score', 'No survey responses in the selected period.', 'Open SMS Maturity', '/dashboard/sms-maturity.html');
+                return;
+            }
+            box.innerHTML = '<div style="display:flex;align-items:baseline;gap:10px;">' +
+                '<span style="font-size:2rem;font-weight:800;">' + esc(data.overall_score) + '%</span>' +
+                '<span class="dash-pill neutral">' + esc(data.tier_label || data.tier || '') + '</span></div>' +
+                '<p style="font-size:0.78rem;color:var(--dash-slate-500);margin:8px 0 0;">' +
+                esc(data.response_count != null ? data.response_count + ' responses' : '') + '</p>' +
+                '<div style="margin-top:8px;"><a class="dash-btn" href="/dashboard/sms-maturity.html">Full maturity view</a></div>';
+        } catch (e) { box.innerHTML = window.EmptyState.error('Maturity widget unavailable.', loadMaturity); }
+    }
+
+    async function reloadAll() {
+        var params = window.Shell.getPeriodParams();
+        window.Shell.showLoading('Loading safety overview…');
+        try {
+            await loadKpis(params);
+            loadEipMonitor();
+            await Promise.allSettled([
+                loadHazardList(), loadSrmQueue(), loadMasterRegister(),
+                loadRiskDist(), loadTrends(params), loadRecent(params), loadMaturity(),
+            ]);
+        } finally {
+            window.Shell.hideLoading();
+        }
+    }
+
+    // ---- Modals -----------------------------------------------------------------------
+    function openModal(id) { $(id).classList.add('open'); document.body.style.overflow = 'hidden'; }
+    function closeModals() {
+        Array.prototype.forEach.call(document.querySelectorAll('.dash-modal.open'), function (m) { m.classList.remove('open'); });
+        document.body.style.overflow = '';
+    }
+
+    function fillSelect(id, values) {
+        $(id).innerHTML = values.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('');
+    }
+
+    async function openHazardDetail(id) {
+        currentDetailId = id;
+        $('hazard-detail').innerHTML = window.EmptyState.loading('Loading hazard…');
+        $('triage-error').textContent = '';
+        openModal('modal-detail');
+        try {
+            var h = unwrap(await window.ApiClient.get(H.ENDPOINTS.hazardDetail(id))) || {};
+            $('modal-detail-title').textContent = (h.hazard_id || 'Hazard') + ' — ' + (h.title || '');
+            $('hazard-detail').innerHTML = '<dl class="dash-kv">' +
+                '<dt>Status</dt><dd>' + pill(h.status) + '</dd>' +
+                '<dt>Priority</dt><dd>' + esc(h.priority || '—') + '</dd>' +
+                '<dt>Taxonomy</dt><dd>' + esc(h.taxonomy || '—') + '</dd>' +
+                '<dt>Risk</dt><dd>' + esc([h.severity, h.probability, h.risk_index].filter(Boolean).join(' / ') || '—') + '</dd>' +
+                '<dt>Department</dt><dd>' + esc(h.department || '—') + '</dd>' +
+                '<dt>SRM</dt><dd>' + esc(h.srm_flag ? ('flagged' + (h.srm_date ? ' · ' + h.srm_date : ' · pending')) : 'not flagged') + '</dd>' +
+                '<dt>Description</dt><dd>' + esc(h.description || '—') + '</dd></dl>';
+        } catch (e) {
+            $('hazard-detail').innerHTML = window.EmptyState.error('Hazard detail unavailable.');
+        }
+    }
+
+    function bindChrome() {
+        ['hz-search', 'hz-status', 'hz-priority'].forEach(function (id) {
+            $(id).addEventListener('change', loadHazardList);
+        });
+        $('hz-search').addEventListener('keyup', function (e) { if (e.key === 'Enter') loadHazardList(); });
+        $('btn-new-hazard').addEventListener('click', function () {
+            $('create-error').textContent = '';
+            openModal('modal-create');
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-close-modal]'), function (b) {
+            b.addEventListener('click', closeModals);
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModals(); });
+        Array.prototype.forEach.call(document.querySelectorAll('.dash-modal'), function (m) {
+            m.addEventListener('click', function (e) { if (e.target === m) closeModals(); });
+        });
+
+        $('form-create-hazard').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var err = $('create-error');
+            err.textContent = '';
+            var form = {
+                title: $('ch-title').value, description: $('ch-desc').value,
+                source: $('ch-source').value, source_id: $('ch-source-id').value,
+                taxonomy: $('ch-taxonomy').value, priority: $('ch-priority').value,
+                department: $('ch-dept').value, recommended_action: $('ch-action').value,
+                srm_flag: $('ch-srm').checked,
+            };
+            var payload;
+            try {
+                payload = H.buildCreateHazardPayload(form, tenantId);
+            } catch (ex) { err.textContent = ex.message; return; }
+            try {
+                await window.ApiClient.post(H.ENDPOINTS.hazardCreate, payload);
+                closeModals();
+                e.target.reset();
+                await reloadAll();
+            } catch (ex) { err.textContent = ex.message || 'Create failed.'; }
+        });
+
+        $('form-triage').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var err = $('triage-error');
+            err.textContent = '';
+            if (!currentDetailId) { err.textContent = 'No hazard selected.'; return; }
+            var payload;
+            try {
+                payload = H.buildTriagePayload($('tr-decision').value, $('tr-notes').value.trim(), $('tr-priority').value || undefined);
+            } catch (ex) { err.textContent = ex.message; return; }
+            try {
+                await window.ApiClient.post(H.ENDPOINTS.hazardTriage(currentDetailId), payload);
+                closeModals();
+                e.target.reset();
+                await reloadAll();
+            } catch (ex) { err.textContent = ex.message || 'Triage failed.'; }
+        });
+    }
+
+    // ---- Boot ----------------------------------------------------------------------------
+    async function boot(user) {
+        if (!user) { window.location.href = '/login.html'; return; }
+        var u = await window.getCurrentUser().catch(function () { return null; });
+        session = u || { email: user.email, role: 'USER', tenantId: null, claims: {} };
+        var role = String((session.claims && session.claims.role) || session.role || 'USER').toUpperCase();
+        tenantId = (session.claims && (session.claims.tenant_id || session.claims.tenantId)) || session.tenantId || null;
+
+        if (!H.roleAllowed(role)) {
+            window.Shell.init({ role: role, roleLabel: role, title: 'Safety Manager Dashboard', period: '30d' });
+            $('dash-content').innerHTML = window.EmptyState.noPermission('TENANT_ADMIN / SAFETY_OFFICER');
+            return;
+        }
+
+        // Tenant display name (best-effort; prettified slug fallback).
+        tenantName = tenantId ? tenantId.replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }) : '—';
+        try {
+            if (window.TenantResolver && tenantId) {
+                var t = await window.TenantResolver.resolveTenantTitle(tenantId);
+                if (t) tenantName = t;
+            }
+        } catch (e) {}
+
+        // Module flags: seed from claims, refresh from the tenant doc.
+        try {
+            var claimsModules = (session.claims && (session.claims.modules || session.claims.module_access)) || null;
+            if (claimsModules) window.ModuleFlag.set(claimsModules);
+            await window.ModuleFlag.refresh(tenantId);
+        } catch (e) {}
+        if (!window.ModuleFlag.requires('module_b_srm', { container: null })) {
+            window.Shell.init({
+                role: role, roleLabel: 'Safety Manager', tenantName: tenantName,
+                userEmail: session.email, title: 'Safety Manager Dashboard',
+                modules: { module_a_survey: window.ModuleFlag.has('module_a_survey'), module_b_srm: false },
+                activeNav: 'key-indicators', period: '30d', navUser: session,
+            });
+            var overlay = $('dash-empty');
+            overlay.innerHTML = window.EmptyState.noModule('Hazard & Risk (SRM)');
+            overlay.hidden = false;
+            return;
+        }
+
+        window.Shell.init({
+            role: role,
+            roleLabel: 'Safety Manager',
+            tenantName: tenantName,
+            userEmail: session.email || '—',
+            title: 'Safety Manager Dashboard',
+            modules: {
+                module_a_survey: window.ModuleFlag.has('module_a_survey'),
+                module_b_srm: true,
+                module_b_can_cap: window.ModuleFlag.has('module_b_can_cap'),
+                module_c_regulator: window.ModuleFlag.has('module_c_regulator'),
+            },
+            activeNav: 'key-indicators',
+            period: '30d',
+            navUser: session,
+            onPeriodChange: function () { reloadAll(); },
+        });
+
+        fillSelect('ch-source', H.HAZARD_SOURCES);
+        fillSelect('ch-taxonomy', H.HAZARD_TAXONOMIES);
+        bindChrome();
+        await reloadAll();
+    }
+
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        firebase.auth().onAuthStateChanged(boot);
+    } else {
+        document.addEventListener('DOMContentLoaded', function () {
+            boot(null);
+        });
+    }
+})();
+</script>
+
+</body>
+</html>
