@@ -168,6 +168,63 @@ DYNASTY_HAZARD_MAP = {
 }
 DYNASTY_CAN_HAZARDS = [5, 10, 14]  # 3 recent CANs (C/E/F eras)
 
+SAURYA_REPORTS = [
+    # A (2)
+    ("A", "VSR", "voluntary", "Parking stand marking faded at night",
+     "Ground Operations", 2, "L"),
+    ("A", "MOR", "mandatory", "Engine vibration above cruise limits",
+     "Propulsion", 4, "H"),
+    # B (3)
+    ("B", "VSR", "voluntary", "Galley cart brake fault on loading",
+     "Ground Operations", 2, "M"),
+    ("B", "VSR", "voluntary", "Pushback headset failure during departure",
+     "Ground Operations", 3, "M"),
+    ("B", "Internal Audit", "voluntary", "Fuel farm record keeping gaps",
+     "Fuel", 2, "M"),
+    # C (4)
+    ("C", "VSR", "voluntary", "Cabin door seal wear found on transit check",
+     "Airframe", 3, "M"),
+    ("C", "MOR", "mandatory", "Landing gear disagree light on approach",
+     "Landing Gear", 4, "H"),
+    ("C", "Internal Audit", "voluntary", "Training records audit findings",
+     "Training", 2, "L"),
+    ("C", "Flight Diversion", "mandatory", "PKR diversion to BWA for weather",
+     "Weather", 3, "M"),
+    # D (4)
+    ("D", "VSR", "voluntary", "Bird strike remains on windshield after arrival",
+     "Wildlife", 3, "M"),
+    ("D", "VSR", "voluntary", "Cargo loading supervision stretched at peak",
+     "Load Control", 2, "M"),
+    ("D", "MOR", "mandatory", "APU overheat message on ground",
+     "Propulsion", 3, "M"),
+    ("D", "Internal Audit", "voluntary", "Station audit findings open past due",
+     "Documentation", 2, "M"),
+    # E (3)
+    ("E", "VSR", "voluntary", "Ground power unit failure before departure",
+     "Ground Operations", 3, "M"),
+    ("E", "Flight Diversion", "mandatory", "KTM diversion to PKR for traffic",
+     "Air Traffic", 2, "M"),
+    ("E", "Internal Audit", "voluntary", "Ramp inspection follow-up overdue",
+     "Ground Operations", 2, "M"),
+    # F (2)
+    ("F", "VSR", "voluntary", "Catering truck proximity on stand",
+     "Ground Operations", 3, "M"),
+    ("F", "Flight Diversion", "mandatory", "BWA diversion to PKR for crosswind",
+     "Weather", 4, "H"),
+]
+
+# 13 hazards: 4 Closed oldest (A/A/B/B), 7 Open, 2 Under Review recent (E/F).
+# Reports 7, 11, 12, 14, 17 stay hazard-less.
+SAURYA_HAZARDS = {
+    0: ("Closed", False), 1: ("Closed", False),
+    2: ("Closed", False), 3: ("Closed", False),
+    4: ("Open", False), 5: ("Open", False), 6: ("Open", False),
+    8: ("Open", False), 9: ("Open", True), 10: ("Open", False),
+    13: ("Open", False),
+    15: ("Under Review", False), 16: ("Under Review", False),
+}
+SAURYA_CAN_HAZARDS = [0, 1, 9, 13, 16]  # 5 CANs (2 old-closed, 2 open, 1 EIP)
+
 TAXONOMIES = ["Organizational", "Technical", "Human", "Environmental"]
 FUNCTIONS = ["OPS", "ENG", "SAF", "DSP", "MNT"]
 
@@ -236,8 +293,9 @@ def main():
         return run(_go())
 
     def safety_user(slug):
-        domain = ("sitaair.com.np" if slug == "sita-air"
-                  else "air-dynasty.com.np")
+        domain = {"sita-air": "sitaair.com.np",
+                  "air-dynasty": "air-dynasty.com.np",
+                  "saurya-airlines": "saurya.com.np"}[slug]
         row = pg.fetch_by(UserProfile, "email", f"safety@{domain}")
         if row is None or row.get("role") not in (
                 "TENANT_ADMIN", "AIRLINE_ADMIN"):
@@ -317,12 +375,17 @@ def main():
 
     plans = [
         ("sita-air", SITA_REPORTS, SITA_HAZARDS, SITA_CAN_HAZARDS,
-         {"cans": 6, "caps": 4}, [4, 5], 48),
+         {"cans": 6, "caps": 4}, [4, 5], 48,
+         {"closed": [0, 1], "prog": [16], "eip": [18]}),
         ("air-dynasty", DYNASTY_REPORTS, DYNASTY_HAZARD_MAP,
-         DYNASTY_CAN_HAZARDS, {"cans": 3, "caps": 3}, [2, 3], 24),
+         DYNASTY_CAN_HAZARDS, {"cans": 3, "caps": 3}, [2, 3], 24,
+         None),
+        ("saurya-airlines", SAURYA_REPORTS, SAURYA_HAZARDS,
+         SAURYA_CAN_HAZARDS, {"cans": 5, "caps": 3}, [3, 4], 36,
+         {"closed": [0, 1], "prog": [], "eip": [16]}),
     ]
 
-    for slug, catalog, hz_plan, can_hz, expect, survey_per_month, sur_min in plans:
+    for slug, catalog, hz_plan, can_hz, expect, survey_per_month, sur_min, cap_plan in plans:
         tid = register_tenant(slug)
         rng = random.Random(f"{RNG_SEED}-{slug}")
         from app.db.db_models import Can as CanM, Cap as CapM
@@ -415,8 +478,9 @@ def main():
 
         # ---- CANs (issued_at via service; created_at backdated) -----------
         now = datetime.now(timezone.utc)
-        camo_email = ("camo@sitaair.com.np" if slug == "sita-air"
-                      else "camo@air-dynasty.com.np")
+        camo_email = {"sita-air": "camo@sitaair.com.np",
+                      "air-dynasty": "camo@air-dynasty.com.np",
+                      "saurya-airlines": "camo@saurya.com.np"}[slug]
         can_rows = {}
         for hidx in can_hz:
             hz = hz_rows[hidx]
@@ -446,10 +510,14 @@ def main():
         print(f"{slug}: cans={len(can_rows)}")
 
         # ---- CAPs ----------------------------------------------------------
-        if slug == "sita-air":
-            # 4 CAPs: 2 oldest Completed, 1 recent In Progress (E window),
-            # 1 EIP (F window, escalated within last 30d).
-            closed_h, prog_h, eip_h = [0, 1], [16], [18]
+        # cap_plan (Sita/Saurya): {"closed": [...], "prog": [...], "eip": [...]}
+        # lists hazard-indexes into can_rows. Dynasty uses its own branch.
+        if cap_plan is not None:
+            n_closed = len(cap_plan["closed"])
+            n_prog = len(cap_plan["prog"])
+            n_eip = len(cap_plan["eip"])
+            closed_h, prog_h, eip_h = (cap_plan["closed"], cap_plan["prog"],
+                                       cap_plan["eip"])
             for hidx in closed_h:
                 can = can_rows[hidx]
                 sub = can["issued_at"] + timedelta(days=rng.randint(3, 10))
@@ -513,7 +581,8 @@ def main():
                 }, user)
                 backdate("caps", cap["id"], created_at=sub,
                          updated_at=esc)
-            print(f"{slug}: caps=4 (2 closed, 1 progress, 1 EIP)")
+            print(f"{slug}: caps={n_closed + n_prog + n_eip} "
+                  f"({n_closed} closed, {n_prog} progress, {n_eip} EIP)")
         else:
             # Dynasty: 3 recent CAPs, all active (2 In Progress, 1 review).
             # The C-era hazard behind the aging CAN is verification-closed so
@@ -549,8 +618,9 @@ def main():
             print(f"{slug}: caps=3 (active)")
 
         # ---- surveys (monthly spread, ORM — see header deviation #2) -------
-        n_s = seed_surveys(slug, tid,
-                           [4, 5] if slug == "sita-air" else [2, 3], rng)
+        survey_bands = {"sita-air": [4, 5], "air-dynasty": [2, 3],
+                        "saurya-airlines": [3, 4]}
+        n_s = seed_surveys(slug, tid, survey_bands[slug], rng)
         print(f"{slug}: surveys={n_s}")
 
     print("SEED-COMPLETE")
