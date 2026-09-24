@@ -1,9 +1,9 @@
 /* ============================================================================
    FILE: firebase.js
    PATH: public/js/firebase.js
-   VERSION: 2.0.2
+   VERSION: 2.0.3
    DATE CREATED: 2026-07-26
-   DATE REVISED: 2026-09-23
+   DATE REVISED: 2026-09-24
    PURPOSE: Firebase client SDK initialization.
             Loads Firebase SDK dynamically and initializes services.
             2.0.1 — fix App Check guard so ?appcheck=false and /admin/
@@ -11,6 +11,9 @@
             2.0.2 — support the v9 compat namespace
             (firebase.appCheck().activate) in initAppCheckSafe;
             the compat SDK exposes no bare modular globals.
+            2.0.3 — switch App Check from legacy ReCaptchaV3Provider to
+            ReCaptchaEnterpriseProvider to match the Enterprise
+            reCAPTCHA key.
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
 
@@ -245,12 +248,14 @@ function initAppCheckSafe(app) {
       // Guard 3: at least one App Check API must be available
       var hasModularApi =
         typeof initializeAppCheck === 'function' &&
-        typeof ReCaptchaV3Provider === 'function';
+        (typeof ReCaptchaV3Provider === 'function' ||
+         typeof ReCaptchaEnterpriseProvider === 'function');
       var hasCompatApi =
         typeof firebase !== 'undefined' &&
         firebase.appCheck &&
         typeof firebase.appCheck === 'function' &&
-        firebase.appCheck.ReCaptchaV3Provider;
+        (firebase.appCheck.ReCaptchaV3Provider ||
+         firebase.appCheck.ReCaptchaEnterpriseProvider);
       if (!hasModularApi && !hasCompatApi) {
         console.warn('[AppCheck] SDK not loaded (neither modular nor compat API present) — App Check disabled.');
         if (typeof clearAppCheckThrottle === 'function') clearAppCheckThrottle();
@@ -269,7 +274,7 @@ function initAppCheckSafe(app) {
       var appCheck;
       if (hasModularApi) {
         appCheck = initializeAppCheck(app, {
-          provider: new ReCaptchaV3Provider(siteKey),
+          provider: new ReCaptchaEnterpriseProvider(siteKey),
           isTokenAutoRefreshEnabled: false
         });
         console.log('[AppCheck] Initialized successfully (modular API)');
@@ -277,7 +282,7 @@ function initAppCheckSafe(app) {
         // Compat namespace (v9 compat SDK)
         appCheck = firebase.appCheck();
         appCheck.activate(
-          new firebase.appCheck.ReCaptchaV3Provider(siteKey),
+          new firebase.appCheck.ReCaptchaEnterpriseProvider(siteKey),
           false
         );
         console.log('[AppCheck] Initialized successfully (compat API)');
