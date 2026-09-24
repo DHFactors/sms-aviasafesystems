@@ -35,7 +35,7 @@ const PROD_CONFIG = {
     storageBucket: "aerosafety-sms-prod.firebasestorage.app",
     messagingSenderId: "527947363983",
     appId: "1:527947363983:web:4b736b6d1d50dd9b7a22fa",
-    appCheckSiteKey: "6LeCcWwtAAAAAFK2Y3hwxjO3pHGX6xaFxFIzF6Jv"
+    appCheckSiteKey: "6LcQf80tAAAAAADwv_QqDJtwu4tc456cBPLDp_RgC"
 };
 
 const firebaseConfig = PROD_CONFIG;
