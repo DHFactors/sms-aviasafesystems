@@ -127,6 +127,36 @@ from app.middleware.rbac_middleware import RBACMiddleware  # noqa: E402
 app.add_middleware(RBACMiddleware)
 
 
+# TEMPORARY DIAGNOSTIC (revert next commit): prove which app_check.py the
+# running container actually imports. Logs module path, mtime, sha256, plus
+# the exact "App Check verification failed" source lines. Line 57 lives in
+# verify_app_check (strict/lenient variants are included for completeness).
+import hashlib as _hashlib  # noqa: E402
+import inspect as _inspect  # noqa: E402
+import logging as _logging  # noqa: E402
+import os as _os  # noqa: E402
+from app.middleware import app_check as _ac  # noqa: E402
+_diagnostic_logger = _logging.getLogger("diagnostic")
+_diagnostic_logger.warning("DIAGNOSTIC: app_check.py loaded from: %s", _ac.__file__)
+try:
+    _diagnostic_logger.warning("DIAGNOSTIC: app_check.py mtime: %s", _os.path.getmtime(_ac.__file__))
+except Exception as _mtime_e:
+    _diagnostic_logger.warning("DIAGNOSTIC: app_check.py mtime unavailable: %s", _mtime_e)
+try:
+    with open(_ac.__file__, "rb") as _diag_f:
+        _diagnostic_logger.warning("DIAGNOSTIC: app_check.py sha256: %s", _hashlib.sha256(_diag_f.read()).hexdigest())
+except Exception as _hash_e:
+    _diagnostic_logger.warning("DIAGNOSTIC: app_check.py sha256 unavailable: %s", _hash_e)
+for _fn_name in ("verify_app_check", "verify_app_check_strict", "verify_app_check_lenient"):
+    try:
+        _diag_src = _inspect.getsource(getattr(_ac, _fn_name))
+    except Exception as _src_e:
+        _diag_src = "<unavailable: %s>" % _src_e
+    for _diag_line in _diag_src.splitlines():
+        if "App Check verification failed" in _diag_line:
+            _diagnostic_logger.warning("DIAGNOSTIC: %s source line: %r", _fn_name, _diag_line)
+
+
 def _req_id(request: Request) -> str:
     return getattr(request.state, "request_id", None) or request.headers.get("X-Request-ID", "")
 
