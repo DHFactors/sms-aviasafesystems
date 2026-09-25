@@ -72,7 +72,7 @@ async def copilot_chat(
         )
     except Exception as e:
         logger.exception(
-            "Copilot chat error for %s (role=%s, tenant=%s): %s",
+            "Copilot chat error for {} (role={}, tenant={}): {}",
             user.get("email"),
             user.get("role"),
             user.get("tenant_id"),
@@ -122,7 +122,7 @@ async def copilot_guest_chat(
         )
     except Exception as e:
         logger.exception(
-            "Guest copilot chat error (page=%s): %s",
+            "Guest copilot chat error (page={}): {}",
             payload.page_context or "unknown",
             e,
         )

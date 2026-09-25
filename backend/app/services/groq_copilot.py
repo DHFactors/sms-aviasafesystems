@@ -572,7 +572,7 @@ def chat(
     # (not the content) so request structure issues are immediately visible.
     model = resolve_groq_model()
     logger.debug(
-        "Groq payload: model=%s messages=%d (first=%s, last=%s) max_tokens=%s temperature=%s stream=False",
+        "Groq payload: model={} messages={} (first={}, last={}) max_tokens={} temperature={} stream=False",
         model,
         len(messages),
         messages[0].get("role") if messages else None,
