@@ -348,30 +348,55 @@ function initAppCheck() {
 
 // Resolve a fresh App Check token (or null when App Check is unavailable) so
 // public pages can attach it as X-Firebase-AppCheck to backend requests.
-// Always resolves: a reCAPTCHA stall or failure (private windows, test
-// browsers) must degrade to null instead of blocking the network dispatch.
+// Null outcomes are logged with the branch that caused them, and a single
+// retry (~500ms later) is attempted before giving up. Still always resolves:
+// a final failure degrades to null instead of blocking the network dispatch.
 function getAppCheckToken(timeoutMs) {
     var limit = timeoutMs || 3000;
     if (typeof firebase === 'undefined' || !firebase.appCheck || !firebase.appCheck().getToken) {
+        console.error("[AppCheck] getToken resolved null (reason: missing-sdk)");
         return Promise.resolve(null);
     }
-    return new Promise(function (resolve) {
-        var settled = false;
-        var done = function (value) {
-            if (settled) return;
-            settled = true;
-            resolve(value ? value : null);
-        };
-        try {
-            firebase.appCheck().getToken(true)
-                .then(function (tokenResult) {
-                    done(tokenResult && tokenResult.token ? tokenResult.token : null);
-                })
-                .catch(function () { done(null); });
-        } catch (e) {
-            done(null);
-        }
-        setTimeout(function () { done(null); }, limit);
+    function attemptOnce() {
+        return new Promise(function (resolve) {
+            var settled = false;
+            var done = function (value, reason) {
+                if (settled) return;
+                settled = true;
+                if (value) {
+                    resolve(value);
+                } else {
+                    console.error("[AppCheck] getToken resolved null (reason: " + reason + ")");
+                    resolve(null);
+                }
+            };
+            try {
+                firebase.appCheck().getToken(true)
+                    .then(function (tokenResult) {
+                        var tok = tokenResult && tokenResult.token ? tokenResult.token : null;
+                        done(tok, tok ? null : "empty-token");
+                    })
+                    .catch(function () { done(null, "reject"); });
+            } catch (e) {
+                done(null, "throw");
+            }
+            setTimeout(function () { done(null, "timeout"); }, limit);
+        });
+    }
+    return attemptOnce().then(function (token) {
+        if (token) return token;
+        return new Promise(function (resolve) {
+            setTimeout(function () {
+                attemptOnce().then(function (retryToken) {
+                    if (retryToken) {
+                        console.log("[AppCheck] getToken retry succeeded");
+                    } else {
+                        console.error("[AppCheck] getToken resolved null (reason: retry-failed)");
+                    }
+                    resolve(retryToken);
+                });
+            }, 500);
+        });
     });
 }
 window.getAppCheckToken = getAppCheckToken;

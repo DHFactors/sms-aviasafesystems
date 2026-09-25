@@ -198,15 +198,20 @@ function getApiBaseUrl() {
     return 'https://aviasafe-unified-platform.onrender.com';
 }
 
-// Attach a fresh App Check token when available (best-effort).
+// Attach a fresh App Check token — required, never silently omitted. A null
+// token throws so signIn() can block the submit with a visible error instead
+// of sending a headerless POST that the backend 403s.
 async function getAppCheckHeader() {
     try {
         if (typeof window.getAppCheckToken === 'function') {
             var token = await window.getAppCheckToken();
             if (token) return { 'X-Firebase-AppCheck': token };
         }
-    } catch (e) { /* best-effort */ }
-    return {};
+    } catch (e) { /* fall through to blocked-submit error below */ }
+    console.error("[Login] App Check token unavailable — submit will be blocked");
+    var appCheckErr = new Error('App Check verification unavailable — please refresh and retry');
+    appCheckErr.code = 'appcheck_unavailable';
+    throw appCheckErr;
 }
 
 // Credentials are verified server-side (POST /api/v1/auth/login) which enforces
@@ -229,9 +234,20 @@ async function signIn(email, password) {
         if (controller) {
             timer = setTimeout(function () { controller.abort(); }, LOGIN_TIMEOUT_MS);
         }
+        var appCheckHeader;
+        try {
+            appCheckHeader = await getAppCheckHeader();
+        } catch (appCheckError) {
+            var appCheckErrorDiv = document.getElementById('errorMessage');
+            if (appCheckErrorDiv) {
+                appCheckErrorDiv.textContent = 'App Check verification unavailable — please refresh and retry';
+                appCheckErrorDiv.style.display = 'block';
+            }
+            return;
+        }
         var resp = await fetch(getApiBaseUrl() + '/api/v1/auth/login', {
             method: 'POST',
-            headers: Object.assign({ 'Content-Type': 'application/json' }, await getAppCheckHeader()),
+            headers: Object.assign({ 'Content-Type': 'application/json' }, appCheckHeader),
             body: JSON.stringify({ email: email, password: password }),
             signal: controller ? controller.signal : undefined
         });
