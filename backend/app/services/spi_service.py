@@ -602,7 +602,7 @@ class SPIService:
         try:
             docs = service.list_diversions(user, None)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to read Firestore diversions: %s", exc)
+            logger.warning("Failed to read Firestore diversions: {}", exc)
             return []
 
         rows: List[Dict[str, Any]] = []

@@ -54,7 +54,7 @@ async def verify_app_check(request: Request) -> None:
             getattr(result, "token_type", "?"),
         )
     except Exception as e:  # noqa: BLE001 - deliberate degradation
-        logger.warning("App Check verification failed: %s", e)
+        logger.warning("App Check verification failed: {}", e)
         raise HTTPException(status_code=401, detail="App Check verification failed") from e
 
 
