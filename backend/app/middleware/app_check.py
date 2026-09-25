@@ -6,7 +6,7 @@
 #          verification and guest copilot chat.
 #
 # Model: the header `X-Firebase-AppCheck` is verified server-side with
-# firebase_admin.app_check.verify_app_check_token() whenever it is present;
+# firebase_admin.app_check.verify_token() whenever it is present;
 # an invalid / expired / malformed token is rejected with 401. Absent tokens
 # are allowed through so deployments where App Check (reCAPTCHA) is not yet
 # provisioned keep working — they are still protected by per-IP rate limiting
@@ -30,7 +30,7 @@ def _verify_sync(token: str) -> Optional[object]:
     """
     from firebase_admin import app_check
 
-    return app_check.verify_app_check_token(token)
+    return app_check.verify_token(token)
 
 
 async def verify_app_check(request: Request) -> None:
