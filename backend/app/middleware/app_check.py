@@ -104,5 +104,5 @@ async def verify_app_check_lenient(request: Request) -> None:
             )
     except Exception as e:  # noqa: BLE001 - deliberate degradation
         logger.warning(
-            "App Check verification failed (lenient mode — continuing): %s", e
+            "App Check verification failed (lenient mode — continuing): {}", e
         )
