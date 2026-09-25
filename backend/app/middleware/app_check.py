@@ -49,7 +49,7 @@ async def verify_app_check(request: Request) -> None:
         if result is None:
             raise ValueError("App Check token rejected")
         logger.debug(
-            "App Check verified (app_id={}, type={}"),
+            "App Check verified (app_id={}, type={})",
             getattr(result, "app_id", "?"),
             getattr(result, "token_type", "?"),
         )
@@ -98,7 +98,7 @@ async def verify_app_check_lenient(request: Request) -> None:
             )
         else:
             logger.debug(
-                "App Check verified (app_id={}, type={}"),
+                "App Check verified (app_id={}, type={})",
                 getattr(result, "app_id", "?"),
                 getattr(result, "token_type", "?"),
             )
