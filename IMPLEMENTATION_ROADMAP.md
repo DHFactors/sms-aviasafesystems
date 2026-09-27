@@ -3,7 +3,8 @@
 AviaSAFE SMS Platform
 Status: PHASE 3 COMPLETE — all Phase 0/1/2/3 items (P1-1..P1-31,
 P2-1..P2-30, P3-1..P3-15) DONE; Phase 4 (frontend dashboards)
-implementation begins next.
+Waves 1-3 complete (P4-1, P4-2, P4-3, P4-6, P4-7); Waves 4-5
+(P4-4 AE, P4-5 State Regulator) pending.
 Purpose: A dependency-ordered plan to implement every schema note and
 compliance remediation defined across the six contracts.
 
@@ -282,15 +283,24 @@ migration per table cluster, with rollback.
 
 **Content.**
 
-| ID | Deliverable | Role | Depends | Effort | Test |
-|---|---|---|---|---|---|
-| P4-1 | Shared shell components (header, period selector, drill-down, empty/loading/error) | all | P3-14 | L | component specs |
-| P4-2 | Safety Manager dashboard (5-counter KPI strip, color rules, EIP, workspace) | TENANT_ADMIN/SAFETY_OFFICER | P3-3,P3-6 | L | E2E KPI drill-down |
-| P4-3 | Department Head dashboard (3-counter strip, dept CAP response) | DEPT_ADMIN | P3-9 | M | dept scoping |
-| P4-4 | AE dashboard (numeric KPI strip, 2 action queues, trends) | ACCOUNTABLE_EXECUTIVE | P3-7,P3-8,P3-13 | L | queues + KPI |
-| P4-5 | State Regulator dashboard (national KPIs, benchmarks, PSOE, SPI/SPT, escalation) | CAAN_SMD | P3-10,P3-11,P3-12 | XL | read-only + escalation |
-| P4-6 | `nav-config.js` role types update (`ACCOUNTABLE_EXECUTIVE`, `SAG_MEMBER`) | all | P1-29 | S | role menus |
-| P4-7 | Graceful module-flag degradation | all | P1-* | M | flag-off empty states |
+| ID | Deliverable | Role | Depends | Effort | Test | Status |
+|---|---|---|---|---|---|---|
+| P4-1 | Shared shell components (header, period selector, drill-down, empty/loading/error) | all | P3-14 | L | component specs | DONE (`267cce5` Wave 1) |
+| P4-2 | Safety Manager dashboard (5-counter KPI strip, color rules, EIP, workspace) | TENANT_ADMIN/SAFETY_OFFICER | P3-3,P3-6 | L | E2E KPI drill-down | DONE (`86f22f8` Wave 2; see deferrals below) |
+| P4-3 | Department Head dashboard (3-counter strip, dept CAP response) | DEPT_ADMIN | P3-9 | M | dept scoping | DONE (`eb25641` Wave 3; see deferrals below) |
+| P4-4 | AE dashboard (numeric KPI strip, 2 action queues, trends) | ACCOUNTABLE_EXECUTIVE | P3-7,P3-8,P3-13 | L | queues + KPI | PENDING (Wave 4; existing `ae-dashboard.html` predates Phase 4 work) |
+| P4-5 | State Regulator dashboard (national KPIs, benchmarks, PSOE, SPI/SPT, escalation) | CAAN_SMD | P3-10,P3-11,P3-12 | XL | read-only + escalation | PENDING (Wave 5; no P4-5 artifact) |
+| P4-6 | `nav-config.js` role types update (`ACCOUNTABLE_EXECUTIVE`, `SAG_MEMBER`) | all | P1-29 | S | role menus | DONE (`267cce5` Wave 1) |
+| P4-7 | Graceful module-flag degradation | all | P1-* | M | flag-off empty states | DONE (`267cce5` Wave 1) |
+
+**Phase 4 deferrals (documented in-page; DONE is not over-read).**
+- P4-2 Safety Manager: create/view/triage wired; enrich, status update,
+  assign, SRAM save, CAN issue, CAP create/review/status, bulletin
+  publish, import, SAG/SRB authoring deferred (per
+  `safety-dashboard.html` header).
+- P4-3 Department Head: CAP create/edit/submit wired; evidence upload,
+  response-to-review, status change beyond submit deferred (per
+  `dept-head-dashboard.html` header).
 
 ---
 
@@ -401,4 +411,5 @@ P2-1..P2-30 and P3-1..P3-15 DONE. Phase 1 commits: Module A `846913d`, Module B
 `3a68f38`, Module C `ce7102a`, RBAC `d15ebd3` (16 migrations). Phase 2 commits:
 Module A `00a16b7`, Module B `b3b823b`+`78dd589`, Module C `9b15eab`, RBAC
 `98986aa`. Phase 3 commits: Wave 1 `f6db16a`, Wave 2 (Part A close-out).
-Phase 4 (dashboards) begins next; Phase 4+ items remain PENDING.*
+Phase 4 Waves 1-3 complete (P4-1, P4-2, P4-3, P4-6, P4-7);
+Waves 4-5 (P4-4 AE, P4-5 State Regulator) pending. Phase 5+ items remain PENDING.*
