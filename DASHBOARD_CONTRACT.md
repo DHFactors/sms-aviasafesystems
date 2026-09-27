@@ -621,7 +621,9 @@ flag; backend/frontend `module3` mismatch (DISCOVERY_REPORT.md:61,256,343).
 - No literal `EIP` state (OVERDUE_MODEL_VERIFICATION.md:33-35).
 - No `granularity`/`group_by` parameters; `period` vs `days` inconsistency.
 - Under-authorized regulator/SPI/N-HRC surfaces (SECURITY_REVIEW.md H1/H2).
-- NAV_CONFIG role types exclude `ACCOUNTABLE_EXECUTIVE`/`SAG_MEMBER`.
+- NAV_CONFIG role types include `ACCOUNTABLE_EXECUTIVE` (→ AE dashboard,
+  `nav-config.js:219-220`) and `SAG_MEMBER` (→ SAG surface, `:219-220`);
+  SAG_MEMBER nav visibility is conditional per P4-6.2 (`:236`).
 
 **Content — migration path.**
 1. Define role→dashboard routing and build the four pages on the shared shell.
