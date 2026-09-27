@@ -701,7 +701,19 @@ async function openCreateUserModal() {
                 populateUserTenantDropdown();
             } catch (err) {
                 toast('Failed to load tenants', 'error');
-}
+            }
+        }
+    }
+    var form = document.getElementById('createUserForm');
+    if (form) { form.reset(); form.style.display = 'block'; }
+    var successEl = document.getElementById('createUserSuccess');
+    if (successEl) successEl.style.display = 'none';
+    var errEl = document.getElementById('createUserError');
+    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    toggleCustomRole();
+    document.getElementById('createUserModal').style.display = 'flex';
+    var email = document.getElementById('newUserEmail');
+    if (email) setTimeout(function () { email.focus(); }, 50);
 }
 
 // ============================================================================
@@ -994,18 +1006,6 @@ entityField('editUserForm').addEventListener('submit', async function (e) {
         if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Save Changes'; }
     }
 });
-    }
-    var form = document.getElementById('createUserForm');
-    if (form) { form.reset(); form.style.display = 'block'; }
-    var successEl = document.getElementById('createUserSuccess');
-    if (successEl) successEl.style.display = 'none';
-    var errEl = document.getElementById('createUserError');
-    if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-    toggleCustomRole();
-    document.getElementById('createUserModal').style.display = 'flex';
-    var email = document.getElementById('newUserEmail');
-    if (email) setTimeout(function () { email.focus(); }, 50);
-}
 
 function closeCreateUserModal() {
     document.getElementById('createUserModal').style.display = 'none';
