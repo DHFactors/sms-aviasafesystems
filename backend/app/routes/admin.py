@@ -659,7 +659,10 @@ async def admin_update_tenant(
     merged = pg.update(Tenant, "slug", tenant_id, fields)
     if merged is None:
         raise HTTPException(status_code=404, detail=f"Unknown tenant: {tenant_id}")
-    sync_tenant_to_firestore(tenant_id, merged)
+    try:
+        sync_tenant_to_firestore(tenant_id, merged)
+    except Exception as e:
+        logger.warning("Firestore mirror sync skipped for tenant {}: {}", tenant_id, e)
 
     ip, request_id = request_context(request)
     log_audit(
