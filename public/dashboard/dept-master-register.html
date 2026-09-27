@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Register - CAN · CAP</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #f1f5f9; font-family: 'Inter', system-ui, -apple-system, sans-serif; color: #0b2a42; margin: 0; }
+        .page { max-width: 1300px; margin: 0 auto; padding: 1.5rem; }
+        .nav { background: #0b2a42; color: #fff; padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .nav h1 { font-size: 1.1rem; font-weight: 600; margin: 0; }
+        .nav h1 i { margin-right: 0.5rem; }
+        .nav-actions { display: flex; align-items: center; gap: 1rem; }
+        .nav-actions span { font-size: 0.8rem; opacity: 0.8; }
+        .btn-logout { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+        .btn-logout:hover { background: rgba(255,255,255,0.1); }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .header-bar h2 { margin: 0; color: #0b2a42; }
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; background: #fff; padding: 1rem 1.25rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .filter-bar label { font-size: 0.8rem; font-weight: 600; color: #475569; }
+        .filter-bar select, .filter-bar input { padding: 0.4rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.85rem; background: #fff; }
+        .filter-bar .btn-search { background: #1a6b8a; color: #fff; border: none; padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+        .table-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+        .table-card table { width: 100%; border-collapse: collapse; }
+        .table-card th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; padding: 0.85rem 1rem; text-align: left; border-bottom: 2px solid #e2e8f0; cursor: pointer; user-select: none; white-space: nowrap; }
+        .table-card td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
+        .table-card tbody tr { cursor: pointer; }
+        .table-card tbody tr:hover { background: #f8fafc; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .badge-critical { background: #fde8e8; color: #dc3545; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-medium { background: #fff8e1; color: #f9a825; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+        .badge-new { background: #e3f2fd; color: #1565c0; }
+        .badge-processing { background: #fff3e0; color: #e65100; }
+        .badge-warning { background: #fef3c7; color: #d97706; }
+        .badge-completed { background: #e8f5e9; color: #2e7d32; }
+        .badge-danger { background: #fde8e8; color: #b91c1c; }
+        .badge-type-hazard { background: #e3f2fd; color: #1565c0; }
+        .badge-type-can { background: #ede7f6; color: #5e35b1; }
+        .badge-type-cap { background: #fce4ec; color: #c2185b; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: #fff; padding: 1rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
+        .stat-card .num { font-size: 1.5rem; font-weight: 700; color: #0b2a42; }
+        .stat-card .lbl { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 0.25rem; }
+        .loading-state { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #64748b; }
+        .loading-state i { font-size: 1.5rem; margin-right: 0.5rem; }
+        .empty-state { text-align: center; padding: 3rem; color: #64748b; }
+        .type-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .type-tab { padding: 0.4rem 1rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #fff; border: 1px solid #e2e8f0; color: #64748b; }
+        .type-tab.active { background: #1a6b8a; color: #fff; border-color: #1a6b8a; }
+        .sort-indicator { font-size: 0.65rem; margin-left: 0.25rem; opacity: 0.6; }
+        @media (max-width: 768px) { .filter-bar { flex-direction: column; align-items: stretch; } }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="/css/dashboard-responsive.css">
+    
+    </head>
+<body>
+
+<div class="app-shell">
+
+<div class="page">
+    <div class="header-bar">
+        <h2><i class="fas fa-table-list"></i> Department CAN · CAP Register</h2>
+    </div>
+
+    <div id="statsRow" class="stats-row"></div>
+
+    <div class="filter-bar">
+        <label>Status:</label>
+        <select id="filterStatus"><option value="">All</option></select>
+        <label>Type:</label>
+        <select id="filterType" style="width:110px;">
+            <option value="">All</option>
+            <option value="CAN">CAN</option>
+            <option value="CAP">CAP</option>
+        </select>
+        <label>Department:</label>
+        <span id="deptBadge" class="badge badge-processing" style="font-size:0.85rem;">—</span>
+        <label>Search:</label>
+        <input type="text" id="filterSearch" placeholder="Reference or title..." style="flex:1;min-width:150px;">
+        <label>Page size:</label>
+        <select id="pageSize" style="width:80px;">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+        </select>
+        <button class="btn-search" onclick="loadRegister(false)"><i class="fas fa-search"></i> Search</button>
+        <button class="btn-search" id="loadMoreBtn" onclick="loadRegister(true)" style="display:none;background:#64748b;"><i class="fas fa-plus"></i> Load More</button>
+    </div>
+    <div id="paginationInfo" style="font-size:0.8rem;color:#64748b;margin-bottom:0.5rem;display:none;"></div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th data-sort="reference">Reference <span class="sort-indicator"></span></th>
+                    <th data-sort="title">Title</th>
+                    <th data-sort="type">Type</th>
+                    <th data-sort="status">Status</th>
+                    <th data-sort="risk_level">Risk</th>
+                    <th data-sort="assigned_to">Assigned To</th>
+                    <th data-sort="department">Department</th>
+                    <th data-sort="date">Date</th>
+                    <th data-sort="target_date">Target</th>
+                </tr>
+            </thead>
+            <tbody id="registerBody"></tbody>
+        </table>
+        <div id="loadingIndicator" class="loading-state" style="display:none;">
+            <i class="fas fa-spinner fa-spin"></i> Loading Master Register...
+        </div>
+        <div id="emptyIndicator" class="empty-state" style="display:none;">
+            <i class="fas fa-inbox" style="font-size:2rem;margin-bottom:0.5rem;"></i>
+            <p>No records found.</p>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script src="/js/tenant_context.js"></script>
+<script src="/js/department_resolver.js"></script>
+<script src="/js/api/client.js"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'Department Dashboard',
+    heroTitle: 'Department Register',
+    heroSubtitle: 'Department CAN · CAP Register',
+};
+</script>
+<script src="/js/nav-config.js"></script>
+<script src="/js/shell.js"></script>
+<script>
+let currentUser = null;
+let currentRole = null;
+let currentDept = '';
+let allRows = [];
+let statusFilter = '';
+let sortKey = 'date';
+let sortDir = -1;
+let nextCursor = null;
+let hasMore = false;
+let currentPageSize = 50;
+
+// Department scope for this page, mirroring the backend override
+// (DEPARTMENT_SCOPE_PREFIXES in middleware/auth.py): 145 → Part-145,
+// camo → CAMO, ops → Flight Operations. Claims department wins when set.
+function deptFromEmail(email) {
+    const local = String(email || '').toLowerCase().split('@')[0];
+    if (local.indexOf('145') === 0) return 'Part-145';
+    if (local.indexOf('camo') === 0) return 'CAMO';
+    if (local.indexOf('ops') === 0) return 'Flight Operations';
+    return '';
+}
+
+firebase.auth().onAuthStateChanged(function(user) {
+    if (!user) { window.location.href = '/login.html'; return; }
+    currentUser = user;
+    if (typeof applyDepartmentContext === 'function') {
+        applyDepartmentContext(user.email);
+    }
+    user.getIdTokenResult(true).then(function(tr) {
+        const t = (tr.claims && tr.claims.tenant_id) || '';
+        if (t && typeof updateShellTenant === 'function') {
+            updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
+        }
+        currentRole = (tr.claims && tr.claims.role) || null;
+        currentDept = (tr.claims && tr.claims.department) || deptFromEmail(user.email);
+        const badge = document.getElementById('deptBadge');
+        if (badge) badge.textContent = currentDept || '—';
+        renderTable();
+    }).catch(function() {});
+    loadRegister();
+});
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+    catch (e) { return iso; }
+}
+
+function typeBadgeClass(type) {
+    return type === 'CAN' ? 'badge-type-can' : 'badge-type-cap';
+}
+
+function statusBadgeClass(status) {
+    const map = {
+        'Open': 'badge-new',
+        'Processing': 'badge-processing',
+        'Under Review': 'badge-warning',
+        'Pending Closure': 'badge-warning',
+        'Closed': 'badge-completed',
+        'Reopened': 'badge-danger',
+        'In Progress': 'badge-processing',
+        'Completed': 'badge-completed',
+        'Revision Required': 'badge-critical',
+        'Overdue': 'badge-danger',
+        'Escalated': 'badge-danger',
+    };
+    return map[status] || 'badge-default';
+}
+
+function riskBadgeClass(risk) {
+    const r = (risk || '').toLowerCase();
+    if (r.indexOf('very high') !== -1 || r.indexOf('intol') !== -1 || r.indexOf('level iv') !== -1) return 'badge-critical';
+    if (r.indexOf('high') !== -1 || r.indexOf('medium') !== -1 || r.indexOf('moderate') !== -1 || r.indexOf('tol') !== -1 || r.indexOf('level iii') !== -1 || r.indexOf('action') !== -1) return 'badge-high';
+    if (r.indexOf('low') !== -1 || r.indexOf('acceptable') !== -1 || r.indexOf('level ii') !== -1) return 'badge-low';
+    return 'badge-default';
+}
+
+async function loadRegister(append) {
+    const tbody = document.getElementById('registerBody');
+    const loading = document.getElementById('loadingIndicator');
+    const empty = document.getElementById('emptyIndicator');
+    const statusSel = document.getElementById('filterStatus');
+    const pageSizeSel = document.getElementById('pageSize');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    const paginationInfo = document.getElementById('paginationInfo');
+    if (!append) {
+        tbody.innerHTML = '';
+        allRows = [];
+        nextCursor = null;
+        hasMore = false;
+    }
+    loading.style.display = 'flex';
+    empty.style.display = 'none';
+    if (pageSizeSel) currentPageSize = parseInt(pageSizeSel.value, 10) || 50;
+
+    try {
+        // Department scope comes from the signed-in user (claims, else email
+        // prefix). The backend independently overrides it for prefixed
+        // department emails, so a forged value here cannot widen scope.
+        const department = currentDept || undefined;
+        const status = document.getElementById('filterStatus').value.trim() || undefined;
+        const search = document.getElementById('filterSearch').value.trim() || undefined;
+        const params = new URLSearchParams();
+        if (department) params.set('department', department);
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+        params.set('page_size', String(currentPageSize));
+        if (append && nextCursor) params.set('cursor', nextCursor);
+        const qs = params.toString() ? '?' + params.toString() : '';
+        const data = await ApiClient.get('/api/v1/dashboard/master-register' + qs);
+        const payload = data || {};
+        // Dept view is CAN+CAP only: drop any Hazard rows the backend returns.
+        const newRows = (payload.rows || []).filter(function(r) {
+            return String(r && r.type || '').trim().toUpperCase() !== 'HAZARD';
+        });
+        if (append) {
+            allRows = allRows.concat(newRows);
+        } else {
+            allRows = newRows;
+        }
+        // Pagination state from backend
+        const pagination = payload.pagination || {};
+        nextCursor = pagination.next_cursor || null;
+        hasMore = !!pagination.has_more;
+
+        // Populate status dropdown from actual data (only on first load without status filter)
+        if (!append) {
+            const current = statusSel.value;
+            if (!status) {
+                statusSel.innerHTML = '<option value="">All</option>';
+                Object.keys(payload.by_status || {}).sort().forEach(function(s) {
+                    const opt = document.createElement('option');
+                    opt.value = s; opt.textContent = s;
+                    statusSel.appendChild(opt);
+                });
+                statusSel.value = current;
+            }
+        }
+
+        renderStats(payload);
+        renderTable();
+        loading.style.display = 'none';
+        // Update pagination UI
+        if (loadMoreBtn) loadMoreBtn.style.display = hasMore ? 'inline-block' : 'none';
+        if (paginationInfo) {
+            paginationInfo.style.display = 'block';
+            paginationInfo.textContent = 'Showing ' + allRows.length + ' rows' + (hasMore ? ' — more available' : ' — end') + ' (page_size=' + currentPageSize + ')';
+        }
+    } catch (err) {
+        loading.style.display = 'none';
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc3545;padding:2rem;"><i class="fas fa-exclamation-circle"></i> Error: ${err.message}</td></tr>`;
+    }
+}
+
+function renderStats(payload) {
+    const container = document.getElementById('statsRow');
+    const rows = payload.rows || allRows || [];
+
+    // Case-insensitive type buckets (guards against 'can'/'CAN' drift).
+    const normType = function(r) { return String(r && r.type || '').trim().toUpperCase(); };
+    const cans = rows.filter(function(r) { return normType(r) === 'CAN'; });
+    const caps = rows.filter(function(r) { return normType(r) === 'CAP'; });
+
+    const activeCans = cans.filter(function(r) {
+        return String(r.status || '').toLowerCase() !== 'closed';
+    }).length;
+    const pendingCaps = caps.filter(function(r) {
+        const s = String(r.status || '').toLowerCase();
+        return s !== 'completed' && s !== 'closed';
+    }).length;
+
+    const byStatus = {};
+    rows.forEach(function(r) { byStatus[r.status] = (byStatus[r.status] || 0) + 1; });
+    const overdue = (byStatus['Overdue'] || 0) + (byStatus['Escalated'] || 0);
+
+    let html = '';
+    html += '<div class="stat-card"><div class="num">' + (activeCans + pendingCaps) + '</div><div class="lbl">Total Actionable Tasks</div></div>';
+    html += '<div class="stat-card"><div class="num">' + activeCans + '</div><div class="lbl">Active CANs</div></div>';
+    html += '<div class="stat-card" style="border-top:3px solid #dc3545;"><div class="num" style="color:#dc3545;">' + overdue + '</div><div class="lbl">Overdue / Escalated</div></div>';
+    container.innerHTML = html;
+}
+
+function getFilteredRows() {
+    let rows = allRows;
+    const typeSel = (document.getElementById('filterType') || {}).value || '';
+    if (typeSel) rows = rows.filter(function(r) { return r.type === typeSel; });
+    statusFilter = document.getElementById('filterStatus').value;
+    if (statusFilter) rows = rows.filter(function(r) { return r.status === statusFilter; });
+    const search = document.getElementById('filterSearch').value.trim().toLowerCase();
+    if (search) {
+        rows = rows.filter(function(r) {
+            return (r.reference || '').toLowerCase().indexOf(search) !== -1 ||
+                   (r.title || '').toLowerCase().indexOf(search) !== -1;
+        });
+    }
+    return rows;
+}
+
+function sortRows(rows) {
+    const key = sortKey;
+    const dir = sortDir;
+    return rows.slice().sort(function(a, b) {
+        let av = a[key] || '';
+        let bv = b[key] || '';
+        if (key === 'date' || key === 'target_date') {
+            av = av ? new Date(av).getTime() : 0;
+            bv = bv ? new Date(bv).getTime() : 0;
+        } else {
+            av = String(av).toLowerCase();
+            bv = String(bv).toLowerCase();
+        }
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+    });
+}
+
+function getDetailUrl(item) {
+        const id = item.id || item.hazard_id || item.can_id || item.cap_id;
+        if (!id) return '#';
+        if (item.type === 'CAN') {
+            return `/can_cap/can_detail.html?id=${encodeURIComponent(id)}`;
+        } else if (item.type === 'CAP') {
+            return `/can_cap/cap_review.html?id=${encodeURIComponent(id)}`;
+        }
+        return '#';
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('registerBody');
+        const empty = document.getElementById('emptyIndicator');
+        const rows = sortRows(getFilteredRows());
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+        rows.forEach(function(r) {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            const detailUrl = getDetailUrl(r);
+            tr.addEventListener('click', function() {
+                window.location.href = detailUrl;
+            });
+            tr.innerHTML = `
+                <td><strong>${r.reference}</strong></td>
+                <td>${r.title}</td>
+                <td><span class="badge ${typeBadgeClass(r.type)}">${r.type}</span></td>
+                <td><span class="badge ${statusBadgeClass(r.status)}">${r.status}</span></td>
+                <td><span class="badge ${riskBadgeClass(r.risk_level)}">${r.risk_level || '-'}</span></td>
+                <td>${r.assigned_to || '-'}</td>
+                <td>${r.department || '-'}</td>
+                <td>${formatDate(r.date)}</td>
+                <td>${formatDate(r.target_date)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+document.querySelectorAll('th[data-sort]').forEach(function(th) {
+    th.addEventListener('click', function() {
+        const key = th.dataset.sort;
+        if (sortKey === key) { sortDir = -sortDir; }
+        else { sortKey = key; sortDir = -1; }
+        renderTable();
+    });
+});
+</script>
+
+</body>
+</html>

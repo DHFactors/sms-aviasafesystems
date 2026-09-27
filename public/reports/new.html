@@ -71,8 +71,8 @@
         <div class="card hidden" data-step-panel="2">
             <h2><i class="fas fa-file-lines"></i> Step 2 — Report Type</h2>
             <div class="radio-group">
-                <label class="radio-option" data-type="mor"><input type="radio" name="reportType" value="mor"> MOR <small style="display:block;color:#991b1b;">CAMO/QA only</small></label>
-                <label class="radio-option selected" data-type="vsr"><input type="radio" name="reportType" value="vsr" checked> VSR</label>
+                <label class="radio-option" data-type="mor"><input type="radio" name="reportType" value="mor"> MOR <small style="display:block;color:#991b1b;">CAMO/QA only</small><small style="display:block;"><a href="/report/mor.html" onclick="event.stopPropagation()" style="font-size:0.75rem;color:#1a6b8a;">Open full MOR form →</a></small></label>
+                <label class="radio-option selected" data-type="vsr"><input type="radio" name="reportType" value="vsr" checked> VSR<small style="display:block;"><a href="/report/vsr.html" onclick="event.stopPropagation()" style="font-size:0.75rem;color:#1a6b8a;">Open full VSR form →</a></small></label>
                 <label class="radio-option" data-type="confidential"><input type="radio" name="reportType" value="confidential"> Confidential</label>
             </div>
             <p id="morRestriction" style="display:none;font-size:0.8rem;color:#991b1b;background:#fef2f2;padding:0.5rem;border-radius:6px;margin-top:0.75rem;"><i class="fas fa-lock"></i> MOR restricted to CAMO/QA. Your role will be checked.</p>

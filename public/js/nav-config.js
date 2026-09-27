@@ -57,11 +57,12 @@ var NAV_CONFIG = {
     },
 
     // ─── HAZARD MANAGEMENT ─── (Module B SRM base; AE excluded — read-only
-    // executive surface lives on the AE dashboard itself, P4-6.1)
+    // executive surface lives on the AE dashboard itself, P4-6.1.
+    // DEPT_ADMIN excluded — narrow department scope lives in its Workspace.)
     hazards: {
         label: 'Hazard Management',
         icon: 'fa-triangle-exclamation',
-        roles: ['SAFETY', 'DEPT_ADMIN'],
+        roles: ['SAFETY'],
         module: 'module_b_srm',
         items: [
             { id: 'hazard-analysis', href: '/hazard-analysis.html', label: 'Hazard Analysis' },
@@ -71,11 +72,12 @@ var NAV_CONFIG = {
     },
 
     // ─── CORRECTIVE ACTIONS ─── (Module B CAN/CAP add-on; AE excluded —
-    // no CAN/CAP authoring, P4-6.1)
+    // no CAN/CAP authoring, P4-6.1. DEPT_ADMIN excluded — department
+    // scope lives in its Workspace.)
     corrective: {
         label: 'Corrective Actions',
         icon: 'fa-clipboard-check',
-        roles: ['SAFETY', 'DEPT_ADMIN'],
+        roles: ['SAFETY'],
         module: 'module_b_can_cap',
         items: [
             { id: 'can-register', href: '/can_cap/cans.html', label: 'CAN Register' },
@@ -84,19 +86,16 @@ var NAV_CONFIG = {
         ]
     },
 
-    // ─── REPORTING ─── (Module B reports; department submitters only —
-    // Safety Managers receive and process reports via the Safety workspace,
-    // they do not submit them, so SAFETY is excluded here)
-    reporting: {
-        label: 'Reporting',
-        icon: 'fa-pen-to-square',
+    // ─── DEPARTMENT WORKSPACE ─── (DEPT_ADMIN only: narrow operational
+    // scope. My Tasks arrives via the Dashboard group; historical
+    // department data lives here. No Reports tab — reports are SAFETY-only.)
+    dept_workspace: {
+        label: 'Workspace',
+        icon: 'fa-briefcase',
         roles: ['DEPT_ADMIN'],
         module: 'module_b_srm',
         items: [
-            { id: 'submit-mor', href: '/report/mor.html', label: 'Submit MOR' },
-            { id: 'submit-vsr', href: '/reports/new.html', label: 'Submit VSR' },
-            { id: 'report-diversion', href: '/flight_diversions/create.html', label: 'Report Diversion' },
-            { id: 'reports-center', href: '/reports/index.html', label: 'Reports Center' },
+            { id: 'dept-register', href: '/dashboard/dept-master-register.html', label: 'Master Register' },
         ]
     },
 
