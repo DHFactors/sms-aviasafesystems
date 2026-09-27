@@ -762,9 +762,12 @@ async function openEntityModal(type, idle) {
         : (isEdit
             ? 'Update operator-tenant metadata. Changes persist to Postgres.'
             : 'Create a new operator tenant. A tenant that still exists in Postgres is updated instead of rejected.');
-    entityField('entitySubmitLabel').innerHTML = isEdit
-        ? '<i class="fas fa-check"></i> Save Changes'
-        : '<i class="fas fa-plus"></i> Create';
+    var submitLabelEl = entityField('entitySubmitLabel');
+    if (submitLabelEl) {
+        submitLabelEl.innerHTML = isEdit
+            ? '<i class="fas fa-check"></i> Save Changes'
+            : '<i class="fas fa-plus"></i> Create';
+    }
 
     var idInput = entityField('entityId');
     var depFields = document.querySelectorAll('.entityTenantOnly');
@@ -901,7 +904,7 @@ entityField('entityForm').addEventListener('submit', async function (e) {
             body = { setup_key: setupKey, tenant: payload };
         }
     }
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span id="entitySubmitLabel"><i class="fas fa-spinner fa-spin"></i> Saving...</span>'; }
 
     try {
         try { AdminUI.setSetupKey(setupKey); } catch (e) {}
@@ -929,7 +932,9 @@ entityField('entityForm').addEventListener('submit', async function (e) {
     } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = isEdit ? '<i class="fas fa-check"></i> Save Changes' : '<i class="fas fa-plus"></i> Create';
+            submitBtn.innerHTML = '<span id="entitySubmitLabel">' +
+                (isEdit ? '<i class="fas fa-check"></i> Save Changes' : '<i class="fas fa-plus"></i> Create') +
+                '</span>';
         }
     }
 });
