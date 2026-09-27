@@ -43,6 +43,7 @@
         .badge-type-hazard { background: #e3f2fd; color: #1565c0; }
         .badge-type-can { background: #ede7f6; color: #5e35b1; }
         .badge-type-cap { background: #fce4ec; color: #c2185b; }
+        .badge-type-report { background: #e8f5e9; color: #2e7d32; }
         .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
         .stat-card { background: #fff; padding: 1rem; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center; }
         .stat-card .num { font-size: 1.5rem; font-weight: 700; color: #0b2a42; }
@@ -70,7 +71,7 @@
 
 <div class="page">
     <div class="header-bar">
-        <h2><i class="fas fa-table-list"></i> Unified Hazard · CAN · CAP Register</h2>
+        <h2><i class="fas fa-table-list"></i> Unified Hazard · CAN · CAP · Report Register</h2>
     </div>
 
     <div class="type-tabs">
@@ -78,6 +79,7 @@
         <span class="type-tab" data-type="Hazard" onclick="setTypeFilter('Hazard')">Hazards</span>
         <span class="type-tab" data-type="CAN" onclick="setTypeFilter('CAN')">CANs</span>
         <span class="type-tab" data-type="CAP" onclick="setTypeFilter('CAP')">CAPs</span>
+        <span class="type-tab" data-type="Report" id="tabReport" style="display:none;" onclick="setTypeFilter('Report')">Reports</span>
     </div>
 
     <div id="statsRow" class="stats-row"></div>
@@ -148,6 +150,7 @@ window.SHELL_CONFIG = {
 <script src="/js/shell.js"></script>
 <script>
 let currentUser = null;
+let currentRole = null;
 let allRows = [];
 let typeFilter = '';
 let statusFilter = '';
@@ -156,6 +159,10 @@ let sortDir = -1;
 let nextCursor = null;
 let hasMore = false;
 let currentPageSize = 50;
+
+// Roles permitted to see the Reports tab (mirrors the backend gate in
+// build_master_register REPORT_VIEWER_ROLES; AIRLINE_ADMIN excluded).
+const REPORT_VIEWER_ROLES = ['TENANT_ADMIN', 'SAFETY_OFFICER', 'SUPER_ADMIN'];
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
@@ -168,6 +175,12 @@ firebase.auth().onAuthStateChanged(function(user) {
         if (t && typeof updateShellTenant === 'function') {
             updateShellTenant(t.replace(/-/g, ' ').toUpperCase());
         }
+        currentRole = (tr.claims && tr.claims.role) || null;
+        if (REPORT_VIEWER_ROLES.indexOf(currentRole) !== -1) {
+            const tab = document.getElementById('tabReport');
+            if (tab) tab.style.display = '';
+        }
+        applyTypeFromUrl();
     }).catch(function() {});
     loadRegister();
 });
@@ -177,7 +190,36 @@ function setTypeFilter(type) {
     document.querySelectorAll('.type-tab').forEach(function(t) {
         t.classList.toggle('active', t.dataset.type === type);
     });
+    try {
+        const url = new URL(window.location.href);
+        const inv = type === 'Report' ? 'report'
+            : type === 'Hazard' ? 'hazard'
+            : type === 'CAN' ? 'can'
+            : type === 'CAP' ? 'cap' : '';
+        if (inv) url.searchParams.set('type', inv);
+        else url.searchParams.delete('type');
+        window.history.replaceState(null, '', url.toString());
+    } catch (e) {}
     renderTable();
+}
+
+function typeFromUrl() {
+    try {
+        const t = (new URLSearchParams(window.location.search).get('type') || '').toLowerCase();
+        if (t === 'report') return 'Report';
+        if (t === 'hazard') return 'Hazard';
+        if (t === 'can') return 'CAN';
+        if (t === 'cap') return 'CAP';
+    } catch (e) {}
+    return '';
+}
+
+function applyTypeFromUrl() {
+    let t = typeFromUrl();
+    // UX layer: unauthorized roles fall back to All silently (backend
+    // enforces the same gate and simply omits Report rows).
+    if (t === 'Report' && REPORT_VIEWER_ROLES.indexOf(currentRole) === -1) t = '';
+    setTypeFilter(t);
 }
 
 function formatDate(iso) {
@@ -187,6 +229,7 @@ function formatDate(iso) {
 }
 
 function typeBadgeClass(type) {
+    if (type === 'Report') return 'badge-type-report';
     return type === 'Hazard' ? 'badge-type-hazard' : type === 'CAN' ? 'badge-type-can' : 'badge-type-cap';
 }
 
@@ -359,6 +402,8 @@ function getDetailUrl(item) {
             return `/can_cap/can_detail.html?id=${encodeURIComponent(id)}`;
         } else if (item.type === 'CAP') {
             return `/can_cap/cap_review.html?id=${encodeURIComponent(id)}`;
+        } else if (item.type === 'Report') {
+            return `/report/detail.html?id=${encodeURIComponent(id)}`;
         }
         return '#';
     }

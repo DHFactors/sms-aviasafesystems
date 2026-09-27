@@ -32,6 +32,12 @@ HAZARD_COLLECTION = "hazards"
 CAN_COLLECTION = "can_cap"
 CAP_SUBCOLLECTION = "caps"
 
+# Roles permitted to see Report rows in the unified register (security
+# layer). Frontend hides the Reports tab for everyone else (UX layer).
+# AIRLINE_ADMIN is legacy and intentionally excluded; is_confidential is
+# dormant (always false in production) and must NOT be used for gating.
+REPORT_VIEWER_ROLES = {"TENANT_ADMIN", "SAFETY_OFFICER", "SUPER_ADMIN"}
+
 # Department aliases — normalizes the many spellings used across seed data,
 # account claims and UI filters onto canonical queue names.
 _DEPARTMENT_ALIASES = {
@@ -754,6 +760,80 @@ def build_master_register(
             })
     except Exception as e:
         logger.error(f"Master register CAP batch scan failed: {e}")
+
+    # --- Reports (PG only): VSR/MOR rows, role-gated ---
+    # Reports have no department column, so when a department filter is
+    # active they are excluded (membership cannot be verified). Search
+    # matches reference/title/narrative/occurrence_type.
+    if (user.get("role") in REPORT_VIEWER_ROLES) and not norm_dept:
+        try:
+            from app.db.session import session_scope as _session_scope_rep
+            from app.db.db_models import Report as _PgReport
+            from app.db.ids import register_tenant as _reg_tenant_rep
+            from sqlalchemy import select as _select_rep
+            import uuid as _uuid_rep
+            _rep_tenant_uuid = None
+            if tenant_id and not cross_tenant:
+                try:
+                    _rep_tenant_uuid = _reg_tenant_rep(tenant_id)
+                except Exception:
+                    _rep_tenant_uuid = None
+
+            def _run_pg_reports():
+                from app.db.runner import run as _run_rep
+
+                async def _q_rep():
+                    async with _session_scope_rep() as _session:
+                        stmt = _select_rep(_PgReport)
+                        if _rep_tenant_uuid:
+                            try:
+                                stmt = stmt.where(_PgReport.tenant_id == _uuid_rep.UUID(_rep_tenant_uuid))
+                            except Exception:
+                                pass
+                        if status:
+                            stmt = stmt.where(_PgReport.status == status)
+                        if cutoff_from is not None:
+                            stmt = stmt.where(_PgReport.created_at >= cutoff_from)
+                        if cutoff_to is not None:
+                            stmt = stmt.where(_PgReport.created_at <= cutoff_to)
+                        stmt = stmt.order_by(_PgReport.created_at.desc()).limit(per_type_limit)
+                        return list((await _session.execute(stmt)).scalars().all())
+
+                return _run_rep(_q_rep())
+
+            for r in _run_pg_reports():
+                rt = (r.report_type or "").lower()
+                subtype = "MOR" if rt == "mandatory" else "VSR"
+                rid = str(r.id)
+                headline = (r.occurrence_type or "").strip()
+                if not headline:
+                    headline = (r.narrative or "").strip().replace("\n", " ")
+                    headline = (headline[:77] + "...") if len(headline) > 80 else headline
+                if search and not _match_search(
+                    {"reference": subtype + "-" + rid[:6], "title": headline,
+                     "narrative": r.narrative, "occurrence_type": r.occurrence_type},
+                    ["reference", "title", "narrative", "occurrence_type"],
+                ):
+                    continue
+                rows.append({
+                    "id": rid,
+                    "reference": subtype + "-" + rid[:6],
+                    "title": headline,
+                    "type": "Report",
+                    "subtype": subtype,
+                    "anonymous": bool(r.is_anonymous),
+                    "status": r.status or "NEW",
+                    "risk_level": r.risk_level,
+                    "priority": None,
+                    "assigned_to": None,
+                    "assigned_to_uid": None,
+                    "department": "",
+                    "date": _iso(r.occurrence_date or r.created_at),
+                    "target_date": _iso(r.regulatory_deadline_at),
+                    "detail_url": f"/report/detail.html?id={rid}",
+                })
+        except Exception as e:
+            logger.warning(f"Master register report scan failed (non-fatal): {e}")
 
     t_filter_sort = time.perf_counter()
     def _sort_key(row: dict):
