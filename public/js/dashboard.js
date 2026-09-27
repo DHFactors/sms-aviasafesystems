@@ -209,13 +209,14 @@ window.reloadDashboardData = function reloadDashboardData(days) {
 async function loadAll() {
     const jobs = [loadKpis()];
 
-    if (document.getElementById('riskChart')) jobs.push(loadRiskDistribution());
     if (document.getElementById('trendChart')) jobs.push(loadMonthlyTrends());
     if (document.getElementById('ssmRiskChart')) jobs.push(loadSSMRiskTrends());
     if (document.getElementById('hazardChart')) jobs.push(loadHazardFrequency());
     if (document.getElementById('reportsTable')) jobs.push(loadRecentReports());
+    if (document.getElementById('reportTrendChart')) jobs.push(loadReportTrends());
+    if (document.getElementById('caTrendChart')) jobs.push(loadCaTrends());
+    if (document.getElementById('cardReports')) jobs.push(loadActivityCards());
     if (typeof fetchCans === 'function') jobs.push(fetchCans(currentDays));
-    if (document.getElementById('escalationQueue')) jobs.push(loadExecutiveOversight());
 
     await Promise.all(jobs);
 }
@@ -225,33 +226,25 @@ async function loadKpis() {
     setLoading(el);
 
     try {
-        const data = await DashboardAPI.getOverview(currentDays);
-        let k = data.kpis || {};
-        // Demo fallback: if seeded data is in Postgres but dashboard read 0 from Firestore, show static demo values
-        if (!k.total_reports && k.total_reports !== undefined && k.total_reports === 0) {
-            // Check if this is a demo tenant (fixedwing/rotarywing/demoairport) - show seeded demo values
-            const isDemoTenant = ['fixedwing', 'rotarywing', 'demoairport'].includes(currentTenant);
-            if (isDemoTenant) {
-                k = {
-                    total_reports: 4,
-                    open_reports: 2,
-                    closed_reports: 2,
-                    high_risk_reports: 1,
-                    critical_reports: 0,
-                    anonymous_percentage: 25.0,
-                    avg_closure_days: 7.5,
-                    reporting_rate_trend: 'up',
-                    repeat_occurrence_rate: 0.1
-                };
-            }
-        }
+        // NOTE (ICAO Annex 19 display names): the database stores report_type
+        // as 'voluntary' (displayed VSR) and 'mandatory' (displayed MOR).
+        const [overview, vsr, mor] = await Promise.all([
+            DashboardAPI.getOverview(currentDays),
+            // VSR is stored as report_type='voluntary'; .total is the count.
+            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=voluntary&page_size=1`).catch(() => null),
+            // MOR is stored as report_type='mandatory'; .total is the count.
+            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=mandatory&page_size=1`).catch(() => null),
+        ]);
+        const k = (overview && overview.kpis) || {};
+        const vsrCount = (vsr && vsr.total) || 0;
+        const morCount = (mor && mor.total) || 0;
 
         el.innerHTML = `
             <div class="kpi-card"><h3>Total Reports</h3><div class="kpi-value">${k.total_reports ?? 0}</div></div>
+            <div class="kpi-card"><h3>VSR</h3><div class="kpi-value">${vsrCount}</div></div>
+            <div class="kpi-card"><h3>MOR</h3><div class="kpi-value">${morCount}</div></div>
             <div class="kpi-card"><h3>Open</h3><div class="kpi-value">${k.open_reports ?? 0}</div></div>
             <div class="kpi-card"><h3>Closed</h3><div class="kpi-value">${k.closed_reports ?? 0}</div></div>
-            <div class="kpi-card high"><h3>High Risk</h3><div class="kpi-value">${k.high_risk_reports ?? 0}</div></div>
-            <div class="kpi-card"><h3>Critical</h3><div class="kpi-value">${k.critical_reports ?? 0}</div></div>
             <div class="kpi-card"><h3>Anon Rate</h3><div class="kpi-value">${k.anonymous_percentage ?? 0}%</div></div>
         `;
         setReady(el);
@@ -261,132 +254,234 @@ async function loadKpis() {
 }
 
 // ============================================================================
-// Executive Risk Oversight — AE dashboard content duplicated for the safety
-// manager on safety.html. Mirrors /dashboard/ae-dashboard.html against the
-// SAME real endpoints (CANs, CAPs, hazards) so the safety manager sees and can
-// action the same residual exposure and escalated-CAP decisions.
+// Safety Manager rebuild: reporting / corrective-action trends + activity cards
 // ============================================================================
-let gExecCans = [];
-let gExecCaps = [];
-let gExecHazards = [];
 
-async function loadExecutiveOversight() {
+function monthLabel(row) {
+    return `${row.month}/${row.year}`;
+}
+
+function monthKeyFromDate(value) {
+    const d = value ? new Date(value) : null;
+    if (!d || isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabelFromKey(key) {
+    const parts = String(key).split('-');
+    return `${parseInt(parts[1], 10)}/${parts[0]}`;
+}
+
+function escText(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function displayReportType(rt) {
+    if (rt === 'mandatory') return 'MOR';
+    if (rt === 'voluntary') return 'VSR';
+    return 'Diversion';
+}
+
+function destroyOrphan(ctx) {
+    if (window.Chart && typeof Chart.getChart === 'function') {
+        const orphan = Chart.getChart(ctx);
+        if (orphan) { try { orphan.destroy(); } catch (_) {} }
+    }
+}
+
+async function loadReportTrends() {
+    const el = document.getElementById('reportTrendChart');
+    if (!el) return;
+    setLoading(el);
     try {
-        const [cans, caps, hazards] = await Promise.all([
-            ApiClient.get('/api/v1/cans/').catch(() => []),
-            ApiClient.get('/api/v1/cans/caps').catch(() => []),
-            ApiClient.get('/api/v1/hazards/').catch(() => []),
-        ]);
-        gExecCans = safeArray(cans);
-        gExecCaps = safeArray(caps);
-        gExecHazards = safeArray(hazards);
-        renderExecRisk(gExecCans, gExecCaps, gExecHazards);
-        renderExecEscalations(gExecCaps);
+        const data = safeArray(await DashboardAPI.getMonthlyTrends(currentDays));
+        if (!data.length) { setEmpty(el, 'No trend data available'); return; }
+        setReady(el);
+        renderReportTrendChart(data);
     } catch (err) {
-        const el = document.getElementById('escalationQueue');
-        if (el) {
-            el.innerHTML = '';
-            const p = document.createElement('p');
-            p.className = 'empty-msg';
-            p.textContent = 'Failed to load: ' + err.message;
-            el.appendChild(p);
-        }
+        setError(el, err.message);
     }
 }
 
-function renderExecRisk(cans, caps, hazards) {
-    const isOpen = s => { const v = String(s || '').toLowerCase(); return v !== 'closed' && v !== 'completed'; };
-    let intolerable = 0, high = 0;
-    safeArray(cans).forEach(c => {
-        if (!isOpen(c.status)) return;
-        const sra = c.initial_sra || {};
-        const idx = sra.risk_index != null ? sra.risk_index : (sra.severity && sra.probability ? sra.severity * sra.probability : null);
-        if (idx == null) return;
-        if (idx > 15) intolerable++;
-        else if (idx >= 12) high++;
+function renderReportTrendChart(data) {
+    destroyChart('reportTrendChartCanvas');
+    const ctx = document.getElementById('reportTrendChartCanvas');
+    if (!ctx) return;
+    destroyOrphan(ctx);
+    chartInstances['reportTrendChartCanvas'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(monthLabel),
+            datasets: [
+                { label: 'VSR', data: data.map(d => d.voluntary ?? 0), borderColor: '#1a6b8a', fill: false, tension: 0.3 },
+                { label: 'MOR', data: data.map(d => d.mandatory ?? 0), borderColor: '#28a745', fill: false, tension: 0.3 },
+                { label: 'Diversion', data: data.map(d => d.diversions ?? 0), borderColor: '#dc3545', fill: false, tension: 0.3 },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
     });
-    let overdue = 0;
-    safeArray(cans).forEach(c => { if (!isOpen(c.status) || !c.target_completion_date) return; if (new Date(c.target_completion_date) < new Date()) overdue++; });
-    safeArray(caps).forEach(c => { if (!isOpen(c.status) || !c.target_completion_date) return; if (new Date(c.target_completion_date) < new Date()) overdue++; });
-    const closed = safeArray(caps).filter(c => c.closed_at && c.submitted_at).map(c => Math.round((new Date(c.closed_at) - new Date(c.submitted_at)) / 86400000)).filter(d => d >= 0);
-    const mttc = closed.length ? Math.round(closed.reduce((a, b) => a + b, 0) / closed.length) : null;
-
-    const setNum = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    setNum('kpiIntolerable', intolerable);
-    setNum('kpiHigh', high);
-    setNum('kpiOverdue', overdue);
-    setNum('kpiMttc', mttc != null ? mttc : '—');
-
-    const hm = document.getElementById('heatmap');
-    if (!hm) return;
-    const active = safeArray(hazards).filter(h => String(h.status || '').toLowerCase() !== 'closed');
-    const grid = {};
-    active.forEach(h => { const s = h.severity || null; const p = h.probability || null; if (!s || !p || s < 1 || s > 5 || p < 1 || p > 5) return; const k = s + '-' + p; grid[k] = (grid[k] || 0) + 1; });
-    const cellColor = (s, p, n) => { if (!n) return ''; const idx = s * p; if (idx > 15) return '#b91c1c'; if (idx >= 12) return '#ea580c'; if (idx >= 8) return '#d97706'; if (idx >= 4) return '#ca8a04'; return '#1e7e34'; };
-    let html = '<div class="hm-cell"></div>';
-    for (let p = 1; p <= 5; p++) html += '<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">P' + p + '</div>';
-    for (let s = 5; s >= 1; s--) {
-        html += '<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">S' + s + '</div>';
-        for (let p = 1; p <= 5; p++) { const n = grid[s + '-' + p] || 0; html += '<div class="hm-cell" ' + (n ? 'style="background:' + cellColor(s, p, n) + ';color:#fff;"' : '') + '>' + (n || '') + '</div>'; }
-    }
-    hm.innerHTML = html;
 }
 
-function renderExecEscalations(caps) {
-    const queue = safeArray(caps).filter(c => c.escalated_to_ae).sort((a, b) => new Date(b.escalated_at || 0) - new Date(a.escalated_at || 0));
-    const el = document.getElementById('escalationQueue');
-    if (el) {
-        if (!queue.length) {
-            el.innerHTML = '<p class="empty-msg" style="text-align:center;padding:0.8rem;">No escalated CAPs — all clear.</p>';
-        } else {
-            el.innerHTML = queue.map(c => '<div class="escalation-card"><div class="ref">' + (c.cap_reference || c.id) + ' <span>· ' + (c.department || '—') + '</span></div><div class="reason">' + (c.escalation_reason || '—') + '</div><div class="actions"><button class="btn btn-approve" onclick="decideEscalation(\'' + c.id + '\',\'authorize\')">Authorize</button><button class="btn btn-risk" onclick="decideEscalation(\'' + c.id + '\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
-        }
+function bucketByMonth(items, keys) {
+    const counts = {};
+    for (const it of items) {
+        let v = null;
+        for (const k of keys) { if (it[k]) { v = it[k]; break; } }
+        const key = monthKeyFromDate(v);
+        if (!key) continue;
+        counts[key] = (counts[key] || 0) + 1;
     }
-    const ledger = document.getElementById('decisionLedger');
-    if (ledger) {
-        const decided = safeArray(caps).filter(c => c.ae_signature).slice(0, 3);
-        ledger.innerHTML = decided.length
-            ? decided.map(c => '<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>' + (c.cap_reference || c.id) + '</strong> — ' + (c.ae_signature || '—') + ' on ' + fmtDate(c.ae_signed_at) + '</div>').join('')
-            : '<p class="empty-msg" style="text-align:center;padding:0.8rem;">No executive decisions yet.</p>';
+    return counts;
+}
+
+async function loadCaTrends() {
+    const el = document.getElementById('caTrendChart');
+    if (!el) return;
+    setLoading(el);
+    try {
+        const days = currentDays || 0;
+        const [cans, caps] = await Promise.all([
+            ApiClient.get(`/api/v1/cans/?days=${days}`).catch(() => []),
+            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch(() => []),
+        ]);
+        setReady(el);
+        renderCaTrendChart(safeArray(cans), safeArray(caps));
+    } catch (err) {
+        setError(el, err.message);
     }
+}
+
+function renderCaTrendChart(cans, caps) {
+    destroyChart('caTrendChartCanvas');
+    const ctx = document.getElementById('caTrendChartCanvas');
+    if (!ctx) return;
+    destroyOrphan(ctx);
+    const canCounts = bucketByMonth(cans, ['issued_at', 'created_at']);
+    const capCounts = bucketByMonth(caps, ['created_at', 'submitted_at', 'issued_at']);
+    const keys = Array.from(new Set([...Object.keys(canCounts), ...Object.keys(capCounts)])).sort();
+    chartInstances['caTrendChartCanvas'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: keys.map(monthLabelFromKey),
+            datasets: [
+                { label: 'CAN', data: keys.map(k => canCounts[k] || 0), borderColor: '#f59e0b', fill: false, tension: 0.3 },
+                { label: 'CAP', data: keys.map(k => capCounts[k] || 0), borderColor: '#7c3aed', fill: false, tension: 0.3 },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
+    });
+}
+
+function cardRow(href, title, metaHtml) {
+    return `<li><a href="${href}"><span class="act-title">${title}</span><span class="act-meta">${metaHtml}</span></a></li>`;
+}
+
+function cardEmpty(msg) {
+    return `<li class="empty-msg">${escText(msg)}</li>`;
+}
+
+function riskIndexBadge(ri) {
+    if (ri == null) return '<span class="badge badge-default">RI —</span>';
+    const cls = ri > 15 ? 'badge-critical' : ri >= 12 ? 'badge-high' : ri >= 8 ? 'badge-medium' : 'badge-low';
+    return `<span class="badge ${cls}">RI ${ri}</span>`;
+}
+
+async function loadActivityCards() {
+    const days = currentDays || 0;
+    const cutoff = days > 0 ? Date.now() - days * 86400000 : 0;
+    const inPeriod = (v) => !cutoff || (v && new Date(v).getTime() >= cutoff);
+    const ids = ['cardReports', 'cardHazards', 'cardCans', 'cardCaps'];
+    ids.forEach(id => { const n = document.getElementById(id); if (n) setLoading(n); });
+    try {
+        const [repRes, hazards, cans, caps] = await Promise.all([
+            ApiClient.get(`/api/v1/dashboard/recent?days=${days}&page_size=5`).catch(() => null),
+            ApiClient.get('/api/v1/hazards/').catch(() => []),
+            ApiClient.get(`/api/v1/cans/?days=${days}`).catch(() => []),
+            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch(() => []),
+        ]);
+        renderReportCards(repRes && repRes.items ? repRes.items : []);
+        const hz = safeArray(hazards).filter(h => inPeriod(h.created_at));
+        hz.sort((a, b) =>
+            ((b.risk_index ?? -1) - (a.risk_index ?? -1)) ||
+            (((b.severity || 0) * (b.probability || 0)) - ((a.severity || 0) * (a.probability || 0))) ||
+            (new Date(b.created_at || 0) - new Date(a.created_at || 0)));
+        renderHazardCards(hz.slice(0, 4));
+        const cn = safeArray(cans)
+            .sort((a, b) => new Date(b.issued_at || b.created_at || 0) - new Date(a.issued_at || a.created_at || 0))
+            .slice(0, 5);
+        renderCanCards(cn);
+        const cp = safeArray(caps)
+            .sort((a, b) => new Date(b.created_at || b.submitted_at || 0) - new Date(a.created_at || a.submitted_at || 0))
+            .slice(0, 5);
+        renderCapCards(cp);
+    } catch (err) {
+        ids.forEach(id => { const n = document.getElementById(id); if (n) setError(n, err.message); });
+    }
+}
+
+function renderReportCards(items) {
+    const ul = document.getElementById('cardReports');
+    if (!ul) return;
+    ul.innerHTML = items.length ? items.map(r => cardRow(
+        `/report/detail.html?id=${encodeURIComponent(r.id || '')}`,
+        escText(r.title || r.occurrence_type || displayReportType(r.report_type)),
+        `<span class="badge ${statusBadgeClass(r.status)}">${escText(r.status || 'NEW')}</span>` +
+        `<span>${escText(displayReportType(r.report_type))}</span>` +
+        `<span>${escText(fmtDate(r.occurrence_date || r.created_at))}</span>`
+    )).join('') : cardEmpty('No reports in period.');
+    setReady(ul);
+}
+
+function renderHazardCards(items) {
+    const ul = document.getElementById('cardHazards');
+    if (!ul) return;
+    ul.innerHTML = items.length ? items.map(h => cardRow(
+        `/hazards/detail.html?id=${encodeURIComponent(h.id || '')}`,
+        escText((h.hazard_id ? h.hazard_id + ' — ' : '') + (h.title || 'Hazard')),
+        `${riskIndexBadge(h.risk_index)}<span>${escText(h.status || '')}</span>`
+    )).join('') : cardEmpty('No hazards in period.');
+    setReady(ul);
+}
+
+function renderCanCards(items) {
+    const ul = document.getElementById('cardCans');
+    if (!ul) return;
+    ul.innerHTML = items.length ? items.map(c => cardRow(
+        `/can_cap/can_detail.html?id=${encodeURIComponent(c.id || '')}`,
+        escText((c.can_reference ? c.can_reference + ' — ' : '') + (c.title || 'CAN')),
+        `<span class="badge ${statusBadgeClass(c.status)}">${escText(c.status || '')}</span>` +
+        `<span>${escText(fmtDate(c.issued_at || c.created_at))}</span>`
+    )).join('') : cardEmpty('No CANs in period.');
+    setReady(ul);
+}
+
+function renderCapCards(items) {
+    const ul = document.getElementById('cardCaps');
+    if (!ul) return;
+    ul.innerHTML = items.length ? items.map(c => cardRow(
+        `/can_cap/cap_review.html?id=${encodeURIComponent(c.id || '')}`,
+        escText((c.cap_reference ? c.cap_reference + ' — ' : '') + (c.can_reference || 'CAP')),
+        `<span class="badge ${statusBadgeClass(c.status)}">${escText(c.status || '')}</span>` +
+        `<span>${escText(fmtDate(c.created_at || c.submitted_at))}</span>`
+    )).join('') : cardEmpty('No CAPs in period.');
+    setReady(ul);
 }
 
 function fmtDate(iso) {
     if (!iso) return '-';
     try { return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return String(iso); }
-}
-
-window.decideEscalation = function decideEscalation(capId, decision) {
-    if (decision === 'accept_risk') { window.location.href = '/can_cap/cap_review.html?id=' + encodeURIComponent(capId); return; }
-    const note = window.prompt('AE authorization note:', 'Resources authorized.');
-    if (note == null || !note.trim()) return;
-    const cap = gExecCaps.find(c => c.id === capId);
-    if (!cap) return;
-    ApiClient.post('/api/v1/cans/caps/' + encodeURIComponent(capId) + '/review', {
-        status: 'In Progress',
-        comments: '[AE] ' + note.trim(),
-        escalated_to_ae: false,
-    }).then(() => {
-        cap.escalated_to_ae = false;
-        renderExecEscalations(gExecCaps);
-    }).catch(e => window.alert(e.message));
-};
-
-async function loadRiskDistribution() {
-    const el = document.getElementById('riskChart');
-    setLoading(el);
-
-    try {
-        const data = safeArray(await DashboardAPI.getRiskDistribution(currentDays));
-        if (data.length === 0) {
-            setEmpty(el, 'No risk data available');
-            return;
-        }
-        setReady(el);
-        renderRiskChart(data);
-    } catch (err) {
-        setError(el, err.message);
-    }
 }
 
 async function loadSSMRiskTrends() {
@@ -484,59 +579,6 @@ async function loadRecentReports() {
     } catch (err) {
         setError(el, err.message);
     }
-}
-
-function renderRiskChart(data) {
-    destroyChart('riskChartCanvas');
-    const ctx = document.getElementById('riskChartCanvas');
-    if (!ctx) return;
-    // Extra guard: Chart.js binds instance to canvas; destroy orphan if destroyChart missed it
-    if (window.Chart && typeof Chart.getChart === 'function') {
-        const orphan = Chart.getChart(ctx);
-        if (orphan) { try { orphan.destroy(); } catch (_) {} }
-    }
-
-    const counts = { Low: 0, High: 0, 'Very High': 0 };
-    for (const d of data) {
-        // Skip null/Unspecified severity so unknown rows don't inflate a
-        // bucket, and aggregate with += so multiple API buckets that
-        // normalize to the same tier (e.g. Medium and High -> High) sum
-        // instead of overwriting.
-        if (!d.risk_level || String(d.risk_level).toUpperCase() === 'UNSPECIFIED') continue;
-        const level = normalizeRiskLevel(d.risk_level);
-        if (counts.hasOwnProperty(level)) counts[level] += d.count;
-    }
-    const labels = ICAO_RISK_LABELS;
-    const vals = labels.map(l => counts[l] || 0);
-    const colors = labels.map(l => ICAO_COLORS[l]);
-
-    chartInstances['riskChartCanvas'] = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Reports',
-                data: vals,
-                backgroundColor: colors,
-                borderRadius: 4,
-            }],
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => `${ctx.parsed.y} (${data[ctx.dataIndex]?.percentage || 0}%)`,
-                    },
-                },
-                legend: { display: false },
-            },
-            scales: {
-                y: { beginAtZero: true, ticks: { precision: 0 } },
-            },
-        },
-    });
 }
 
 function renderSSMRiskChart(data) {

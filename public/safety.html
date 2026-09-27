@@ -172,6 +172,43 @@
         .badge-failed { background: #fde8e8; color: #dc3545; }
         .badge-archived { background: #f1f5f9; color: #64748b; }
 
+        /* ── Recent-activity cards ── */
+        .activity-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .activity-list li a {
+            display: block;
+            padding: 0.55rem 0.7rem;
+            border: 1px solid #eef2f7;
+            border-radius: 8px;
+            text-decoration: none;
+            color: inherit;
+            background: #fff;
+        }
+        .activity-list li a:hover { border-color: #1a6b8a; }
+        .activity-list .act-title {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #0b2a42;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .activity-list .act-meta {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 0.25rem;
+            font-size: 0.72rem;
+            color: #64748b;
+        }
+
         /* ── Pagination ── */
         .pagination {
             display: flex;
@@ -288,6 +325,7 @@
                     <option value="30">Last 30 Days</option>
                     <option value="60" selected>Last 60 Days</option>
                     <option value="90">Last 90 Days</option>
+                    <option value="120">Last 120 Days</option>
                     <option value="180">Last 180 Days</option>
                     <option value="365">Last 365 Days</option>
                     <option value="0">All Time</option>
@@ -298,6 +336,44 @@
             <!-- Section 1: KPI Cards -->
             <div class="section-title shell-scroll-spy" id="kpi"><i class="fas fa-chart-simple"></i> Key Performance Indicators</div>
             <div id="kpiGrid" class="kpi-grid state-container"></div>
+
+            <!-- Section 1b: Trend Charts -->
+            <div class="section-title shell-scroll-spy" id="trends"><i class="fas fa-chart-line"></i> Trends</div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Reporting Trends (VSR / MOR / Diversion)</h3>
+                    <div id="reportTrendChart" class="chart-wrapper state-container">
+                        <canvas id="reportTrendChartCanvas"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Corrective Action Trends (CAN / CAP)</h3>
+                    <div id="caTrendChart" class="chart-wrapper state-container">
+                        <canvas id="caTrendChartCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 1c: Recent Activity -->
+            <div class="section-title shell-scroll-spy" id="recent-activity"><i class="fas fa-clock"></i> Recent Activity</div>
+            <div class="chart-grid" id="activityRow">
+                <div class="chart-card">
+                    <h3>Last 5 Reports <a href="/reports/index.html" style="margin-left:auto;font-size:0.72rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> View all</a></h3>
+                    <ul id="cardReports" class="activity-list state-container"></ul>
+                </div>
+                <div class="chart-card">
+                    <h3>Top 4 Hazards <a href="/hazards/index.html" style="margin-left:auto;font-size:0.72rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> View all</a></h3>
+                    <ul id="cardHazards" class="activity-list state-container"></ul>
+                </div>
+                <div class="chart-card">
+                    <h3>Last 5 CANs <a href="/can_cap/cans.html" style="margin-left:auto;font-size:0.72rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> View all</a></h3>
+                    <ul id="cardCans" class="activity-list state-container"></ul>
+                </div>
+                <div class="chart-card">
+                    <h3>Last 5 CAPs <a href="/can_cap/caps.html" style="margin-left:auto;font-size:0.72rem;font-weight:500;"><i class="fas fa-external-link-alt"></i> View all</a></h3>
+                    <ul id="cardCaps" class="activity-list state-container"></ul>
+                </div>
+            </div>
 
         </div>
 
@@ -312,12 +388,6 @@
             <!-- Section 2: Risk & Trends -->
             <div class="section-title shell-scroll-spy" id="risk-trends"><i class="fas fa-chart-bar"></i> Risk & Trends</div>
             <div class="chart-grid">
-                <div class="chart-card">
-                    <h3>Risk Distribution</h3>
-                    <div id="riskChart" class="chart-wrapper state-container">
-                        <canvas id="riskChartCanvas"></canvas>
-                    </div>
-                </div>
                 <div class="chart-card">
                     <h3>Monthly Trends</h3>
                     <div id="trendChart" class="chart-wrapper state-container">
