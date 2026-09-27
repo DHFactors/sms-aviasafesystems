@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await waitForFirebase();
     const session = await getCurrentUser();
     if (!session) { window.location.href = '/login.html'; return; }
-    if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'CAAN_SMD' && session.role !== 'SUPER_ADMIN') {
+    if (session.role !== 'AIRLINE_ADMIN' && session.role !== 'TENANT_ADMIN' && session.role !== 'SAFETY_OFFICER' && session.role !== 'CAAN_SMD' && session.role !== 'SUPER_ADMIN') {
         window.location.href = '/login.html';
         return;
     }

@@ -137,7 +137,7 @@ firebase.auth().onAuthStateChanged(async function(user){
     try{
         const tr=await user.getIdTokenResult();
         const role=(tr.claims&&tr.claims.role)||'USER';
-        if(['SUPER_ADMIN','AIRLINE_ADMIN','CAAN_SMD'].indexOf(role)===-1){ window.location.href='/safety.html'; return; }
+        if(['SUPER_ADMIN','AIRLINE_ADMIN','TENANT_ADMIN','CAAN_SMD'].indexOf(role)===-1){ window.location.href='/safety.html'; return; }
         myEmail=user.email||''; myDomain=myEmail.split('@')[1]||'';
         if(window.DemoAnalytics) window.DemoAnalytics.init({email:myEmail});
         const tenant=(tr.claims&&tr.claims.tenant_id)||'';
