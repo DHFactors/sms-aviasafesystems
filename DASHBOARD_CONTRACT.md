@@ -57,16 +57,19 @@ Architecture:
 - A dashboard is a composition of (a) a KPI strip, (b) a workspace, and
   (c) a navigation set — the three are specified per role below.
 
-**Current implementation.** Only two dashboard surfaces exist today: the
+**Current implementation.** Role-scoped dashboard pages exist alongside the
 tenant airline dashboard (`routes/dashboard.py:64-279`) and the CAAN/regulator
-dashboard (`routes/dashboard.py:287-372`, `routes/regulator_dashboard.py:26-93`).
-There is no dedicated Department Head or AE dashboard; `nav-config.js:16`
-links an `ae-dashboard.html` and `nav-config.js:14` a Key Indicators page for
-Safety. Role scoping is enforced by per-route dependencies, not by dashboard.
+dashboard (`routes/dashboard.py:287-372`, `routes/regulator_dashboard.py:26-93`):
+`public/dashboard/safety-dashboard.html` (Wave 2 / P4-2, Safety Manager),
+`public/dashboard/dept-head-dashboard.html` (Wave 3 / P4-3, Department Head),
+and `public/dashboard/ae-dashboard.html` (pre-Wave-4 content — the Phase 4
+Wave 4 rebuild per P4-4 is still pending). Role scoping is enforced by
+per-route dependencies, not by dashboard.
 
-**Gaps.** No unified role→dashboard router; the Safety Manager dashboard has no
-dedicated page (Safety reuses `/safety.html`, `nav-config.js:14`); AE page is a
-stub; the four-dashboard split is contract-only.
+**Gaps.** No unified role→dashboard router; the Safety Manager (Wave 2) and
+Department Head (Wave 3) pages exist — remaining gaps are the deferred
+workflow actions documented in each page header; the AE page is pre-Wave-4
+content (Wave 4 rebuild pending, P4-4).
 
 ---
 
@@ -187,8 +190,12 @@ Endpoints: `POST /api/v1/hazards` (`routes/hazards.py:30`),
 ```
 
 **Current implementation.** Source endpoints exist and are tenant-scoped
-(`routes/dashboard.py` airline block). KPI strip, color coding, EIP counter,
-and the dedicated page do not exist.
+(`routes/dashboard.py` airline block). Dedicated page exists:
+`public/dashboard/safety-dashboard.html` (Wave 2 / P4-2) with the 5-counter
+KPI strip, drill-down, and workspace; create/view/triage actions wired.
+Deferred per the page header: enrichment, status update, assign, SRAM save,
+CAN issue, CAP create/review/status, bulletin publish, import, SAG/SRB
+authoring. Color coding and EIP counter derive client-side (see §2.3/§2.4).
 
 **Gaps.** No `/safety` KPI-strip page specified in code; EIP requires a derived
 query or the Module B `"EIP"` status; color thresholds undefined; SRM queue has
@@ -248,9 +255,13 @@ department scope enforced by `get_department_scope` (`auth.py:209-220`).
 **Current implementation.** Master register and CAN/CAP list already accept a
 `department` filter (`routes/dashboard.py:169-249`; `routes/can_cap.py:104-138`);
 `get_department_scope` restricts 145/CAMO/ops accounts
-(`auth.py:202-220`). No dedicated department dashboard page.
+(`auth.py:202-220`). Dedicated page exists:
+`public/dashboard/dept-head-dashboard.html` (Wave 3 / P4-3) with the
+3-counter dept-filtered KPI strip and CAP create/edit/submit wired.
+Deferred per the page header: evidence upload, response-to-review, and
+status change beyond submit.
 
-**Gaps.** No department KPI endpoint; no department page; department mapping is
+**Gaps.** No department KPI endpoint; department mapping is
 email-prefix based, not a first-class attribute
 (`auth.py:202-206`); evidence upload missing (Module B §27).
 
@@ -352,8 +363,10 @@ Non-delegability enforced at API (`get_accountable_executive`,
 
 **Current implementation.** `get_accountable_executive` exists but is applied
 only to the closure route (`routes/verification.py:76`), never to CAN/CAP
-(MODULE_B §22 `:1114-1120`). No AE dashboard page (a link stub exists,
-`nav-config.js:16`); risk register read exists (MODULE_B §23 `:1169`); the
+(MODULE_B §22 `:1114-1120`). AE page exists at
+`public/dashboard/ae-dashboard.html` but is pre-Wave-4 content (real page,
+not a stub — the Phase 4 Wave 4 rebuild per P4-4 is still pending);
+risk register read exists (MODULE_B §23 `:1169`); the
 hazard-response KPI has **no endpoint**.
 
 **Gaps.** AE KPI endpoint missing (`FIRST_ACTION_KPI_VERIFICATION.md:131`);
@@ -598,8 +611,10 @@ flag; backend/frontend `module3` mismatch (DISCOVERY_REPORT.md:61,256,343).
 - Envelope: implemented (`routes/dashboard.py:26-31`).
 
 **Content — gaps.**
-- No dedicated Safety Manager / Department Head / AE pages; AE page is a stub
-  (`nav-config.js:16`).
+- Safety Manager page exists (Wave 2 / P4-2) and Department Head page exists
+  (Wave 3 / P4-3) — remaining gaps are the deferred workflow actions noted
+  above; AE page exists but is pre-Wave-4 content (Wave 4 rebuild pending,
+  P4-4).
 - AE Hazard-Response-Time KPI has **no endpoint**
   (`FIRST_ACTION_KPI_VERIFICATION.md:131`).
 - No `escalated_to_ae` filter on `GET /api/v1/caps` (MODULE_B §23 `:1163-1168`).
