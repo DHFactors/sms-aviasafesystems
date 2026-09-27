@@ -87,11 +87,13 @@ var NAV_CONFIG = {
         ]
     },
 
-    // ─── REPORTING ─── (Module B reports)
+    // ─── REPORTING ─── (Module B reports; department submitters only —
+    // Safety Managers receive and process reports via the Safety workspace,
+    // they do not submit them, so SAFETY is excluded here)
     reporting: {
         label: 'Reporting',
         icon: 'fa-pen-to-square',
-        roles: ['SAFETY', 'DEPT_ADMIN'],
+        roles: ['DEPT_ADMIN'],
         module: 'module_b_srm',
         items: [
             { id: 'submit-mor', href: '/report/mor.html', label: 'Submit MOR' },
