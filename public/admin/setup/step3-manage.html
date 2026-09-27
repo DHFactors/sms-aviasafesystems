@@ -749,6 +749,7 @@ async function ensureRegulatorsLoaded() {
 // opens the modal in edit mode when the id resolves in the cached lists.
 async function openEntityModal(type, idle) {
     pendingEntity = { type: type, id: idle || null };
+    try {
     await ensureRegulatorsLoaded();
     var isEdit = !!idle;
     var isReg = type === 'regulator';
@@ -808,6 +809,10 @@ async function openEntityModal(type, idle) {
     entityField('entityModal').style.display = 'flex';
     var nameEl = entityField('entityName');
     if (nameEl) setTimeout(function () { nameEl.focus(); }, 50);
+    } catch (err) {
+        console.error('[openEntityModal] failed:', err);
+        toast('Could not open editor: ' + (err && err.message ? err.message : String(err)), 'error');
+    }
 }
 
 function closeEntityModal() {
@@ -817,11 +822,17 @@ function closeEntityModal() {
     pendingEntity = null;
 }
 
-function entityDone() {
+async function entityDone() {
+    var wasRegulator = pendingEntity && pendingEntity.type === 'regulator';
     closeEntityModal();
-    if (pendingEntity && pendingEntity.type === 'regulator') loadExistingRegulators();
-    else loadExistingTenants();
-    loadUsers();
+    try {
+        if (wasRegulator) await loadExistingRegulators();
+        else await loadExistingTenants();
+        await loadUsers();
+    } catch (err) {
+        console.error('[entityDone] reload failed:', err);
+        toast('Reload failed: ' + (err && err.message ? err.message : String(err)), 'error');
+    }
 }
 
 entityField('entityModal').addEventListener('click', function (e) {
@@ -931,6 +942,7 @@ var pendingEditUser = null; // { uid, email }
 
 async function openEditUserModal(uid, email, role, tenantId, department, displayName) {
     pendingEditUser = { uid: uid, email: email };
+    try {
     await ensureRegulatorsLoaded();
     if ((EXISTING_TENANTS || []).length) {
         var sel = entityField('editUserTenant');
@@ -952,6 +964,10 @@ async function openEditUserModal(uid, email, role, tenantId, department, display
     if (keyInput) { try { keyInput.value = AdminUI.getSetupKey() || ''; } catch (e) { keyInput.value = ''; } }
     entityField('editUserError').style.display = 'none';
     entityField('editUserModal').style.display = 'flex';
+    } catch (err) {
+        console.error('[openEditUserModal] failed:', err);
+        toast('Could not open editor: ' + (err && err.message ? err.message : String(err)), 'error');
+    }
 }
 
 function closeEditUserModal() {
