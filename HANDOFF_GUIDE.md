@@ -156,3 +156,63 @@ HEAD at time of writing: 5cc3308c819de5ed3f5070e13f1c8abd90a52016
   verified end-to-end.
 - **Tenants list slow-refresh** — backend aggregates run per
   tenant; consider batching.
+
+## Session Update — 2026-09-27 (Part 2)
+
+### Commits landed this session
+- fed2293 — backend report_type filter on /dashboard/recent
+- e4b4aa6 — Safety Manager dashboard rebuild (6 KPIs, dual trend
+  charts, 4 recent-activity cards)
+- 26c7361 — removed 5 orphan/stub HTML files
+- 13a8493 — demo password reset script
+- b3ae6ee — role-guard batch fix (4 files)
+- 8e1fa1c — nav cleanup + setActiveNav fix
+- ccb7d77 — Reports tab on unified Master Register (role-gated)
+- feef695 — DEPT_ADMIN scoped register + nav + link fixes
+- (plus earlier: f93b130, 777991e, 94095f8)
+
+### What works now
+- Login for every demo role
+- Safety Manager dashboard rebuilt with all sections
+- Unified Master Register: Hazards/CANs/CAPs/Reports tabs,
+  role-gated, URL param selection
+- Department Master Register: CANs + CAPs only, no tabs,
+  department-scoped
+- DEPT_ADMIN nav: My Tasks + Master Register
+- Submit Report button routes to /reports/new.html
+- Full MOR/VSR forms reachable from the wizard
+- Auto-deploy: GitHub Actions (frontend) + Render (backend)
+- Demo passwords: AviaSafeDemo2026! for all 16 pilot users
+
+### Tomorrow morning — first test
+Test DEPT_ADMIN end-to-end as camo@sitaair.com.np
+(password: AviaSafeDemo2026!) in incognito:
+1. Nav shows only My Tasks + Master Register
+2. Master Register → /dashboard/dept-master-register.html
+3. Dept register: CANs + CAPs only, no tabs
+4. CAN row click → /can_cap/can_detail.html
+5. Submit Report → /reports/new.html
+6. Wizard Step 2 shows MOR + VSR full-form links
+7. Both links reach /report/mor.html and /report/vsr.html
+
+### Queued work (priority order)
+1. Multi-tenant routing test — Air Dynasty + Saurya
+2. Adaptive chart granularity — day/week/month/year buckets
+3. CAAN role-boundary audit + PSOE under Performance
+4. AE dashboard refinement (High Risk + Critical counters)
+5. Frontend audit Fix 1 — api/client.js App Check
+6. Firestore cleanup (bulk)
+7. Shell migration (legacy → modern, incremental)
+
+### Production readiness checklist
+- Replace demo users with real users
+- Upgrade Render + Supabase tiers (cold-start delay)
+- join.html production scrutiny
+- PSOE scope enforcement audit
+- Remove AIRLINE_ADMIN from step-3 dropdown + role checks
+
+### Known limitations (demo-acceptable)
+- Right trend chart may show "Loading…" during Render cold
+  start (30-60s after 15min idle on free tier)
+- Folder split report/ (individual) vs reports/ (hub) is
+  intentional — do not merge
