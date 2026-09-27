@@ -118,6 +118,7 @@ async def get_recent_reports(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1),
     cursor: Optional[str] = Query(None),
+    report_type: Optional[str] = Query(None, description="Filter by stored report_type (voluntary / mandatory)"),
     params: Dict[str, Any] = Depends(dashboard_params),
     user: Dict[str, Any] = Depends(get_tenant_user),
 ):
@@ -126,7 +127,7 @@ async def get_recent_reports(
     if clamped != page_size:
         logger.info(f"page_size clamped from {page_size} to {clamped} for tenant {user.get('tenant_id')}")
     svc = DashboardService(user)
-    data = _safe_airline("get_recent_reports", svc, days=days, page=page, page_size=clamped, cursor=cursor)
+    data = _safe_airline("get_recent_reports", svc, days=days, page=page, page_size=clamped, cursor=cursor, report_type=report_type)
     return _envelope(data)
 
 
