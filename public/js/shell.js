@@ -323,13 +323,23 @@
     };
 
     // Set the active nav link based on the current page path.
+    // Exact path+hash matches win (e.g. ae-dashboard.html#trends must not
+    // also highlight the bare ae-dashboard.html link); basename matching is
+    // only the fallback when nothing matches exactly.
     function setActiveNav() {
         const path = window.location.pathname || '';
         const base = path.split('/').pop() || '';
-        document.querySelectorAll('.app-header .header-nav a.nav-link[href]').forEach(function (a) {
+        const full = path + (window.location.hash || '');
+        const links = Array.prototype.slice.call(document.querySelectorAll('.app-header .header-nav a.nav-link[href]'));
+        const exact = links.filter(function (a) {
             const href = a.getAttribute('href') || '';
-            const hrefBase = href.split('/').pop().split('#')[0] || '';
-            a.classList.toggle('active', hrefBase === base && href !== '#');
+            return href && href !== '#' && (href === full || href.endsWith(full));
+        });
+        links.forEach(function (a) {
+            const href = a.getAttribute('href') || '';
+            const hrefBase = href.split('/').pop().split('#')[0].split('?')[0] || '';
+            const on = exact.length ? exact.indexOf(a) !== -1 : (hrefBase === base && href !== '#');
+            a.classList.toggle('active', on);
         });
         // Highlight the parent dropdown toggle when one of its links is active.
         document.querySelectorAll('.app-header .header-nav .nav-dropdown').forEach(function (dd) {

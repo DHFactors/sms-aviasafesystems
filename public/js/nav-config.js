@@ -65,9 +65,7 @@ var NAV_CONFIG = {
         module: 'module_b_srm',
         items: [
             { id: 'hazard-analysis', href: '/hazard-analysis.html', label: 'Hazard Analysis' },
-            { id: 'top-hazards', href: '/top-hazards.html', label: 'Top Hazards' },
             { id: 'risk-register', href: '/risk-register/index.html', label: 'Risk Register' },
-            { id: 'sram', href: '/sram/index.html', label: 'Bow-Tie SRAM' },
             { id: 'barrier-register', href: '/barrier-register/index.html', label: 'Barrier Register' },
         ]
     },
@@ -82,7 +80,6 @@ var NAV_CONFIG = {
         items: [
             { id: 'can-register', href: '/can_cap/cans.html', label: 'CAN Register' },
             { id: 'cap-register', href: '/can_cap/caps.html', label: 'CAP Register' },
-            { id: 'issue-can', href: '/can_cap/issue.html', label: 'Issue CAN', roles: ['SAFETY'] },
             { id: 'master-register', href: '/dashboard/master-register.html', label: 'Master Register' },
         ]
     },
