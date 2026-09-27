@@ -5,6 +5,7 @@
    PURPOSE: Layout rules for hierarchical tree navigation and node selection.
    AUTHOR: AviaSAFE Systems
    ============================================================================ */
+/* CI deploy smoke test: 2026-09-27 */
 
 .taxonomy-tree-container {
   max-height: 520px;
