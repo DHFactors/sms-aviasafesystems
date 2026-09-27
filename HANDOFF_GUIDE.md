@@ -101,3 +101,58 @@ Stdlib `logging` files are fine with %s.
 ---
 Last updated: 2026-09-25
 HEAD at time of writing: 5cc3308c819de5ed3f5070e13f1c8abd90a52016
+
+## Session Update — 2026-09-27
+
+### Fixed in this session
+
+**Admin user management (step3-manage.html) — fully functional now:**
+- Block-nesting trap that made Edit/Manage buttons dead
+  (commit 4df7f50)
+- entityDone ordering bug that loaded the wrong list after a
+  regulator save (commit 1613103)
+- entitySubmitLabel span destroyed by the submit spinner,
+  breaking Edit on every post-save click (commit 0b8b90b)
+- Hardened openEntityModal / openEditUserModal with try/catch
+  so async failures toast instead of dying silently (commit
+  1613103)
+- Removed 5 stale Firestore references from user-visible copy
+  (commits 78f3bc1, 01a6090)
+- Guarded Firestore mirror sync so tenant PATCH succeeds after
+  PG update (commit 94095f8)
+
+**Broader Firestore copy cleanup:**
+- Removed 8 more user-visible Firestore references across admin
+  pages and the privacy policy (commit c397b67)
+- Privacy policy now correctly cites Supabase (PostgreSQL) as
+  the data storage layer
+
+**Documentation:**
+- IMPLEMENTATION_ROADMAP.md — Phase 4 Waves 1-3 marked DONE
+  (commit 67aeaa8)
+- DASHBOARD_CONTRACT.md — stale page-existence claims corrected
+  (commits bfd6927, b09f583)
+
+**Deploy pipeline:**
+- Firebase Hosting auto-deploy via GitHub Actions workflow
+  (commits fdaddee, 318c010, 474f4c5)
+- Node 22 upgrade on the workflow
+- Render auto-deploy confirmed working (dashboard needs refresh
+  to show new deploys — the UI does not live-update)
+
+### Known follow-ups (unchanged from before, plus new)
+
+- **Bug B — resync contract** (production_seed.py:334-343):
+  "tenant exists in Postgres → resync instead of reject" is
+  dead code. Decide: fix the backend or fix the copy.
+- **Frontend audit Fix 1** — api/client.js should attach App
+  Check token and log token/tenant failures instead of silent
+  null returns.
+- **Frontend audit Fix 2-4** — smaller HIGH-priority items.
+- **Backend Firestore cleanup** (bulk): ~15 guarded mirror
+  blocks, firestore_deleted response fields, ~10 test functions
+  pinning dead behavior. Multi-session project.
+- **Multi-tenant routing test** — non-super-admin login must be
+  verified end-to-end.
+- **Tenants list slow-refresh** — backend aggregates run per
+  tenant; consider batching.
