@@ -1090,7 +1090,7 @@ function requestDeleteUser(email, uid) {
     openConfirm(
         'Delete User',
         'Permanently delete <strong>' + esc(label) + '</strong> from Firebase Authentication?<br><br>' +
-        '<span style="color:#b91c1c;">This cannot be undone.</span> The Firestore <code>users/{uid}</code> doc will also be removed and an audit log entry <code>USER_DELETED</code> will be written.',
+        '<span style="color:#b91c1c;">This cannot be undone.</span> An audit log entry <code>USER_DELETED</code> will be written.',
         { type: 'deleteUser', email: email, uid: uid }
     );
 }
