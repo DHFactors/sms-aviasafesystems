@@ -135,7 +135,7 @@ async function execStateRisk(body) {
 function purgeStateRiskDemo() {
     openConfirm(
         '⚠️ Purge Demo State Risk',
-        '<strong>Purge all State Risk demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>state_risk_register</code>). The Firestore ICAO reference taxonomy is global reference data and is preserved.<br><br>' +
+        '<strong>Purge all State Risk demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>state_risk_register</code>). The ICAO reference taxonomy is global reference data and is preserved.<br><br>' +
         '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE all State Risk demo data (is_demo = true).</span>',
         { type: 'purgeStateRiskDemo', body: {} }
     );

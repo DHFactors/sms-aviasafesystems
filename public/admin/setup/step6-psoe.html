@@ -168,7 +168,7 @@ async function execPsoe(body) {
 function purgePsoeDemo() {
     openConfirm(
         '⚠️ Purge Demo PSOE',
-        '<strong>Purge all PSOE demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>psoe_assessments</code> + <code>psoe_findings</code>) and the Firestore production-setup baseline assessments.<br><br>' +
+        '<strong>Purge all PSOE demo data</strong> (<code>is_demo = true</code>) from Postgres (<code>psoe_assessments</code> + <code>psoe_findings</code>) and the production-setup baseline assessments.<br><br>' +
         '<span style="color:#b91c1c;font-weight:700;">⚠️ This will PURGE all PSOE demo data (is_demo = true).</span> Real PSOE assessments are untouched.',
         { type: 'purgePsoeDemo', body: {} }
     );
@@ -182,7 +182,7 @@ async function execPurgePsoeDemo(body) {
         if (!resp || resp.success !== true) throw new Error((resp && resp.detail) || 'PSOE purge request failed');
 
         var pg = resp.details || {};
-        var html = '<div class="status-box success"><strong>✅ PSOE demo data purged &mdash; ' + esc(resp.deleted_count) + ' Postgres rows, ' + esc(resp.firestore_deleted || 0) + ' Firestore baselines removed.</strong></div>';
+        var html = '<div class="status-box success"><strong>✅ PSOE demo data purged &mdash; ' + esc(resp.deleted_count) + ' Postgres rows.</strong></div>';
         html += '<div style="overflow-x:auto;margin-top:10px;"><table class="admin-table"><thead><tr><th style="text-align:left;">Table</th><th>Deleted</th></tr></thead><tbody>';
         Object.keys(pg).forEach(function (k) { html += '<tr><td><code>' + esc(k) + '</code></td><td>' + esc(pg[k]) + '</td></tr>'; });
         html += '</tbody></table></div>';

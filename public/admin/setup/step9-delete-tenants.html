@@ -50,7 +50,7 @@ AUTHOR: AviaSAFE Systems
     <div class="content-area">
         <div class="page-head">
             <h1><i class="fas fa-eraser" style="color:var(--color-brand-600);"></i> Step 9 — Delete Tenants</h1>
-            <div class="sub">Delete demo tenants from Postgres (all attached data) with Firestore cleanup — scoped per selection. Count first, then delete.</div>
+            <div class="sub">Delete demo tenants from Postgres (all attached data) — scoped per selection. Count first, then delete.</div>
         </div>
 
         <div class="admin-card">
@@ -121,7 +121,7 @@ function deleteDemoTenants(mode) {
     } else {
         openConfirm(
             '⚠️ Delete Tenant',
-            '<strong>Delete demo tenant <code>' + esc(tid) + '</code></strong> from Postgres <em>(all attached data)</em> and clean up its Firestore collections.<br><br>' +
+            '<strong>Delete demo tenant <code>' + esc(tid) + '</code></strong> from Postgres <em>(all attached data)</em>.<br><br>' +
             '<span style="color:#b91c1c;font-weight:700;">⚠️ This removes the tenant and all of its data permanently.</span> Run Count First to review row totals before deleting.',
             { type: 'deleteDemoTenants', body: { tenant_id: tid } }
         );
