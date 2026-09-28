@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     var claims = currentUser.claims || {};
-    if (claims.role !== 'SUPER_ADMIN' && claims.role !== 'AIRLINE_ADMIN' && claims.role !== 'TENANT_ADMIN' && claims.role !== 'SAFETY_OFFICER') {
+    if (claims.role !== 'SUPER_ADMIN' && claims.role !== 'AIRLINE_ADMIN' && claims.role !== 'TENANT_ADMIN' && claims.role !== 'SAFETY_OFFICER' && claims.role !== 'OFFICER') {
         document.getElementById('authGuard').querySelector('h3').textContent = 'Access Denied';
         document.getElementById('authGuard').querySelector('p').innerHTML = 'Your role (' + (claims.role || 'USER') + ') does not have permission to view the airline SMS dashboard.';
         document.getElementById('authGuard').style.display = 'block';

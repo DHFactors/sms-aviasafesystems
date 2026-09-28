@@ -9,7 +9,7 @@
   "method": {
     "title": "Method & Scoring Rules",
     "paragraphs": [
-      "Safety Manager (TENANT_ADMIN / AIRLINE_ADMIN) — can invite users into any applicable department with any role (DEPT_ADMIN, SAFETY_OFFICER, STAFF), sees every department's members, and manages all invites.",
+      "Safety Manager (TENANT_ADMIN / AIRLINE_ADMIN) — can invite users into any applicable department with any role (DEPT_ADMIN, SAFETY_OFFICER / OFFICER, STAFF), sees every department's members, and manages all invites.",
       "Department Admin (DEPT_ADMIN / HOD) — scoped to their own department only: can invite STAFF into that department, and only sees their own department's members. Cross-department invites and granting DEPT_ADMIN / TENANT_ADMIN roles are denied.",
       "STAFF / USER — least-privilege members who cannot invite.",
       "Invite codes are single-use; a scoped invite carries tenant_id, department, department_label and role, and its status moves from ACTIVE to USED on join."

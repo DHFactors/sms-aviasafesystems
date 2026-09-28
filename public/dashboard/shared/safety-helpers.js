@@ -57,7 +57,7 @@
     };
 
     // Roles permitted on the Safety Manager dashboard (§2.1 + platform).
-    var ALLOWED_ROLES = ['TENANT_ADMIN', 'SAFETY_OFFICER', 'SUPER_ADMIN', 'AIRLINE_ADMIN'];
+    var ALLOWED_ROLES = ['TENANT_ADMIN', 'SAFETY_OFFICER', 'OFFICER', 'SUPER_ADMIN', 'AIRLINE_ADMIN'];
 
     // --- Status → bucket ------------------------------------------------------
     // Per-metric maps; unknown statuses fall through to 'In Process' (never

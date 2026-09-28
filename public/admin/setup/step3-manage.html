@@ -228,11 +228,9 @@ AUTHOR: AviaSAFE Systems
             <div class="form-group">
                 <label for="editUserRole">Role *</label>
                 <select id="editUserRole" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
-                    <option value="AIRLINE_ADMIN">Airline Admin (Safety Manager)</option>
                     <option value="TENANT_ADMIN">Tenant Admin</option>
                     <option value="DEPT_ADMIN">Department Admin</option>
-                    <option value="SAFETY_OFFICER">Safety Officer</option>
-                    <option value="STAFF">Staff (View-Only)</option>
+                    <option value="OFFICER">Officer</option>
                     <option value="CAAN_SMD">CAAN SMD (Regulator)</option>
                     <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
@@ -292,11 +290,9 @@ AUTHOR: AviaSAFE Systems
                 <div class="form-group">
                     <label for="newUserRole">Role *</label>
                     <select id="newUserRole" required onchange="toggleCustomRole()" style="width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:.86rem;">
-                        <option value="AIRLINE_ADMIN">Airline Admin (Safety Manager)</option>
                         <option value="TENANT_ADMIN">Tenant Admin</option>
                         <option value="DEPT_ADMIN">Department Admin</option>
-                        <option value="SAFETY_OFFICER">Safety Officer</option>
-                        <option value="STAFF" selected>Staff (View-Only)</option>
+                        <option value="OFFICER">Officer</option>
                         <option value="CAAN_SMD">CAAN SMD (Regulator)</option>
                         <option value="__custom__">+ Custom Role</option>
                     </select>
@@ -961,7 +957,7 @@ async function openEditUserModal(uid, email, role, tenantId, department, display
         }
     }
     entityField('editUserEmailLabel').textContent = 'UID: ' + (uid || '—') + (email ? ' · ' + email : '');
-    entityField('editUserRole').value = role || 'STAFF';
+    entityField('editUserRole').value = role || 'OFFICER';
     entityField('editUserTenant').value = tenantId || '';
     entityField('editUserDepartment').value = department || '';
     entityField('editUserDisplayName').value = displayName || '';

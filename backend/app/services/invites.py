@@ -8,7 +8,7 @@
 #                      `invites` collection. RBAC:
 #                        - TENANT_ADMIN / AIRLINE_ADMIN / SUPER_ADMIN may invite
 #                          into ANY applicable department with roles
-#                          DEPT_ADMIN / SAFETY_OFFICER / STAFF.
+#                          DEPT_ADMIN / SAFETY_OFFICER / OFFICER / STAFF.
 #                        - DEPT_ADMIN may only invite STAFF into their OWN
 #                          department (cross-department or privilege escalation
 #                          is rejected with PermissionError -> 403).
@@ -44,6 +44,8 @@ from app.services.tenant_registration import (
 ROLE_TENANT_ADMIN = settings.ROLE_TENANT_ADMIN
 ROLE_DEPT_ADMIN = settings.ROLE_DEPT_ADMIN
 ROLE_SAFETY_OFFICER = settings.ROLE_SAFETY_OFFICER
+# Canonical rename (dual-accept shim with ROLE_SAFETY_OFFICER).
+ROLE_OFFICER = settings.ROLE_OFFICER
 ROLE_STAFF = settings.ROLE_STAFF
 ROLE_SAG_MEMBER = settings.ROLE_SAG_MEMBER
 
@@ -51,7 +53,7 @@ ROLE_SAG_MEMBER = settings.ROLE_SAG_MEMBER
 # Executive is deliberately NOT invite-assignable — one per tenant, provisioned
 # by SUPER_ADMIN / tenant provisioning (RBAC_MODEL.md §1).
 TENANT_ADMIN_ASSIGNABLE_ROLES = frozenset(
-    {ROLE_DEPT_ADMIN, ROLE_SAFETY_OFFICER, ROLE_STAFF, ROLE_SAG_MEMBER}
+    {ROLE_DEPT_ADMIN, ROLE_SAFETY_OFFICER, ROLE_OFFICER, ROLE_STAFF, ROLE_SAG_MEMBER}
 )
 # Roles a department admin (HOD) may assign via invite.
 DEPT_ADMIN_ASSIGNABLE_ROLES = frozenset({ROLE_STAFF})
@@ -67,7 +69,8 @@ ROLE_LABELS = {
     "TENANT_ADMIN": "Safety Manager (Tenant Admin)",
     "AIRLINE_ADMIN": "Safety Manager (Tenant Admin)",
     "DEPT_ADMIN": "Department Admin (HOD)",
-    "SAFETY_OFFICER": "Safety Officer",
+    "SAFETY_OFFICER": "Officer",
+    "OFFICER": "Officer",
     "STAFF": "Staff / Employee",
     "USER": "Staff / Employee",
     "CAAN_SMD": "State Safety Regulator",
@@ -155,7 +158,7 @@ def create_invite(
 
     RBAC (enforced strictly):
       - TENANT_ADMIN / AIRLINE_ADMIN / SUPER_ADMIN: any applicable department,
-        assignable roles DEPT_ADMIN / SAFETY_OFFICER / STAFF.
+        assignable roles DEPT_ADMIN / SAFETY_OFFICER / OFFICER / STAFF.
       - DEPT_ADMIN: target department MUST equal the caller's department and
         the role MUST be STAFF (no cross-department invites, no escalation).
     """

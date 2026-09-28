@@ -340,7 +340,7 @@ async def invite_endpoint(
 
     Role-aware enforcement:
       - TENANT_ADMIN / AIRLINE_ADMIN / SUPER_ADMIN: invite into any applicable
-        department with DEPT_ADMIN / SAFETY_OFFICER / STAFF.
+        department with DEPT_ADMIN / SAFETY_OFFICER / OFFICER / STAFF.
       - DEPT_ADMIN: target department must equal the caller's department and
         only the STAFF role may be assigned (403 otherwise).
     """

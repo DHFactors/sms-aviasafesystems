@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.currentTenantSlug = currentTenantSlug;
     window.currentTenantName = currentTenantSlug ? currentTenantSlug.toUpperCase() : null;
 
-    if (role !== 'AIRLINE_ADMIN' && role !== 'TENANT_ADMIN' && role !== 'SAFETY_OFFICER' && role !== 'CAAN_SMD' && role !== 'SUPER_ADMIN') {
+    if (role !== 'AIRLINE_ADMIN' && role !== 'TENANT_ADMIN' && role !== 'SAFETY_OFFICER' && role !== 'OFFICER' && role !== 'CAAN_SMD' && role !== 'SUPER_ADMIN') {
         showError('Unauthorized role. Contact your administrator.');
         return;
     }

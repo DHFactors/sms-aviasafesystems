@@ -23,7 +23,8 @@
         TENANT_ADMIN: 'Safety Manager (Tenant Admin)',
         AIRLINE_ADMIN: 'Safety Manager (Tenant Admin)',
         DEPT_ADMIN: 'Department Admin (HOD)',
-        SAFETY_OFFICER: 'Safety Officer',
+        SAFETY_OFFICER: 'Officer',
+        OFFICER: 'Officer',
         STAFF: 'Staff / Employee',
         USER: 'Staff / Employee',
         CAAN_SMD: 'State Safety Regulator',
@@ -35,6 +36,7 @@
         AIRLINE_ADMIN: 'role-admin',
         DEPT_ADMIN: 'role-hod',
         SAFETY_OFFICER: 'role-officer',
+        OFFICER: 'role-officer',
         STAFF: 'role-staff',
         USER: 'role-staff',
         CAAN_SMD: 'role-admin',
@@ -119,7 +121,8 @@
         } else {
             options = [
                 { value: 'DEPT_ADMIN', label: 'Department Admin (HOD)' },
-                { value: 'SAFETY_OFFICER', label: 'Safety Officer' },
+                { value: 'SAFETY_OFFICER', label: 'Officer' },
+                { value: 'OFFICER', label: 'Officer' },
                 { value: 'STAFF', label: 'Staff / Employee' },
             ];
             select.disabled = false;

@@ -722,7 +722,7 @@
 
         if (!H.roleAllowed(role)) {
             window.Shell.init({ role: role, roleLabel: role, title: 'Safety Manager Dashboard', period: '30d' });
-            $('dash-content').innerHTML = window.EmptyState.noPermission('TENANT_ADMIN / SAFETY_OFFICER');
+            $('dash-content').innerHTML = window.EmptyState.noPermission('TENANT_ADMIN / SAFETY_OFFICER / OFFICER');
             return;
         }
 

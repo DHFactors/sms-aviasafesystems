@@ -162,7 +162,7 @@ let currentPageSize = 50;
 
 // Roles permitted to see the Reports tab (mirrors the backend gate in
 // build_master_register REPORT_VIEWER_ROLES; AIRLINE_ADMIN excluded).
-const REPORT_VIEWER_ROLES = ['TENANT_ADMIN', 'SAFETY_OFFICER', 'SUPER_ADMIN'];
+const REPORT_VIEWER_ROLES = ['TENANT_ADMIN', 'SAFETY_OFFICER', 'OFFICER', 'SUPER_ADMIN'];
 
 firebase.auth().onAuthStateChanged(function(user) {
     if (!user) { window.location.href = '/login.html'; return; }

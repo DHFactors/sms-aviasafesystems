@@ -99,7 +99,7 @@ const AviaSDCPSRouter = (function () {
       template: 'views/tenant-dashboard.html',
       controllerName: 'AviaSDCPSTenantDashboard',
       title: 'Tenant SMS Dashboard',
-      allowedRoles: ['operator', 'safety_manager', 'admin', 'AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN', 'SAFETY_OFFICER']
+      allowedRoles: ['operator', 'safety_manager', 'admin', 'AIRLINE_ADMIN', 'TENANT_ADMIN', 'DEPT_ADMIN', 'SAFETY_OFFICER', 'OFFICER']
     }
   };
 

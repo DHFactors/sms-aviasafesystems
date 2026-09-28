@@ -227,7 +227,7 @@ function getUserRoleType(user) {
     // stubbed as TENANT_ADMIN/AIRLINE_ADMIN, so the ae@ email check must run
     // BEFORE the tenant-admin mapping — preserves existing routing behavior.
     if (email.indexOf('ae@') === 0 || email.indexOf('ae.') === 0) return 'AE';
-    if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN' || role === 'SAFETY_OFFICER') return 'SAFETY';
+    if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN' || role === 'SAFETY_OFFICER' || role === 'OFFICER') return 'SAFETY';
     if (role === 'DEPT_ADMIN') return 'DEPT_ADMIN';
     // STAFF (department staff, role-based emails) shares the department
     // Workspace nav with DEPT_ADMIN. Mapped explicitly (not left to the

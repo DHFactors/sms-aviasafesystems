@@ -36,7 +36,7 @@ CAP_SUBCOLLECTION = "caps"
 # layer). Frontend hides the Reports tab for everyone else (UX layer).
 # AIRLINE_ADMIN is legacy and intentionally excluded; is_confidential is
 # dormant (always false in production) and must NOT be used for gating.
-REPORT_VIEWER_ROLES = {"TENANT_ADMIN", "SAFETY_OFFICER", "SUPER_ADMIN"}
+REPORT_VIEWER_ROLES = {"TENANT_ADMIN", "SAFETY_OFFICER", "OFFICER", "SUPER_ADMIN"}
 
 # Department aliases — normalizes the many spellings used across seed data,
 # account claims and UI filters onto canonical queue names.

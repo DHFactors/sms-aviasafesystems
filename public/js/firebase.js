@@ -643,30 +643,62 @@ window.getStoredDemoContext = getStoredDemoContext;
 
 function getRoleDestination(user) {
     var role = (user && user.role) || 'USER';
-    if (role === 'SUPER_ADMIN') return '/admin/production-setup.html';
+
+    // 1. Regulator
     if (role === 'CAAN_SMD') return '/caan.html';
-    // Accountable Executive accounts (ae@{domain}) get the executive
-    // governance dashboard — top-level SMS oversight per ICAO Annex 19 /
-    // Doc 10159. Safety Managers (safety@) keep the operational workspace.
-    if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN') {
-        var email = ((user && user.email) || '').toLowerCase();
-        if (_isAeEmail(email)) {
-            // Resolve + persist the mirroring context BEFORE the dashboard
-            // loads so panels render with the prospect's branding/formatter.
-            try { resolveTenantContext({ email: email }); } catch (e) { /* non-fatal */ }
+
+    // 2. Accountable Executive — executive governance dashboard per
+    // ICAO Annex 19 / Doc 10159.
+    if (role === 'ACCOUNTABLE_EXECUTIVE') return '/dashboard/ae-dashboard.html';
+
+    // 3. Super Admin
+    if (role === 'SUPER_ADMIN') return '/admin/production-setup.html';
+
+    // 4. Safety Manager (tenant-wide). Legacy ae@ heuristic preserved:
+    // AE accounts stubbed as TENANT_ADMIN/AIRLINE_ADMIN still resolve +
+    // persist the mirroring context BEFORE the dashboard loads.
+    if (role === 'TENANT_ADMIN') {
+        var tenantEmail = ((user && user.email) || '').toLowerCase();
+        if (_isAeEmail(tenantEmail)) {
+            try { resolveTenantContext({ email: tenantEmail }); } catch (e) { /* non-fatal */ }
             return '/dashboard/ae-dashboard.html';
         }
+        return '/safety.html';
     }
-    // Department admins (DEPT_ADMIN for CAMO, Part-145, Operations) must be
-    // routed directly to the responsible-manager dashboard instead of safety.html
-    // to prevent the Access Denied routing loop.
+
+    // 5. Department Manager — responsible-manager dashboard (avoids the
+    // Access Denied routing loop on safety.html).
     if (role === 'DEPT_ADMIN') return '/dashboard/my-tasks.html';
+
+    // 6. Officer / Safety Officer (dual-accept shim) — department
+    // determines landing: safety@ keeps the tenant-wide workspace,
+    // every other department prefix lands on My Tasks.
+    if (role === 'OFFICER' || role === 'SAFETY_OFFICER') {
+        var officerEmail = ((user && user.email) || '').toLowerCase();
+        var localPart = (officerEmail.split('@')[0] || '').toLowerCase();
+        if (localPart === 'safety') return '/safety.html';
+        return '/dashboard/my-tasks.html';
+    }
+
+    // 7. Legacy alias
+    if (role === 'AIRLINE_ADMIN') {
+        var legacyEmail = ((user && user.email) || '').toLowerCase();
+        if (_isAeEmail(legacyEmail)) {
+            try { resolveTenantContext({ email: legacyEmail }); } catch (e) { /* non-fatal */ }
+            return '/dashboard/ae-dashboard.html';
+        }
+        return '/safety.html';
+    }
+
+    // 8. USER with department claim → department landing
     if (role === 'USER') {
         var claims = (user && (user.claims || {})) || {};
         var department = claims.department || (user && user.department) || '';
         if (department) return '/dashboard/my-tasks.html';
         return '/safety.html';
     }
+
+    // 9. Default
     return '/safety.html';
 }
 

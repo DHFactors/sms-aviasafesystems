@@ -1739,7 +1739,7 @@ class UserCreateRequest(UserProfileCreate):
 
 # Roles recognized by the app RBAC for tenant-scoped operator users. Custom
 # roles are accepted for future RBAC additions but logged for awareness.
-ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "STAFF", "CAAN_SMD", "ACCOUNTABLE_EXECUTIVE", "SAG_MEMBER"}
+ALLOWED_USER_CREATE_ROLES = {"AIRLINE_ADMIN", "TENANT_ADMIN", "DEPT_ADMIN", "SAFETY_OFFICER", "OFFICER", "STAFF", "CAAN_SMD", "ACCOUNTABLE_EXECUTIVE", "SAG_MEMBER"}
 
 
 SUPER_ADMIN_PROTECTED_EMAILS = {"ezondiza.dhf@gmail.com", "ghanshyamacharya@outlook.com"}

@@ -19,7 +19,10 @@ class AuthRole(str, Enum):
     # Department-scoped administrator (Head of Department).
     DEPT_ADMIN = "DEPT_ADMIN"
     # Operational safety review role (cross-department review within tenant).
+    # Legacy name; OFFICER is the canonical rename (dual-accept shim).
     SAFETY_OFFICER = "SAFETY_OFFICER"
+    # Canonical officer name; accepted everywhere SAFETY_OFFICER is.
+    OFFICER = "OFFICER"
     # Legacy least-privilege member role.
     USER = "USER"
     # Canonical least-privilege member role; USER is its legacy alias.
@@ -170,6 +173,8 @@ class Settings(BaseSettings):
     ROLE_TENANT_ADMIN: str = "TENANT_ADMIN"
     ROLE_DEPT_ADMIN: str = "DEPT_ADMIN"
     ROLE_SAFETY_OFFICER: str = "SAFETY_OFFICER"
+    # Canonical rename of the officer role (dual-accept shim with the above).
+    ROLE_OFFICER: str = "OFFICER"
     ROLE_STAFF: str = "STAFF"
     ROLE_ACCOUNTABLE_EXECUTIVE: str = "ACCOUNTABLE_EXECUTIVE"
     ROLE_SAG_MEMBER: str = "SAG_MEMBER"
@@ -182,6 +187,7 @@ class Settings(BaseSettings):
         "ACCOUNTABLE_EXECUTIVE",
         "DEPT_ADMIN",
         "SAFETY_OFFICER",
+        "OFFICER",
         "STAFF",
         "SAG_MEMBER",
     ]
@@ -189,7 +195,9 @@ class Settings(BaseSettings):
     # canonical names (TENANT_ADMIN == AIRLINE_ADMIN, STAFF == USER).
     TENANT_ADMIN_ROLES: List[str] = ["AIRLINE_ADMIN", "TENANT_ADMIN"]
     DEPT_ADMIN_ROLES: List[str] = ["DEPT_ADMIN"]
-    SAFETY_OFFICER_ROLES: List[str] = ["SAFETY_OFFICER"]
+    # Dual-accept shim: OFFICER is the canonical rename of SAFETY_OFFICER.
+    # Both values stay valid until stored claims are migrated (future commit).
+    SAFETY_OFFICER_ROLES: List[str] = ["SAFETY_OFFICER", "OFFICER"]
     STAFF_ROLES: List[str] = ["USER", "STAFF"]
     ACCOUNTABLE_EXECUTIVE_ROLES: List[str] = ["ACCOUNTABLE_EXECUTIVE"]
     SAG_MEMBER_ROLES: List[str] = ["SAG_MEMBER"]
