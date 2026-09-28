@@ -551,12 +551,13 @@
 
     // Department personas (DEPT_ADMIN + STAFF) must not see the Home link
     // (it points at /safety.html, the Safety Manager landing page) and the
-    // brand logo routes them to My Tasks instead. Runs inside
+    // brand logo routes them to My Tasks instead. Same for AE, whose home
+    // is the Executive dashboard. Runs inside
     // applyNavVisibility so it re-applies once auth claims resolve —
     // buildHeader itself runs before claims are available, so gating there
     // would never see the role. Fail-open: when nav-config is absent or the
     // role is still unknown, Home/brand stay as built (other roles
-    // unaffected — only DEPT_ADMIN/STAFF are ever rewritten).
+    // unaffected — only DEPT_ADMIN/STAFF/AE are ever rewritten).
     function applyDeptHeaderVisibility() {
         if (typeof getUserRoleType !== 'function') return;
         var roleType;
@@ -564,10 +565,11 @@
             roleType = getUserRoleType(buildNavUser());
         } catch (e) { return; }
         var isDept = roleType === 'DEPT_ADMIN' || roleType === 'STAFF';
+        var isAE = roleType === 'AE';
         var home = document.getElementById('shellHomeLink');
-        if (home) home.style.display = isDept ? 'none' : '';
+        if (home) home.style.display = (isDept || isAE) ? 'none' : '';
         var brandLink = document.getElementById('shellBrandLink');
-        if (brandLink) brandLink.href = isDept ? '/dashboard/my-tasks.html' : '/safety.html';
+        if (brandLink) brandLink.href = isAE ? '/dashboard/ae-dashboard.html' : (isDept ? '/dashboard/my-tasks.html' : '/safety.html');
     }
 
     function buildHeader() {

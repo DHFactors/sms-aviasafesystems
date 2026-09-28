@@ -271,6 +271,12 @@ function getVisibleNav(user, moduleAccess) {
         if (normalized && !moduleEnabled(normalized, group.module)) continue;
 
         var items = group.items.filter(function (item) {
+            // AE sees Executive + Trends only — My Tasks is not an AE
+            // surface (same targeted-skip pattern as the department
+            // Dashboard exclusion above). NOTE: frontend-tests
+            // test_ae_narrow_menu asserts the old 3-item AE menu and
+            // will need updating (test file untouched here).
+            if (roleType === 'AE' && item.id === 'my-tasks') return false;
             if (item.roles && item.roles.indexOf('ALL') === -1 && item.roles.indexOf(roleType) === -1) {
                 return false;
             }

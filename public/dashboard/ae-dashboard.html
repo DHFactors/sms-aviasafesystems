@@ -92,6 +92,7 @@
                 <div class="card" style="border-top:4px solid #1a6b8a;">
                     <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
                     <div id="escalationQueue"></div>
+                    <p style="font-size:0.72rem;color:#94a3b8;margin-top:0.4rem;">Sign-off workflow under development — decision recording coming in a future release.</p>
                     <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
                         <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
                         <div id="decisionLedger" style="margin-top:0.5rem;"></div>
@@ -107,6 +108,14 @@
                 <a href="/safety.html" class="btn btn-outline" style="margin-top:0.8rem;"><i class="fas fa-chart-line"></i> Open Safety Workspace for Granular Data</a>
             </div>
         </div>
+    </div>
+</div>
+
+<div id="aeDecisionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(11,42,66,0.55);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:1.5rem;border-radius:14px;max-width:440px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:center;">
+        <h3 style="margin:0 0 0.5rem;color:#0b2a42;font-size:1rem;"><i class="fas fa-gavel" style="color:#d4af37;"></i> Executive Decision — Coming Soon</h3>
+        <p style="font-size:0.85rem;color:#475569;">Digital signature capture and decision recording are under development. Full workflow available in the next release.</p>
+        <button class="btn btn-outline" onclick="closeAeDecisionModal()" style="margin-top:0.75rem;">Close</button>
     </div>
 </div>
 
@@ -222,7 +231,7 @@ function renderEscalations(caps){
     const queue=(caps||[]).filter(c=>c.escalated_to_ae).sort((a,b)=>new Date(b.escalated_at||0)-new Date(a.escalated_at||0));
     const el=document.getElementById('escalationQueue');
     if(!queue.length){ el.innerHTML='<div class="empty">No escalated CAPs — all clear.</div>'; } else {
-        el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;">'+(c.cap_reference||c.id)+' <span style="color:#64748b;font-weight:400;">· '+ (c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+c.id+'\',\'authorize\')">Authorize</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+c.id+'\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
+        el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;"><a href="/can_cap/cap_review.html?id='+c.id+'" target="_blank" rel="noopener noreferrer" style="color:#1a6b8a;text-decoration:underline;">'+(c.cap_reference||c.id)+'</a> <span style="color:#64748b;font-weight:400;">· '+ (c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+c.id+'\',\'authorize\')">Authorize</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+c.id+'\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
     }
     // decision ledger (simplified)
     const ledger=document.getElementById('decisionLedger');
@@ -230,17 +239,15 @@ function renderEscalations(caps){
     ledger.innerHTML=decided.length?decided.map(c=>'<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>'+c.cap_reference+'</strong> — '+ (c.ae_signature||'')+' on '+fmtDate(c.ae_signed_at)+'</div>').join(''):'<div class="empty">No executive decisions yet.</div>';
 }
 function decideEscalation(capId, decision){
-    if(decision==='accept_risk'){ alert('Risk acceptance requires signature — use full AE view for detailed modal.'); return; }
-    const note=prompt('AE authorization note:','Resources authorized.');
-    if(note==null||!note.trim()) return;
-    const cap=gCaps.find(c=>c.id===capId);
-    if(!cap) return;
-    // demo vs real
-    if(window.DEMO_CONTEXT){
-        fetch('/api/v1/demo/session/decision',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(window.__demoIdToken||'')},body:JSON.stringify({email:myEmail,cap_id:capId,decision:'authorize',note:note.trim()})}).then(()=>{ cap.escalated_to_ae=false; renderEscalations(gCaps); alert('Authorized (demo session).'); }).catch(e=>alert(e.message));
-    } else {
-        ApiClient.post('/api/v1/cans/caps/'+capId+'/review',{status:'In Progress',comments:'[AE] '+note.trim(),escalated_to_ae:false}).then(()=>{ cap.escalated_to_ae=false; renderEscalations(gCaps); }).catch(e=>alert(e.message));
-    }
+    openAeDecisionModal();
+}
+function openAeDecisionModal(){
+    var m=document.getElementById('aeDecisionModal');
+    if(m) m.style.display='flex';
+}
+function closeAeDecisionModal(){
+    var m=document.getElementById('aeDecisionModal');
+    if(m) m.style.display='none';
 }
 function renderSituationalBanner(){
     // simplified contextual chips
