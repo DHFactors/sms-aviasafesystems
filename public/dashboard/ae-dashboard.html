@@ -86,9 +86,17 @@
                                 </select>
                             </div>
                             <div class="maturity-score-block" style="flex:1;min-width:220px;">
-                                <div class="score-value big-score" id="aeMaturityScore">—</div>
-                                <div class="score-label" style="font-size:0.7rem;color:#64748b;">Overall score</div>
-                                <div style="margin-top:0.4rem;"><span class="chip chip-blue" id="aeMaturityTier">—</span></div>
+                                <div style="display:flex;gap:1.2rem;align-items:start;">
+                                    <div>
+                                        <div class="score-value big-score" id="aeMaturityScore">—</div>
+                                        <div class="score-label" style="font-size:0.7rem;color:#64748b;">Overall score</div>
+                                        <div style="margin-top:0.4rem;"><span class="chip chip-blue" id="aeMaturityTier">—</span></div>
+                                    </div>
+                                    <div id="aeMaturityCompBlock" style="display:none;">
+                                        <div class="score-value" id="aeMaturityCompScore" style="font-size:1.6rem;font-weight:800;line-height:1;">—</div>
+                                        <div class="score-label" id="aeMaturityCompLabel" style="font-size:0.7rem;color:#64748b;">(component)</div>
+                                    </div>
+                                </div>
                                 <p class="recommendation-text" id="aeMaturityReco" style="font-size:0.78rem;color:#475569;margin:0.5rem 0 0;"></p>
                             </div>
                         </div>
@@ -100,17 +108,6 @@
                         </div>
                     </div>
                     <div id="aeMatEmpty" class="empty" style="display:none;">No survey responses in period.</div>
-                </div>
-                <div class="card" style="border-top:4px solid #dc3545;">
-                    <h2><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure <span class="tag">Risk</span></h2>
-                    <div class="kpi-strip">
-                        <div class="kpi" style="border-left:3px solid #dc3545;"><div class="num" style="color:#dc3545;" id="kpiIntolerable">—</div><div class="lbl">Intolerable</div></div>
-                        <div class="kpi" style="border-left:3px solid #d97706;"><div class="num" style="color:#d97706;" id="kpiHigh">—</div><div class="lbl">High</div></div>
-                        <div class="kpi"><div class="num" id="kpiOverdue">—</div><div class="lbl">Overdue</div></div>
-                        <div class="kpi"><div class="num" id="kpiMttc">—</div><div class="lbl">MTTC days</div></div>
-                    </div>
-                    <div class="heatmap" id="heatmap" style="margin-top:0.8rem;"></div>
-                    <div style="font-size:0.65rem;color:#94a3b8;margin-top:0.4rem;text-align:center;">5×5 Residual Risk Heatmap</div>
                 </div>
                 <div class="card" style="border-top:4px solid #1a6b8a;">
                     <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
@@ -234,7 +231,7 @@ async function loadDashboard(){
         ]);
         gPsoeList=[]; gCans=cans||[]; gCaps=caps||[]; gHazards=hazards||[]; gReports=reports||[];
         gCaps.forEach(c=>{ const ov=gOverlays[c.id]; if(ov) Object.assign(c,ov); });
-        renderRisk(gCans,gCaps,gHazards); renderEscalations(gCaps);
+        renderEscalations(gCaps);
         renderSituationalBanner();
         document.getElementById('loadingIndicator').style.display='none';
         document.getElementById('dashContent').style.display='block';
@@ -296,6 +293,15 @@ function renderAeMaturity(){
     if(scoreEl){ scoreEl.textContent=score!=null?score+'%':'—'; scoreEl.style.color=psoeStage(score).color; }
     if(tierEl){ tierEl.textContent=data.tier_label||data.tier||'—'; tierEl.className=aeMaturityTierClass(data.tier); }
     if(recoEl) recoEl.textContent=aeMaturityRecoText(data);
+    const compBlock=document.getElementById('aeMaturityCompBlock');
+    if(pillarKey!=='overall'){
+        const compScore=(data.pillars||{})[pillarKey];
+        const compName=(AE_PILLARS.find(function(p){return p.key===pillarKey;})||{}).name||pillarKey;
+        const compScoreEl=document.getElementById('aeMaturityCompScore'), compLabelEl=document.getElementById('aeMaturityCompLabel');
+        if(compScoreEl) compScoreEl.textContent=compScore!=null?compScore+'%':'—';
+        if(compLabelEl) compLabelEl.textContent=compName;
+        if(compBlock) compBlock.style.display='block';
+    } else if(compBlock){ compBlock.style.display='none'; }
     const showEmpty=!history.length;
     if(emptyEl) emptyEl.style.display=showEmpty?'block':'none';
     const ctx=document.getElementById('aeMaturityChart');
@@ -336,22 +342,6 @@ document.addEventListener('keydown',function(e){
         if(m&&m.style.display==='flex') closeAeMaturityExpandModal();
     }
 });
-function renderRisk(cans,caps,hazards){
-    const isOpen=s=>{const v=String(s||'').toLowerCase();return v!=='closed'&&v!=='completed';};
-    let intolerable=0,high=0; (cans||[]).forEach(c=>{ if(!isOpen(c.status))return; const sra=c.initial_sra||{}; const idx=sra.risk_index!=null?sra.risk_index:(sra.severity&&sra.probability?sra.severity*sra.probability:null); if(idx==null)return; if(idx>15) intolerable++; else if(idx>=12) high++;});
-    let overdue=0; (cans||[]).forEach(c=>{ if(!isOpen(c.status)||!c.target_completion_date)return; if(new Date(c.target_completion_date)<new Date()) overdue++;}); (caps||[]).forEach(c=>{ if(!isOpen(c.status)||!c.target_completion_date)return; if(new Date(c.target_completion_date)<new Date()) overdue++;});
-    const closed=caps.filter(c=>c.closed_at&&c.submitted_at).map(c=>Math.round((new Date(c.closed_at)-new Date(c.submitted_at))/86400000)).filter(d=>d>=0);
-    const mttc=closed.length?Math.round(closed.reduce((a,b)=>a+b,0)/closed.length):null;
-    document.getElementById('kpiIntolerable').textContent=intolerable; document.getElementById('kpiHigh').textContent=high;
-    document.getElementById('kpiOverdue').textContent=overdue; document.getElementById('kpiMttc').textContent=mttc!=null?mttc:'—';
-    // heatmap
-    const el=document.getElementById('heatmap'); const active=(hazards||[]).filter(h=>String(h.status||'').toLowerCase()!=='closed'); const grid={};
-    active.forEach(h=>{ const s=h.severity||null; const p=h.probability||null; if(!s||!p||s<1||s>5||p<1||p>5) return; const k=s+'-'+p; grid[k]=(grid[k]||0)+1; });
-    const cellColor=(s,p,n)=>{ if(!n) return ''; const idx=s*p; if(idx>15) return '#b91c1c'; if(idx>=12) return '#ea580c'; if(idx>=8) return '#d97706'; if(idx>=4) return '#ca8a04'; return '#1e7e34'; };
-    let html='<div class="hm-cell"></div>'; for(let p=1;p<=5;p++) html+='<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">P'+p+'</div>';
-    for(let s=5;s>=1;s--){ html+='<div class="hm-cell" style="background:transparent;color:#64748b;font-weight:600;">S'+s+'</div>'; for(let p=1;p<=5;p++){ const n=grid[s+'-'+p]||0; html+='<div class="hm-cell" '+(n?'style="background:'+cellColor(s,p,n)+';color:#fff;"':'')+'>'+(n||'')+'</div>'; } }
-    el.innerHTML=html;
-}
 function renderEscalations(caps){
     const queue=(caps||[]).filter(c=>c.escalated_to_ae).sort((a,b)=>new Date(b.escalated_at||0)-new Date(a.escalated_at||0));
     const el=document.getElementById('escalationQueue');

@@ -239,8 +239,8 @@
     color: #1a6b8a;
 }
 .header-nav .dropdown-menu .dropdown-link.active {
-    background: rgba(26, 107, 138, 0.22);
-    color: #0b2a42;
+    background: #1a6b8a;
+    color: #ffffff;
     font-weight: 700;
 }
 
