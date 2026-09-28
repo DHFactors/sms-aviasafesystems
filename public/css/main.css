@@ -275,7 +275,7 @@ select.form-control { appearance: auto; }
     text-decoration-thickness: 2px;
     text-decoration-color: var(--color-accent);
 }
-.app-header nav a.active {
+.app-header nav > a.active {
     color: var(--color-primary-dark);
     text-decoration: underline;
     text-underline-offset: 6px;
