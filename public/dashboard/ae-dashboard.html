@@ -66,17 +66,30 @@
 <div id="dashContent" style="display:none;">
             <div class="grid">
                 <div class="card">
-                    <h2><i class="fas fa-heart-pulse" style="color:#d4af37;"></i> SMS Maturity <span class="tag">PSOE</span></h2>
+                    <h2><i class="fas fa-heart-pulse" style="color:#d4af37;"></i> SMS Maturity <span class="tag">Module A</span></h2>
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.8rem;">
+                        <select id="aeMatDays" onchange="loadAeMaturity()" style="padding:0.35rem 0.6rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.75rem;background:#fff;">
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="365" selected>Last 12 months</option>
+                        </select>
+                        <select id="aeMatPillar" onchange="renderAeMaturity()" style="padding:0.35rem 0.6rem;border:1px solid #e2e8f0;border-radius:8px;font-size:0.75rem;background:#fff;">
+                            <option value="overall">All components</option>
+                            <option value="safety_policy">Safety Policy</option>
+                            <option value="safety_risk_management">Safety Risk Management</option>
+                            <option value="safety_assurance">Safety Assurance</option>
+                            <option value="safety_promotion">Safety Promotion</option>
+                        </select>
+                    </div>
                     <div style="display:flex;align-items:center;gap:1.2rem;">
                         <div>
-                            <div class="big-score" id="psoeScore">—</div>
+                            <div class="big-score" id="aeMatScore">—</div>
                             <div style="font-size:0.7rem;color:#64748b;">Overall score</div>
-                            <div id="psoeLevel" style="margin-top:0.5rem;background:#64748b;color:#fff;display:inline-block;padding:0.3rem 0.7rem;border-radius:999px;font-size:0.7rem;font-weight:700;">No audit</div>
+                            <div id="aeMatMeta" style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;"></div>
                         </div>
-                        <div style="flex:1;"><canvas id="psoeRadar" height="160"></canvas></div>
+                        <div style="flex:1;min-width:0;"><canvas id="aeMatTrend" height="160"></canvas></div>
                     </div>
-                    <div id="pillarBars" style="margin-top:1rem;"></div>
-                    <div id="psoeMeta" style="font-size:0.7rem;color:#64748b;margin-top:0.5rem;"></div>
+                    <div id="aeMatEmpty" class="empty" style="display:none;">No survey responses in period.</div>
                 </div>
                 <div class="card" style="border-top:4px solid #dc3545;">
                     <h2><i class="fas fa-triangle-exclamation" style="color:#dc3545;"></i> Residual Exposure <span class="tag">Risk</span></h2>
@@ -188,45 +201,59 @@ function psoeStage(pct){
 }
 async function loadDashboard(){
     try{
-        const [psoeList,cans,caps,hazards,reports]=await Promise.all([
-            ApiClient.get('/api/v1/psoe/assessments?status=completed').catch(()=>[]),
+        const [cans,caps,hazards,reports]=await Promise.all([
             ApiClient.get('/api/v1/cans/').catch(()=>[]),
             ApiClient.get('/api/v1/cans/caps').catch(()=>[]),
             ApiClient.get('/api/v1/hazards/').catch(()=>[]),
             ApiClient.get('/api/v1/reports/').catch(()=>[])
         ]);
-        gPsoeList=psoeList||[]; gCans=cans||[]; gCaps=caps||[]; gHazards=hazards||[]; gReports=reports||[];
+        gPsoeList=[]; gCans=cans||[]; gCaps=caps||[]; gHazards=hazards||[]; gReports=reports||[];
         gCaps.forEach(c=>{ const ov=gOverlays[c.id]; if(ov) Object.assign(c,ov); });
-        renderPsoe(gPsoeList); renderRisk(gCans,gCaps,gHazards); renderEscalations(gCaps);
+        renderRisk(gCans,gCaps,gHazards); renderEscalations(gCaps);
         renderSituationalBanner();
         document.getElementById('loadingIndicator').style.display='none';
         document.getElementById('dashContent').style.display='block';
+        loadAeMaturity();
     }catch(err){
         document.getElementById('loadingIndicator').innerHTML='<span style="color:#dc3545;">Failed to load: '+err.message+'</span>';
     }
 }
 window.__aeRefresh=loadDashboard;
 // Simplified renderers — reuse original logic but minimalist DOM
-const PILLARS=[{id:'component_1',name:'Safety Policy & Objectives'},{id:'component_2',name:'Safety Risk Management'},{id:'component_3',name:'Safety Assurance'},{id:'component_4',name:'Safety Promotion'}];
-async function renderPsoe(list){
-    const latest=(list||[])[0]||null;
-    const scoreEl=document.getElementById('psoeScore'), levelEl=document.getElementById('psoeLevel'), metaEl=document.getElementById('psoeMeta');
-    if(!latest){ scoreEl.textContent='—'; levelEl.textContent='No completed audit'; levelEl.style.background='#64748b'; return; }
-    let detail=null; try{ detail=await ApiClient.get('/api/v1/psoe/assessments/'+latest.id);}catch(e){}
-    const pct=latest.overall_score_pct!=null?latest.overall_score_pct:(detail&&detail.overall_score_pct);
-    const stage=psoeStage(pct);
-    scoreEl.textContent=pct!=null?pct+'%':'—'; scoreEl.style.color=stage.color;
-    levelEl.textContent=stage.label; levelEl.style.background=stage.color;
-    metaEl.textContent=(latest.title||'PSOE')+' · '+fmtDate(latest.assessment_date||latest.updated_at);
-    const comps=(detail&&detail.component_scores)||{};
-    document.getElementById('pillarBars').innerHTML=PILLARS.map(p=>{
-        const c=comps[p.id]||{}; const v=c.score_pct!=null?c.score_pct:(c.pct!=null?c.pct:0);
-        return '<div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.75rem;"><span style="width:160px;color:#475569;">'+p.name+'</span><span style="flex:1;height:6px;background:#eef2f7;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;background:#1a6b8a;width:'+Math.max(0,Math.min(100,v))+'%;"></i></span><span style="width:40px;text-align:right;font-weight:700;">'+(v?v.toFixed(0):0)+'%</span></div>';
-    }).join('');
-    const ctx=document.getElementById('psoeRadar');
+const AE_PILLARS=[{key:'safety_policy',name:'Safety Policy'},{key:'safety_risk_management',name:'Safety Risk Management'},{key:'safety_assurance',name:'Safety Assurance'},{key:'safety_promotion',name:'Safety Promotion'}];
+let gMaturity=null;
+async function loadAeMaturity(){
+    const days=(document.getElementById('aeMatDays')||{}).value||'365';
+    const scoreEl=document.getElementById('aeMatScore'), metaEl=document.getElementById('aeMatMeta'), emptyEl=document.getElementById('aeMatEmpty');
+    if(scoreEl) scoreEl.textContent='…';
+    if(emptyEl) emptyEl.style.display='none';
+    try{
+        gMaturity=await ApiClient.get('/api/v1/dashboard/airline/sms-maturity?days='+encodeURIComponent(days));
+    }catch(e){ gMaturity=null; }
+    renderAeMaturity();
+    renderSituationalBanner();
+}
+function renderAeMaturity(){
+    const scoreEl=document.getElementById('aeMatScore'), metaEl=document.getElementById('aeMatMeta'), emptyEl=document.getElementById('aeMatEmpty');
+    const pillarKey=(document.getElementById('aeMatPillar')||{}).value||'overall';
+    const data=gMaturity||{};
+    const history=(data.history||[]).slice().reverse();
+    const score=data.overall_score;
+    if(scoreEl){ scoreEl.textContent=score!=null?score+'%':'—'; scoreEl.style.color=psoeStage(score).color; }
+    if(metaEl) metaEl.textContent=data.tier_label||data.tier||'';
+    const showEmpty=!history.length;
+    if(emptyEl) emptyEl.style.display=showEmpty?'block':'none';
+    const ctx=document.getElementById('aeMatTrend');
     if(ctx&&window.Chart){
-        if(charts.radar) try{charts.radar.destroy();}catch(_){}
-        charts.radar=new Chart(ctx,{type:'radar',data:{labels:PILLARS.map(p=>p.name.split(' ')[0]),datasets:[{label:'Component %',data:PILLARS.map(p=>{const c=comps[p.id]||{};return c.score_pct!=null?c.score_pct:(c.pct!=null?c.pct:0);}),backgroundColor:'rgba(26,107,138,0.15)',borderColor:'#1a6b8a',pointBackgroundColor:'#1a6b8a'}]},options:{plugins:{legend:{display:false}},scales:{r:{min:0,max:100,ticks:{display:false}}}}});
+        if(charts.maturity) try{charts.maturity.destroy();}catch(_){}
+        if(!showEmpty){
+            const val=function(h){
+                if(pillarKey==='overall') return h.overall_score;
+                const p=h.pillars||{}; return p[pillarKey];
+            };
+            const label=pillarKey==='overall'?'Overall %':(AE_PILLARS.find(function(p){return p.key===pillarKey;})||{}).name+' %';
+            charts.maturity=new Chart(ctx,{type:'line',data:{labels:history.map(function(h){return h.period||'';}),datasets:[{label:label,data:history.map(val),borderColor:'#1a6b8a',backgroundColor:'rgba(26,107,138,0.12)',fill:true,tension:0.25,spanGaps:true,pointRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:function(v){return v+'%';}}},x:{ticks:{maxRotation:45}}}}});
+        }
     }
 }
 function renderRisk(cans,caps,hazards){
@@ -322,8 +349,9 @@ function closeAeCapReviewModal(){
     if(body) body.innerHTML='';
 }
 function renderSituationalBanner(){
-    // simplified contextual chips
-    const health=(gPsoeList[0]&&gPsoeList[0].overall_score_pct>=70)?'Healthy':'Attention';
+    // simplified contextual chips (SMS health from Module A maturity)
+    const matScore=(gMaturity&&gMaturity.overall_score!=null)?gMaturity.overall_score:null;
+    const health=(matScore!=null&&matScore>=70)?'Healthy':'Attention';
     document.getElementById('sitHealth').textContent=health; document.getElementById('sitHealth').className='chip '+(health==='Healthy'?'chip-green':'chip-amber');
     const exp=(gCans.filter(c=>{const s=c.initial_sra||{}; const idx=s.risk_index||0; return idx>15;}).length);
     document.getElementById('sitExposure').textContent=exp?exp+' high':'None';
