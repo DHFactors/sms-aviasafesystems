@@ -132,10 +132,34 @@
 </div>
 
 <div id="aeDecisionModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(11,42,66,0.55);z-index:1000;justify-content:center;align-items:center;">
-    <div style="background:#fff;padding:1.5rem;border-radius:14px;max-width:440px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:center;">
-        <h3 style="margin:0 0 0.5rem;color:#0b2a42;font-size:1rem;"><i class="fas fa-gavel" style="color:#d4af37;"></i> Executive Decision — Coming Soon</h3>
-        <p style="font-size:0.85rem;color:#475569;">Digital signature capture and decision recording are under development. Full workflow available in the next release.</p>
-        <button class="btn btn-outline" onclick="closeAeDecisionModal()" style="margin-top:0.75rem;">Close</button>
+    <div style="background:#fff;padding:1.5rem;border-radius:14px;max-width:480px;width:92%;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:left;">
+        <h3 style="margin:0 0 0.5rem;color:#0b2a42;font-size:1rem;"><i class="fas fa-gavel" style="color:#d4af37;"></i> Executive Decision</h3>
+        <p id="aeDecisionContext" style="font-size:0.82rem;color:#64748b;margin:0 0 1rem;"></p>
+        <div style="margin-bottom:0.9rem;">
+            <label for="aeDecisionType" style="display:block;font-size:0.78rem;font-weight:700;color:#475569;margin-bottom:0.3rem;">Decision</label>
+            <select id="aeDecisionType" style="width:100%;padding:0.5rem 0.6rem;border:1px solid #cbd5e1;border-radius:8px;font-size:0.85rem;background:#fff;">
+                <option value="acknowledge" title="Accept the CAP as scoped and move it to EIP">Acknowledge</option>
+                <option value="direct" title="Direct further action — notes are required">Direct</option>
+                <option value="continue" title="Continue monitoring — notes are required">Continue</option>
+            </select>
+        </div>
+        <div style="margin-bottom:0.9rem;">
+            <label for="aeDecisionNotes" style="display:block;font-size:0.78rem;font-weight:700;color:#475569;margin-bottom:0.3rem;">Notes</label>
+            <textarea id="aeDecisionNotes" rows="3" placeholder="Required for Direct and Continue (min 20 characters)" style="width:100%;padding:0.5rem 0.6rem;border:1px solid #cbd5e1;border-radius:8px;font-size:0.85rem;box-sizing:border-box;resize:vertical;"></textarea>
+        </div>
+        <div style="margin-bottom:0.9rem;">
+            <label for="aeDecisionSignatureName" style="display:block;font-size:0.78rem;font-weight:700;color:#475569;margin-bottom:0.3rem;">Type your name</label>
+            <input id="aeDecisionSignatureName" type="text" placeholder="Full name" autocomplete="off" style="width:100%;padding:0.5rem 0.6rem;border:1px solid #cbd5e1;border-radius:8px;font-size:0.85rem;box-sizing:border-box;">
+        </div>
+        <label style="display:flex;gap:0.5rem;align-items:flex-start;font-size:0.8rem;color:#475569;margin-bottom:0.9rem;cursor:pointer;">
+            <input type="checkbox" id="aeDecisionAttestation" style="margin-top:0.2rem;">
+            <span>I confirm this is my terminal decision as Accountable Executive. I understand it is recorded immutably and attributed to my account.</span>
+        </label>
+        <div id="aeDecisionError" style="display:none;font-size:0.8rem;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:0.5rem 0.7rem;margin-bottom:0.9rem;"></div>
+        <div style="display:flex;gap:0.6rem;justify-content:flex-end;">
+            <button type="button" class="btn btn-outline" onclick="closeAeDecisionModal()">Cancel</button>
+            <button type="button" id="aeDecisionSubmit" class="btn btn-approve" onclick="submitAeDecision()" disabled>Submit</button>
+        </div>
     </div>
 </div>
 
@@ -151,8 +175,9 @@
         <div id="aeCapReviewBody"></div>
         <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9;">
             <button type="button" onclick="closeAeCapReviewModal()" class="btn btn-outline">Close</button>
-            <button type="button" onclick="closeAeCapReviewModal();openAeDecisionModal()" class="btn btn-approve" style="background:#1e7e34;color:#fff;">Authorize</button>
-            <button type="button" onclick="closeAeCapReviewModal();openAeDecisionModal()" class="btn btn-risk" style="background:#b45309;color:#fff;">Accept Risk</button>
+            <button type="button" onclick="closeAeCapReviewModal();openAeDecisionModal(currentDecisionCapId,'acknowledge')" class="btn btn-approve" style="background:#1e7e34;color:#fff;">Acknowledge</button>
+            <button type="button" onclick="closeAeCapReviewModal();openAeDecisionModal(currentDecisionCapId,'direct')" class="btn btn-outline">Direct</button>
+            <button type="button" onclick="closeAeCapReviewModal();openAeDecisionModal(currentDecisionCapId,'continue')" class="btn btn-risk" style="background:#b45309;color:#fff;">Continue</button>
         </div>
     </div>
 </div>
@@ -192,7 +217,7 @@ window.SHELL_CONFIG = {
 <script src="/js/shell.js"></script>
 <script>
 // Minimalist AE — reuses ae-dashboard.html logic but hides non-executive panels
-let myEmail=null, myDomain=null, charts={}, gPsoeList=[], gCans=[], gCaps=[], gHazards=[], gReports=[], gOverlays={};
+let myEmail=null, myDomain=null, charts={}, gPsoeList=[], gCans=[], gCaps=[], gHazards=[], gReports=[], gOverlays={}, currentDecisionCapId=null;
 function isDemoSession(){ return !!(window.DEMO_CONTEXT && window.DEMO_CONTEXT.archetypeId); }
 firebase.auth().onAuthStateChanged(async function(user){
     if(!user){ window.location.href='/login.html'; return; }
@@ -346,7 +371,7 @@ function renderEscalations(caps){
     const queue=(caps||[]).filter(c=>c.escalated_to_ae).sort((a,b)=>new Date(b.escalated_at||0)-new Date(a.escalated_at||0));
     const el=document.getElementById('escalationQueue');
     if(!queue.length){ el.innerHTML='<div class="empty">No escalated CAPs — all clear.</div>'; } else {
-        el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;"><span onclick="openAeCapReviewModal(\''+c.id+'\')" style="color:#1a6b8a;text-decoration:underline;cursor:pointer;" role="button" tabindex="0">'+(c.cap_reference||c.id)+'</span> <span style="color:#64748b;font-weight:400;">· '+ (c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+c.id+'\',\'authorize\')">Authorize</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+c.id+'\',\'accept_risk\')">Accept Risk</button></div></div>').join('');
+        el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;"><span onclick="openAeCapReviewModal(\''+aeEsc(c.id)+'\')" style="color:#1a6b8a;text-decoration:underline;cursor:pointer;" role="button" tabindex="0">'+aeEsc(c.cap_reference||c.id)+'</span> <span style="color:#64748b;font-weight:400;">· '+ aeEsc(c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+aeEsc(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+aeEsc(c.id)+'\',\'acknowledge\')">Acknowledge</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+aeEsc(c.id)+'\',\'continue\')">Continue</button></div></div>').join('');
     }
     // decision ledger (simplified)
     const ledger=document.getElementById('decisionLedger');
@@ -354,18 +379,98 @@ function renderEscalations(caps){
     ledger.innerHTML=decided.length?decided.map(c=>'<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>'+c.cap_reference+'</strong> — '+ (c.ae_signature||'')+' on '+fmtDate(c.ae_signed_at)+'</div>').join(''):'<div class="empty">No executive decisions yet.</div>';
 }
 function decideEscalation(capId, decision){
-    openAeDecisionModal();
+    currentDecisionCapId=capId;
+    openAeDecisionModal(capId, decision);
 }
-function openAeDecisionModal(){
+function aeDecisionCapLabel(capId){
+    var found=(gCaps||[]).find(function(c){ return String(c.id)===String(capId); });
+    if(!found) return String(capId||'');
+    return (found.cap_reference||found.id)+(found.department?(' · '+found.department):'');
+}
+function openAeDecisionModal(capId, decisionType){
+    currentDecisionCapId=capId||null;
+    var typeEl=document.getElementById('aeDecisionType');
+    var ctxEl=document.getElementById('aeDecisionContext');
+    var notesEl=document.getElementById('aeDecisionNotes');
+    var nameEl=document.getElementById('aeDecisionSignatureName');
+    var attEl=document.getElementById('aeDecisionAttestation');
+    var errEl=document.getElementById('aeDecisionError');
+    if(typeEl&&decisionType) typeEl.value=decisionType;
+    if(ctxEl) ctxEl.textContent=currentDecisionCapId?aeDecisionCapLabel(currentDecisionCapId):'';
+    if(notesEl) notesEl.value='';
+    if(nameEl){
+        var dn=null;
+        try{ dn=firebase.auth().currentUser&&firebase.auth().currentUser.displayName; }catch(e){}
+        nameEl.value=dn||'';
+    }
+    if(attEl) attEl.checked=false;
+    if(errEl){ errEl.textContent=''; errEl.style.display='none'; }
+    validateAeDecisionForm();
     var m=document.getElementById('aeDecisionModal');
     if(m) m.style.display='flex';
 }
 function closeAeDecisionModal(){
     var m=document.getElementById('aeDecisionModal');
     if(m) m.style.display='none';
+    currentDecisionCapId=null;
+}
+function validateAeDecisionForm(){
+    var typeEl=document.getElementById('aeDecisionType');
+    var notesEl=document.getElementById('aeDecisionNotes');
+    var nameEl=document.getElementById('aeDecisionSignatureName');
+    var attEl=document.getElementById('aeDecisionAttestation');
+    var btn=document.getElementById('aeDecisionSubmit');
+    var type=typeEl?typeEl.value:'';
+    var notes=notesEl?notesEl.value.trim():'';
+    var name=nameEl?nameEl.value.trim():'';
+    var att=attEl?!!attEl.checked:false;
+    var ok=!!type&&!!name&&att;
+    if(ok&&(type==='direct'||type==='continue')) ok=notes.length>=20;
+    if(btn) btn.disabled=!ok;
+    return ok;
+}
+['aeDecisionType','aeDecisionNotes','aeDecisionSignatureName','aeDecisionAttestation'].forEach(function(id){
+    document.addEventListener('DOMContentLoaded',function(){
+        var el=document.getElementById(id);
+        if(!el) return;
+        el.addEventListener('input',validateAeDecisionForm);
+        el.addEventListener('change',validateAeDecisionForm);
+    });
+});
+async function submitAeDecision(){
+    var typeEl=document.getElementById('aeDecisionType');
+    var notesEl=document.getElementById('aeDecisionNotes');
+    var nameEl=document.getElementById('aeDecisionSignatureName');
+    var errEl=document.getElementById('aeDecisionError');
+    var capId=currentDecisionCapId;
+    var fail=function(msg){ if(errEl){ errEl.textContent=msg; errEl.style.display='block'; } };
+    if(!capId){ fail('No CAP selected. Close and try again.'); return; }
+    if(!validateAeDecisionForm()){ fail('Complete the decision type, your name, the attestation, and notes (min 20 characters) for Direct and Continue.'); return; }
+    var type=typeEl.value;
+    var userNotes=notesEl.value.trim();
+    var name=nameEl.value.trim();
+    var composed='Signed by '+name+' (AE attestation).'+(userNotes?' '+userNotes:'');
+    composed=composed.trim();
+    var btn=document.getElementById('aeDecisionSubmit');
+    if(btn) btn.disabled=true;
+    try{
+        await ApiClient.post('/api/v1/cans/caps/'+encodeURIComponent(capId)+'/ae-decision',{decision_type:type,notes:composed});
+        closeAeDecisionModal();
+        alert('Executive decision recorded.');
+        loadDashboard();
+    }catch(e){
+        var msg=(e&&e.message)||'Decision failed. Please try again.';
+        if(msg.toLowerCase().indexOf('already recorded')!==-1||msg.toLowerCase().indexOf('immutable')!==-1){
+            msg='This CAP has already been decided. AE decisions are terminal and cannot be changed.';
+        }
+        fail(msg);
+    }finally{
+        validateAeDecisionForm();
+    }
 }
 function aeEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 async function openAeCapReviewModal(capId, queueRow){
+    currentDecisionCapId=capId;
     var q=queueRow||{};
     if(!q.cap_reference){
         var found=(gCaps||[]).find(function(c){ return String(c.id)===String(capId); });
