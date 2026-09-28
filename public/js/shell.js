@@ -546,6 +546,28 @@
         });
         if (hasNavConfig) applyConfigItemVisibility();
         applyConfigNavVisibility();
+        applyDeptHeaderVisibility();
+    }
+
+    // Department personas (DEPT_ADMIN + STAFF) must not see the Home link
+    // (it points at /safety.html, the Safety Manager landing page) and the
+    // brand logo routes them to My Tasks instead. Runs inside
+    // applyNavVisibility so it re-applies once auth claims resolve —
+    // buildHeader itself runs before claims are available, so gating there
+    // would never see the role. Fail-open: when nav-config is absent or the
+    // role is still unknown, Home/brand stay as built (other roles
+    // unaffected — only DEPT_ADMIN/STAFF are ever rewritten).
+    function applyDeptHeaderVisibility() {
+        if (typeof getUserRoleType !== 'function') return;
+        var roleType;
+        try {
+            roleType = getUserRoleType(buildNavUser());
+        } catch (e) { return; }
+        var isDept = roleType === 'DEPT_ADMIN' || roleType === 'STAFF';
+        var home = document.getElementById('shellHomeLink');
+        if (home) home.style.display = isDept ? 'none' : '';
+        var brandLink = document.getElementById('shellBrandLink');
+        if (brandLink) brandLink.href = isDept ? '/dashboard/my-tasks.html' : '/safety.html';
     }
 
     function buildHeader() {
@@ -563,6 +585,7 @@
         left.className = 'header-left';
         const brand = document.createElement('a');
         brand.className = 'header-brand';
+        brand.id = 'shellBrandLink';
         brand.href = '/safety.html';
         brand.innerHTML = '<span class="logo-icon">\u2708\uFE0F</span> AviaSAFE';
         left.appendChild(brand);
@@ -604,6 +627,7 @@
         if (!isLandingPage) {
             const homeLink = document.createElement('a');
             homeLink.href = '/safety.html';
+            homeLink.id = 'shellHomeLink';
             homeLink.className = 'nav-link nav-home';
             const homeIcon = document.createElement('span');
             homeIcon.className = 'home-icon';

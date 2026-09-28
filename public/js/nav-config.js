@@ -42,7 +42,9 @@
 'use strict';
 
 var NAV_CONFIG = {
-    // ─── DASHBOARD ─── (All roles; AE sees ONLY this group — narrow menu)
+    // ─── DASHBOARD ─── (All roles except department personas; AE sees ONLY
+    // this group — narrow menu. DEPT_ADMIN/STAFF get My Tasks from their
+    // Workspace group instead — see the dashboard skip in getVisibleNav.)
     dashboard: {
         label: 'Dashboard',
         icon: 'fa-gauge-high',
@@ -86,15 +88,18 @@ var NAV_CONFIG = {
         ]
     },
 
-    // ─── DEPARTMENT WORKSPACE ─── (DEPT_ADMIN only: narrow operational
-    // scope. My Tasks arrives via the Dashboard group; historical
-    // department data lives here. No Reports tab — reports are SAFETY-only.)
+    // ─── DEPARTMENT WORKSPACE ─── (DEPT_ADMIN + STAFF: narrow operational
+    // scope. Both department personas land on My Tasks and share this nav;
+    // they differ in action-level authority, not navigation. No Reports
+    // tab — reports are SAFETY-only. SAFETY_OFFICER references elsewhere
+    // are legacy (role retired in favor of STAFF) — untouched here.)
     dept_workspace: {
         label: 'Workspace',
         icon: 'fa-briefcase',
-        roles: ['DEPT_ADMIN'],
+        roles: ['DEPT_ADMIN', 'STAFF'],
         module: 'module_b_srm',
         items: [
+            { id: 'dept-tasks', href: '/dashboard/my-tasks.html', label: 'My Tasks', badge: true },
             { id: 'dept-register', href: '/dashboard/dept-master-register.html', label: 'Master Register' },
         ]
     },
@@ -204,7 +209,9 @@ function moduleEnabled(normalized, flag) {
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 // Canonical role literals (RBAC_MODEL.md §1) + legacy aliases → nav role type.
-// Role types: SUPER | CAAN | AE | SAFETY | DEPT_ADMIN | SAG | ALL.
+// Role types: SUPER | CAAN | AE | SAFETY | DEPT_ADMIN | STAFF | SAG | ALL.
+// STAFF shares the department Workspace nav with DEPT_ADMIN (same nav,
+// same scope; action-level authority differs, not navigation).
 // SAG_MEMBER → SAG (no dashboard in scope — hidden from nav, P4-6.2).
 // ACCOUNTABLE_EXECUTIVE → AE (narrow menu, P4-6.1).
 function getUserRoleType(user) {
@@ -222,6 +229,12 @@ function getUserRoleType(user) {
     if (email.indexOf('ae@') === 0 || email.indexOf('ae.') === 0) return 'AE';
     if (role === 'AIRLINE_ADMIN' || role === 'TENANT_ADMIN' || role === 'SAFETY_OFFICER') return 'SAFETY';
     if (role === 'DEPT_ADMIN') return 'DEPT_ADMIN';
+    // STAFF (department staff, role-based emails) shares the department
+    // Workspace nav with DEPT_ADMIN. Mapped explicitly (not left to the
+    // ALL fallthrough) so Workspace roles ['DEPT_ADMIN','STAFF'] match.
+    // NOTE: frontend-tests/test_nav_config.js:36 asserts STAFF → ALL and
+    // will need updating to STAFF → STAFF (test file untouched here).
+    if (role === 'STAFF') return 'STAFF';
     return 'ALL';
 }
 
@@ -243,6 +256,14 @@ function getVisibleNav(user, moduleAccess) {
 
     var keys = Object.keys(NAV_CONFIG);
     for (var i = 0; i < keys.length; i++) {
+        // Department personas (DEPT_ADMIN + STAFF) live in their Workspace
+        // group — hide the shared Dashboard wrapper so My Tasks appears only
+        // once. Done here (not by narrowing the group's ['ALL'] roles)
+        // because 'ALL' is a wildcard: removing it would also hide Dashboard
+        // from genuinely unknown roles (USER/legacy fallthrough), while
+        // keeping it would still match department roles. Targeted skip
+        // preserves wildcard semantics for everyone else.
+        if ((roleType === 'DEPT_ADMIN' || roleType === 'STAFF') && keys[i] === 'dashboard') continue;
         var group = NAV_CONFIG[keys[i]];
         // Check if group is visible for this role
         if (group.roles.indexOf('ALL') === -1 && group.roles.indexOf(roleType) === -1) continue;

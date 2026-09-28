@@ -5,6 +5,8 @@
  *  - ACCOUNTABLE_EXECUTIVE → AE with the NARROW menu only
  *    (Dashboard/Executive, Action Queues/My Tasks, Trends)
  *  - SAG_MEMBER → hidden from nav (no dashboard in scope)
+ *  - STAFF → STAFF, sharing the department Workspace nav with DEPT_ADMIN
+ *    (Workspace/My Tasks + Master Register only, no Dashboard wrapper)
  *  - Canonical role literals + legacy aliases resolve correctly
  *  - Module flag gating (canonical + legacy keys) hides tagged items
  *  - All canonical module flags recognized
@@ -31,9 +33,9 @@ function test_role_type_mapping() {
     assert.strictEqual(getUserRoleType({ role: 'AIRLINE_ADMIN' }), 'SAFETY');
     assert.strictEqual(getUserRoleType({ role: 'SAFETY_OFFICER' }), 'SAFETY');
     assert.strictEqual(getUserRoleType({ role: 'DEPT_ADMIN' }), 'DEPT_ADMIN');
+    assert.strictEqual(getUserRoleType({ role: 'STAFF' }), 'STAFF');
     assert.strictEqual(getUserRoleType({ role: 'ACCOUNTABLE_EXECUTIVE' }), 'AE');
     assert.strictEqual(getUserRoleType({ role: 'SAG_MEMBER' }), 'SAG');
-    assert.strictEqual(getUserRoleType({ role: 'STAFF' }), 'ALL');
     assert.strictEqual(getUserRoleType({ role: 'USER' }), 'ALL');
     // ae@ email heuristic retained as fallback for legacy AE accounts.
     assert.strictEqual(getUserRoleType({ role: 'TENANT_ADMIN', email: 'ae@buddha-air.com' }), 'AE');
@@ -71,6 +73,34 @@ function test_ae_email_fallback_same_menu() {
     const viaLiteral = groupsOf(getVisibleNav({ role: 'ACCOUNTABLE_EXECUTIVE', email: 'x@y.com' }));
     const viaEmail = groupsOf(getVisibleNav({ role: 'TENANT_ADMIN', email: 'ae@buddha-air.com' }));
     assert.deepStrictEqual(viaEmail, viaLiteral, 'ae@ fallback matches the literal AE menu');
+}
+
+// ---------------------------------------------------------------------------
+// Department Workspace (DEPT_ADMIN + STAFF share the same nav and scope;
+// both land on My Tasks; action-level authority differs, not navigation)
+// ---------------------------------------------------------------------------
+
+function test_dept_workspace_nav() {
+    for (const role of ['DEPT_ADMIN', 'STAFF']) {
+        const visible = getVisibleNav({ role, email: 'camo@sitaair.com.np' });
+        const groups = groupsOf(visible);
+        assert.deepStrictEqual(Object.keys(groups), ['Workspace'], role + ' sees ONLY the Workspace group');
+        assert.deepStrictEqual(
+            groups.Workspace,
+            ['dept-tasks', 'dept-register'],
+            role + ' Workspace = My Tasks + Master Register'
+        );
+        assert.ok(!groups.Dashboard, role + ' does NOT see the Dashboard wrapper');
+        const tasks = visible[0].items.find((i) => i.id === 'dept-tasks');
+        assert.strictEqual(tasks.href, '/dashboard/my-tasks.html', role + ' My Tasks target');
+        const reg = visible[0].items.find((i) => i.id === 'dept-register');
+        assert.strictEqual(reg.href, '/dashboard/dept-master-register.html', role + ' Master Register target');
+    }
+    // Same nav with and without module filtering (Workspace module tag is
+    // module_b_srm; department tenants carry it — but the group must also
+    // render for callers that pass no moduleAccess, e.g. shell.js).
+    const noModules = groupsOf(getVisibleNav({ role: 'STAFF', email: 'camo@sitaair.com.np' }));
+    assert.deepStrictEqual(Object.keys(noModules), ['Workspace'], 'STAFF Workspace without moduleAccess');
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +195,7 @@ function main() {
     test_role_type_mapping();
     test_ae_narrow_menu();
     test_ae_email_fallback_same_menu();
+    test_dept_workspace_nav();
     test_sag_member_hidden();
     test_canonical_flags_exact();
     test_module_gating_hides_groups();
@@ -172,7 +203,7 @@ function main() {
     test_legacy_module_keys_mapped();
     test_no_module_access_arg_backward_compatible();
     test_regulator_untouched();
-    console.log('test_nav_config: 10 tests passed (AE narrow menu, SAG hidden, canonical flags, module gating, back-compat)');
+    console.log('test_nav_config: 11 tests passed (AE narrow menu, dept Workspace, SAG hidden, canonical flags, module gating, back-compat)');
 }
 
 main();

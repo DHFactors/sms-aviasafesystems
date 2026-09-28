@@ -77,7 +77,7 @@
     <div class="header-bar">
         <h2><i class="fas fa-list-check"></i> Assigned CANs & CAPs</h2>
         <div>
-            <a id="submitReportBtn" href="/reports/new.html" class="btn btn-outline btn-sm" style="display:none;margin-right:0.5rem;"><i class="fas fa-plus"></i> Submit Report</a>
+            <a id="submitReportBtn" href="/report/mor.html" class="btn btn-outline btn-sm" style="display:none;margin-right:0.5rem;"><i class="fas fa-plus"></i> Submit MOR</a>
             <a id="masterRegisterBtn" href="/dashboard/master-register.html" class="btn btn-outline btn-sm"><i class="fas fa-table"></i> Master Register</a>
         </div>
     </div>
@@ -167,15 +167,16 @@ firebase.auth().onAuthStateChanged(async function(user) {
         myEmail = user.email;
         myDepartment = (tokenResult.claims && tokenResult.claims.department) || '';
         const myRole = (tokenResult.claims && tokenResult.claims.role) || '';
-        // Role-conditional header actions: DEPT_ADMIN works on the
-        // department register and submits via /report.html; everyone else
-        // uses the unified register. Submit Report stays DEPT-only.
+        // Role-conditional header actions: department personas (DEPT_ADMIN +
+        // STAFF, same nav and scope) work on the department register and
+        // submit MOR only via /report/mor.html; everyone else uses the
+        // unified register. Submit MOR stays department-only.
         const regBtn = document.getElementById('masterRegisterBtn');
         if (regBtn) regBtn.href = myRole === 'DEPT_ADMIN'
             ? '/dashboard/dept-master-register.html'
             : '/dashboard/master-register.html';
         const repBtn = document.getElementById('submitReportBtn');
-        if (repBtn && myRole === 'DEPT_ADMIN') repBtn.style.display = '';
+        if (repBtn && (myRole === 'DEPT_ADMIN' || myRole === 'STAFF')) repBtn.style.display = '';
         const t = (tokenResult.claims && tokenResult.claims.tenant_id) || '';
         if (t && typeof updateShellTenant === 'function') {
             updateShellTenant(t.replace(/-/g, ' ').toUpperCase(), myDepartment || undefined);
