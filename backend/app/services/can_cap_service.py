@@ -901,6 +901,36 @@ class CanCapService:
                 return None
             return _cap_to_dict(row)
 
+    def get_cap_for_decision_record(self, cap_id: str, user: dict) -> Optional[dict]:
+        """CAP row for the AE decision PDF: like get_cap but WITHOUT the
+        ae_signature / closed_signature flattening step.
+
+        Returns the raw ae_signature JSONB ({name, decision, notes,
+        signed_by, signed_at}) and the raw ae_signed_at datetime so the
+        decision record renders authoritatively. All other serialization
+        (UUID stringification, tenant_slug, timestamps) matches
+        _cap_to_dict; only the final flattening loop is skipped.
+        """
+        return run(self._get_cap_for_decision_record_async(cap_id, user))
+
+    async def _get_cap_for_decision_record_async(self, cap_id: str, user: dict) -> Optional[dict]:
+        tid = None
+        if user.get("role") not in settings.CROSS_TENANT_ROLES:
+            tid = register_tenant(self.tenant_id)
+        async with session_scope() as session:
+            row = (await session.execute(_cap_lookup_stmt(tid, cap_id))).scalars().first()
+            if not row:
+                return None
+            data = {}
+            for col in Cap.__table__.columns:
+                value = getattr(row, col.name)
+                if isinstance(value, uuid.UUID):
+                    value = str(value)
+                data[col.name] = value
+            data["tenant_id"] = tenant_slug(row.tenant_id)
+            _serialize_timestamps(data)
+            return data
+
     def update_cap(self, cap_id: str, payload: dict, user: dict) -> Optional[dict]:
         return run(self._update_cap_async(cap_id, payload, user))
 

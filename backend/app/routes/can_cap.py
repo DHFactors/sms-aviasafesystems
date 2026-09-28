@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, Response
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional, List
 from loguru import logger
@@ -390,6 +390,59 @@ async def ae_decision(
             "data": _to_cap_response(updated)}
 
 
+def _safe_filename(value: str) -> str:
+    """Strip filename-unsafe characters from a CAP reference."""
+    import re
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "cap"))
+    return cleaned.strip("._") or "cap"
+
+
+@router.get("/caps/{cap_id}/decision.pdf", response_model=None)
+async def ae_decision_pdf(
+    cap_id: str,
+    request: Request,
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Authoritative PDF record of a terminal AE decision on a CAP.
+
+    Scoped strictly to the caller's own tenant. Only decided CAPs
+    (ae_signed_at set) render; anything else is a 404, never a 500.
+    """
+    if user.get("role") not in ("ACCOUNTABLE_EXECUTIVE", "TENANT_ADMIN"):
+        raise HTTPException(status_code=403,
+                            detail="Accountable Executive or Safety Manager role required")
+    if not user.get("tenant_id"):
+        raise HTTPException(status_code=403, detail="Tenant access required")
+    service = CanCapService(user["tenant_id"])
+    doc = service.get_cap_for_decision_record(cap_id, user)
+    if not doc:
+        raise HTTPException(status_code=404, detail="CAP not found")
+    if doc.get("ae_signed_at") is None:
+        raise HTTPException(status_code=404, detail="No AE decision recorded for this CAP.")
+    raw_signature = doc.get("ae_signature")
+    if not isinstance(raw_signature, dict):
+        raise HTTPException(status_code=404, detail="No AE decision recorded for this CAP.")
+    from app.services.pdf_canvas import render_ae_decision_pdf
+    pdf_bytes = render_ae_decision_pdf(doc, raw_signature, doc.get("ae_signed_at"))
+    ip, request_id = request_context(request)
+    log_audit(
+        action="CAP_AE_DECISION_PDF_DOWNLOADED",
+        user=user.get("email"),
+        tenant_id=user["tenant_id"],
+        target_type="cap",
+        target_id=cap_id,
+        ip=ip,
+        request_id=request_id,
+        metadata={"cap_reference": doc.get("cap_reference")},
+    )
+    filename = "ae-decision-{}.pdf".format(_safe_filename(doc.get("cap_reference") or cap_id))
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="{}"'.format(filename)},
+    )
+
+
 @router.get("/caps/{cap_id}/linked-findings", response_model=dict)
 async def get_linked_findings(
     cap_id: str,
@@ -615,6 +668,7 @@ def _to_cap_list_item(data: dict) -> dict:
         "escalated_at": data.get("escalated_at"),
         "escalation_reason": data.get("escalation_reason"),
         "ae_signature": bool(data.get("ae_signature")),
+        "ae_signed_at": data.get("ae_signed_at"),
         "ae_review_date": data.get("ae_review_date"),
         # Aggregate barrier health from the persisted Bow-Tie SRAM block
         "barrier_health": _barrier_health_summary(data),
