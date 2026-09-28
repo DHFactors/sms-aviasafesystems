@@ -116,9 +116,10 @@
                     <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
                         <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
                         <div id="decisionLedger" style="margin-top:0.5rem;"></div>
-                        <div style="display:flex;gap:0.5rem;margin-top:0.7rem;">
-                            <button class="btn btn-outline" onclick="exportDecisionLog('csv')" style="font-size:0.7rem;"><i class="fas fa-file-csv"></i> Export CSV</button>
-                            <button class="btn btn-outline" onclick="exportDecisionLog('pdf')" style="font-size:0.7rem;"><i class="fas fa-file-pdf"></i> PDF</button>
+                        <div style="display:flex;gap:0.5rem;margin-top:0.7rem;align-items:center;flex-wrap:wrap;">
+                            <button id="aeExportCsvBtn" class="btn btn-outline" onclick="exportDecisionLog('csv')" style="font-size:0.7rem;" disabled title="Select at least one decision to export"><i class="fas fa-file-csv"></i> Export CSV</button>
+                            <button id="aeExportPdfBtn" class="btn btn-outline" onclick="exportDecisionLog('pdf')" style="font-size:0.7rem;" disabled title="Select exactly one CAP to download its record"><i class="fas fa-file-pdf"></i> PDF</button>
+                            <span id="aeExportHint" style="font-size:0.72rem;color:#94a3b8;">Select at least one decision to export.</span>
                         </div>
                     </div>
                 </div>
@@ -218,6 +219,7 @@ window.SHELL_CONFIG = {
 <script>
 // Minimalist AE — reuses ae-dashboard.html logic but hides non-executive panels
 let myEmail=null, myDomain=null, charts={}, gPsoeList=[], gCans=[], gCaps=[], gHazards=[], gReports=[], gOverlays={}, currentDecisionCapId=null;
+const AE_LEDGER_N=3; let aeLedgerSelected=new Set(); let aeLedgerExpanded=false; let aeLedgerDetails={};
 function isDemoSession(){ return !!(window.DEMO_CONTEXT && window.DEMO_CONTEXT.archetypeId); }
 firebase.auth().onAuthStateChanged(async function(user){
     if(!user){ window.location.href='/login.html'; return; }
@@ -373,10 +375,153 @@ function renderEscalations(caps){
     if(!queue.length){ el.innerHTML='<div class="empty">No escalated CAPs — all clear.</div>'; } else {
         el.innerHTML=queue.map(c=>'<div style="border:1px solid #e2e8f0;border-radius:8px;padding:0.8rem;margin-bottom:0.6rem;"><div style="font-weight:700;font-size:0.85rem;"><span onclick="openAeCapReviewModal(\''+aeEsc(c.id)+'\')" style="color:#1a6b8a;text-decoration:underline;cursor:pointer;" role="button" tabindex="0">'+aeEsc(c.cap_reference||c.id)+'</span> <span style="color:#64748b;font-weight:400;">· '+ aeEsc(c.department||'—')+'</span></div><div style="font-size:0.78rem;color:#475569;margin:0.3rem 0;">'+aeEsc(c.escalation_reason||'—')+'</div><div style="display:flex;gap:0.4rem;"><button class="btn btn-approve" onclick="decideEscalation(\''+aeEsc(c.id)+'\',\'acknowledge\')">Acknowledge</button><button class="btn" style="background:#b45309;color:#fff;" onclick="decideEscalation(\''+aeEsc(c.id)+'\',\'continue\')">Continue</button></div></div>').join('');
     }
-    // decision ledger (simplified)
+    // decision ledger (real decision records w/ multi-select + expand)
+    aeLedgerSelected=new Set(); aeLedgerExpanded=false; aeLedgerDetails={};
+    renderAeLedger(caps).catch(function(e){ console.error('AE ledger render failed:',e); });
+}
+function aeDecisionWord(raw){
+    var v=String(raw||'').trim().toLowerCase();
+    if(v==='acknowledge') return 'Acknowledge';
+    if(v==='direct') return 'Direct';
+    if(v==='continue') return 'Continue';
+    return String(raw||'—');
+}
+async function renderAeLedger(caps){
     const ledger=document.getElementById('decisionLedger');
-    const decided=(caps||[]).filter(c=>c.ae_signature).slice(0,3);
-    ledger.innerHTML=decided.length?decided.map(c=>'<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;"><strong>'+c.cap_reference+'</strong> — '+ (c.ae_signature||'')+' on '+fmtDate(c.ae_signed_at)+'</div>').join(''):'<div class="empty">No executive decisions yet.</div>';
+    if(!ledger) return;
+    const decided=(caps||[]).filter(c=>c.ae_signed_at).sort(function(a,b){ return new Date(b.ae_signed_at||0)-new Date(a.ae_signed_at||0); });
+    if(!decided.length){ ledger.innerHTML='<div class="empty">No executive decisions yet.</div>'; aeLedgerUpdateButtons(); return; }
+    const shown=aeLedgerExpanded?decided:decided.slice(0,AE_LEDGER_N);
+    const settled=await Promise.all(shown.map(async function(c){
+        if(aeLedgerDetails[c.id]) return {c:c,detail:aeLedgerDetails[c.id].detail,sig:aeLedgerDetails[c.id].sig};
+        try{
+            const detail=await ApiClient.get('/api/v1/cans/caps/'+encodeURIComponent(c.id));
+            const sig=(detail&&detail.ae_signature&&typeof detail.ae_signature==='object')?detail.ae_signature:{};
+            aeLedgerDetails[c.id]={detail:detail||{},sig:sig};
+            return {c:c,detail:detail||{},sig:sig};
+        }catch(e){
+            console.warn('AE ledger detail unavailable for cap '+c.id+':',e);
+            return {c:c,detail:null,sig:null};
+        }
+    }));
+    let html='<div style="display:flex;align-items:center;gap:0.5rem;padding:0.3rem 0;border-bottom:1px solid #f1f5f9;font-size:0.75rem;color:#64748b;"><input type="checkbox" id="aeLedgerSelectAll" onclick="aeLedgerToggleAll(this.checked)" aria-label="Select all"><span>Select all</span></div>';
+    html+=settled.map(function(r){
+        const c=r.c;
+        if(!r.detail){
+            return '<div style="font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;color:#94a3b8;">'+aeEsc(c.cap_reference||c.id)+' — Decision record unavailable</div>';
+        }
+        const d=r.detail, s=r.sig;
+        const checked=aeLedgerSelected.has(c.id)?' checked':'';
+        const word=aeDecisionWord(s.decision);
+        const signer=s.name||s.signed_by||'—';
+        return '<div style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.8rem;padding:0.4rem 0;border-bottom:1px dashed #eef2f7;">'
+            +'<input type="checkbox"'+checked+' onclick="aeLedgerToggle(\''+aeEsc(c.id)+'\',this.checked)" aria-label="Select '+aeEsc(d.cap_reference||c.id)+'">'
+            +'<span><strong>'+aeEsc(d.cap_reference||c.cap_reference||c.id)+'</strong> · '+aeEsc(d.department||c.department||'—')+' · '+aeEsc(word)+' · '+aeEsc(signer)+' · '+aeEsc(fmtDate(c.ae_signed_at))+'</span></div>';
+    }).join('');
+    if(decided.length>AE_LEDGER_N){
+        html+='<div style="padding:0.4rem 0;"><button type="button" class="btn btn-outline btn-sm" style="font-size:0.72rem;" onclick="aeLedgerToggleExpand()">'+(aeLedgerExpanded?'Collapse':'View all ('+decided.length+')')+'</button></div>';
+    }
+    ledger.innerHTML=html;
+    const allBox=document.getElementById('aeLedgerSelectAll');
+    if(allBox){
+        const ids=shown.map(function(c){return c.id;});
+        const n=ids.filter(function(id){return aeLedgerSelected.has(id);}).length;
+        allBox.checked=n>0&&n===ids.length;
+        allBox.indeterminate=n>0&&n<ids.length;
+    }
+    aeLedgerUpdateButtons();
+}
+function aeLedgerToggle(id, on){
+    if(on) aeLedgerSelected.add(id); else aeLedgerSelected.delete(id);
+    renderAeLedger(gCaps).catch(function(e){ console.error('AE ledger render failed:',e); });
+}
+function aeLedgerShownIds(){
+    const decided=(gCaps||[]).filter(c=>c.ae_signed_at).sort(function(a,b){ return new Date(b.ae_signed_at||0)-new Date(a.ae_signed_at||0); });
+    return (aeLedgerExpanded?decided:decided.slice(0,AE_LEDGER_N)).map(function(c){ return c.id; });
+}
+function aeLedgerToggleAll(on){
+    aeLedgerShownIds().forEach(function(id){ if(on) aeLedgerSelected.add(id); else aeLedgerSelected.delete(id); });
+    renderAeLedger(gCaps).catch(function(e){ console.error('AE ledger render failed:',e); });
+}
+function aeLedgerToggleExpand(){
+    aeLedgerExpanded=!aeLedgerExpanded;
+    renderAeLedger(gCaps).catch(function(e){ console.error('AE ledger render failed:',e); });
+}
+function aeLedgerUpdateButtons(){
+    const n=aeLedgerSelected.size;
+    const csvBtn=document.getElementById('aeExportCsvBtn');
+    const pdfBtn=document.getElementById('aeExportPdfBtn');
+    const hint=document.getElementById('aeExportHint');
+    if(csvBtn){
+        csvBtn.disabled=n<1;
+        if(n<1) csvBtn.setAttribute('title','Select at least one decision to export');
+        else csvBtn.setAttribute('title','Export '+n+' selected decision'+(n>1?'s':'')+' as CSV');
+    }
+    if(pdfBtn){
+        pdfBtn.disabled=n!==1;
+        if(n!==1) pdfBtn.setAttribute('title','Select exactly one CAP to download its record');
+        else pdfBtn.setAttribute('title','Download the AE decision record (PDF)');
+    }
+    if(hint) hint.style.display=n<1?'':'none';
+}
+function aeCsvCell(v){
+    const s=String(v==null?'':v);
+    return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+}
+async function exportDecisionLog(kind){
+    try{
+        const ids=Array.from(aeLedgerSelected);
+        if(kind==='pdf'){
+            if(ids.length!==1) return;
+            const id=ids[0];
+            const token=await ApiClient._getToken();
+            if(!token){ alert('Sign-in required to download the decision record.'); return; }
+            const url=ApiClient._baseUrl()+'/api/v1/cans/caps/'+encodeURIComponent(id)+'/decision.pdf';
+            const res=await fetch(url,{method:'GET',headers:{'Authorization':'Bearer '+token,'Accept':'application/pdf'}});
+            if(!res.ok){
+                let detail='HTTP '+res.status;
+                try{ const j=await res.clone().json(); detail=j.detail||detail; }catch(_){}
+                throw new Error(detail);
+            }
+            const blob=await res.blob();
+            const cached=aeLedgerDetails[id]||{};
+            const ref=((cached.detail||{}).cap_reference)||id;
+            const safe=String(ref).replace(/[\/\"\\\x00-\x1f]/g,'_')||id;
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download='ae-decision-'+safe+'.pdf';
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(a.href);
+        }else if(kind==='csv'){
+            if(!ids.length) return;
+            const rows=[['cap_reference','department','decision','signer_name','signer_email','signed_at','notes']];
+            ids.forEach(function(id){
+                const cached=aeLedgerDetails[id]||{};
+                const d=cached.detail||{}, s=cached.sig||{};
+                const listRow=(gCaps||[]).find(function(c){ return String(c.id)===String(id); })||{};
+                rows.push([
+                    d.cap_reference||listRow.cap_reference||id,
+                    d.department||listRow.department||'',
+                    aeDecisionWord(s.decision),
+                    s.name||s.signed_by||'',
+                    s.signed_by||'',
+                    listRow.ae_signed_at||d.ae_signed_at||'',
+                    s.notes||''
+                ]);
+            });
+            const csv='\ufeff'+rows.map(function(r){ return r.map(aeCsvCell).join(','); }).join('\r\n');
+            const stamp=new Date().toISOString().slice(0,10).replace(/-/g,'');
+            const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+            const a=document.createElement('a');
+            a.href=URL.createObjectURL(blob);
+            a.download='ae-decisions-'+stamp+'.csv';
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(a.href);
+        }
+    }catch(e){
+        console.error('AE decision export failed:',e);
+        alert('Export failed: '+((e&&e.message)||e));
+    }
 }
 function decideEscalation(capId, decision){
     currentDecisionCapId=capId;
