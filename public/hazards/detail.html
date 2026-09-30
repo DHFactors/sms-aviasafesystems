@@ -394,30 +394,82 @@ async function confirmReopen() {
     }
 }
 
+function scrollToSramWorkspace() {
+    const el = document.getElementById('srmWorkspace');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function tolerabilityBadgeClass(tier) {
+    if (tier === 'LOW') return 'badge-low';
+    if (tier === 'HIGH') return 'badge-high';
+    if (tier === 'VERY HIGH') return 'badge-critical';
+    return 'badge-default';
+}
+
 function renderRiskDisplay(h) {
     const container = document.getElementById('riskDisplay');
     const ri = h.risk_index;
     const sev = h.severity;
     const prob = h.probability;
-    const rl = h.risk_level;
-    const ro = h.risk_outcome;
 
-    const rlNorm = rl === 'Very High' ? 'Very High' : rl === 'Low' ? 'Low' : 'High';
-    const bgClass = rlNorm === 'Very High' ? 'bg-very-high' : rlNorm === 'High' ? 'bg-high' : rlNorm === 'Low' ? 'bg-low' : 'bg-na';
-    const rlDisplay = rl || 'N/A';
+    // SRAM has assessed this hazard when it reported an assessment run and/or
+    // stored a risk profile. Both are absent for a registered-only hazard.
+    const profile = (h.sram_data && h.sram_data.risk_profile) || null;
+    const sramRan = h.srm_conducted === true || !!profile;
+
+    const fmt = (v) => (v !== null && v !== undefined && v !== '' ? v : '—');
+    const tolCell = (risk) => {
+        if (!risk) return '—';
+        const tier = risk.tier ? ` <span class="badge ${tolerabilityBadgeClass(risk.tier)}">${risk.tier}</span>` : '';
+        return fmt(risk.tolerability) + tier;
+    };
+
+    let assessmentHtml;
+    if (!sramRan) {
+        assessmentHtml = `
+            <div class="detail-grid">
+                <div class="detail-field full-width">
+                    <div class="label">Risk assessment</div>
+                    <div class="value">Not yet assessed.</div>
+                </div>
+                <div class="detail-field full-width">
+                    <div class="value" style="color:#64748b;">SRAM analysis has not been completed for this hazard. Tolerability and formal risk classification will be recorded once SRAM runs.</div>
+                </div>
+                <div class="detail-field full-width">
+                    <button type="button" class="action-btn action-btn-review" onclick="scrollToSramWorkspace()"><i class="fas fa-diagram-project"></i> Open SRAM analysis</button>
+                </div>
+            </div>`;
+    } else if (profile) {
+        const initial = profile.initial_risk || {};
+        const resultant = profile.resultant_risk || {};
+        assessmentHtml = `
+            <div class="detail-grid">
+                <div class="detail-field"><div class="label">Resultant Risk Index</div><div class="value">${fmt(resultant.index)}</div></div>
+                <div class="detail-field"><div class="label">Resultant Tolerability</div><div class="value">${tolCell(resultant)}</div></div>
+                <div class="detail-field"><div class="label">Initial Risk Index</div><div class="value">${fmt(initial.index)}</div></div>
+                <div class="detail-field"><div class="label">Initial Tolerability</div><div class="value">${tolCell(initial)}</div></div>
+            </div>`;
+    } else {
+        assessmentHtml = `
+            <div class="detail-grid">
+                <div class="detail-field full-width">
+                    <div class="label">Tolerability</div>
+                    <div class="value">see SRAM analysis below.</div>
+                </div>
+            </div>`;
+    }
 
     container.innerHTML = `
-        <div class="risk-index-display ${bgClass}">
-            <div class="value">${ri != null ? ri : '-'}</div>
+        <div class="risk-index-display bg-na">
+            <div class="value">${fmt(ri)}</div>
             <div class="label">Risk Index (Severity × Probability)</div>
-            <div class="sub">S=${sev != null ? sev : '-'} × P=${prob != null ? prob : '-'}</div>
+            <div class="sub">S=${fmt(sev)} × P=${fmt(prob)}</div>
         </div>
         <div class="detail-grid">
-            <div class="detail-field"><div class="label">Severity</div><div class="value">${sev != null ? sev : '-'}</div></div>
-            <div class="detail-field"><div class="label">Probability</div><div class="value">${prob != null ? prob : '-'}</div></div>
-            <div class="detail-field"><div class="label">Risk Level</div><div class="value"><span class="badge ${hazardRiskBadgeClass(rl)}">${rlDisplay}</span></div></div>
-            <div class="detail-field"><div class="label">Risk Outcome</div><div class="value">${ro || '-'}</div></div>
+            <div class="detail-field"><div class="label">Severity</div><div class="value">${fmt(sev)}</div></div>
+            <div class="detail-field"><div class="label">Probability</div><div class="value">${fmt(prob)}</div></div>
         </div>
+        ${assessmentHtml}
     `;
 }
 
