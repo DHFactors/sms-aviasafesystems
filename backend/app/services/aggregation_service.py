@@ -90,7 +90,11 @@ class AggregationService:
                 "title": d.get("title") or "",
                 "risk_level": d.get("risk_level"),
                 "initial_risk_level": d.get("risk_level"),
-                "initial_risk_level_value": d.get("risk_index"),
+                # risk_index can be NULL for un-assessed / legacy hazards;
+                # default to None (never fabricate 0, which would rank as the
+                # lowest risk). None is handled by the sort in
+                # get_state_risk_register.
+                "initial_risk_level_value": d.get("risk_index", None),
                 "created_at": created.isoformat() if created is not None else "",
             })
         return docs
@@ -123,8 +127,10 @@ class AggregationService:
         scores = await self.collect_maturity_scores(tenant_ids)
         if not scores:
             return {"error": "No maturity data", "count": 0}
-        # Average overall
-        avg_overall = round(sum(s["overall_maturity"] for s in scores) / len(scores), 1)
+        # Average overall — skip None values (heterogeneous data). With zero
+        # populated values the average is None (unknown), never a fabricated 0.
+        maturity_vals = [s["overall_maturity"] for s in scores if s.get("overall_maturity") is not None]
+        avg_overall = round(sum(maturity_vals) / len(maturity_vals), 1) if maturity_vals else None
         # Average component scores
         comp_avgs = {}
         for comp in ["component_1", "component_2", "component_3", "component_4"]:
@@ -205,8 +211,10 @@ class AggregationService:
                         })
             except Exception as e:
                 logger.warning(f"State risk failed for {tid}: {e}")
-        # Sort by risk_value desc
-        risks.sort(key=lambda x: x.get("risk_value", 0), reverse=True)
+        # Sort by risk_value desc; None risk_value sorts LAST (key flags
+        # False for None; under reverse=True the flagged True/numeric rows
+        # come first) so un-assessed / legacy rows cluster at the end.
+        risks.sort(key=lambda x: (x.get("risk_value") is not None, x.get("risk_value") or 0), reverse=True)
         return {"top_risks": risks[:10], "total_high_risks": len(risks)}
 
     async def get_benchmarking(self, tenant_id: str, tenant_ids: List[str]) -> Dict[str, Any]:

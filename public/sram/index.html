@@ -140,11 +140,11 @@
                 <div class="inline-form">
                     <input type="text" id="consequenceInput" placeholder="Consequence e.g. Forced landing">
                     <select id="consequenceSeverity" title="Severity A-E">
-                        <option value="A">A Negligible</option>
-                        <option value="B">B Minor</option>
-                        <option value="C" selected>C Moderate</option>
-                        <option value="D">D Major</option>
-                        <option value="E">E Catastrophic</option>
+                        <option value="A">A Catastrophic</option>
+                        <option value="B">B Hazardous</option>
+                        <option value="C" selected>C Major</option>
+                        <option value="D">D Minor</option>
+                        <option value="E">E Negligible</option>
                     </select>
                     <button class="btn btn-small" onclick="addConsequence()"><i class="fas fa-plus"></i> Add</button>
                 </div>
@@ -197,11 +197,11 @@
             <label>Current severity:</label>
             <select id="riskCurrentSev">
                 <option value="">Select</option>
-                <option value="A">A Negligible</option>
-                <option value="B">B Minor</option>
-                <option value="C">C Moderate</option>
-                <option value="D">D Major</option>
-                <option value="E">E Catastrophic</option>
+                <option value="A">A Catastrophic</option>
+                <option value="B">B Hazardous</option>
+                <option value="C">C Major</option>
+                <option value="D">D Minor</option>
+                <option value="E">E Negligible</option>
             </select>
             <label>Residual probability:</label>
             <select id="riskResultantProb">
@@ -215,11 +215,11 @@
             <label>Residual severity:</label>
             <select id="riskResultantSev">
                 <option value="">n/a</option>
-                <option value="A">A Negligible</option>
-                <option value="B">B Minor</option>
-                <option value="C">C Moderate</option>
-                <option value="D">D Major</option>
-                <option value="E">E Catastrophic</option>
+                <option value="A">A Catastrophic</option>
+                <option value="B">B Hazardous</option>
+                <option value="C">C Major</option>
+                <option value="D">D Minor</option>
+                <option value="E">E Negligible</option>
             </select>
             <button class="btn" onclick="calculateRisk()"><i class="fas fa-calculator"></i> Calculate</button>
         </div>
