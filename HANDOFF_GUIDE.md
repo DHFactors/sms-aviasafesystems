@@ -1,6 +1,6 @@
 # Starting a New Session — Handoff Guide
 
-## Current State (as of 2026-09-28)
+## Current State (as of 2026-09-30)
 - Platform: sms.aviasafesystems.com (production, live)
 - Backend: Render (auto-deploy on push to main)
 - Frontend: Firebase Hosting (auto-deploy via GitHub Actions on
@@ -9,9 +9,9 @@
 - Auth: Firebase Auth + App Check (reCAPTCHA Enterprise)
 - Platform: multi-tenant aviation SMS per ICAO Annex 19 3rd
   Edition, Doc 9859, Doc 10159
-- HEAD: cb4d875 (all pushed, working tree clean)
-- Latest Firebase Hosting deploy: #28 on cb4d875 (31s, green)
-- Latest Render deploy: #30 on b4f8770 (1m55s, Live)
+- HEAD: b4523ae (all pushed, working tree clean)
+- Latest Firebase Hosting deploy: #31 on b4523ae (31s, green)
+- Latest Render deploy: a33ebf5 (hazard tolerability fix)
 - All roles can log in: TENANT_ADMIN, DEPT_ADMIN, OFFICER
   (formerly SAFETY_OFFICER), ACCOUNTABLE_EXECUTIVE, CAAN_SMD,
   SUPER_ADMIN
@@ -98,14 +98,32 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
 8. PowerShell splits inline multi-line git commit -m messages
    into pathspecs. Always use git commit -F <tempfile> for
    multi-line commit messages on this workstation.
+9. Un-assessed hazards: a hazard that has been registered but not
+   yet SRAM-assessed has NULL for risk_level, risk_outcome, and
+   tolerability_tier. SRAM is the sole writer of these fields.
+   CAAN-facing aggregations exclude un-assessed hazards entirely;
+   airline-facing displays show "Not assessed". Any future
+   consumer of those three Hazard columns must handle NULL
+   explicitly.
+10. normalize_tolerability now returns "UNASSESSED" (a fourth
+    value beyond LOW/HIGH/VERY HIGH) for None, empty, and
+    unrecognized labels. It no longer fabricates "HIGH". Any
+    caller that assumed three values must be updated. The
+    deliberate design choice is that an unknown label is not
+    the same as a high-risk label.
+11. The earlier HANDOFF_GUIDE entry describing a PDF immutability
+    typo ("Dc decision" in pdf_canvas.py) was stale documentation
+    — the defect never existed in code. That entry has been
+    removed. Future readers should not re-add it.
 
 ## Follow-ups (prioritized)
 ### Tier 1 — This week
-1. PDF immutability text typo — the string in pdf_canvas.py
-   currently reads "under ICAO Annex 19 / Dc decision is
-   immutable"; should read "under ICAO Annex 19 / Doc 9859.
-   The decision is immutable". One-line fix on a
-   compliance-facing artifact. DO FIRST.
+1. Priority derivation by consequence (CAAN SRM Manual §2.2):
+   Accident→H, Serious Incident→M, Incident→L. Currently the
+   hazard create form takes operator-entered priority directly,
+   and the report-auto-create path uses risk-index bands. Both
+   should derive priority from the most-credible-consequence
+   category instead. DO FIRST.
 2. Ledger row shows blank decision and signer fields — the
    AE dashboard ledger renders "-- . --" for decision word and
    signer name despite the detail fetch succeeding. Likely a
@@ -118,47 +136,62 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
    attestation)." Fix: add signer_name: Optional[str] to
    AEDecisionRequest, populate the signature block's name
    from it, keep signed_by = user.email. Backend + frontend.
-4. Grep for any remaining silent-failure patterns in frontend
 
 ### Tier 2 — This month
-5. Component score edge cases — verify null-data handling.
-6. Migrate google.generativeai to google.genai (deprecation warning
+4. Safety Deficiency service + routes: the SafetyDeficiency
+   model exists (db_models.py:725-774) with the right columns
+   but has no service layer and no API. Needs
+   SafetyDeficiencyService and /api/v1/deficiencies/* routes.
+5. Exposure data model: no first-class table for operator
+   flight movements (FMs) and flight hours (FHs) per period.
+   Needed for N-HRC per-10,000 rate calculations. Add an
+   OperatorExposure table plus a route and minimal UI for
+   operators to declare monthly exposure.
+6. Component score edge cases — verify null-data handling.
+7. Migrate google.generativeai to google.genai (deprecation warning
    in every Render startup)
-7. Add favicon.ico to backend to fix 404 in logs
-8. Consider removing ?appcheck=false debug flag from firebase.js
+8. Add favicon.ico to backend to fix 404 in logs
+9. Consider removing ?appcheck=false debug flag from firebase.js
    (documented in source but should not be in production)
-9. **Bug B — resync contract** (production_seed.py:334-343):
-   "tenant exists in Postgres → resync instead of reject" is
-   dead code. Decide: fix the backend or fix the copy.
-10. **Frontend audit Fix 2-4** — smaller HIGH-priority items.
-11. Multi-tenant routing test — Air Dynasty + Saurya
-12. Adaptive chart granularity — day/week/month/year buckets
+10. **Bug B — resync contract** (production_seed.py:334-343):
+    "tenant exists in Postgres → resync instead of reject" is
+    dead code. Decide: fix the backend or fix the copy.
+11. **Frontend audit Fix 2-4** — smaller HIGH-priority items.
+12. Multi-tenant routing test — Air Dynasty + Saurya
+13. Adaptive chart granularity — day/week/month/year buckets
     based on selected period. Spec agreed: <=60d daily,
     61-180d weekly, 181-365d monthly, >365d yearly.
-13. Trends anchor on AE dashboard — deferred; will define
-    content based on Annex 19 3rd Edition. Nav item currently
-    points to #trends but no element has that id.
 
 ### Tier 3 — Next quarter
-14. CAAN dashboard redesign — regulator view; aggregate-only.
+14. Airline Safety dashboard rebuild — after the Safety
+    Deficiency service and Exposure data model land (Tier 2
+    items 4-5).
+15. CAAN dashboard finalization — regulator view; aggregate-only.
+    Add the N-HRC KPI card, per-operator drilldown, state EI
+    score, and the other cards identified during this session.
     Multi-session.
-15. Firestore cleanup (bulk): ~15 guarded mirror blocks,
+16. AE dashboard finalization — parked this session pending the
+    marketing/demonstration framing being fully specced. The
+    AE dashboard is a marketing artifact for prospective
+    customer airlines as well as a regulatory intelligence
+    tool.
+17. Firestore cleanup (bulk): ~15 guarded mirror blocks,
     firestore_deleted response fields, ~10 test functions
     pinning dead behavior. Multi-session project.
-16. Frontend audit Fix 1 — api/client.js App Check attachment
+18. Frontend audit Fix 1 — api/client.js App Check attachment
     + token/tenant failure logging. NOTE: App Check work must
     be verified on the deployed site (see gotcha 7).
-17. AE dashboard RCA seeder enrichment — add factual_review
+19. AE dashboard RCA seeder enrichment — add factual_review
     + rca narrative to the demo CAP. Seeder-only change.
-18. Remove /admin/* App Check bypass, then enable Firebase App Check
+20. Remove /admin/* App Check bypass, then enable Firebase App Check
     enforcement
-19. Tenants list slow-refresh — backend aggregates run per
+21. Tenants list slow-refresh — backend aggregates run per
     tenant; consider batching.
-20. Replace demo users with real users
-21. Upgrade Render + Supabase tiers (cold-start delay)
-22. join.html production scrutiny
-23. PSOE scope enforcement audit
-24. Retired role cleanup — multi-session project. Includes:
+22. Replace demo users with real users
+23. Upgrade Render + Supabase tiers (cold-start delay)
+24. join.html production scrutiny
+25. PSOE scope enforcement audit
+26. Retired role cleanup — multi-session project. Includes:
     (a) AIRLINE_ADMIN decommission across ~98 references in
     ~58 files (60 backend, 38 frontend); (b) fix
     get_accountable_executive in auth.py to allow
@@ -168,21 +201,32 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
     remove the SAFETY_OFFICER shim. One coordinated project
     because they share root cause: role-name drift not yet
     reconciled.
-25. _cap_to_dict signature shape inconsistency — three
+27. _cap_to_dict signature shape inconsistency — three
     shapes for ae_signature across three read paths (bool /
     full dict / name string). Deferred refactor; needs a
     plan for how to unify without breaking any of the six
     callers of _cap_to_dict.
-26. Test file updates — ~18 test files pin the SAFETY_OFFICER
+28. Test file updates — ~18 test files pin the SAFETY_OFFICER
     literal; several pin old AE menu shape (test_ae_narrow_menu)
     and SAFETY_OFFICER -> ALL mapping (test_nav_config). Update
     to match the shim + new nav shape.
-27. Standardize on one logging library (currently mixed loguru +
+29. Standardize on one logging library (currently mixed loguru +
     stdlib)
-28. Cosmetic debt: alert() used for success confirmation in
+30. Cosmetic debt: alert() used for success confirmation in
     submitAeDecision (ae-dashboard.html). No toast idiom
     exists in the file; consider adding a shared one.
-29. Full production hardening review
+31. Full production hardening review
+32. AE dashboard Trends section — feature planned but not yet
+    built. The dead nav item that pointed to a nonexistent
+    #trends anchor was removed in 03b485b, so the defect is
+    closed, but the underlying feature was never implemented.
+    Per the earlier session's design note, Trends content is
+    scoped to Annex 13 / Annex 19 / Doc 10159 and does not
+    include manpower or finance. Candidate charts: hazard
+    identification rate over time by taxonomy family,
+    residual risk distribution movement between tolerability
+    bands, top SPIs, AE decision trend, SMS maturity trend.
+    To be specced as part of the AE dashboard rebuild.
 
 ## Key Documents
 - LOGIN_FAILURE_DIAGNOSIS.md (root cause history)
@@ -203,8 +247,8 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
 | Git repo | github.com/DHFactors/sms-aviasafesystems |
 
 ---
-Last updated: 2026-09-28
-HEAD at time of writing: cb4d875
+Last updated: 2026-09-30
+HEAD at time of writing: b4523ae
 
 ## Session Update — 2026-09-27
 
@@ -361,7 +405,7 @@ Test DEPT_ADMIN end-to-end as camo@sitaair.com.np
   dict, _cap_to_dict name string); get_cap_for_decision_record
   bypasses flattening for the PDF route
 - AIRLINE_ADMIN is a fossil (~98 refs); coordinated
-  decommission queued (see Follow-ups, Tier 3 item 24)
+  decommission queued (see Follow-ups, Tier 3 item 26)
 - get_accountable_executive (auth.py) is broken and unused
   except verification.py:76; fix folded into the same cleanup
 
@@ -373,4 +417,61 @@ Test DEPT_ADMIN end-to-end as camo@sitaair.com.np
 - Confirm git state, then txt queue item 1 (PDF typo fix).
   See Follow-ups, Tier 1.
 
-HEAD at time of writing: cb4d875
+## Session Update — 2026-09-30
+
+### Commits landed this session
+- bc29bd1 — dashboard cleanup pass (AE and CAAN)
+- d5f1161 — SRAM severity letters + aggregation null-safety
+- 03b485b — dead Trends nav item removed from AE
+- a33ebf5 — un-assessed hazards must not count as high-risk
+- b4523ae — hazard detail renders "Not yet assessed"
+
+### Reverted work (documented for history)
+An earlier attempt to null the hazard create-path tolerability
+writes was reverted because the blast-radius check found 11
+consumer sites. The full-scope fix was done properly in
+a33ebf5.
+
+### Key architectural decisions recorded this session
+- SRAM is the sole writer of hazard tolerability
+  (risk_level, risk_outcome, tolerability_tier). The hazard
+  create and update paths do not write these; they stay NULL
+  for a registered-but-un-assessed hazard.
+- normalize_tolerability returns UNASSESSED (not HIGH) for
+  None, empty, and unrecognized labels.
+- Un-assessed hazards are an airline-internal workflow state.
+  They have no value to CAAN. CAAN-facing aggregations
+  exclude them entirely; airline-facing displays show
+  "Not assessed".
+- The domain workflow is: report → Safety Dept triage →
+  Hazard Register (registered, un-assessed) → SRAM analysis
+  (produces tolerability) → Risk Register. Tolerability is a
+  stage-2 output, not a stage-1 one.
+- Priority derivation on the hazard create path should be by
+  consequence (Accident→H, Serious Incident→M, Incident→L), per
+  CAAN SRM Manual §2.2. Not yet implemented in code — the
+  current create form takes operator-entered priority directly.
+  Queued.
+
+### Deployments
+- Firebase Hosting: run #31 on b4523ae (hazard detail page)
+- Render backend: a33ebf5 (hazard tolerability fix)
+
+### Known follow-ups (not in this session)
+- Priority derivation by consequence (CAAN §2.2) is not yet
+  implemented. Queued as the first task for the next session.
+- The "SMS Health: Healthy" chip on the AE dashboard
+  contradicts the SMS Maturity card's "Watch" state. Both
+  read from the Module 1 survey but apply different
+  thresholds or read different fields. To be resolved as
+  part of the AE dashboard rebuild.
+
+### First task for the new session
+- Confirm git state (git log --oneline -5, git status,
+  git log origin/main --oneline -1). Then choose from the
+  queue. Recommendation: item 1 (priority derivation by
+  consequence) — it is small, it closes the last correctness
+  gap in the hazard pipeline, and the CAAN SRM Manual §2.2
+  mapping is unambiguous.
+
+HEAD at time of writing: b4523ae
