@@ -112,7 +112,6 @@
                 <div class="card" style="border-top:4px solid #1a6b8a;">
                     <h2><i class="fas fa-gavel"></i> Executive Decisions <span class="tag">Approvals</span></h2>
                     <div id="escalationQueue"></div>
-                    <p style="font-size:0.72rem;color:#94a3b8;margin-top:0.4rem;">Sign-off workflow under development — decision recording coming in a future release.</p>
                     <div style="margin-top:1rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
                         <div style="font-size:0.75rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.3px;">Recent Decisions</div>
                         <div id="decisionLedger" style="margin-top:0.5rem;"></div>
@@ -123,10 +122,6 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="card" style="margin-top:1.25rem;text-align:center;padding:2rem;">
-                <div style="font-size:0.8rem;color:#64748b;">Detailed operational analysis, departmental health matrix, and predictive simulations are available in the dedicated Safety Workspace.</div>
-                <a href="/safety.html" class="btn btn-outline" style="margin-top:0.8rem;"><i class="fas fa-chart-line"></i> Open Safety Workspace for Granular Data</a>
             </div>
         </div>
     </div>
@@ -251,10 +246,10 @@ function psoeStage(pct){
 async function loadDashboard(){
     try{
         const [cans,caps,hazards,reports]=await Promise.all([
-            ApiClient.get('/api/v1/cans/').catch(()=>[]),
-            ApiClient.get('/api/v1/cans/caps').catch(()=>[]),
-            ApiClient.get('/api/v1/hazards/').catch(()=>[]),
-            ApiClient.get('/api/v1/reports/').catch(()=>[])
+            ApiClient.get('/api/v1/cans/').catch(err=>{ console.error('[AE dashboard] /api/v1/cans/ failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get('/api/v1/cans/caps').catch(err=>{ console.error('[AE dashboard] /api/v1/cans/caps failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get('/api/v1/hazards/').catch(err=>{ console.error('[AE dashboard] /api/v1/hazards/ failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get('/api/v1/reports/').catch(err=>{ console.error('[AE dashboard] /api/v1/reports/ failed:', err && err.message ? err.message : err); return []; })
         ]);
         gPsoeList=[]; gCans=cans||[]; gCaps=caps||[]; gHazards=hazards||[]; gReports=reports||[];
         gCaps.forEach(c=>{ const ov=gOverlays[c.id]; if(ov) Object.assign(c,ov); });

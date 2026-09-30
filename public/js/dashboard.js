@@ -231,9 +231,9 @@ async function loadKpis() {
         const [overview, vsr, mor] = await Promise.all([
             DashboardAPI.getOverview(currentDays),
             // VSR is stored as report_type='voluntary'; .total is the count.
-            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=voluntary&page_size=1`).catch(() => null),
+            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=voluntary&page_size=1`).catch((err) => { console.error('[dashboard] loadKpis /api/v1/dashboard/recent?report_type=voluntary failed:', err && err.message ? err.message : err); return null; }),
             // MOR is stored as report_type='mandatory'; .total is the count.
-            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=mandatory&page_size=1`).catch(() => null),
+            ApiClient.get(`/api/v1/dashboard/recent?days=${currentDays || 0}&report_type=mandatory&page_size=1`).catch((err) => { console.error('[dashboard] loadKpis /api/v1/dashboard/recent?report_type=mandatory failed:', err && err.message ? err.message : err); return null; }),
         ]);
         const k = (overview && overview.kpis) || {};
         const vsrCount = (vsr && vsr.total) || 0;
@@ -348,8 +348,8 @@ async function loadCaTrends() {
     try {
         const days = currentDays || 0;
         const [cans, caps] = await Promise.all([
-            ApiClient.get(`/api/v1/cans/?days=${days}`).catch(() => []),
-            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch(() => []),
+            ApiClient.get(`/api/v1/cans/?days=${days}`).catch((err) => { console.error('[dashboard] loadCaTrends /api/v1/cans/ failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch((err) => { console.error('[dashboard] loadCaTrends /api/v1/cans/caps failed:', err && err.message ? err.message : err); return []; }),
         ]);
         setReady(el);
         renderCaTrendChart(safeArray(cans), safeArray(caps));
@@ -406,10 +406,10 @@ async function loadActivityCards() {
     ids.forEach(id => { const n = document.getElementById(id); if (n) setLoading(n); });
     try {
         const [repRes, hazards, cans, caps] = await Promise.all([
-            ApiClient.get(`/api/v1/dashboard/recent?days=${days}&page_size=5`).catch(() => null),
-            ApiClient.get('/api/v1/hazards/').catch(() => []),
-            ApiClient.get(`/api/v1/cans/?days=${days}`).catch(() => []),
-            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch(() => []),
+            ApiClient.get(`/api/v1/dashboard/recent?days=${days}&page_size=5`).catch((err) => { console.error('[dashboard] loadActivityCards /api/v1/dashboard/recent failed:', err && err.message ? err.message : err); return null; }),
+            ApiClient.get('/api/v1/hazards/').catch((err) => { console.error('[dashboard] loadActivityCards /api/v1/hazards/ failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get(`/api/v1/cans/?days=${days}`).catch((err) => { console.error('[dashboard] loadActivityCards /api/v1/cans/ failed:', err && err.message ? err.message : err); return []; }),
+            ApiClient.get(`/api/v1/cans/caps?days=${days}`).catch((err) => { console.error('[dashboard] loadActivityCards /api/v1/cans/caps failed:', err && err.message ? err.message : err); return []; }),
         ]);
         renderReportCards(repRes && repRes.items ? repRes.items : []);
         const hz = safeArray(hazards).filter(h => inPeriod(h.created_at));

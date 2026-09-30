@@ -277,6 +277,9 @@ function getVisibleNav(user, moduleAccess) {
             // test_ae_narrow_menu asserts the old 3-item AE menu and
             // will need updating (test file untouched here).
             if (roleType === 'AE' && item.id === 'my-tasks') return false;
+            // CAAN has no task surface (caan.html is macro/state-scope only),
+            // so hide My Tasks for CAAN only — every other role keeps it.
+            if (roleType === 'CAAN' && item.id === 'my-tasks') return false;
             if (item.roles && item.roles.indexOf('ALL') === -1 && item.roles.indexOf(roleType) === -1) {
                 return false;
             }
