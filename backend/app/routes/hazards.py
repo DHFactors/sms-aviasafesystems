@@ -34,6 +34,12 @@ from app.services import (
     sram_service,
     srm_engine,
 )
+from app.services.risk_matrix import (
+    classify_risk,
+    get_thresholds,
+    get_tolerability_tier,
+    risk_outcome,
+)
 
 router = APIRouter()
 
@@ -519,12 +525,20 @@ async def save_sram(
     prob = risk_profile["resultant_risk"]["probability_value"]
     now = datetime.now(timezone.utc)
 
+    # SRAM is the authority for the tolerability outputs. The generic hazard
+    # create/update paths no longer fabricate risk_level / risk_outcome /
+    # tolerability_tier; they are written here when SRAM actually assesses.
+    risk_index = sev_num * prob
+    thresholds = get_thresholds(tenant_id)
     update_payload = {
         "analysis_mode": payload.analysis_mode.value,
         "sram_data": sram_data,
         "severity": sev_num,
         "probability": prob,
-        "risk_index": sev_num * prob,
+        "risk_index": risk_index,
+        "risk_level": classify_risk(risk_index, thresholds),
+        "risk_outcome": risk_outcome(sev_num, prob, thresholds),
+        "tolerability_tier": get_tolerability_tier(risk_index, thresholds),
         "srm_conducted": True,
         "srm_date": now,
         "srm_status": "Conducted",

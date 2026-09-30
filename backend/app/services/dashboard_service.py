@@ -700,6 +700,8 @@ class DashboardService:
                 if cell:
                     cell["count"] += 1
             tier = normalize_tolerability(h.get("risk_level"))
+            if tier == "UNASSESSED":
+                continue
             if tier == "LOW":
                 level2 += 1
             elif tier == "HIGH":

@@ -111,8 +111,10 @@ def test_normalize_tolerability_maps_legacy_labels():
     assert rm.normalize_tolerability("Very High") == "VERY HIGH"
     assert rm.normalize_tolerability("Critical") == "VERY HIGH"
     assert rm.normalize_tolerability("Intolerable") == "VERY HIGH"
-    assert rm.normalize_tolerability(None) == "HIGH"
-    assert rm.normalize_tolerability("") == "HIGH"
+    assert rm.normalize_tolerability(None) == "UNASSESSED"
+    assert rm.normalize_tolerability("") == "UNASSESSED"
+    # Un-recognised labels are UNASSESSED, not a fabricated HIGH.
+    assert rm.normalize_tolerability("Something Else") == "UNASSESSED"
 
 
 def test_classify_tolerability_full_payload():
@@ -201,34 +203,20 @@ def _hazard_payload(**overrides):
     return payload
 
 
-def test_hazard_create_uses_canonical_scheme(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_thresholds",
-                        lambda tid: dict(DEFAULT))
-
+def test_hazard_create_is_unassessed():
     doc = HazardService("airline1").create_hazard(_hazard_payload(), {"uid": "u1"})
     assert doc["risk_index"] == 9
-    assert doc["risk_level"] == "High"
-    assert doc["risk_outcome"] == "Tolerable"
-    assert doc["tolerability_tier"] == "HIGH"
+    # Registered, not yet SRAM-assessed: tolerability outputs stay null.
+    assert doc["risk_level"] is None
+    assert doc["risk_outcome"] is None
+    assert doc["tolerability_tier"] is None
 
 
-def test_hazard_create_honours_stored_thresholds(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_thresholds",
-                        lambda tid: dict(CUSTOM))
-
-    doc = HazardService("airline1").create_hazard(_hazard_payload(), {"uid": "u1"})
-    assert doc["risk_index"] == 9
-    assert doc["risk_level"] == "High"
-    assert doc["risk_outcome"] == "Tolerable"
-
-
-def test_hazard_create_classifies_from_risk_index_only(monkeypatch):
-    monkeypatch.setattr("app.services.hazard_service.get_thresholds",
-                        lambda tid: dict(DEFAULT))
-
+def test_hazard_create_honours_risk_index_without_classifying():
     payload = _hazard_payload(severity=None, probability=None, risk_index=9, risk_level=None)
     doc = HazardService("airline1").create_hazard(payload, {"uid": "u1"})
-    assert doc["risk_level"] == "High"
+    assert doc["risk_index"] == 9
+    assert doc["risk_level"] is None
 
 
 # ============================================================================

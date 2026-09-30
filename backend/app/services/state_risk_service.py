@@ -197,7 +197,9 @@ class StateRiskService:
                 agg["severity_sum"] += sev
                 agg["probability_sum"] += prob
             tier = normalize_tolerability(h.get("risk_level"))
-            if tier == "LOW":
+            if tier == "UNASSESSED":
+                pass
+            elif tier == "LOW":
                 agg["level_ii_count"] += 1
             else:
                 agg["high_risk_count"] += 1
@@ -227,7 +229,9 @@ class StateRiskService:
                 agg["severity_sum"] += sev
                 agg["probability_sum"] += prob
             tier = normalize_tolerability(r.get("risk_level"))
-            if tier == "LOW":
+            if tier == "UNASSESSED":
+                pass
+            elif tier == "LOW":
                 agg["level_ii_count"] += 1
             else:
                 agg["high_risk_count"] += 1

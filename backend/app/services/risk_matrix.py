@@ -118,19 +118,28 @@ def get_tolerability_tier(risk_index: int, thresholds: Optional[dict] = None) ->
 
 
 def normalize_tolerability(label: Optional[str]) -> str:
-    """Normalise any legacy risk label/outcome into the 3-tier tolerance tier.
+    """Normalise any legacy risk label/outcome into the tolerability tier.
 
-    Low / Acceptable -> LOW; Very High / Critical / Intolerable -> VERY HIGH;
-    Medium / Moderate / High / Tolerable / unknown -> HIGH.
+    Low / Acceptable -> LOW
+    Very High / Critical / Intolerable / Severe -> VERY HIGH
+    Medium / Moderate / High / Tolerable -> HIGH
+    None / empty / unknown -> UNASSESSED  (see note)
+
+    Note: un-recognised labels are treated as UNASSESSED rather than HIGH.
+    Fabricating "HIGH" for an unknown label is the bug this function fixes.
     """
     if not label:
-        return "HIGH"
+        return "UNASSESSED"
     norm = str(label).strip().upper()
+    if not norm:
+        return "UNASSESSED"
     if norm in ("LOW", "ACCEPTABLE"):
         return "LOW"
     if norm in ("VERY HIGH", "CRITICAL", "INTOLERABLE", "SEVERE"):
         return "VERY HIGH"
-    return "HIGH"
+    if norm in ("MEDIUM", "MODERATE", "HIGH", "TOLERABLE"):
+        return "HIGH"
+    return "UNASSESSED"
 
 
 def classify_tolerability(risk_index: int, thresholds: Optional[dict] = None) -> dict:

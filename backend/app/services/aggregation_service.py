@@ -180,12 +180,12 @@ class AggregationService:
                 for h in hazards:
                     trends.append({
                         "date": h.get("created_at", "")[:10],
-                        "risk_level": h.get("initial_risk_level") or h.get("risk_level") or "Low",
+                        "risk_level": h.get("initial_risk_level") or h.get("risk_level"),
                     })
             except Exception as e:
                 logger.warning(f"Risk trend failed for {tid}: {e}")
         # Aggregate by risk_level
-        by_level = Counter(t["risk_level"] for t in trends)
+        by_level = Counter(t["risk_level"] for t in trends if t["risk_level"] is not None)
         return {
             "total_points": len(trends),
             "by_risk_level": dict(by_level),

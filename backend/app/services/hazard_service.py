@@ -45,14 +45,7 @@ from app.db.isolation import demo_scope
 from app.db.runner import run
 from app.db.schema_init import ensure_v2_schema_async
 from app.db.session import session_scope
-from app.services.risk_matrix import (
-    classify_risk,
-    compute_risk_index,
-    get_thresholds,
-    get_tolerability_tier,
-    normalize_tolerability,
-    risk_outcome,
-)
+from app.services.risk_matrix import compute_risk_index
 from app.services.users import get_user_department
 
 # ICAO Doc 9859 Standard Risk Tolerability Lookups
@@ -297,28 +290,15 @@ class HazardService:
         severity = payload.get("severity")
         probability = payload.get("probability")
         risk_index = payload.get("risk_index")
-        risk_level = payload.get("risk_level")
-        risk_out = payload.get("risk_outcome")
-        tolerability_tier = payload.get("tolerability_tier")
 
-        if severity is not None and probability is not None:
-            computed_risk_index = compute_risk_index(severity, probability)
-            thresholds = get_thresholds(self.tenant_id)
-            if risk_index is None:
-                risk_index = computed_risk_index
-            if risk_level is None:
-                risk_level = classify_risk(computed_risk_index, thresholds)
-            if risk_out is None:
-                risk_out = risk_outcome(severity, probability, thresholds)
-            if tolerability_tier is None:
-                tolerability_tier = get_tolerability_tier(computed_risk_index, thresholds)
-        elif risk_index is not None and risk_level is None:
-            thresholds = get_thresholds(self.tenant_id)
-            risk_level = classify_risk(risk_index, thresholds)
-            tolerability_tier = get_tolerability_tier(risk_index, thresholds)
-
-        if tolerability_tier is None and risk_level is not None:
-            tolerability_tier = normalize_tolerability(risk_level)
+        # Hazard registration is an un-assessed state. risk_index may be seeded
+        # (severity x probability), but risk_level / risk_outcome /
+        # tolerability_tier are SRAM outputs and stay None until SRAM runs.
+        if risk_index is None and severity is not None and probability is not None:
+            risk_index = compute_risk_index(severity, probability)
+        risk_level = None
+        risk_out = None
+        tolerability_tier = None
 
         taxonomy = revalue_taxonomy(payload.get("taxonomy", "Organizational"))
         function = resolve_function_code(
@@ -554,14 +534,10 @@ class HazardService:
                 sev = payload.get("severity", row.severity)
                 prob = payload.get("probability", row.probability)
                 if sev is not None and prob is not None:
-                    thresholds = get_thresholds(self.tenant_id)
-                    computed = compute_risk_index(sev, prob)
-                    payload["risk_index"] = computed
-                    payload["risk_level"] = classify_risk(computed, thresholds)
-                    payload["risk_outcome"] = risk_outcome(sev, prob, thresholds)
-                    payload["tolerability_tier"] = get_tolerability_tier(computed, thresholds)
-            elif "risk_level" in payload:
-                payload["tolerability_tier"] = normalize_tolerability(payload.get("risk_level"))
+                    # Only the index is derived here. risk_level / risk_outcome /
+                    # tolerability_tier are SRAM outputs and must not be
+                    # overwritten on update.
+                    payload["risk_index"] = compute_risk_index(sev, prob)
 
             if "assigned_to" in payload or "assigned_to_uid" in payload:
                 new_uid = payload.get("assigned_to_uid", row.assigned_to_uid)
@@ -651,6 +627,8 @@ class HazardService:
             rl = row.risk_level
             if rl:
                 risk_level_counts[rl] = risk_level_counts.get(rl, 0) + 1
+            else:
+                risk_level_counts["Not assessed"] = risk_level_counts.get("Not assessed", 0) + 1
 
         return {
             "by_status": status_stats,

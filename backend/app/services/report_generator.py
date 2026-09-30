@@ -96,6 +96,8 @@ class ReportGenerator:
         risk_dist = {"Low": 0, "High": 0, "Very High": 0}
         for h in hazards:
             tier = normalize_tolerability(h.get("risk_level"))
+            if tier == "UNASSESSED":
+                continue
             risk_dist[TIER_TO_LEVEL[tier]] += 1
 
         top_risks = self._calculate_top_risks(hazards)
@@ -143,6 +145,8 @@ class ReportGenerator:
         risk_dist = {"Low": 0, "High": 0, "Very High": 0}
         for h in hazards:
             tier = normalize_tolerability(h.get("risk_level"))
+            if tier == "UNASSESSED":
+                continue
             risk_dist[TIER_TO_LEVEL[tier]] += 1
 
         hazard_trends = self._calculate_hazard_trends(hazards, year)
@@ -280,6 +284,8 @@ class ReportGenerator:
             levels = {"Low": 0, "High": 0, "Very High": 0}
             for h in month_hazards:
                 tier = normalize_tolerability(h.get("risk_level"))
+                if tier == "UNASSESSED":
+                    continue
                 levels[TIER_TO_LEVEL[tier]] += 1
             trends.append({
                 "month": f"{year}-{m:02d}",
