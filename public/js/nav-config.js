@@ -9,8 +9,8 @@
  *    ACCOUNTABLE_EXECUTIVE, SAG_MEMBER (+ legacy aliases AIRLINE_ADMIN,
  *    USER, CAAN_ADMIN, CAAN_AUDITOR).
  *  - ACCOUNTABLE_EXECUTIVE maps to the AE role type with a NARROW menu:
- *    Dashboard (/dashboard/ae-dashboard.html), Action Queues (My Tasks),
- *    Trends. No CAN/CAP authoring, no admin.
+ *    Dashboard (/dashboard/ae-dashboard.html) — Executive only. Trends is
+ *    planned but not yet implemented. No CAN/CAP authoring, no admin.
  *  - SAG_MEMBER maps to the SAG role type. There is currently NO SAG member
  *    dashboard in scope, so SAG is hidden from nav entirely: getVisibleNav
  *    returns [] for SAG (confirmed per P4-6.2).
@@ -53,7 +53,6 @@ var NAV_CONFIG = {
             { id: 'key-indicators', href: '/safety.html', label: 'Key Indicators', roles: ['SAFETY'], module: 'module_b_srm' },
             { id: 'my-tasks', href: '/dashboard/my-tasks.html', label: 'My Tasks', roles: ['ALL'], badge: true, module: 'module_b_can_cap' },
             { id: 'ae-dashboard', href: '/dashboard/ae-dashboard.html', label: 'Executive', roles: ['AE'], module: 'module_b_srm' },
-            { id: 'ae-trends', href: '/dashboard/ae-dashboard.html#trends', label: 'Trends', roles: ['AE'], module: 'module_b_srm' },
             { id: 'caan-dashboard', href: '/caan.html', label: 'CAAN Oversight', roles: ['CAAN'], module: 'module_c_regulator' },
         ]
     },
@@ -271,7 +270,7 @@ function getVisibleNav(user, moduleAccess) {
         if (normalized && !moduleEnabled(normalized, group.module)) continue;
 
         var items = group.items.filter(function (item) {
-            // AE sees Executive + Trends only — My Tasks is not an AE
+            // AE sees Executive only — My Tasks is not an AE
             // surface (same targeted-skip pattern as the department
             // Dashboard exclusion above). NOTE: frontend-tests
             // test_ae_narrow_menu asserts the old 3-item AE menu and
