@@ -564,3 +564,256 @@ or projected Unsafe Event / Consequence.
   consolidation. The recon prompt will be provided separately.
 
 HEAD at time of writing: fb4bb3b
+
+## Session Update — 2026-10-01 (afternoon/evening)
+
+### Commits landed this session
+
+Ordered oldest to newest. All pushed to `origin/main`.
+
+- `ab73247` — chore(project-e): create public/_hold/ for parked files pending chain verification
+- `cb14de5` — chore(project-e): move Batch 1 files into public/_hold/
+- `bcaa9c2` — fix(can_cap): correct department nav, hero title, and register back-links
+- `7c922be` — fix(can_cap): remove duplicate header-bar buttons on register pages
+- `cb384c0` — fix(dept-master-register): let hero subtitle reflect logged-in department
+- `0d24d5b` — chore(project-e): move Batch 2 files into public/_hold/
+
+HEAD at time of writing: `0d24d5b`.
+
+Base for the session: `fb4bb3b` (the priority-derivation commit from the
+morning, which was the starting HEAD when this session began).
+
+### Context — what this session was about
+
+This session ran three strands of work in parallel:
+
+1. **Project E (HTML surface inventory and clean-up).** A project to
+   inventory all 87 `.html` files under `public/`, determine which are
+   live, which are stale, and which are dead, and then park the dead
+   ones in a `public/_hold/` folder so the working tree reflects only
+   the live surface. The project runs in numbered batches. Each batch
+   is one commit, verified on the deployed site after push.
+
+2. **Module 2 (can_cap/) fixes.** Three UI bugs found during
+   verification of Project E's Batch 1. The CAN/CAP pages had wrong
+   nav on some pages, wrong hero titles on some, a wrong back-link on
+   the CAP review page, and redundant header-bar buttons duplicating
+   nav entries. All fixed across three commits.
+
+3. **Department register subtitle.** Found during verification of the
+   Module 2 fixes. `dept-master-register.html` was showing a static
+   subtitle instead of the logged-in user's department. Fixed by
+   removing the static `heroSubtitle` so the shell derives it from the
+   user's claims.
+
+### Project E — current state
+
+Project E is **mid-flight**. Two of four planned batches are done.
+
+**Batch 0 (`ab73247`) — done.** Created `public/_hold/`, added its
+`README.md`, and added `public/_hold/` to `.gitignore`. The README is
+the one tracked file inside the folder; the parked HTML files are
+ignored.
+
+**Batch 1 (`cb14de5`) — done.** Parked four files with no live inbound
+references:
+
+- `public/hazards/index.html` → `public/_hold/hazards/index.html`
+- `public/hazards/create.html` → `public/_hold/hazards/create.html`
+- `public/test-portal.html` → `public/_hold/test-portal.html`
+- `public/portal/survey/index.html` → `public/_hold/portal/survey/index.html`
+
+**Batch 2 (`0d24d5b`) — done.** Parked three more files:
+
+- `public/demo-contract.html` → `public/_hold/demo-contract.html`
+- `public/portal/index.html` → `public/_hold/portal/index.html`
+- `public/dashboard/shared/shell.html` → `public/_hold/dashboard/shared/shell.html`
+
+The `public/portal/` folder is now empty (both `portal/` and its
+`survey/` subdirectory have no remaining files). Empty directories
+were left in place; Firebase Hosting serves files, not directories,
+so an empty path falls through the catch-all rewrite to `/index.html`.
+
+**Batch 3 — pending.** Three files to park, but this batch requires
+documentation and test updates in the same commit because the CI test
+`frontend-tests/test_dept_head_dashboard.js` reads one of the files
+from disk and two docs (`DASHBOARD_CONTRACT.md`,
+`IMPLEMENTATION_ROADMAP.md`) describe the two dashboards as live:
+
+- `public/admin/dashboard.html` — source of the 301 redirect in
+  `firebase.json:20-22`; referenced in
+  `backend/tests/test_rbac_claims.py:104` and in comments in
+  `backend/app/routes/admin.py` (`:421`, `:941`, `:1561`).
+- `public/dashboard/safety-dashboard.html` — described as "Wave 2 /
+  P4-2" in `DASHBOARD_CONTRACT.md:63,194` and
+  `IMPLEMENTATION_ROADMAP.md:300`.
+- `public/dashboard/dept-head-dashboard.html` — described as "Wave 3 /
+  P4-3" in `DASHBOARD_CONTRACT.md:64,259` and
+  `IMPLEMENTATION_ROADMAP.md:303`; read by
+  `frontend-tests/test_dept_head_dashboard.js:4,24`.
+
+Batch 3's first step is a reconnaissance pass to see the exact current
+state of the two docs and the test, then a single execution commit that
+moves the three files, updates the docs to record the supersession, and
+retargets (or retires) the test.
+
+**Batch 4 — pending, separate.** Park `public/aviasdcps.html` and the
+`public/views/*` family (13 files). This is the project's origin (the
+Annex 19 data-collection shell that the SMS application grew out of)
+and is confirmed not to be in any live chain. It is a larger commit
+than Batch 3 and should be its own session.
+
+### Module 2 fixes — current state
+
+All three Module 2 fixes are done and verified on the deployed site.
+
+**`bcaa9c2` — nav, title, back-links, dept nav entries.**
+
+- `can_detail.html` and `caps.html` were missing the
+  `<script src="/js/nav-config.js">` include, so the shell fell to its
+  legacy `NAV_ITEMS` and rendered the Safety Manager nav for
+  department users. Added the include to both.
+- `can_detail.html`, `cans.html`, and `caps.html` were missing the
+  `updateShellTenant(...)` call, so the hero title showed "Unknown".
+  Added the standard call (matching `my-tasks.html:176-177`) to all
+  three. Each page's `onAuthStateChanged` handler was made `async` and
+  given a `const tokenResult = await user.getIdTokenResult();` line,
+  because none of the three previously called `getIdTokenResult()`.
+- `cap_review.html` top back-link retargeted from `/can_cap/cans.html`
+  ("Back to CANs") to `/can_cap/caps.html` ("Back to CAP Register").
+  The bottom link remains "Back to Related CAN" →
+  `/can_cap/can_detail.html?id=<can_id>`.
+- `nav-config.js` `dept_workspace` group extended from two items to
+  four: added `dept-can-register` → `/can_cap/cans.html` and
+  `dept-cap-register` → `/can_cap/caps.html`. The existing IDs
+  (`dept-tasks`, `dept-register`) were preserved.
+- `my-tasks.html` header-bar Master Register button removed; its
+  rewrite block also removed. The nav entry is now the single source
+  for that link.
+
+**`7c922be` — duplicate header buttons.**
+
+- `cans.html` and `caps.html` each rendered a "My Tasks" and a
+  "Master Hazard Register" button in the header bar. Both duplicate
+  nav entries for the audiences that reach these pages. Removed both
+  buttons on both pages.
+
+**`cb384c0` — department register subtitle.**
+
+- `dept-master-register.html` set
+  `SHELL_CONFIG.heroSubtitle = 'Department CAN · CAP Register'`,
+  which the shell's post-token repaint at `shell.js:982` treats as
+  the highest-priority value, overriding
+  `getDepartmentLabel(claims)`. Removing the static value lets the
+  shell fall through to the department label, so a 145 user sees the
+  department name instead of the static string.
+
+### Verified on the deployed site
+
+- `safety.html` — Safety Manager hub, correct nav, all sections render
+- `dashboard/ae-dashboard.html` — AE dashboard, SMS Maturity card,
+  Executive Decisions card, escalation queue, decision ledger, PDF
+  export
+- `caan.html` — CAAN dashboard
+- `dashboard/my-tasks.html` — department Workspace nav with four
+  entries, Submit MOR button present, Master Register header button
+  gone
+- `can_cap/cans.html` — correct department nav, title resolves, table
+  renders
+- `can_cap/caps.html` — same
+- `can_cap/can_detail.html` — correct department nav, title resolves
+- `can_cap/cap_review.html` — top link now "Back to CAP Register"
+- `dashboard/dept-master-register.html` — subtitle now reads the
+  logged-in department (verified for the 145 user)
+
+### Key decisions recorded this session
+
+- **The four dashboard hubs are:** `public/safety.html` (Module 2 hub,
+  Safety Department cockpit), `public/dashboard/ae-dashboard.html`
+  (cross-module executive view), `public/caan.html` (Module 3 hub,
+  regulator view), `public/dashboard/my-tasks.html` (Module 2
+  departmental slice). Confirmed from `firebase.js:644-703`
+  (`getRoleDestination`) and the nav config.
+- **The three modules are:** Module 1 (SMS Survey), Module 2
+  (Hazard/Risk Management), Module 3 (PSOE Audit). Module access is a
+  hard per-tenant boundary.
+- **The `admin/*` surface is platform operator tooling** for the
+  SUPER_ADMIN, not a module. It provisions tenants and users, seeds
+  demo data with `is_demo=true`, and purges demo data once the pilot
+  walkthrough is complete.
+- **`is_demo=true` on subordinate rows is the purge marker.** Sita
+  Air's tenant row is `is_demo=false`; its demo content is
+  `is_demo=true` and will be purged before handover. Production rows
+  are written `is_demo=false` by construction.
+- **`flight_diversions/*` is live-intended but currently orphaned.**
+  Wiring it into the nav is a queue item, not part of Project E.
+- **`aviasdcps.html` and `views/*` are the project's origin**, not the
+  current surface, and are confirmed not to be in any live chain.
+- **The dashboard subtitles should reflect the logged-in user's
+  department**, per the pattern already established on `my-tasks.html`
+  and now applied to `dept-master-register.html`.
+- **The `nav-config.js` `dept_workspace` group is the department's nav
+  source of truth.** Header-bar buttons that duplicate entries in that
+  group should be removed, not retargeted.
+
+### Pre-existing issues carried forward
+
+These are not in scope for this session, but they are relevant to
+Project B's design and should not be lost.
+
+1. **Module-gate leak.** All four dashboard hubs render module-tagged
+   data without a Module 1 / 2 / 3 access check.
+   `/api/v1/dashboard*` is absent from
+   `rbac_middleware.py:17-28` (`ENDPOINT_MODULE_MAP`), so the
+   middleware gate that protects `/api/v1/surveys`,
+   `/api/v1/hazards`, `/api/v1/reports`, `/api/v1/cans`,
+   `/api/v1/caps`, `/api/v1/regulator`, `/api/v1/psoe`,
+   `/api/v1/spi/state`, `/api/v1/nhrc/state` does not touch the
+   aggregate endpoints. The AE dashboard's SMS Maturity card renders
+   Module 1 data without a Module 1 gate; `safety.html` renders
+   Module 2 data without a Module 2 gate; `caan.html` renders Module 3
+   data behind a role check only.
+
+2. **`nav-config.js` fail-open.** `getVisibleNav(user)` with no
+   `moduleAccess` argument skips module filtering entirely
+   (`nav-config.js:250-251`). Several `shell.js` call sites pass no
+   argument (e.g. `shell.js:516`), so tagged entries render
+   unconditionally.
+
+Both are documented in the Project E Phase 2 reconnaissance and are
+relevant to Project B's tenant-configurable tolerability grid design
+because the module boundary is one of the things Project B will touch.
+
+### Queue for the next session
+
+**First task — confirm git state.** Run:
+
+- `git log --oneline -5`
+- `git status --porcelain`
+- `git log origin/main --oneline -1`
+
+Expect HEAD at `0d24d5b` (or a later commit if the handoff itself has
+been committed), working tree clean.
+
+**Second task — confirm Batch 2 verification.** If it is not already
+done, run the five checks: the four dashboard hubs load, and
+`admin/login.html` → `admin/production-setup.html` works.
+
+**Third task — Batch 3 reconnaissance.** Read-only. See the "Batch 3 —
+pending" section above for the files and the reasons it needs doc and
+test coordination.
+
+**Fourth task — Batch 4.** Park `aviasdcps.html` and `views/*` as a
+separate commit.
+
+**Fifth task — session-update consolidation** after Batch 4.
+
+### Deployments this session
+
+- Firebase Hosting: redeployed on `ab73247`, then on each subsequent
+  push to `main`
+- Render: no backend changes, so no Render deploys this session
+
+### HEAD at time of writing
+
+`0d24d5b`
