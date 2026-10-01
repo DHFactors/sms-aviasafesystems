@@ -86,3 +86,6 @@ backend/scripts/logs/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Project E: parked files pending chain verification (see public/_hold/README.md)
+public/_hold/
