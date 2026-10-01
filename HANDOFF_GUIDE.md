@@ -1,6 +1,6 @@
 # Starting a New Session — Handoff Guide
 
-## Current State (as of 2026-09-30)
+## Current State (as of 2026-10-01)
 - Platform: sms.aviasafesystems.com (production, live)
 - Backend: Render (auto-deploy on push to main)
 - Frontend: Firebase Hosting (auto-deploy via GitHub Actions on
@@ -9,9 +9,9 @@
 - Auth: Firebase Auth + App Check (reCAPTCHA Enterprise)
 - Platform: multi-tenant aviation SMS per ICAO Annex 19 3rd
   Edition, Doc 9859, Doc 10159
-- HEAD: b4523ae (all pushed, working tree clean)
-- Latest Firebase Hosting deploy: #31 on b4523ae (31s, green)
-- Latest Render deploy: a33ebf5 (hazard tolerability fix)
+- HEAD: fb4bb3b (all pushed, working tree clean)
+- Latest Firebase Hosting deploy: #32 on fb4bb3b (36s, green)
+- Latest Render deploy: fb4bb3b (priority derivation; 1m42s, Live)
 - All roles can log in: TENANT_ADMIN, DEPT_ADMIN, OFFICER
   (formerly SAFETY_OFFICER), ACCOUNTABLE_EXECUTIVE, CAAN_SMD,
   SUPER_ADMIN
@@ -115,15 +115,27 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
     typo ("Dc decision" in pdf_canvas.py) was stale documentation
     — the defect never existed in code. That entry has been
     removed. Future readers should not re-add it.
+12. The VSR form currently uses the MOR-shaped wizard (sections:
+    About You, Aircraft, Flight, Occurrence, Risk Assessment,
+    Review & Submit). Per Sita Air's accepted SMS Manual Appendix D,
+    the VSR reporter describes what was observed; they do not
+    classify the occurrence. The form should match Appendix D's
+    simple single-page layout. Queued as Project D.
 
 ## Follow-ups (prioritized)
+### Active projects (multi-session)
+1. Project B — tenant-configurable tolerability grid and
+   follow-up windows. Multi-session. Recon first.
+2. Project C — CAN auto-derivation + threshold-scheme
+   deprecation on the hazard path.
+3. Project D — Report intake forms aligned to Sita Air's
+   accepted manuals (VSR first, then MOR).
+
 ### Tier 1 — This week
-1. Priority derivation by consequence (CAAN SRM Manual §2.2):
-   Accident→H, Serious Incident→M, Incident→L. Currently the
-   hazard create form takes operator-entered priority directly,
-   and the report-auto-create path uses risk-index bands. Both
-   should derive priority from the most-credible-consequence
-   category instead. DO FIRST.
+1. Tenant-user VSR smoke test — verify the deployed fb4bb3b
+   build accepts VSR submissions with a real tenant context
+   (the earlier test was done as Super Admin, which has no
+   tenant).
 2. Ledger row shows blank decision and signer fields — the
    AE dashboard ledger renders "-- . --" for decision word and
    signer name despite the detail fetch succeeding. Likely a
@@ -138,60 +150,60 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
    from it, keep signed_by = user.email. Backend + frontend.
 
 ### Tier 2 — This month
-4. Safety Deficiency service + routes: the SafetyDeficiency
+1. Safety Deficiency service + routes: the SafetyDeficiency
    model exists (db_models.py:725-774) with the right columns
    but has no service layer and no API. Needs
    SafetyDeficiencyService and /api/v1/deficiencies/* routes.
-5. Exposure data model: no first-class table for operator
+2. Exposure data model: no first-class table for operator
    flight movements (FMs) and flight hours (FHs) per period.
    Needed for N-HRC per-10,000 rate calculations. Add an
    OperatorExposure table plus a route and minimal UI for
    operators to declare monthly exposure.
-6. Component score edge cases — verify null-data handling.
-7. Migrate google.generativeai to google.genai (deprecation warning
-   in every Render startup)
-8. Add favicon.ico to backend to fix 404 in logs
-9. Consider removing ?appcheck=false debug flag from firebase.js
-   (documented in source but should not be in production)
-10. **Bug B — resync contract** (production_seed.py:334-343):
+3. Component score edge cases — verify null-data handling.
+4. Migrate google.generativeai to google.genai (deprecation warning
+    in every Render startup)
+5. Add favicon.ico to backend to fix 404 in logs
+6. Consider removing ?appcheck=false debug flag from firebase.js
+    (documented in source but should not be in production)
+7. **Bug B — resync contract** (production_seed.py:334-343):
     "tenant exists in Postgres → resync instead of reject" is
     dead code. Decide: fix the backend or fix the copy.
-11. **Frontend audit Fix 2-4** — smaller HIGH-priority items.
-12. Multi-tenant routing test — Air Dynasty + Saurya
-13. Adaptive chart granularity — day/week/month/year buckets
+8. **Frontend audit Fix 2-4** — smaller HIGH-priority items.
+9. Multi-tenant routing test — Air Dynasty + Saurya
+10. Adaptive chart granularity — day/week/month/year buckets
     based on selected period. Spec agreed: <=60d daily,
     61-180d weekly, 181-365d monthly, >365d yearly.
 
 ### Tier 3 — Next quarter
-14. Airline Safety dashboard rebuild — after the Safety
+1. Airline Safety dashboard rebuild — after the Safety
     Deficiency service and Exposure data model land (Tier 2
-    items 4-5).
-15. CAAN dashboard finalization — regulator view; aggregate-only.
+    items 1-2).
+2. CAAN dashboard finalization — regulator view; aggregate-only.
     Add the N-HRC KPI card, per-operator drilldown, state EI
     score, and the other cards identified during this session.
     Multi-session.
-16. AE dashboard finalization — parked this session pending the
+3. AE dashboard finalization — parked this session pending the
     marketing/demonstration framing being fully specced. The
     AE dashboard is a marketing artifact for prospective
     customer airlines as well as a regulatory intelligence
     tool.
-17. Firestore cleanup (bulk): ~15 guarded mirror blocks,
+4. Firestore cleanup (bulk): ~15 guarded mirror blocks,
     firestore_deleted response fields, ~10 test functions
     pinning dead behavior. Multi-session project.
-18. Frontend audit Fix 1 — api/client.js App Check attachment
+5. Frontend audit Fix 1 — api/client.js App Check attachment
     + token/tenant failure logging. NOTE: App Check work must
     be verified on the deployed site (see gotcha 7).
-19. AE dashboard RCA seeder enrichment — add factual_review
+6. AE dashboard RCA seeder enrichment — add factual_review
     + rca narrative to the demo CAP. Seeder-only change.
-20. Remove /admin/* App Check bypass, then enable Firebase App Check
+7. Remove /admin/* App Check bypass, then enable Firebase App Check
     enforcement
-21. Tenants list slow-refresh — backend aggregates run per
+8. Tenants list slow-refresh — backend aggregates run per
     tenant; consider batching.
-22. Replace demo users with real users
-23. Upgrade Render + Supabase tiers (cold-start delay)
-24. join.html production scrutiny
-25. PSOE scope enforcement audit
-26. Retired role cleanup — multi-session project. Includes:
+9. Replace demo users with real users
+10. Upgrade Render + Supabase tiers (cold-start delay)
+11. join.html production scrutiny
+12. PSOE scope enforcement audit
+13. Retired role cleanup — multi-session project. Includes:
     (a) AIRLINE_ADMIN decommission across ~98 references in
     ~58 files (60 backend, 38 frontend); (b) fix
     get_accountable_executive in auth.py to allow
@@ -201,22 +213,22 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
     remove the SAFETY_OFFICER shim. One coordinated project
     because they share root cause: role-name drift not yet
     reconciled.
-27. _cap_to_dict signature shape inconsistency — three
+14. _cap_to_dict signature shape inconsistency — three
     shapes for ae_signature across three read paths (bool /
     full dict / name string). Deferred refactor; needs a
     plan for how to unify without breaking any of the six
     callers of _cap_to_dict.
-28. Test file updates — ~18 test files pin the SAFETY_OFFICER
+15. Test file updates — ~18 test files pin the SAFETY_OFFICER
     literal; several pin old AE menu shape (test_ae_narrow_menu)
     and SAFETY_OFFICER -> ALL mapping (test_nav_config). Update
     to match the shim + new nav shape.
-29. Standardize on one logging library (currently mixed loguru +
+16. Standardize on one logging library (currently mixed loguru +
     stdlib)
-30. Cosmetic debt: alert() used for success confirmation in
+17. Cosmetic debt: alert() used for success confirmation in
     submitAeDecision (ae-dashboard.html). No toast idiom
     exists in the file; consider adding a shared one.
-31. Full production hardening review
-32. AE dashboard Trends section — feature planned but not yet
+18. Full production hardening review
+19. AE dashboard Trends section — feature planned but not yet
     built. The dead nav item that pointed to a nonexistent
     #trends anchor was removed in 03b485b, so the defect is
     closed, but the underlying feature was never implemented.
@@ -227,6 +239,10 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
     residual risk distribution movement between tolerability
     bands, top SPIs, AE decision trend, SMS maturity trend.
     To be specced as part of the AE dashboard rebuild.
+20. Refactor HANDOFF_GUIDE.md: move historical session updates into
+    docs/handoffs/YYYY-MM-DD.md and keep HANDOFF_GUIDE.md focused on
+    current state and the queued list. The session-update log is now
+    five entries and will keep growing. Small, one-time.
 
 ## Key Documents
 - LOGIN_FAILURE_DIAGNOSIS.md (root cause history)
@@ -247,8 +263,8 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
 | Git repo | github.com/DHFactors/sms-aviasafesystems |
 
 ---
-Last updated: 2026-09-30
-HEAD at time of writing: b4523ae
+Last updated: 2026-10-01
+HEAD at time of writing: fb4bb3b
 
 ## Session Update — 2026-09-27
 
@@ -405,7 +421,7 @@ Test DEPT_ADMIN end-to-end as camo@sitaair.com.np
   dict, _cap_to_dict name string); get_cap_for_decision_record
   bypasses flattening for the PDF route
 - AIRLINE_ADMIN is a fossil (~98 refs); coordinated
-  decommission queued (see Follow-ups, Tier 3 item 26)
+  decommission queued (see Follow-ups, Tier 3 item 13)
 - get_accountable_executive (auth.py) is broken and unused
   except verification.py:76; fix folded into the same cleanup
 
@@ -475,3 +491,76 @@ a33ebf5.
   mapping is unambiguous.
 
 HEAD at time of writing: b4523ae
+
+## Session Update — 2026-10-01 (morning)
+
+### Commits landed this session
+- fb4bb3b — feat(hazard): derive priority from consequence
+  (CAAN SRM §2.2)
+
+### Context on this session's work
+This commit closed the priority-derivation correctness issue
+that was the last item in the hazard pipeline. It replaces two
+inconsistent rules (operator-selected priority on the create
+form; risk-index bands in the report auto-create path) with
+the CAAN SRM Manual §2.2 rule, which is also what Sita Air's
+accepted SMS Manual §5.5 (item 7) prescribes: priority is
+derived from the Annex 13 occurrence category of the reported
+or projected Unsafe Event / Consequence.
+
+### Key architectural decisions recorded this session
+- Priority derivation is a service-layer concern
+  (derive_priority_from_consequence in hazard_service.py).
+  The helper is the single source of truth. The create form
+  and the report auto-create path both call it.
+- Priority is a derived output, not a client input, on the
+  hazard create path. HazardCreate.priority is now Optional
+  with default None (accepted for backward compatibility,
+  ignored by the service). HazardUpdate.priority remains
+  available for manual override after review.
+- The reporter does not classify the occurrence. The VSR form
+  no longer asks for "Occurrence Type" — that field is the
+  Safety Department's classification, not the reporter's.
+  Sita Air's accepted VSR template (Appendix D) confirms this.
+- Three follow-up projects are queued and scoped:
+    Project B — tenant-configurable tolerability grid and
+      follow-up windows. The grid is currently hardcoded in
+      four places (risk_calculator.py, srm_engine.py,
+      schemas/tenant_sms.py, hazard_service.py); the follow-up
+      windows are hardcoded in hazard_service.py. Sita Air's
+      manual differs from CAAN's: 1A is Acceptable (not
+      Tolerable); the L window is 30 days (not 15). Both need
+      to be per-tenant configurable.
+    Project C — CAN target_completion_date auto-derivation
+      from hazard priority via the tenant's configured
+      windows, plus deprecation of the threshold-based risk
+      classification scheme on the hazard path (hazards should
+      use the cell grid everywhere).
+    Project D — Report intake forms aligned to Sita Air's
+      accepted manuals. VSR: replace the MOR-shaped wizard
+      with Sita Air Appendix D (single-page, simple). MOR:
+      enrich to match Sita Air Appendix C. VSR first.
+
+### Deployments
+- Firebase Hosting: run #32 on fb4bb3b
+- Render backend: fb4bb3b
+
+### Known follow-ups (not in this session)
+- Projects B, C, and D as noted above.
+- On the deployed site, the smoke test of fb4bb3b was partially
+  run (create-form derivation verified visually). The VSR form
+  smoke test was performed as Super Admin (no tenant assigned);
+  a tenant-user smoke test to confirm submission still works is
+  pending.
+- No HTTP-level test asserts the fastapi 422 fix for
+  HazardCreate.priority (the schema is now Optional). The fix is
+  confirmed by the schema change and by service-level tests.
+
+### First task for the new session
+- Confirm git state (git log --oneline -5, git status,
+  git log origin/main --oneline -1). Then begin Project B with
+  a read-only reconnaissance of the four tolerability grids and
+  the follow-up windows, so we can plan the config
+  consolidation. The recon prompt will be provided separately.
+
+HEAD at time of writing: fb4bb3b
