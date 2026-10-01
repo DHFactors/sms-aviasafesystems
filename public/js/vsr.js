@@ -59,7 +59,6 @@ function gatherSectionData(sectionIdx) {
         case 3:
             d.reportDate = getVal('reportDate');
             d.occurrenceDate = getVal('occurrenceDate');
-            d.occurrenceType = getVal('occurrenceType') || null;
             d.occurrenceClass = getVal('occurrenceClass') || null;
             d.location = getVal('location');
             d.country = getVal('country') || null;
@@ -183,7 +182,7 @@ function buildReview() {
         ['reporterName', 'reporterRole', 'reporterOrganisation', 'reporterEmail', 'reporterPhone', 'isAnonymous'],
         ['aircraftMake', 'aircraftModel', 'aircraftReg', 'aircraftSerial', 'aircraftCategory', 'operator', 'operatorIcao'],
         ['flightPhase', 'flightType', 'flightNumber', 'callSign', 'departureAirport', 'destinationAirport'],
-        ['reportDate', 'occurrenceDate', 'occurrenceType', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'occurrenceCategory', 'humanFactors', 'narrative', 'safetySuggestions'],
+        ['reportDate', 'occurrenceDate', 'occurrenceClass', 'location', 'country', 'latitude', 'longitude', 'occurrenceCategory', 'humanFactors', 'narrative', 'safetySuggestions'],
         ['severity', 'probability'],
     ];
     const labels = {
@@ -194,7 +193,7 @@ function buildReview() {
         operatorIcao: 'Operator ICAO',
         flightPhase: 'Phase', flightType: 'Type', flightNumber: 'Flight No.',
         callSign: 'Call Sign', departureAirport: 'Departure', destinationAirport: 'Destination',
-            reportDate: 'Report Date', occurrenceDate: 'Occurrence Date', occurrenceType: 'Type', occurrenceClass: 'Class', location: 'Location',
+            reportDate: 'Report Date', occurrenceDate: 'Occurrence Date', occurrenceClass: 'Class', location: 'Location',
             country: 'Country', latitude: 'Latitude', longitude: 'Longitude',
             occurrenceCategory: 'Category', humanFactors: 'Human Factors',
             narrative: 'Narrative', safetySuggestions: 'Safety Suggestions', severity: 'Severity', probability: 'Probability',
@@ -285,8 +284,6 @@ function gatherAllData() {
     delete d.departureAirport;
     d.destination_airport = d.destinationAirport;
     delete d.destinationAirport;
-    d.occurrence_type = d.occurrenceType;
-    delete d.occurrenceType;
     d.occurrence_class = d.occurrenceClass;
     delete d.occurrenceClass;
     d.occurrence_category = d.occurrenceCategory;

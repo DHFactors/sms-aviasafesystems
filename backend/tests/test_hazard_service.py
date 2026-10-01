@@ -27,7 +27,11 @@ from app.db.db_models import (
 from app.db.ids import register_tenant
 from app.db.session import session_scope
 from app.services import escalation_service, sram_service
-from app.services.hazard_service import HazardService, derive_follow_up_date
+from app.services.hazard_service import (
+    HazardService,
+    derive_follow_up_date,
+    derive_priority_from_consequence,
+)
 from app.services.sram_service import is_risk_overdue
 
 
@@ -119,6 +123,51 @@ def _cleanup(slug: str) -> None:
     except Exception as e:
         logging.getLogger(__name__).warning(
             "test cleanup: session failed for %s: %s", slug, e)
+
+
+# ---------------------------------------------------------------------------
+# CAAN SRM Manual §2.2 — priority derived from consequence
+# ---------------------------------------------------------------------------
+
+def test_derive_priority_from_consequence():
+    assert derive_priority_from_consequence("ACCIDENT") == "H"
+    assert derive_priority_from_consequence("SERIOUS_INCIDENT") == "M"
+    assert derive_priority_from_consequence("INCIDENT") == "L"
+    assert derive_priority_from_consequence(None) == "M"
+    assert derive_priority_from_consequence("") == "M"
+    assert derive_priority_from_consequence("unknown") == "M"
+    assert derive_priority_from_consequence("accident") == "H"
+    assert derive_priority_from_consequence(" Accident ") == "H"
+
+
+def test_create_hazard_derives_priority_from_occurrence_type():
+    slug = _unique_slug("hzpri")
+    _create_tenant(slug)
+    try:
+        svc = HazardService(slug)
+        user = {"uid": "u-pri", "email": "pri@example.com"}
+        for occurrence_type, expected in (
+            ("ACCIDENT", "H"),
+            ("SERIOUS_INCIDENT", "M"),
+            ("INCIDENT", "L"),
+        ):
+            doc = svc.create_hazard_v1({
+                "title": f"Priority {occurrence_type}",
+                "description": "d", "source": "voluntary",
+                "taxonomy": "Organizational",
+                "occurrence_type": occurrence_type,
+            }, user)
+            assert doc["priority"] == expected
+            assert doc["hazard_id"].split("/")[2] == expected
+
+        # No occurrence_type -> safe default M.
+        doc = svc.create_hazard_v1({
+            "title": "Priority fallback", "description": "d",
+            "source": "voluntary", "taxonomy": "Organizational",
+        }, user)
+        assert doc["priority"] == "M"
+    finally:
+        _cleanup(slug)
 
 
 # ---------------------------------------------------------------------------

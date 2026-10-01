@@ -218,7 +218,14 @@ class HazardCreate(BaseModel):
     risk_outcome: Optional[str] = None
     tolerability_tier: Optional[str] = None
 
-    priority: HazardPriority = Field(...)
+    priority: Optional[HazardPriority] = Field(
+        None,
+        description=(
+            "Accepted for backward compatibility; ignored on the "
+            "create path. Priority is derived by the service from "
+            "occurrence_type via CAAN SRM Manual §2.2."
+        ),
+    )
 
     recommended_action: Optional[str] = None
     corrective_action: Optional[str] = None

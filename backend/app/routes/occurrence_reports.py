@@ -26,7 +26,7 @@ from app.middleware.auth import get_current_user, get_tenant_user, get_safety_ma
 from app.core.config import settings
 from app.db.ids import register_tenant
 from app.services.report_service import ReportService
-from app.services.hazard_service import HazardService
+from app.services.hazard_service import HazardService, derive_priority_from_consequence
 from app.services.risk_matrix import compute_risk_index, get_risk_level
 from app.services.severity_service import apply_auto_severity
 from app.services.audit_service import log_audit, request_context
@@ -438,18 +438,6 @@ def _determine_hazard_taxonomy(occurrence_category: Optional[str]) -> str:
     return revalue_taxonomy(TAXONOMY_FROM_OCCURRENCE.get(occurrence_category or "", ""))
 
 
-def _determine_hazard_priority(severity_level: Optional[int], probability_level: Optional[int]) -> str:
-    if severity_level is None or probability_level is None:
-        return "M"
-    risk = compute_risk_index(severity_level, probability_level)
-    if risk >= 12:
-        return "H"
-    elif risk >= 6:
-        return "M"
-    else:
-        return "L"
-
-
 def _auto_create_hazard_from_report(stored: dict, user: dict):
     try:
         tenant_id = stored.get("tenant_id")
@@ -459,7 +447,9 @@ def _auto_create_hazard_from_report(stored: dict, user: dict):
         sev = stored.get("severity_level")
         prob = stored.get("probability_level")
         taxonomy_str = _determine_hazard_taxonomy(stored.get("occurrence_category"))
-        priority_str = _determine_hazard_priority(sev, prob)
+        priority_str = derive_priority_from_consequence(
+            stored.get("occurrence_type")
+        )
 
         hazard_payload = HazardCreate(
             title=(stored.get("narrative") or "")[:100],

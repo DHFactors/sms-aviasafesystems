@@ -100,8 +100,20 @@
 
             <div class="form-row">
                 <div class="form-group">
-                    <label>Priority <span class="required">*</span></label>
-                    <select class="form-control" id="fieldPriority" required></select>
+                    <label>Most Credible Consequence <span class="required">*</span></label>
+                    <select class="form-control" id="fieldConsequenceType" required onchange="updateDerivedPriority()">
+                        <option value="">— Select —</option>
+                        <option value="ACCIDENT">Accident</option>
+                        <option value="SERIOUS_INCIDENT">Serious Incident</option>
+                        <option value="INCIDENT">Incident</option>
+                    </select>
+                    <div class="form-hint" style="font-size:0.78rem;color:#64748b;margin-top:0.25rem;">
+                        Priority is derived from this: Accident → High, Serious Incident → Medium, Incident → Low.
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Derived Priority</label>
+                    <div id="fieldDerivedPriority" style="font-weight:600;color:#0b2a42;">—</div>
                 </div>
                 <div class="form-group">
                     <label>Source ID (Reference) <span class="required">*</span></label>
@@ -288,14 +300,16 @@ function populateDropdowns() {
     taxSel.innerHTML = '<option value="">— Select —</option>' +
         HAZARD_TAXONOMIES.map(t => `<option value="${t}">${t}</option>`).join('');
 
-    const priSel = document.getElementById('fieldPriority');
-    priSel.innerHTML = '<option value="">— Select —</option>' +
-        HAZARD_PRIORITIES.map(p => `<option value="${p}">${p === 'H' ? 'High' : p === 'M' ? 'Medium' : 'Low'}</option>`).join('');
-
     const fnSel = document.getElementById('fieldFunction');
     const relevant = HAZARD_FUNCTION_CODES.map(({ code, label }) =>
         `<option value="${code}">${code} — ${label}</option>`).join('');
     fnSel.innerHTML = '<option value="">— Select —</option>' + relevant;
+}
+
+function updateDerivedPriority() {
+    const type = document.getElementById('fieldConsequenceType').value;
+    const map = { 'ACCIDENT': 'High (H)', 'SERIOUS_INCIDENT': 'Medium (M)', 'INCIDENT': 'Low (L)' };
+    document.getElementById('fieldDerivedPriority').textContent = map[type] || '—';
 }
 
 function updateRiskPreview() {
@@ -312,7 +326,7 @@ async function submitHazard() {
     const description = document.getElementById('fieldDescription').value.trim();
     const source = document.getElementById('fieldSource').value;
     const taxonomy = document.getElementById('fieldTaxonomy').value;
-    const priority = document.getElementById('fieldPriority').value;
+    const consequenceType = document.getElementById('fieldConsequenceType').value;
     const functionCode = document.getElementById('fieldFunction').value;
 
     if (!title || title.length < 3) { showMessage('Title is required (min 3 characters)', 'error'); return; }
@@ -322,7 +336,7 @@ async function submitHazard() {
     const sourceId = document.getElementById('fieldSourceId').value.trim();
     if (!sourceId) { showMessage('Source ID (reference) is required', 'error'); return; }
     if (!taxonomy) { showMessage('Taxonomy is required', 'error'); return; }
-    if (!priority) { showMessage('Priority is required', 'error'); return; }
+    if (!consequenceType) { showMessage('Most Credible Consequence is required', 'error'); return; }
 
     const sev = parseInt(document.getElementById('fieldSeverity').value) || null;
     const prob = parseInt(document.getElementById('fieldProbability').value) || null;
@@ -342,7 +356,7 @@ async function submitHazard() {
         function: functionCode,
         source,
         taxonomy,
-        priority,
+        occurrence_type: consequenceType,
         source_id: sourceId,
         source_url: document.getElementById('fieldSourceUrl').value.trim() || null,
         adrep_category: document.getElementById('fieldAdrep').value.trim() || null,

@@ -61,6 +61,28 @@ SEVERITY_LABELS = {5: "Catastrophic", 4: "Hazardous", 3: "Major", 2: "Minor", 1:
 PROBABILITY_LABELS = {"A": "Frequent", "B": "Occasional", "C": "Remote", "D": "Improbable", "E": "Extremely Improbable"}
 
 
+def derive_priority_from_consequence(
+    occurrence_type: Optional[str],
+) -> str:
+    """CAAN SRM Manual §2.2 (also Sita Air SMS Manual §5.5 item 7):
+    priority is derived from the Annex 13 occurrence category of the
+    reported or projected Unsafe Event / Consequence.
+
+    ACCIDENT          -> "H"
+    SERIOUS_INCIDENT  -> "M"
+    INCIDENT          -> "L"
+    None / unknown    -> "M"  (safe default)
+    """
+    normalized = str(occurrence_type or "").strip().upper()
+    if normalized == "ACCIDENT":
+        return "H"
+    if normalized == "SERIOUS_INCIDENT":
+        return "M"
+    if normalized == "INCIDENT":
+        return "L"
+    return "M"
+
+
 def generate_hazard_id(function: str, priority: str, year: int, seq: int) -> str:
     """Generate the hazard reference per the CAAN Annex 19 / CAR-19 format.
 
@@ -332,7 +354,9 @@ class HazardService:
                     if fields["seq"] > max_seq:
                         max_seq = fields["seq"]
             sequence = max_seq + 1
-            priority = payload.get("priority") or "M"
+            priority = derive_priority_from_consequence(
+                payload.get("occurrence_type")
+            )
             hazard_id = generate_hazard_id(function, priority, year, sequence)
             now = datetime.now(timezone.utc)
             status = payload.get("status", "Open")
@@ -371,7 +395,7 @@ class HazardService:
                 risk_level=risk_level,
                 risk_outcome=risk_out,
                 tolerability_tier=tolerability_tier,
-                priority=payload.get("priority") or "M",
+                priority=priority,
                 recommended_action=payload.get("recommended_action"),
                 corrective_action=payload.get("corrective_action"),
                 corrective_action_flag=payload.get("corrective_action_flag", False),
