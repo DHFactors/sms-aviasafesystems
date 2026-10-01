@@ -78,7 +78,6 @@
         <h2><i class="fas fa-list-check"></i> Assigned CANs & CAPs</h2>
         <div>
             <a id="submitReportBtn" href="/report/mor.html" class="btn btn-outline btn-sm" style="display:none;margin-right:0.5rem;"><i class="fas fa-plus"></i> Submit MOR</a>
-            <a id="masterRegisterBtn" href="/dashboard/master-register.html" class="btn btn-outline btn-sm"><i class="fas fa-table"></i> Master Register</a>
         </div>
     </div>
 
@@ -171,10 +170,6 @@ firebase.auth().onAuthStateChanged(async function(user) {
         // STAFF, same nav and scope) work on the department register and
         // submit MOR only via /report/mor.html; everyone else uses the
         // unified register. Submit MOR stays department-only.
-        const regBtn = document.getElementById('masterRegisterBtn');
-        if (regBtn) regBtn.href = myRole === 'DEPT_ADMIN'
-            ? '/dashboard/dept-master-register.html'
-            : '/dashboard/master-register.html';
         const repBtn = document.getElementById('submitReportBtn');
         if (repBtn && (myRole === 'DEPT_ADMIN' || myRole === 'STAFF')) repBtn.style.display = '';
         const t = (tokenResult.claims && tokenResult.claims.tenant_id) || '';

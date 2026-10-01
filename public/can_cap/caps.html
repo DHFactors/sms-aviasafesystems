@@ -114,13 +114,19 @@ window.SHELL_CONFIG = {
     roleLabel: 'Corrective Action Management',
 };
 </script>
+<script src="/js/nav-config.js"></script>
 <script src="/js/shell.js"></script>
 <script src="/js/can_cap.js"></script>
 <script>
 let currentUser = null;
 
-firebase.auth().onAuthStateChanged(function(user) {
+firebase.auth().onAuthStateChanged(async function(user) {
     if (!user) { window.location.href = '/login.html'; return; }
+    const tokenResult = await user.getIdTokenResult();
+    const t = (tokenResult.claims && tokenResult.claims.tenant_id) || '';
+    if (t && typeof updateShellTenant === 'function') {
+        updateShellTenant(t.replace(/-/g, ' ').toUpperCase(), (tokenResult.claims && tokenResult.claims.department) || undefined);
+    }
     currentUser = user;
     populateFilters();
     loadCaps();

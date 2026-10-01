@@ -100,6 +100,8 @@ var NAV_CONFIG = {
         items: [
             { id: 'dept-tasks', href: '/dashboard/my-tasks.html', label: 'My Tasks', badge: true },
             { id: 'dept-register', href: '/dashboard/dept-master-register.html', label: 'Master Register' },
+            { id: 'dept-can-register', href: '/can_cap/cans.html', label: 'CAN Register' },
+            { id: 'dept-cap-register', href: '/can_cap/caps.html', label: 'CAP Register' },
         ]
     },
 
