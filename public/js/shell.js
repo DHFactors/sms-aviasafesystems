@@ -626,7 +626,7 @@
         // Conditional Home link - show on all pages except landing (safety.html)
         const path = window.location.pathname || '';
         const isLandingPage = path === '/safety.html' || path === '/' || path === '/index.html' || path.endsWith('/safety.html');
-        if (!isLandingPage) {
+        if (!isLandingPage && !cfg.suppressAutoHome) {
             const homeLink = document.createElement('a');
             homeLink.href = '/safety.html';
             homeLink.id = 'shellHomeLink';

@@ -1,0 +1,119 @@
+<!-- ============================================================================
+FILE: state-safety-trends.html
+PATH: public/state-safety-trends.html
+VERSION: 1.0.0
+DATE CREATED: 2026-10-02
+PURPOSE: Safety Trends hub of the State Regulator surface (CAAN SMD / future
+         state regulators). A menu page — no data calls. Links to the three
+         Safety Trends spokes: the State Risk Register, the SPI/SPT dashboard,
+         and the N-HRC KPI dashboard. Part of the State Regulator
+         hub-and-spoke structure alongside state-oversight.html (hub),
+         dashboard/state-sms-maturity.html, and psoe-audit.html.
+AUTHOR: AviaSAFE Systems
+============================================================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safety Trends — State Oversight | AviaSAFE SSP</title>
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/shell.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-check-compat.js"></script>
+    <style>
+        .hub-head { margin-bottom: 1.5rem; }
+        .hub-head h1 { margin: 0; color: var(--color-primary-dark, #0b2a42); display: flex; align-items: center; gap: 0.5rem; }
+        .hub-sub { color: #64748b; font-size: 0.9rem; margin-top: 0.35rem; }
+
+        .hub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+        .hub-card { display: block; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 1.4rem 1.5rem; border-top: 3px solid #1a6b8a; text-decoration: none; color: inherit; transition: box-shadow 0.15s, transform 0.15s; }
+        .hub-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); transform: translateY(-2px); }
+        .hub-card .hub-icon { font-size: 1.6rem; color: #1a6b8a; margin-bottom: 0.6rem; }
+        .hub-card .hub-title { font-weight: 700; font-size: 1.05rem; color: #0b2a42; }
+        .hub-card .hub-desc { font-size: 0.85rem; color: #64748b; margin-top: 0.4rem; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <div id="authGate" style="padding:3rem;text-align:center;color:#64748b;">
+        <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i>
+        <p>Checking State safety oversight access...</p>
+    </div>
+
+    <div id="mainContent" style="display:none;">
+        <div class="hub-head">
+            <h1><i class="fas fa-chart-line" style="color:#1a6b8a;"></i> Safety Trends</h1>
+            <div class="hub-sub">State Safety Performance Indicators, National High-Risk Categories, and the State Risk Register — aggregated at State scope</div>
+        </div>
+
+        <div class="hub-grid">
+            <a href="/state-risk-register.html" class="hub-card">
+                <div class="hub-icon"><i class="fas fa-book"></i></div>
+                <div class="hub-title">State Risk Register</div>
+                <div class="hub-desc">ICAO top-risk categories vs State Safety Programme targets, with cross-tenant aggregation.</div>
+            </a>
+
+            <a href="/dashboard/spi-dashboard.html" class="hub-card">
+                <div class="hub-icon"><i class="fas fa-gauge-high"></i></div>
+                <div class="hub-title">SPI / SPT</div>
+                <div class="hub-desc">State-wide Safety Performance Indicators and Targets — leading and lagging indicators over time.</div>
+            </a>
+
+            <a href="/dashboard/nhrc-kpis.html" class="hub-card">
+                <div class="hub-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="hub-title">N-HRC KPIs</div>
+                <div class="hub-desc">National High-Risk Categories — the State's NASP-aligned top hazards and their risk trends.</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script src="/js/firebase.js?v=4.0.1"></script>
+<script>
+window.SHELL_CONFIG = {
+    brand: 'AviaSAFE',
+    roleLabel: 'State Safety Oversight',
+    tenantTitle: 'Safety Trends — State Oversight',
+    heroSubtitle: 'State Safety Performance Indicators, National High-Risk Categories, and the State Risk Register',
+    suppressAutoHome: true,
+    nav: [
+        { href: '/state-oversight.html', label: 'Home', icon: 'fa-house' },
+        { href: '/dashboard/state-sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+        { href: '/state-safety-trends.html', label: 'Safety Trends', icon: 'fa-chart-line' },
+        { href: '/psoe-audit.html', label: 'PSOE', icon: 'fa-clipboard-check' },
+    ],
+};
+</script>
+<script src="/js/api/client.js"></script>
+<script src="/js/nav-config.js"></script>
+<script src="/js/shell.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    await waitForFirebase();
+    currentUser = await getCurrentUser();
+    if (!currentUser) {
+        window.location.href = '/login.html?tenant=caan';
+        return;
+    }
+    if (currentUser.role !== 'CAAN_SMD' && currentUser.role !== 'SUPER_ADMIN') {
+        alert('Access denied. CAAN_SMD or SUPER_ADMIN role required.');
+        window.location.href = '/';
+        return;
+    }
+    document.getElementById('authGate').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    if (typeof updateShellTenant === 'function') {
+        updateShellTenant('Safety Trends — State Oversight', 'CAAN · Safety Management Division');
+    }
+});
+</script>
+
+</body>
+</html>
