@@ -904,3 +904,44 @@ The result is a mismatch table that makes the full scope visible.
 ### HEAD at time of writing
 
 `1379e07` (pending push).
+
+## Project E — Complete (2026-10-02)
+
+Project E (HTML surface inventory and clean-up) is complete. All four
+batches have landed:
+
+- **Batch 0** (`ab73247`) — created `public/_hold/`, its README, and
+  the `.gitignore` rule.
+- **Batch 1** (`cb14de5`) — parked four files with no live inbound
+  references.
+- **Batch 2** (`0d24d5b`) — parked three more files.
+- **Batch 3** (`3b45158`) — parked three superseded pages and retired
+  the two dormant frontend tests that read them; updated
+  `DASHBOARD_CONTRACT.md`, `IMPLEMENTATION_ROADMAP.md`,
+  `docs/status.md`, and fixed a stale routing mirror in
+  `backend/tests/test_rbac_claims.py:104`.
+- **Batch 4** (`0196e33`) — parked `aviasdcps.html` and the fifteen
+  `views/*` templates. Final batch.
+
+`public/_hold/` now contains the parked HTML files at their original
+relative paths, plus a tracked `README.md` inventory. The folder is
+git-ignored except for the README. Restore procedure: `git mv` each
+file back from `_hold/` to `public/` at its original path.
+
+### What remains queued
+
+- **Nav Submenu Consistency thread** (opened 2026-10-02, see the
+  section above at line ~810). Next step: run the read-only
+  reconnaissance to inventory every submenu entry across
+  `nav-config.js`, produce a mismatch table, triage, then fix.
+- **Todo list** for two placeholder pages whose content is unwritten:
+  `dashboard/spi-dashboard.html` and `dashboard/nhrc-kpis.html`.
+  These are feature-development items, not nav-thread items.
+- **Project B** — tenant-configurable tolerability grid and follow-up
+  windows. Design substantially shaped by prior reconnaissance and
+  the decisions recorded in the 2026-10-01 (afternoon/evening) session
+  update. Has not been started in code.
+
+### HEAD at time of writing
+
+`0196e33` (pending push).
