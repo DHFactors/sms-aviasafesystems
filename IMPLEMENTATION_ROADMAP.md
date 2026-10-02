@@ -297,10 +297,11 @@ migration per table cluster, with rollback.
 - P4-2 Safety Manager: create/view/triage wired; enrich, status update,
   assign, SRAM save, CAN issue, CAP create/review/status, bulletin
   publish, import, SAG/SRB authoring deferred (per
-  `safety-dashboard.html` header).
+  `safety.html` header — this roadmap item is superseded by safety.html).
 - P4-3 Department Head: CAP create/edit/submit wired; evidence upload,
   response-to-review, status change beyond submit deferred (per
-  `dept-head-dashboard.html` header).
+  `dashboard/my-tasks.html` header — this roadmap item is superseded by
+  my-tasks.html).
 
 ---
 

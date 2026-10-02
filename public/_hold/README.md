@@ -60,12 +60,28 @@ moved in, and the reason it was parked.
   candidate. The sibling files `shell.js`, `module-flag.js`, and
   `shell.css` in the same folder remain in place.
 
+### Batch 3 — moved 2026-10-02
+
+- `admin/dashboard.html` — Batch 3 — <title> already marked
+  [DEPRECATED → Production Setup]; meta-refresh at :20 and
+  firebase.json:20-22 both redirect /admin/dashboard.html to
+  /admin/production-setup.html. The redirect is URL-pattern-based, so
+  it survives the file move.
+- `dashboard/safety-dashboard.html` — Batch 3 — Wave 2 / P4-2
+  contract-defined page, superseded by /safety.html. No live inbound.
+- `dashboard/dept-head-dashboard.html` — Batch 3 — Wave 3 / P4-3
+  contract-defined page, superseded by /dashboard/my-tasks.html. No
+  live inbound. Live router (firebase.js:671) already routes DEPT_ADMIN
+  to my-tasks.html.
+- `frontend-tests/test_dept_head_dashboard.js` — Batch 3 — reads
+  dept-head-dashboard.html from disk; parked alongside the page it
+  tests. Not in CI (package.json:14 does not reference it).
+- `frontend-tests/test_safety_dashboard.js` — Batch 3 — reads
+  safety-dashboard.html from disk; parked alongside the page it tests.
+  Not in CI (package.json:14 does not reference it).
+
 ### Pending batches
 
-- Batch 3 — `admin/dashboard.html`, `dashboard/safety-dashboard.html`,
-  `dashboard/dept-head-dashboard.html`. Requires updates to
-  `DASHBOARD_CONTRACT.md`, `IMPLEMENTATION_ROADMAP.md`, and
-  `frontend-tests/test_dept_head_dashboard.js` in the same commit
-  because the CI test reads `dept-head-dashboard.html` from disk and
-  the two docs describe the two dashboards as live.
-- Batch 4 (separate queue item) — `aviasdcps.html` and `views/*`.
+- Batch 4 (separate queue item) — `aviasdcps.html` and `views/*`
+  (13 files). The project's origin (the Annex 19 data-collection shell
+  the SMS application grew out of). Confirmed not in any live chain.

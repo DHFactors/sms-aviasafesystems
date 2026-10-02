@@ -60,8 +60,8 @@ Architecture:
 **Current implementation.** Role-scoped dashboard pages exist alongside the
 tenant airline dashboard (`routes/dashboard.py:64-279`) and the CAAN/regulator
 dashboard (`routes/dashboard.py:287-372`, `routes/regulator_dashboard.py:26-93`):
-`public/dashboard/safety-dashboard.html` (Wave 2 / P4-2, Safety Manager),
-`public/dashboard/dept-head-dashboard.html` (Wave 3 / P4-3, Department Head),
+`public/safety.html` (Safety Manager — supersedes Wave 2 / P4-2), and
+`public/dashboard/my-tasks.html` (Department — supersedes Wave 3 / P4-3),
 and `public/dashboard/ae-dashboard.html` (pre-Wave-4 content — the Phase 4
 Wave 4 rebuild per P4-4 is still pending). Role scoping is enforced by
 per-route dependencies, not by dashboard.
@@ -191,7 +191,7 @@ Endpoints: `POST /api/v1/hazards` (`routes/hazards.py:30`),
 
 **Current implementation.** Source endpoints exist and are tenant-scoped
 (`routes/dashboard.py` airline block). Dedicated page exists:
-`public/dashboard/safety-dashboard.html` (Wave 2 / P4-2) with the 5-counter
+`public/safety.html` (supersedes Wave 2 / P4-2) with the 5-counter
 KPI strip, drill-down, and workspace; create/view/triage actions wired.
 Deferred per the page header: enrichment, status update, assign, SRAM save,
 CAN issue, CAP create/review/status, bulletin publish, import, SAG/SRB
@@ -256,7 +256,7 @@ department scope enforced by `get_department_scope` (`auth.py:209-220`).
 `department` filter (`routes/dashboard.py:169-249`; `routes/can_cap.py:104-138`);
 `get_department_scope` restricts 145/CAMO/ops accounts
 (`auth.py:202-220`). Dedicated page exists:
-`public/dashboard/dept-head-dashboard.html` (Wave 3 / P4-3) with the
+`public/dashboard/my-tasks.html` (supersedes Wave 3 / P4-3) with the
 3-counter dept-filtered KPI strip and CAP create/edit/submit wired.
 Deferred per the page header: evidence upload, response-to-review, and
 status change beyond submit.

@@ -65,9 +65,11 @@ Completed, committed, and deployed in the previous cycle (report of 2026-08-31):
   enforcement, and CAN/CAP email notifications with an overdue-check job.
 * **Localhost cleanup** — every `localhost`/`127.0.0.1` runtime reference
   removed across frontend and backend.
-* **Unified Super Admin Dashboard** (`/admin/dashboard.html`) — SUPER_ADMIN-gated
-  console consolidating Test Portal, Tenant Management, Production Setup,
-  Audit Log, and Dummy Data.
+* **Production Setup** (`/admin/production-setup.html`) — SUPER_ADMIN-gated
+  console consolidating Tenant Management, Production Setup Steps 1–9,
+  Audit Log, and Dummy Data. Supersedes the earlier Unified Super Admin
+  Dashboard (`/admin/dashboard.html`), which now 301-redirects here via
+  firebase.json.
 * **HFACS catalog to 109 nanocodes** (ACT/PRECOND/SUPER/ORG tiers) wired into
   the hazard-analysis dropdown.
 * **PSOE → CAN persistent link** (`psoe_assessment_id`) and the **archived-flag
