@@ -634,28 +634,17 @@ The `public/portal/` folder is now empty (both `portal/` and its
 were left in place; Firebase Hosting serves files, not directories,
 so an empty path falls through the catch-all rewrite to `/index.html`.
 
-**Batch 3 — pending.** Three files to park, but this batch requires
-documentation and test updates in the same commit because the CI test
-`frontend-tests/test_dept_head_dashboard.js` reads one of the files
-from disk and two docs (`DASHBOARD_CONTRACT.md`,
-`IMPLEMENTATION_ROADMAP.md`) describe the two dashboards as live:
-
-- `public/admin/dashboard.html` — source of the 301 redirect in
-  `firebase.json:20-22`; referenced in
-  `backend/tests/test_rbac_claims.py:104` and in comments in
-  `backend/app/routes/admin.py` (`:421`, `:941`, `:1561`).
-- `public/dashboard/safety-dashboard.html` — described as "Wave 2 /
-  P4-2" in `DASHBOARD_CONTRACT.md:63,194` and
-  `IMPLEMENTATION_ROADMAP.md:300`.
-- `public/dashboard/dept-head-dashboard.html` — described as "Wave 3 /
-  P4-3" in `DASHBOARD_CONTRACT.md:64,259` and
-  `IMPLEMENTATION_ROADMAP.md:303`; read by
-  `frontend-tests/test_dept_head_dashboard.js:4,24`.
-
-Batch 3's first step is a reconnaissance pass to see the exact current
-state of the two docs and the test, then a single execution commit that
-moves the three files, updates the docs to record the supersession, and
-retargets (or retires) the test.
+**Batch 3 (`3b45158`) — done.** Parked three pages and retired
+the two dormant frontend tests that read them from disk:
+`admin/dashboard.html`, `dashboard/safety-dashboard.html`,
+`dashboard/dept-head-dashboard.html`, plus
+`frontend-tests/test_dept_head_dashboard.js` and
+`frontend-tests/test_safety_dashboard.js`. Updated
+`DASHBOARD_CONTRACT.md`, `IMPLEMENTATION_ROADMAP.md`, and
+`docs/status.md` to record the supersessions. Fixed a stale mirror
+in `backend/tests/test_rbac_claims.py:104`
+(`/admin/dashboard.html` → `/admin/production-setup.html`), which
+did not match the live router at `firebase.js:655`.
 
 **Batch 4 — pending, separate.** Park `public/aviasdcps.html` and the
 `public/views/*` family (13 files). This is the project's origin (the
