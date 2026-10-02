@@ -945,3 +945,272 @@ file back from `_hold/` to `public/` at its original path.
 ### HEAD at time of writing
 
 `0196e33` (pending push).
+
+## Session Update — 2026-10-02 (afternoon/evening) — CAAN rename, State Regulator nav, shell consolidation
+
+### Commits landed this session
+
+Ordered oldest to newest. All pushed to `origin/main`.
+
+- `ab73247` — chore(project-e): create public/_hold/ for parked files pending chain verification
+- `cb14de5` — chore(project-e): move Batch 1 files into public/_hold/
+- `0d24d5b` — chore(project-e): move Batch 2 files into public/_hold/
+- `3b45158` — chore(project-e): move Batch 3 pages into public/_hold/ and update references
+- `1379e07` — docs(handoff): record Project E Batch 3 as done
+- `b4e90ea` — docs(handoff): record Nav Submenu Consistency thread
+- `0196e33` — chore(project-e): move Batch 4 into public/_hold/ (aviasdcps + views)
+- `8c23d02` — docs(handoff): record Project E completion
+- `8d35994` — fix(nav): restructure PSOE Audit as a per-tenant Module 3 entry
+- `1851842` — refactor(caan): rename State Regulator pages to state-neutral filenames
+- `f184f46` — feat(nav): State Regulator flat four-entry nav (hub-and-spoke)
+- `f52d46d` — fix(state): hub page CSS includes and risk register hero fallback
+- `ef15547` — refactor(css): consolidate shell header chrome to shell.css
+- `4085474` — refactor(css): move header layout to shell.css; stack header rows
+- `e7e5527` — fix(css): stretch header children to full width so internal alignment applies
+
+HEAD at time of writing: `e7e5527`.
+
+### Workstream 1 — Project E (complete)
+
+Project E was opened to inventory the 87 `.html` files under
+`public/`, determine which are live, which are superseded, and which
+are dead, and park the dead ones in `public/_hold/`. It is now
+complete across four batches plus a session-close entry.
+
+**Batch 0** (`ab73247`) — created `public/_hold/`, its README, and
+the `.gitignore` rule. The folder is git-ignored except for the
+README, which is force-added.
+
+**Batch 1** (`cb14de5`) — parked `hazards/index.html`,
+`hazards/create.html`, `test-portal.html`,
+`portal/survey/index.html`.
+
+**Batch 2** (`0d24d5b`) — parked `demo-contract.html`,
+`portal/index.html`, `dashboard/shared/shell.html`.
+
+**Batch 3** (`3b45158`) — parked `admin/dashboard.html`,
+`dashboard/safety-dashboard.html`, `dashboard/dept-head-dashboard.html`;
+retired the two dormant frontend tests
+(`test_dept_head_dashboard.js`, `test_safety_dashboard.js`); updated
+`DASHBOARD_CONTRACT.md`, `IMPLEMENTATION_ROADMAP.md`,
+`docs/status.md`; fixed a stale routing mirror in
+`backend/tests/test_rbac_claims.py:104`.
+
+**Batch 4** (`0196e33`) — parked `aviasdcps.html` and the fifteen
+`views/*` templates. Final batch.
+
+Restore procedure is in `public/_hold/README.md`.
+
+### Workstream 2 — PSOE Audit as a per-tenant Module 3 nav entry (`8d35994`)
+
+Module 3 is a per-tenant subscriber module. Two audiences reach the
+PSOE Audit surface: CAAN can conduct an audit of a specific tenant,
+and a tenant can self-audit. CAAN's aggregated oversight applies to
+Module 1 and Module 2 only, not Module 3.
+
+Changes:
+
+- Removed PSOE Audit from the CAAN-only `regulator` group in
+  `nav-config.js`.
+- Removed the `module_c_regulator` gate from `regulator` (CAAN's
+  aggregated Module 1/2 views are not gated by a tenant's Module 3
+  subscription).
+- Added an `oversight` group with `roles: ['SAFETY', 'CAAN']`,
+  `module: 'module_c_regulator'`, containing the PSOE Audit entry.
+- `shell.js`: threaded the tenant module bag into both
+  `getVisibleNav` call sites. Previously the bag was resolved and
+  stored but never passed, so every module gate was inert.
+
+Pre-existing unrelated test failure: `test_nav_config.js` has a
+stale AE-menu assertion (`test_ae_narrow_menu`, line 59) that was
+failing before any of this session's work. Not touched.
+
+### Workstream 3 — CAAN → state-neutral filenames (`1851842`)
+
+The State Regulator surface is a subscriber-facing product that will
+be sold to multiple states. Renamed four CAAN-specific filenames to
+state-neutral paths:
+
+```
+caan.html                         → state-oversight.html
+dashboard/caan-sms-maturity.html  → dashboard/state-sms-maturity.html
+caan-state-risk.html              → state-risk-register.html
+audits/psoe.html                  → psoe-audit.html
+```
+
+Four 301 redirects added to `firebase.json` so old URLs continue to
+resolve.
+
+References updated across the platform:
+
+- `public/js/firebase.js` — the CAAN_SMD role router return.
+- `backend/tests/test_rbac_claims.py` — the router mirror.
+- `public/js/nav-config.js` — four hrefs (including the oversight
+  entry found in extended reconnaissance).
+- `public/can_cap/can_detail.html` — the live PSOE link.
+- `public/js/shell.js` — the legacy `NAV_ITEMS` PSOE path.
+- `backend/app/services/groq_copilot.py` — the copilot page-key
+  lookup table (`:135`) and its docstring example. The copilot's
+  page-aware behaviour depends on this key; leaving it stale would
+  have silently lost page-scope instructions for the State oversight
+  page.
+- `backend/tests/test_copilot.py` and `test_admin_feedback.py` —
+  test strings keying on the old page filename.
+
+`public/audits/` is now empty; folder left in place.
+
+**Pattern to remember:** the copilot page-key table in
+`groq_copilot.py` is a dependency that future page renames must
+update. If a page's filename changes, the key must change with it.
+
+### Workstream 4 — State Regulator flat four-entry nav (`f184f46`)
+
+The State Regulator surface was restructured as hub-and-spoke with a
+flat four-entry nav, identical on every State Regulator page:
+
+```
+Home           → /state-oversight.html
+SMS Maturity   → /dashboard/state-sms-maturity.html
+Safety Trends  → /state-safety-trends.html    (new hub)
+PSOE           → /psoe-audit.html
+```
+
+- `state-safety-trends.html` is a new hub page — a menu with three
+  cards linking to its spokes (`state-risk-register.html`,
+  `dashboard/spi-dashboard.html`, `dashboard/nhrc-kpis.html`). No
+  data on the hub.
+- `shell.js` gained a `suppressAutoHome` config key so a page can
+  opt out of the automatic Home link (which pointed at
+  `/safety.html`, wrong for a State Regulator user).
+
+Known follow-ons documented in the commit message:
+- `dashboard/spi-dashboard.html` and `dashboard/nhrc-kpis.html`
+  still render the shared `nav-config.js` nav. A CAAN user reaching
+  them from the Safety Trends hub sees a different nav from the hub.
+- The CAAN-specific entries in `nav-config.js` (regulator group,
+  `caan-dashboard` item, `oversight` group) are inert for CAAN after
+  this change but remain as fallback for other roles.
+- The Operator-side PSOE flow on `psoe-audit.html` now sees the State
+  Regulator nav. If that is wrong for operators, a role-aware nav
+  variant is the follow-on.
+
+### Workstream 5 — Hub page CSS and risk register hero (`f52d46d`)
+
+- `state-safety-trends.html` was missing four shell includes
+  (`tenant-overrides.css`, `chart.js`, `chart-theme.js`,
+  `theme.css`). Added in the order used by `state-oversight.html`.
+- `state-risk-register.html` briefly showed "Unknown" during the
+  initial hero paint — its `SHELL_CONFIG` carried no `tenantTitle` or
+  `heroSubtitle`, so the shell fell through to
+  `airlineNameFromEmail()`, which cannot derive a name from a
+  regulator's email domain. Added both as fallback values. The
+  existing dynamic `updateShellTenant` call that refines the title
+  once the regulator metadata resolves is unchanged.
+
+### Workstream 6 — Shell header consolidation (`ef15547`, `4085474`, `e7e5527`)
+
+Three commits that together settled the shell header, after several
+symptoms surfaced during CAAN page verification.
+
+**The mismatch (`ef15547`).** `shell.js` builds the header element
+with `className = 'app-header'`. `shell.css` styled `.shell-header`
+— a class that no live element carries. So the shell's own stylesheet
+never styled the shell's own header. The navy background came from a
+workaround rule in `dashboard-responsive.css:17`
+(`.app-header { position: fixed; background: #1a237e; ... }`) that
+was load-bearing for seven pages and not loaded on the three CAAN
+pages that lacked it. The newly-created `state-safety-trends.html`
+rendered teal because it got the fresh CSS without the workaround.
+
+Fix: made `shell.css` the single owner of the base `.app-header`
+rule (navy `var(--shell-navy)` = `#072535`, `position: sticky`),
+deleted the ten dead `.shell-header` descendant rules, removed the
+base `.app-header` rule from `main.css`, `theme.css`, and
+`dashboard-responsive.css`, and added `shell.css` to the seven
+pages that had been relying on the workaround.
+
+**Layout consolidation (`4085474`).** `shell.css` still defined none
+of the header's internal layout classes — `.header-top`,
+`.header-left`, `.header-right`, `.header-brand`, `.header-nav`,
+`.nav-link`, `.nav-dropdown`, `.dropdown-toggle`, `.dropdown-menu`,
+`.header-divider`. All of those lived only in
+`dashboard-responsive.css`. So the CAAN pages that load only
+`shell.css` rendered a default-block header. This commit moved the
+header-layout rules to `shell.css`, added `flex-direction: column`
+to `.app-header` so its three children (top row, divider, nav row)
+stack as rows, and removed the stale `.main-content { margin-top:
+94px }` rule from `dashboard-responsive.css` (that margin existed to
+clear the old `position: fixed` header; it produced a blank band
+above the sticky header).
+
+**Alignment fix (`e7e5527`).** `align-items: center` on
+`.app-header` (added in `4085474`) shrank each child to content
+width and centred it, so `.header-top { justify-content:
+space-between }` and `.header-nav { justify-content: center }` had
+no width to distribute — the brand, user email, and Logout clustered
+in a centred group. Changed to `align-items: stretch`, so each child
+fills the header's width and the internal alignment rules take
+effect.
+
+Verified on the deployed site: `/safety.html` (tenant) and
+`/state-safety-trends.html` (regulator) both render brand left, user
+email + Logout right, full-width gold divider, nav row centred.
+
+### Key decisions recorded this session
+
+- **Subscriber model.** The platform's audience is two subscriber
+  types: tenants (operators) and state regulators. They are both
+  "tenants" in the data model — a state regulator has a tenant row,
+  a category, and scope that differ from an operator's. The
+  SUPER_ADMIN (the vendor) is not a subscriber; the `admin/*` surface
+  is vendor-side tooling.
+
+- **State Regulator nav is page-local, not `nav-config.js`.** The
+  five CAAN pages declare their own four-entry nav via
+  `SHELL_CONFIG.nav`. The shared `nav-config.js` continues to serve
+  the tenant roles. Future State Regulator pages use the same
+  four-entry array.
+
+- **Top-bar layout stays.** The abandoned `dashboard/shared/shell.js`
+  is a sidebar shell. It is not adopted. The top-bar shell
+  (`js/shell.js`) remains the platform's shell.
+
+- **`shell.css` owns the whole header** — colour and layout.
+
+### Outstanding follow-ons
+
+1. **Shared spokes role-aware nav** — `dashboard/spi-dashboard.html`
+   and `dashboard/nhrc-kpis.html` still render the shared
+   `nav-config.js` nav. A CAAN user reaching them from the Safety
+   Trends hub sees the shared nav, not the four-entry regulator nav.
+   Requires a role-conditional nav on each page (or a shell method
+   to set `SHELL_CONFIG.nav` after the role resolves). A read-only
+   reconnaissance was drafted but not run.
+
+2. **Nav Submenu Consistency thread** — five issues recorded in the
+   session's "Nav Submenu Consistency" entry (`b4e90ea`): SMS
+   Maturity mixed nav, SPI/SPT and N-HRC KPI placeholder content,
+   Team Management Access Denied, System Settings mismatched nav.
+   Needs its own full inventory reconnaissance across
+   `nav-config.js`.
+
+3. **Remove now-inert CAAN entries from `nav-config.js`** — the
+   `regulator` group, the `caan-dashboard` item, and the `oversight`
+   group are inert for CAAN after `f184f46` but remain in place as
+   fallback for other roles and other pages. Small cleanup, once we
+   are confident nothing consults them.
+
+4. **Park `dashboard/shared/shell.js`** — no live page loads it. One
+   `git mv` into `_hold/`, alongside the earlier housekeeping.
+
+### Test status
+
+- `test_rbac_claims.py`, `test_copilot.py`, `test_admin_feedback.py`
+  — 54 passed after the rename (commit `1851842`).
+- `test_nav_config.js` — fails on a pre-existing stale AE-menu
+  assertion (`test_ae_narrow_menu`, line 59). Present on `fb4bb3b`
+  and earlier, before any of this session's work. Not modified.
+
+### HEAD at time of writing
+
+`e7e5527`
