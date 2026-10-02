@@ -645,7 +645,7 @@ function getRoleDestination(user) {
     var role = (user && user.role) || 'USER';
 
     // 1. Regulator
-    if (role === 'CAAN_SMD') return '/caan.html';
+    if (role === 'CAAN_SMD') return '/state-oversight.html';
 
     // 2. Accountable Executive — executive governance dashboard per
     // ICAO Annex 19 / Doc 10159.

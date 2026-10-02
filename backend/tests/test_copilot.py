@@ -214,7 +214,7 @@ def test_chat_uses_explicit_model_and_params(monkeypatch):
     monkeypatch.setitem(sys.modules, "groq", module)
     monkeypatch.setenv("GROQ_API_KEY", "gsk_test_key")
 
-    groq_copilot.chat("hello", page_context="caan.html")
+    groq_copilot.chat("hello", page_context="state-oversight.html")
 
     kwargs = _FakeGroqCompletions.last_kwargs
     assert kwargs["model"] == "openai/gpt-oss-120b"
@@ -439,7 +439,7 @@ def test_build_system_prompt_includes_strict_page_scope(monkeypatch):
 
 def test_detect_page_name_parses_filename(monkeypatch):
     _patch_env(monkeypatch, groq=False)
-    assert groq_copilot.detect_page_name("caan.html — State Safety Programme") == "caan.html"
+    assert groq_copilot.detect_page_name("state-oversight.html — State Safety Programme") == "state-oversight.html"
     assert groq_copilot.detect_page_name("Register Your Organization — register.html") == "register.html"
     assert groq_copilot.detect_page_name("Safety Dashboard") is None
     assert groq_copilot.detect_page_name(None) is None

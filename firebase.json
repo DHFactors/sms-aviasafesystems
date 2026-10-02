@@ -20,6 +20,26 @@
           "source": "/admin/dashboard.html",
           "destination": "/admin/production-setup.html",
           "type": 301
+        },
+        {
+          "source": "/caan.html",
+          "destination": "/state-oversight.html",
+          "type": 301
+        },
+        {
+          "source": "/dashboard/caan-sms-maturity.html",
+          "destination": "/dashboard/state-sms-maturity.html",
+          "type": 301
+        },
+        {
+          "source": "/caan-state-risk.html",
+          "destination": "/state-risk-register.html",
+          "type": 301
+        },
+        {
+          "source": "/audits/psoe.html",
+          "destination": "/psoe-audit.html",
+          "type": 301
         }
       ],
       "rewrites": [

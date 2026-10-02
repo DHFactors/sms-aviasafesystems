@@ -112,7 +112,7 @@ def _seed(db):
             "subject": "SSP Reporting",
             "message": "Reviewing dashboards.",
             "rating": None,
-            "page": "/caan.html",
+            "page": "/state-oversight.html",
             "created_at": now,
             "status": "new",
         },

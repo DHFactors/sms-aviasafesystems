@@ -108,7 +108,7 @@
             icon: '\uD83D\uDD0D',
             dropdown: [
                 { label: 'SPI/SPT Dashboard', path: '/dashboard/spi-dashboard.html' },
-                { label: 'PSOE Audit', path: '/audits/psoe.html' },
+                { label: 'PSOE Audit', path: '/psoe-audit.html' },
                 { label: 'Management of Change', path: '/moc/index.html' }
             ],
             requires: { plan: 'pro', module: 'module3' }

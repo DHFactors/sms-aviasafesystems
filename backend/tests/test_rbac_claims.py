@@ -103,7 +103,7 @@ def _route(user):
     if role == "SUPER_ADMIN":
         return "/admin/production-setup.html"
     if role == "CAAN_SMD":
-        return "/caan.html"
+        return "/state-oversight.html"
     if role == "USER":
         department = user.get("department") or ""
         if department:

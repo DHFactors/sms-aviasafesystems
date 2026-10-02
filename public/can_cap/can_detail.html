@@ -270,7 +270,7 @@ function renderCan() {
     const psoeLink = document.getElementById('psoeAssessmentLink');
     if (psoeId && psoeField && psoeLink) {
         psoeLink.textContent = psoeId;
-        psoeLink.href = `/audits/psoe.html?id=${encodeURIComponent(psoeId)}`;
+        psoeLink.href = `/psoe-audit.html?id=${encodeURIComponent(psoeId)}`;
         psoeField.style.display = '';
     }
 

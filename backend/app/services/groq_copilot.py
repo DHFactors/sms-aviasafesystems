@@ -132,7 +132,7 @@ PAGE_SCOPE_GUIDANCE = {
         "Safety Management System dashboard. Support SMS reporting (VSR voluntary/confidential, MOR "
         "mandatory), hazard & risk management, corrective actions (CAN/CAP), and safety performance monitoring."
     ),
-    "caan.html": (
+    "state-oversight.html": (
         "State aviation safety oversight dashboard. Support State Safety Programme (SSP) activities, "
         "state safety objectives, regulatory oversight, inspections, operator audits, and safety "
         "performance monitoring for the civil aviation authority."
@@ -149,7 +149,7 @@ PAGE_SCOPE_GUIDANCE = {
 
 
 def detect_page_name(page_context: Optional[str]) -> Optional[str]:
-    """Extract the page filename (e.g. 'caan.html') from the page_context string."""
+    """Extract the page filename (e.g. 'state-oversight.html') from the page_context string."""
     if not page_context:
         return None
     match = re.search(r"([A-Za-z0-9_.-]+\.html)", page_context)

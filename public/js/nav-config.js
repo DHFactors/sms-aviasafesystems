@@ -53,7 +53,7 @@ var NAV_CONFIG = {
             { id: 'key-indicators', href: '/safety.html', label: 'Key Indicators', roles: ['SAFETY'], module: 'module_b_srm' },
             { id: 'my-tasks', href: '/dashboard/my-tasks.html', label: 'My Tasks', roles: ['ALL'], badge: true, module: 'module_b_can_cap' },
             { id: 'ae-dashboard', href: '/dashboard/ae-dashboard.html', label: 'Executive', roles: ['AE'], module: 'module_b_srm' },
-            { id: 'caan-dashboard', href: '/caan.html', label: 'CAAN Oversight', roles: ['CAAN'], module: 'module_c_regulator' },
+            { id: 'caan-dashboard', href: '/state-oversight.html', label: 'CAAN Oversight', roles: ['CAAN'], module: 'module_c_regulator' },
         ]
     },
 
@@ -126,7 +126,7 @@ var NAV_CONFIG = {
         roles: ['SAFETY', 'CAAN'],
         module: 'module_c_regulator',
         items: [
-            { id: 'psoe-audit', href: '/audits/psoe.html', label: 'PSOE Audit' },
+            { id: 'psoe-audit', href: '/psoe-audit.html', label: 'PSOE Audit' },
         ]
     },
 
@@ -136,8 +136,8 @@ var NAV_CONFIG = {
         icon: 'fa-landmark',
         roles: ['CAAN'],
         items: [
-            { id: 'state-maturity', href: '/dashboard/caan-sms-maturity.html', label: 'State SMS Maturity' },
-            { id: 'caan-risk', href: '/caan-state-risk.html', label: 'State Risk Register' },
+            { id: 'state-maturity', href: '/dashboard/state-sms-maturity.html', label: 'State SMS Maturity' },
+            { id: 'caan-risk', href: '/state-risk-register.html', label: 'State Risk Register' },
         ]
     },
 
