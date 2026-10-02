@@ -806,3 +806,101 @@ separate commit.
 ### HEAD at time of writing
 
 `0d24d5b`
+
+## Nav Submenu Consistency — new thread opened 2026-10-02
+
+### Context
+
+Batch 3 verification of Project E surfaced a cluster of navigation
+inconsistencies on the Safety Manager (TENANT_ADMIN) surface. Several
+pages reached via the Performance and Administration submenus render a
+different nav from the one that offered them. Two further submenu
+entries lead to pages whose content is unwritten (SPI/SPT and N-HRC
+KPIs). One submenu entry leads to a page that denies access to the
+Safety Manager who reached it.
+
+This is the same class of issue as the CAN/CAP nav bugs fixed earlier
+in `bcaa9c2`, but broader: each submenu page appears to choose its own
+shell setup independently, so pages from one nav group can render a
+nav that belongs to a different group.
+
+### Confirmed findings (from the Batch 3 verification)
+
+1. **Performance → SMS Maturity renders a mixed-module nav.**
+   `/dashboard/sms-maturity.html` (reached from
+   `safety.html` → Performance → SMS Maturity) renders a nav that
+   mixes Module 1, Module 2, and Module 3 entries
+   (Home, SMS Maturity, Risk Management, Assurance, Reports, Promotion,
+   Administration) instead of the Safety Manager nav the user came
+   from.
+
+2. **Performance → SPI/SPT content not developed.**
+   `/dashboard/spi-dashboard.html` renders the page shell (title,
+   Refresh button, "Leading Indicators", "Lagging Indicators",
+   "SPI Trend (Last 6 Months)" headings) but no data or charts.
+
+3. **Performance → N-HRC KPIs content not developed.**
+   `/dashboard/nhrc-kpis.html` renders the page shell (title, Refresh
+   button, "Total Hazards", "Action Required", "Stable / OK",
+   "Avg Risk Index" labels, "N-HRC Trend (Last 6 Months)" heading)
+   but no values or chart.
+
+4. **Administration → Team Management renders Access Denied for the
+   Safety Manager.**
+   `/settings/team.html` shows "Access Denied — Team management is
+   available to the Safety Manager (Tenant Admin) and Department Admins
+   only." while the logged-in user is `safety@sitaair.com.np`
+   (TENANT_ADMIN / Safety Manager). The page's own access check is
+   contradicting the nav that offered the link.
+
+5. **Administration → System Settings renders a mismatched nav.**
+   `/administration.html` renders fine in the body (ICAO Risk Matrix
+   Configuration, SMS Survey Management, further sections below), but
+   its nav is the SMS Maturity-style nav, not the Safety Manager nav
+   the user came from. Additionally, `/settings/team.html` renders a
+   third nav shape (Home, Key Indicators, SMS Maturity, Risk Trends,
+   Top Hazards, N-HRC KPIs, SPI/SPT) — a different vocabulary entirely.
+
+### Owner decisions
+
+- **Full inventory required.** Rather than fix these five items
+  piecemeal, run a read-only reconnaissance that inventories every
+  entry in `public/js/nav-config.js` — what page it lands on, what nav
+  that page renders, and whether the rendered nav matches the offering
+  nav. Produce a mismatch table, then triage.
+- **SPI/SPT and N-HRC KPIs are placeholders.** Their nav entries are
+  valid; the content is queued. Add both to a todo list for future
+  work, not to this refinement thread.
+- **Batch 4 first, then nav recon.** Project E Batch 4
+  (`aviasdcps.html` + `views/*`) is unaffected by these findings and
+  should complete before the nav thread opens.
+
+### Todo — content development (queued, not in this thread)
+
+- Build `dashboard/spi-dashboard.html` content — Leading Indicators,
+  Lagging Indicators, SPI Trend chart, backed by the existing SPI/SPT
+  endpoints if they exist; new endpoints if they do not.
+- Build `dashboard/nhrc-kpis.html` content — Total Hazards, Action
+  Required, Stable / OK, Avg Risk Index, N-HRC Trend chart.
+- Both pages already have shells; the work is data wiring plus chart
+  rendering.
+
+### First step for the nav thread
+
+A read-only reconnaissance prompt will inventory every submenu entry
+across `nav-config.js`. It will quote, for each entry:
+
+- The submenu label and the parent group it appears under.
+- The href and the file it resolves to.
+- The shell includes that file loads.
+- The `SHELL_CONFIG` block on that file.
+- The nav the page actually renders (by inspection of the shell
+  it loads and the nav-config it consumes).
+- Whether the rendered nav matches the offering group's nav, or is
+  different.
+
+The result is a mismatch table that makes the full scope visible.
+
+### HEAD at time of writing
+
+`1379e07` (pending push).
