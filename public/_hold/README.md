@@ -80,8 +80,21 @@ moved in, and the reason it was parked.
   safety-dashboard.html from disk; parked alongside the page it tests.
   Not in CI (package.json:14 does not reference it).
 
+### Batch 4 — moved 2026-10-02
+
+- `aviasdcps.html` — Batch 4 — the project's origin, the Annex 19
+  data-collection shell. Loads `public/js/aviasdcps-router.js`, which
+  fetch()es templates from `views/`. Not in any live chain; not
+  linked from any SMS-app page. The firebase.json rewrites for
+  `/aviasdcps` and `/aviasdcps/**` are URL-pattern-matched and are
+  unaffected by the file move; requests to those paths now fall
+  through to `/index.html` via the catch-all rewrite.
+- `views/*` — Batch 4 — fifteen template files fetched by
+  `aviasdcps.html` via `aviasdcps-router.js`. None is reachable as a
+  navigated page. The router file `public/js/aviasdcps-router.js` is
+  intentionally not moved; it may be loaded by pages outside this
+  batch and is left in place.
+
 ### Pending batches
 
-- Batch 4 (separate queue item) — `aviasdcps.html` and `views/*`
-  (13 files). The project's origin (the Annex 19 data-collection shell
-  the SMS application grew out of). Confirmed not in any live chain.
+(none — Project E is complete)
