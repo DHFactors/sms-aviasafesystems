@@ -35,7 +35,7 @@
 }
 
 /* ========== TOP HEADER ========== */
-.shell-header {
+.app-header {
     background: var(--shell-navy);
     color: #fff;
     display: flex;
@@ -49,64 +49,6 @@
     border-bottom: 3px solid var(--shell-gold);
     gap: 1rem;
     flex-wrap: wrap;
-}
-
-.shell-header .shell-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    font-weight: 700;
-    font-size: 1.05rem;
-}
-
-.shell-header .shell-brand i {
-    font-size: 1.3rem;
-}
-
-.shell-header .shell-tenant {
-    text-align: right;
-}
-
-.shell-header .shell-tenant .tenant-name {
-    font-weight: 700;
-    font-size: 0.95rem;
-}
-
-.shell-header .shell-tenant .tenant-meta {
-    font-size: 0.7rem;
-    opacity: 0.8;
-}
-
-.shell-header .shell-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.shell-header .shell-user {
-    font-size: 0.75rem;
-    opacity: 0.85;
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.shell-header .btn-logout {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.35);
-    color: #fff;
-    padding: 0.4rem 1rem;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.shell-header .btn-logout:hover {
-    background: rgba(255,255,255,0.12);
-    border-color: rgba(255,255,255,0.6);
 }
 
 /* ========== FIXED LEFT SIDEBAR ========== */
@@ -270,7 +212,6 @@
     .shell-sidebar .sidebar-nav li a.active { border-left: none; border-bottom-color: var(--shell-gold); }
     .shell-sidebar .sidebar-footer { display: none; }
     .app-shell .shell-main { margin-left: 0; }
-    .shell-header .shell-tenant { text-align: left; }
 }
 
 /* ========== SHELL.JS TOP-NAV EXTENSIONS ========== */

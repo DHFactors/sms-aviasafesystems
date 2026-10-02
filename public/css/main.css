@@ -231,15 +231,6 @@ select.form-control { appearance: auto; }
 .table tr:hover { background: var(--color-gray-50); }
 
 /* ========== HEADER ========== */
-.app-header {
-    background: var(--color-primary);
-    color: var(--color-white);
-    padding: var(--spacing-md) 0;
-    box-shadow: var(--shadow-md);
-    position: sticky;
-    top: 0;
-    z-index: var(--z-sticky);
-}
 .app-header .header-content {
     display: flex;
     justify-content: space-between;
