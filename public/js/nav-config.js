@@ -117,15 +117,26 @@ var NAV_CONFIG = {
         ]
     },
 
+    // ─── OVERSIGHT ─── (Module 3, per-tenant PSOE Audit; both
+    // audiences reach the same surface for different purposes —
+    // CAAN conducts audits of a tenant; a tenant self-audits.)
+    oversight: {
+        label: 'Oversight',
+        icon: 'fa-clipboard-check',
+        roles: ['SAFETY', 'CAAN'],
+        module: 'module_c_regulator',
+        items: [
+            { id: 'psoe-audit', href: '/audits/psoe.html', label: 'PSOE Audit' },
+        ]
+    },
+
     // ─── REGULATOR ─── (Module C; CAAN only)
     regulator: {
         label: 'Regulator',
         icon: 'fa-landmark',
         roles: ['CAAN'],
-        module: 'module_c_regulator',
         items: [
             { id: 'state-maturity', href: '/dashboard/caan-sms-maturity.html', label: 'State SMS Maturity' },
-            { id: 'psoe-audit', href: '/audits/psoe.html', label: 'PSOE Audit' },
             { id: 'caan-risk', href: '/caan-state-risk.html', label: 'State Risk Register' },
         ]
     },

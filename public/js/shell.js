@@ -513,7 +513,7 @@
     // Per-item role toggling for NAV_CONFIG dropdown links.
     function applyConfigItemVisibility() {
         const userObj = buildNavUser();
-        const vis = getVisibleNav(userObj);
+        const vis = getVisibleNav(userObj, currentUserState.modules || null);
         const visibleItems = new Set();
         vis.forEach(function (g) {
             g.items.forEach(function (it) { visibleItems.add(g.group + '::' + it.label); });
@@ -534,7 +534,7 @@
         const hasNavConfig = typeof window.NAV_CONFIG === 'object' && window.NAV_CONFIG !== null;
         let visibleGroups = null;
         if (hasNavConfig) {
-            visibleGroups = new Set(getVisibleNav(buildNavUser()).map(function (g) { return g.group; }));
+            visibleGroups = new Set(getVisibleNav(buildNavUser(), currentUserState.modules || null).map(function (g) { return g.group; }));
         }
         document.querySelectorAll('.app-header .header-nav .nav-dropdown[data-nav-item]').forEach(function (dd) {
             const source = dd.dataset.navSource || 'legacy';
