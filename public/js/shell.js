@@ -510,6 +510,36 @@
         return groups;
     }
 
+    // ── SHELL_CONFIG.navByRole support ────────────────────────────────────
+    // Render one role-keyed flat set (SHELL_CONFIG.navByRole[roleKey]) as direct
+    // links inside a wrapper. ALL sets are rendered at build time; the
+    // post-claims pass (applyRoleKeyedNav) shows the set matching the resolved
+    // role type and hides the rest — consistent with the "render all, gate
+    // later" pattern used for NAV_CONFIG.
+    function buildNavRoleSet(roleKey, items) {
+        const wrap = document.createElement('div');
+        wrap.className = 'nav-role-set';
+        wrap.dataset.navRole = roleKey;
+        (items || []).forEach(function (item) {
+            wrap.appendChild(buildConfigNavItem(item));
+        });
+        return wrap;
+    }
+
+    // Fallback set for roles not named in navByRole: the shared NAV_CONFIG (or
+    // legacy NAV_ITEMS when nav-config.js is absent), tagged 'default'.
+    function buildDefaultNavRoleSet() {
+        const wrap = document.createElement('div');
+        wrap.className = 'nav-role-set';
+        wrap.dataset.navRole = 'default';
+        if (typeof window.NAV_CONFIG === 'object' && window.NAV_CONFIG !== null) {
+            buildNavFromConfig().forEach(function (item) { wrap.appendChild(buildNavItem(item)); });
+        } else {
+            getVisibleNavItems().forEach(function (item) { wrap.appendChild(buildNavItem(item)); });
+        }
+        return wrap;
+    }
+
     // Per-item role toggling for NAV_CONFIG dropdown links.
     function applyConfigItemVisibility() {
         const userObj = buildNavUser();
@@ -547,6 +577,7 @@
         if (hasNavConfig) applyConfigItemVisibility();
         applyConfigNavVisibility();
         applyDeptHeaderVisibility();
+        applyRoleKeyedNav();
     }
 
     // Department personas (DEPT_ADMIN + STAFF) must not see the Home link
@@ -570,6 +601,39 @@
         if (home) home.style.display = (isDept || isAE) ? 'none' : '';
         var brandLink = document.getElementById('shellBrandLink');
         if (brandLink) brandLink.href = isAE ? '/dashboard/ae-dashboard.html' : (isDept ? '/dashboard/my-tasks.html' : '/safety.html');
+    }
+
+    // Choose which role-keyed set (SHELL_CONFIG.navByRole) is visible once the
+    // role resolves. Sets are all present in the DOM; this shows the one whose
+    // key matches getUserRoleType() and hides the rest, falling back to the
+    // 'default' set for unlisted roles. When the chosen set carries its own
+    // "Home" entry, the generic auto-Home (/safety.html) is hidden so the set's
+    // Home wins (e.g. state → /state-oversight.html). Pages without navByRole
+    // have no .nav-role-set and return immediately.
+    function applyRoleKeyedNav() {
+        const sets = document.querySelectorAll('.app-header .header-nav .nav-role-set[data-nav-role]');
+        if (!sets.length) return;
+        let chosen = 'default';
+        if (typeof getUserRoleType === 'function') {
+            try {
+                const roleType = getUserRoleType(buildNavUser());
+                if (roleType) {
+                    for (let i = 0; i < sets.length; i++) {
+                        if (sets[i].dataset.navRole === roleType) { chosen = roleType; break; }
+                    }
+                }
+            } catch (e) { /* fail-open to the default set */ }
+        }
+        let chosenSet = null;
+        sets.forEach(function (set) {
+            const on = set.dataset.navRole === chosen;
+            set.style.display = on ? '' : 'none';
+            if (on) chosenSet = set;
+        });
+        if (chosenSet && chosenSet.querySelector('.config-nav-link[data-nav-item="Home"]')) {
+            const home = document.getElementById('shellHomeLink');
+            if (home) home.style.display = 'none';
+        }
     }
 
     function buildHeader() {
@@ -646,17 +710,32 @@
 
         // Navigation source precedence:
         //   1. SHELL_CONFIG.nav — page-explicit flat links (psoe, team, etc.).
-        //   2. NAV_CONFIG (js/nav-config.js) — role-based default for pages
+        //   2. SHELL_CONFIG.navByRole — role-keyed sets; ALL sets are rendered
+        //      and the post-claims pass (applyRoleKeyedNav) chooses one.
+        //   3. NAV_CONFIG (js/nav-config.js) — role-based default for pages
         //      that do not declare their own nav.
-        //   3. Legacy NAV_ITEMS (pages that load neither).
+        //   4. Legacy NAV_ITEMS (pages that load neither).
         // Group dropdowns are ALWAYS fully rendered and role-gated via
         // applyNavVisibility()/applyConfigItemVisibility(), so items never go
         // missing from the DOM when claims resolve after first paint.
         const hasNavConfig = typeof window.NAV_CONFIG === 'object' && window.NAV_CONFIG !== null;
+        const navByRole = (cfg.navByRole && typeof cfg.navByRole === 'object' && !Array.isArray(cfg.navByRole)) ? cfg.navByRole : null;
         if (Array.isArray(cfg.nav) && cfg.nav.length) {
             cfg.nav.forEach(function (item) {
                 nav.appendChild(buildConfigNavItem(item));
             });
+        } else if (navByRole) {
+            Object.keys(navByRole).forEach(function (roleKey) {
+                const set = navByRole[roleKey];
+                if (!Array.isArray(set) || !set.length) return;
+                nav.appendChild(buildNavRoleSet(roleKey, set));
+            });
+            // No explicit default set: fall back to the shared NAV_CONFIG (or
+            // legacy NAV_ITEMS) as the 'default' set so unlisted roles see the
+            // same nav they would without navByRole.
+            if (!Object.prototype.hasOwnProperty.call(navByRole, 'default')) {
+                nav.appendChild(buildDefaultNavRoleSet());
+            }
         } else if (hasNavConfig) {
             buildNavFromConfig().forEach(function (item) {
                 nav.appendChild(buildNavItem(item));

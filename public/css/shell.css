@@ -185,6 +185,13 @@
     overflow: visible; /* let dropdown menus escape the nav bar */
 }
 
+/* Role-keyed nav sets (SHELL_CONFIG.navByRole): the wrapper is layout-neutral
+   so its links participate directly in the .header-nav flex row. Hiding a set
+   sets display:none inline; showing restores this rule. */
+.header-nav .nav-role-set {
+    display: contents;
+}
+
 /* Dropdown toggle button (top-level pillar item) */
 .header-nav .dropdown-toggle {
     border: none;

@@ -89,9 +89,19 @@
     </div>
 
     <script>
+    var STATE_REGULATOR_NAV = [
+        { href: '/state-oversight.html', label: 'Home', icon: 'fa-house' },
+        { href: '/dashboard/state-sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
+        { href: '/state-safety-trends.html', label: 'Safety Trends', icon: 'fa-chart-line' },
+        { href: '/psoe-audit.html', label: 'PSOE', icon: 'fa-clipboard-check' },
+    ];
     window.SHELL_CONFIG = {
         brand: 'AviaSAFE',
         roleLabel: 'Operator N-HRC Dashboard',
+        navByRole: {
+            CAAN: STATE_REGULATOR_NAV,
+            SUPER: STATE_REGULATOR_NAV,
+        },
     };
     </script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
