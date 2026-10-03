@@ -1,8 +1,6 @@
 {
   "projects": {
-    "default": "aerosafety-sms-prod",
-    "smssurvey": "aerosafety-sms-prod",
-    "beta": "aerosafety-sms-prod"
+    "default": "aerosafety-sms-prod"
   },
   "targets": {},
   "etags": {}
