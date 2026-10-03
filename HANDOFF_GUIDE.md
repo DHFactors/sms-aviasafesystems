@@ -1179,13 +1179,16 @@ email + Logout right, full-width gold divider, nav row centred.
 
 ### Outstanding follow-ons
 
-1. **Shared spokes role-aware nav** — `dashboard/spi-dashboard.html`
-   and `dashboard/nhrc-kpis.html` still render the shared
-   `nav-config.js` nav. A CAAN user reaching them from the Safety
-   Trends hub sees the shared nav, not the four-entry regulator nav.
-   Requires a role-conditional nav on each page (or a shell method
-   to set `SHELL_CONFIG.nav` after the role resolves). A read-only
-   reconnaissance was drafted but not run.
+1. ~~**Shared spokes role-aware nav**~~ — **RESOLVED 2026-10-03
+   (`fa0e8a1`).** `dashboard/spi-dashboard.html` and
+   `dashboard/nhrc-kpis.html` now declare `SHELL_CONFIG.navByRole`
+   (the four-entry state set for `CAAN`/`SUPER`, falling through to the
+   shared operator `NAV_CONFIG` otherwise). `shell.js` renders the
+   role-keyed sets at build time and `applyRoleKeyedNav()` chooses one
+   after the role resolves, with a role-aware auto-Home (state →
+   `/state-oversight.html`, operator → `/safety.html`). No rebuild hook
+   was added (Option B as designed). Verified live; see the 2026-10-03
+   session entry below.
 
 2. **Nav Submenu Consistency thread** — five issues recorded in the
    session's "Nav Submenu Consistency" entry (`b4e90ea`): SMS
@@ -1214,3 +1217,72 @@ email + Logout right, full-width gold divider, nav row centred.
 ### HEAD at time of writing
 
 `e7e5527`
+
+## Session Update — 2026-10-03 — Option B role-keyed nav shipped
+
+### What shipped
+
+The two State Regulator spokes now render the four-entry state nav for
+state users instead of the shared operator `nav-config.js` nav:
+
+- `public/dashboard/spi-dashboard.html`
+- `public/dashboard/nhrc-kpis.html`
+
+**Mechanism (Option B — role-keyed nav in `buildHeader`):** both pages
+declare `SHELL_CONFIG.navByRole` with the state four-entry set under
+`CAAN` and `SUPER` (and no `default` key, so unlisted roles fall through
+to the shared `NAV_CONFIG`). `public/js/shell.js` gained:
+
+- `buildNavRoleSet()` / `buildDefaultNavRoleSet()` — render every
+  role-keyed set into the DOM at build time (`render all, gate later`).
+- a new `else if (navByRole)` branch in the nav-source precedence, after
+  `cfg.nav` and before `NAV_CONFIG`.
+- `applyRoleKeyedNav()` — runs from `applyNavVisibility()` after claims
+  resolve; shows the set matching `getUserRoleType(buildNavUser())`
+  (`'CAAN'` / `'SUPER'`) and hides the rest, falling back to the
+  `'default'` set. When the chosen set carries its own `Home` entry, the
+  generic auto-Home (`/safety.html`) is hidden so the set's Home wins
+  (state → `/state-oversight.html`, operator → `/safety.html`).
+- `public/css/shell.css` — `.header-nav .nav-role-set { display: contents; }`
+  so the wrapper is layout-neutral inside the flex nav row.
+
+No Option A rebuild hook and no Option C role cache were added.
+
+### Files changed
+
+- `public/js/shell.js`
+- `public/css/shell.css`
+- `public/dashboard/spi-dashboard.html`
+- `public/dashboard/nhrc-kpis.html`
+
+108 insertions, 2 deletions.
+
+### Commits
+
+- `fa0e8a1` — `fix(nav): role-keyed State Regulator nav for SPI/N-HRC
+  spokes (Option B)`.
+- Pushed `e7e5527..fa0e8a1` to `main` (this range also carried the
+  earlier local-only docs commit `71be813`). Committed directly on
+  `main`; no feature branch and no merge commit were used.
+
+### Verification result
+
+- Deploy: GitHub Actions `Deploy Firebase Hosting`, run
+  `37130875214` — **success** (~29s), head SHA `fa0e8a1`.
+- Programmatic (live site, cache-busted):
+  - `css/shell.css` contains `.nav-role-set` — yes.
+  - `js/shell.js` contains `applyRoleKeyedNav` and `navByRole` — yes.
+  - `dashboard/spi-dashboard.html` and `dashboard/nhrc-kpis.html`
+    contain `navByRole` — yes.
+  - `state-safety-trends.html` still has the flat four-entry
+    `SHELL_CONFIG.nav` array and no `navByRole` — unchanged.
+- Browser (SME, incognito, hard refresh): state user on both spokes →
+  four state entries, Home `/state-oversight.html`, one row; operator
+  user (`safety@sitaair.com.np`) on the N-HRC spoke → operator nav,
+  Home `/safety.html`, no state-nav crossover, one row; state pages
+  unchanged. **All checks pass.**
+
+### Now resolved
+
+The "Shared spokes role-aware nav" open item (previously Outstanding
+follow-on #1) is closed.

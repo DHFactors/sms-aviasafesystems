@@ -47,7 +47,11 @@ surfaces:
     for the 7 ICAO categories (CFIT, LOC-I, MAC, RE, RI, ARC, WS).
   * Operator dashboards `/dashboard/spi-dashboard.html` and
     `/dashboard/nhrc-kpis.html`, wired into the shell navigation across all
-    operator-facing pages.
+    operator-facing pages. Both are dual-audience: `SHELL_CONFIG.navByRole`
+    gives State Regulator users (`CAAN`/`SUPER`) the four-entry state nav
+    (Home → `/state-oversight.html`) and other roles the shared `NAV_CONFIG`
+    (Home → `/safety.html`), applied after the role resolves (role-keyed nav
+    in `buildHeader`; commit `fa0e8a1`, 2026-10-03).
 * **Data source of truth for diversions is the Postgres `flight_diversions`
   table** (read by `FlightDiversionService`); the legacy Firestore
   `tenants/{tid}/flight_diversions` store is deprecated.
@@ -170,7 +174,7 @@ flight diversions) creating one consistent view:
 | Seeder CLI dry-run | **87 created, 0 skipped, 0 errors** |
 | DB counts | PG hazards 26 · reports 10 · cans 6 · caps 6 · tenants 4 · diversions 7 · SSP 29 · PSOE 6 |
 | HFACS catalog | **109 codes, 0 duplicates**, valid JSON (fetch-parseable) |
-| Navigation | N-HRC + SPI/SPT items on all operator pages, no duplicates |
+| Navigation | N-HRC + SPI/SPT items on all operator pages, no duplicates; State Regulator spokes (`dashboard/spi-dashboard.html`, `dashboard/nhrc-kpis.html`) render the four-entry state nav for `CAAN`/`SUPER` via role-keyed `navByRole` (verified live, `fa0e8a1`) |
 | Baseline (Aug 31) | 631 backend tests passing |
 
 ## 4. Deployment Endpoints
@@ -197,7 +201,11 @@ flight diversions) creating one consistent view:
 * **New dashboards**: `/dashboard/spi-dashboard.html` (SPI/SPT) and
   `/dashboard/nhrc-kpis.html` (N-HRC KPIs) follow the standard
   `SHELL_CONFIG` + auth-gate + `ApiClient` pattern and are reachable from the
-  sidebar on every operator page.
+  sidebar on every operator page. As of `fa0e8a1` (2026-10-03) both declare
+  `SHELL_CONFIG.navByRole`, so a State Regulator user sees the four-entry
+  state nav (Home → `/state-oversight.html`) while operator roles see the
+  shared `NAV_CONFIG` (Home → `/safety.html`); the choice is applied after the
+  role resolves via role-keyed nav in `buildHeader`.
 * **Diversion data**: authored and read from the Postgres `flight_diversions`
   table (`FlightDiversionService`). The legacy Firestore
   `tenants/{tid}/flight_diversions` store is deprecated (no runtime reads;
