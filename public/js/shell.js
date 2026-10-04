@@ -27,6 +27,15 @@
     }
     global.getLocalUser = getLocalUser;
 
+    // CAAN -> state transition: normalize the generalized STATE_SMD claim to
+    // the internal CAAN_SMD value at the boundary, so every role check below
+    // is unchanged. Remove once the internal vocabulary is migrated.
+    if (typeof global.normalizeRoleClaim !== 'function') {
+        global.normalizeRoleClaim = function (role) {
+            return role === 'STATE_SMD' ? 'CAAN_SMD' : role;
+        };
+    }
+
     // Returns the current user email: from an authenticated session if present,
     // otherwise the local mock user (localhost), otherwise a safe default.
     function getUserEmail() {
@@ -483,7 +492,8 @@
         try { email = getUserEmail() || ''; } catch (e) {}
         let role = currentUserState.role ||
             (window.currentUser && (window.currentUser.roles || window.currentUser.role)) || '';
-        return { email: email || '', role: String(role) || 'USER' };
+        role = global.normalizeRoleClaim ? global.normalizeRoleClaim(String(role)) : String(role);
+        return { email: email || '', role: role || 'USER' };
     }
 
     // Convert NAV_CONFIG into dropdown groups. EVERY group and item is rendered
@@ -1051,7 +1061,8 @@
                         const claims = (tokenResult && tokenResult.claims) || {};
                         if (claims.tenant_id) applyTenantToSurveyLinks(claims.tenant_id);
                         currentUserState.tenant = claims.tenant_id || null;
-                        currentUserState.role = claims.role || claims.roles || null;
+                        var rawRole = claims.role || claims.roles || null;
+                        currentUserState.role = rawRole ? (global.normalizeRoleClaim ? global.normalizeRoleClaim(rawRole) : rawRole) : null;
                         currentUserState.plan = claims.plan || null;
                         currentUserState.modules = claims.modules || null;
                         applyNavVisibility();

@@ -1,4 +1,11 @@
 // RBAC - Role-Based Menu
+// CAAN -> state transition: normalize the generalized STATE_SMD claim to the
+// internal CAAN_SMD value at this boundary. Remove once migrated.
+if (typeof window !== 'undefined' && typeof window.normalizeRoleClaim !== 'function') {
+    window.normalizeRoleClaim = function (role) {
+        return role === 'STATE_SMD' ? 'CAAN_SMD' : role;
+    };
+}
 const RBAC_PERMISSIONS = {
     'tenant_admin': ['module1', 'module2', 'module3', 'settings'],
     'safety_manager': ['module1', 'module2', 'module3'],
@@ -74,7 +81,10 @@ if (typeof firebase !== 'undefined' && firebase.auth) {
         if (user) {
             try {
                 const tokenResult = await user.getIdTokenResult();
-                const role = tokenResult.claims.role || 'employee';
+                const rawRole = tokenResult.claims.role || 'employee';
+                const role = (typeof window !== 'undefined' && typeof window.normalizeRoleClaim === 'function')
+                    ? window.normalizeRoleClaim(rawRole)
+                    : rawRole;
                 // Normalize legacy roles
                 const normalized = {
                     'AIRLINE_ADMIN': 'tenant_admin',

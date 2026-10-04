@@ -444,6 +444,13 @@ window.getAppCheckToken = getAppCheckToken;
 // SHARED AUTH HELPERS (used by all pages)
 // ============================================================================
 
+// CAAN -> state transition: normalize the generalized STATE_SMD claim to the
+// existing internal CAAN_SMD value at this boundary, so every downstream role
+// check is unchanged. Remove once the internal vocabulary is migrated.
+window.normalizeRoleClaim = window.normalizeRoleClaim || function (role) {
+    return role === 'STATE_SMD' ? 'CAAN_SMD' : role;
+};
+
 function waitForFirebase() {
     return new Promise(function(resolve) {
         if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -494,7 +501,7 @@ async function getCurrentUser() {
                     settle({
                         uid: user.uid,
                         email: user.email,
-                        role: claims.role || 'USER',
+                        role: window.normalizeRoleClaim(claims.role || 'USER'),
                         tenantId: claims.tenant_id || null,
                         claims: claims
                     });

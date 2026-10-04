@@ -512,7 +512,9 @@ function onAuthStateChanged(user) {
     authRedirectInProgress = true;
     user.getIdTokenResult(true).then(function(tokenResult) {
         var claims = tokenResult.claims || {};
-        var role = claims.role || 'USER';
+        var role = (typeof window.normalizeRoleClaim === 'function')
+            ? window.normalizeRoleClaim(claims.role || 'USER')
+            : (claims.role || 'USER');
         var tenantId = claims.tenant_id || null;
         
         console.log('Authenticated as:', user.email, 'role:', role, 'tenant:', tenantId);
