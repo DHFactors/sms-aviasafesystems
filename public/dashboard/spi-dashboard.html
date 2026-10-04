@@ -72,6 +72,7 @@
     window.SHELL_CONFIG = {
         brand: 'AviaSAFE',
         roleLabel: 'Operator SPI/SPT Dashboard',
+        feedbackWidget: true,
         navByRole: {
             CAAN: STATE_REGULATOR_NAV,
             SUPER: STATE_REGULATOR_NAV,
@@ -85,6 +86,8 @@
     <script src="/js/api/client.js"></script>
     <script src="/js/nav-config.js"></script>
 <script src="/js/shell.js"></script>
+<script src="/js/feedback.js"></script>
     <script src="/js/spi-dashboard.js"></script>
+    <script>initFeedbackWidget();</script>
 </body>
 </html>

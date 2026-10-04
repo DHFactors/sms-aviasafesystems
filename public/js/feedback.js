@@ -103,11 +103,34 @@ AUTHOR: AviaSAFE Systems
         }\
         #feedbackWidgetHost .feedback-modal.open { display: flex; }\
         #feedbackWidgetHost .feedback-card {\
+            position: relative;\
             width: min(440px, calc(100vw - 2rem));\
             background: #fff;\
             border-radius: 12px;\
             padding: 1.5rem;\
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);\
+        }\
+        #feedbackWidgetHost .feedback-card-close {\
+            position: absolute;\
+            top: 12px;\
+            right: 12px;\
+            width: 36px;\
+            height: 36px;\
+            border: none;\
+            background: transparent;\
+            font-size: 24px;\
+            line-height: 1;\
+            color: #666;\
+            cursor: pointer;\
+            border-radius: 50%;\
+            display: flex;\
+            align-items: center;\
+            justify-content: center;\
+            transition: all 0.15s ease;\
+        }\
+        #feedbackWidgetHost .feedback-card-close:hover {\
+            background: #f0f0f0;\
+            color: #1a6b8a;\
         }\
         #feedbackWidgetHost .feedback-card h3 {\
             margin: 0 0 0.25rem;\
@@ -271,6 +294,7 @@ AUTHOR: AviaSAFE Systems
         var card = document.createElement('div');
         card.className = 'feedback-card';
         card.innerHTML =
+            '<button type="button" class="feedback-card-close" aria-label="Close feedback modal" onclick="document.getElementById(\'feedbackModal\').classList.remove(\'open\')">&times;</button>' +
             '<h3><i class="fas fa-comment-dots"></i> Feedback on Safety Intelligence</h3>' +
             '<p class="feedback-sub">Help us improve the platform. Reviewed quarterly.</p>' +
             '<label>Rating (optional)</label>' +
