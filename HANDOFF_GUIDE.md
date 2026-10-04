@@ -1408,3 +1408,16 @@ first click succeeded (password was in the response), second click 409'd,
 and the panel was missed. Confirmed via audit trail, not code inspection.
 Rule stands alongside Infra-1 (hard-refresh for CSS): verify deploy state
 (`origin/main` SHA vs `/health` commit) before manual testing a fresh push.
+
+### UX-3 (logged — feedback widget)
+
+Send flow depends on the `{id, ok}` envelope from `POST /api/v1/feedback`;
+if the envelope shape ever changes, the widget throws a generic error with
+no useful state. Consider asserting `result.id` and giving the failure a
+proper error state instead of the silent generic throw.
+
+### Cleanup-1 (logged — Phase 2 or small cleanup)
+
+`getUserEmail` / `getTenantName` in `public/js/feedback.js` are unused
+after the Cloudflare → backend unification (identity now comes from the
+auth token). Remove them in Phase 2 or a small cleanup task.
