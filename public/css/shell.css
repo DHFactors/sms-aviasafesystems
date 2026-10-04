@@ -20,6 +20,15 @@
     --shell-sidebar-width: 250px;
 }
 
+/* Base body type + text color. Pages that declare their own body font/color
+   in a later <style> (inline blocks) or stylesheet keep theirs by cascade
+   order; this only fills the gap for pages that declare neither, which would
+   otherwise fall back to the browser default serif + black text. */
+body {
+    font-family: var(--font-family);
+    color: var(--color-text);
+}
+
 /* ========== APP SHELL LAYOUT ========== */
 .app-shell {
     display: flex;
