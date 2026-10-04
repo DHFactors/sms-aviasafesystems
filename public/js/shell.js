@@ -954,6 +954,12 @@
             closeBtn.addEventListener('click', global.closeFeedbackModal);
         }
 
+        // Cancel button
+        const cancelBtn = modal.querySelector('.feedback-btn-cancel');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', global.closeFeedbackModal);
+        }
+
         // Click overlay to close
         modal.addEventListener('click', function (e) {
             if (e.target === modal) global.closeFeedbackModal();
@@ -1031,8 +1037,10 @@
 
         shell.appendChild(main);
 
-        // Append feedback modal to body
-        if (!document.getElementById('feedbackModal')) {
+        // Append feedback modal to body, unless the page opts into the
+        // standalone feedback.js widget (SHELL_CONFIG.feedbackWidget), which
+        // builds the only #feedbackModal to avoid duplicate IDs.
+        if (!cfg.feedbackWidget && !document.getElementById('feedbackModal')) {
             document.body.appendChild(buildFeedbackModal());
             bindFeedbackModalEvents();
         }

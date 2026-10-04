@@ -87,5 +87,13 @@ async def submit_feedback(
     except Exception:
         logger.warning(f"Feedback mirror write failed for {user.get('email')}")
 
+    # Best-effort notification: the DB write above stands regardless; an
+    # email failure must never fail the request.
+    try:
+        from app.services.email_service import send_feedback_notification
+        send_feedback_notification(doc)
+    except Exception as e:
+        logger.warning(f"Feedback notification email failed for {user.get('email')}: {e}")
+
     logger.info(f"Feedback received from {user.get('email')} (role={user.get('role')})")
     return _envelope({"id": feedback_id, "ok": True})

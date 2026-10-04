@@ -564,6 +564,43 @@ def send_can_issued_email(can_data: Dict[str, Any], to: Any = None) -> Dict[str,
     return result
 
 
+def send_feedback_notification(feedback: Dict[str, Any], to: Any = None) -> Dict[str, Any]:
+    """Notify support of a new in-product feedback submission.
+
+    Recipients default to support@aviasafesystems.com. Best-effort: goes
+    through the configured provider via _dispatch_notification (which never
+    raises); a mail failure must never fail the already-stored feedback.
+    """
+    recipients = _split_emails(to) or ["support@aviasafesystems.com"]
+    subject = f"[AviaSAFE Feedback] {feedback.get('subject') or 'No subject'} ({feedback.get('feedback_id')})"
+    text_body = (
+        "A new in-product feedback submission was recorded.\n\n"
+        f"Feedback ID: {feedback.get('feedback_id')}\n"
+        f"From: {feedback.get('email')} (role={feedback.get('role')})\n"
+        f"Page: {feedback.get('page')}\n"
+        f"Rating: {feedback.get('rating')}\n\n"
+        f"Subject: {feedback.get('subject')}\n\n"
+        f"{feedback.get('message')}\n"
+    )
+    html_body = (
+        "<p>A new in-product feedback submission was recorded.</p>"
+        "<ul>"
+        f"<li><strong>Feedback ID:</strong> {feedback.get('feedback_id')}</li>"
+        f"<li><strong>From:</strong> {feedback.get('email')} (role={feedback.get('role')})</li>"
+        f"<li><strong>Page:</strong> {feedback.get('page')}</li>"
+        f"<li><strong>Rating:</strong> {feedback.get('rating')}</li>"
+        f"<li><strong>Subject:</strong> {feedback.get('subject')}</li>"
+        f"</ul>"
+        f"<p>{feedback.get('message')}</p>"
+    )
+    result = _dispatch_notification(recipients, subject, html_body, text_body)
+    logger.info(
+        f"Feedback notification for {feedback.get('feedback_id')}: "
+        f"provider={result.get('provider')} recipients={result.get('recipients')} sent={result.get('delivered', 0)}"
+    )
+    return result
+
+
 def _cap_email_context(cap_data: Dict[str, Any]) -> Dict[str, str]:
     target = cap_data.get("target_completion_date")
     target_str = (target.isoformat() if hasattr(target, "isoformat") else str(target)) if target else "Not set"

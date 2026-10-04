@@ -1,22 +1,17 @@
 /* ============================================================================
-   FILE: feedback.js
-   PATH: public/js/feedback.js
-   VERSION: 2.0.0
-   PURPOSE: Lightweight in-product feedback widget. Adds a floating
-            "Send Feedback" button + modal that routes feedback to the
-            Cloudflare Worker at aviasafe-contact-form.ghanshyamacharya.workers.dev
-            which emails support@aviasafesystems.com. Collects an optional
-            1-5 rating, user email, tenant name, and page context.
-   AUTHOR: AviaSAFE Systems
-   ============================================================================ */
+FILE: feedback.js
+PATH: public/js/feedback.js
+VERSION: 2.1.0
+PURPOSE: Lightweight in-product feedback widget. Adds a floating
+         "Send Feedback" button + modal that posts to the FastAPI backend
+         (POST /api/v1/feedback via ApiClient, auth header attached), which
+         stores the row and notifies support@aviasafesystems.com. Collects
+         an optional 1-5 rating, subject, message, and page context.
+AUTHOR: AviaSAFE Systems
+============================================================================ */
 
 (function (global) {
     'use strict';
-
-    // ============================================================
-    // Cloudflare Worker endpoint
-    // ============================================================
-    var FEEDBACK_API = 'https://aviasafe-contact-form.ghanshyamacharya.workers.dev/api/send-feedback';
 
     var STYLE_ID = 'feedbackWidgetStyle';
     var HOST_ID = 'feedbackWidgetHost';
@@ -54,30 +49,21 @@
     // Main submit function
     // ============================================================
     async function submitFeedback(data) {
-        var payload = {
-            email: getUserEmail(),
-            tenant: getTenantName(),
-            rating: data.rating || 0,
+        // Posts to the FastAPI backend via ApiClient (auth header attached).
+        // Identity (uid/email/role/tenant) comes from the verified token, so
+        // only the content fields are sent. rating 0 means "no rating" and
+        // must go as null (backend requires 1-5 when present).
+        var result = await ApiClient.post('/api/v1/feedback', {
             subject: data.subject || 'No subject',
             message: data.message || '',
-            page: global.location.href,
-            date: new Date().toISOString(),
-            userAgent: navigator.userAgent
-        };
-
-        var response = await fetch(FEEDBACK_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            rating: data.rating || null,
+            page: (global.location.href || '').slice(0, 200)
         });
 
-        var result = await response.json();
-
-        if (response.ok && result.success) {
-            return { success: true, message: result.message || 'Feedback sent!' };
-        } else {
-            throw new Error(result.error || 'Failed to send feedback');
+        if (result && result.ok) {
+            return { success: true, message: 'Feedback sent!' };
         }
+        throw new Error('Failed to send feedback');
     }
 
     global.submitFeedback = submitFeedback;

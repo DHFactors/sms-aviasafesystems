@@ -86,6 +86,7 @@ window.SHELL_CONFIG = {
     tenantTitle: 'Safety Trends — State Oversight',
     heroSubtitle: 'State Safety Performance Indicators, National High-Risk Categories, and the State Risk Register',
     suppressAutoHome: true,
+    feedbackWidget: true,
     nav: [
         { href: '/state-oversight.html', label: 'Home', icon: 'fa-house' },
         { href: '/dashboard/state-sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
@@ -97,6 +98,7 @@ window.SHELL_CONFIG = {
 <script src="/js/api/client.js"></script>
 <script src="/js/nav-config.js"></script>
 <script src="/js/shell.js"></script>
+<script src="/js/feedback.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
@@ -117,6 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateShellTenant('Safety Trends — State Oversight', 'CAAN · Safety Management Division');
     }
 });
+
+initFeedbackWidget();
 </script>
 
 </body>
