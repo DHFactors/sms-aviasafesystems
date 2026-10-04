@@ -33,7 +33,7 @@ from loguru import logger
 
 from app.core.config import settings
 from app.db import pg
-from app.db.db_models import Tenant
+from app.db.db_models import Regulator, Tenant
 from app.firebase import get_auth, get_db
 from app.services import production_seed
 from app.services.email_service import send_welcome_email
@@ -215,6 +215,106 @@ def create_user_for_tenant(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[
         "uid": result.get("uid"),
         "role": result["role"],
         "password": result["password"],
+        "delivery": delivery,
+    }
+
+
+# ============================================================================
+# Regulator admin creation (Production Setup Step 1 / Adm-2)
+# ============================================================================
+
+_REGULATOR_ADMIN_ROLES = frozenset({"CAAN_SMD", "STATE_SMD"})
+
+
+def create_user_for_regulator(data: Dict[str, Any], actor: Dict[str, Any]) -> Dict[str, Any]:
+    """Create the STATE_SMD administrator for an existing State Regulator.
+
+    Regulator roles cannot hold a tenant (role_validation rejects regulator +
+    tenant), so this path is intentionally separate from
+    create_user_for_tenant: it never reads the tenants collection, never
+    touches any tenant doc's users list, and writes claims WITHOUT a
+    tenant_id key. The users-table mirror row is written with tenant_id NULL.
+    Raises ValueError when the regulator is missing, the email is taken, or
+    the role is not a regulator role.
+    """
+    rid = (data.get("regulator_id") or data.get("regulator_slug") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    if not rid or not email:
+        raise ValueError("regulator_id and email are required")
+
+    reg = pg.fetch_by(Regulator, "slug", rid)
+    if reg is None:
+        raise ValueError(f"regulator not found: {rid}")
+
+    avail = check_email_available(email)
+    if not avail.get("available", True):
+        raise ValueError("email already exists")
+
+    role = (data.get("role") or "STATE_SMD").strip().upper()
+    if role not in _REGULATOR_ADMIN_ROLES:
+        raise ValueError(f"role must be one of {sorted(_REGULATOR_ADMIN_ROLES)}")
+
+    # RBAC §7: regulator roles with tenant_id=None pass; anything else 400s.
+    from app.services.role_validation import validate_role_assignment
+    validate_role_assignment(role, None)
+
+    full_name = (data.get("full_name") or "").strip()
+    department = (data.get("department") or "").strip()
+    password = data.get("password") or generate_password()
+    auth = get_auth()
+    try:
+        user = auth.create_user(
+            email=email,
+            password=password,
+            email_verified=True,
+            display_name=full_name or None,
+        )
+        claims = {"role": role}
+        if department:
+            claims["department"] = department
+        auth.update_user(user.uid, custom_claims=claims)
+        doc = user_doc_from_auth_record(auth.get_user(user.uid))
+        doc["tenant_id"] = None
+        doc["password_updated_at"] = datetime.now(timezone.utc)
+        upsert_user_doc(**doc)
+    except fb_auth.EmailAlreadyExistsError:
+        raise ValueError("email already exists in Firebase Auth")
+
+    now = datetime.now(timezone.utc)
+    reg_name = reg.get("name") or rid
+    context = {
+        "contact_name": full_name or reg_name,
+        "tenant_name": reg_name,
+        "admin_email": email,
+        "password": password,
+        "login_url": settings.APP_LOGIN_URL,
+        "support_email": settings.APP_SUPPORT_EMAIL,
+    }
+    try:
+        delivery = send_welcome_email(email, context)
+    except Exception as e:
+        logger.warning(f"Welcome email for {email} failed: {e}")
+        delivery = {"sent": False, "provider": "none", "to": email, "error": str(e)}
+
+    production_seed._audit(
+        "USER_CREATED", actor, email,
+        f"Created regulator admin {email} (role={role}) for regulator {rid}",
+        tenant_id=None,
+        metadata={"source": "route:admin.create_user_for_regulator", "target_uid": user.uid, "regulator_id": rid},
+    )
+    production_seed._audit(
+        "USER_PASSWORD_SET", actor, email,
+        f"Initial password set for regulator admin {email} (uid={user.uid})",
+        tenant_id=None,
+        metadata={"source": "route:admin.create_user_for_regulator", "target_uid": user.uid, "regulator_id": rid},
+    )
+    logger.info(f"Regulator admin {email} created for regulator {rid} by {actor.get('uid')}")
+    return {
+        "regulator_id": rid,
+        "email": email,
+        "uid": user.uid,
+        "role": role,
+        "password": password,
         "delivery": delivery,
     }
 

@@ -436,6 +436,16 @@ class RegulatorCreate(BaseModel):
     subscription_end: Optional[date] = None
 
 
+class RegulatorAdminCreate(BaseModel):
+    """Optional administrator account created together with the regulator
+    (Production Setup Step 1 / Adm-2). When `email` is present a STATE_SMD
+    Auth user is provisioned; when absent, only the regulator doc is
+    created (previous behavior, unchanged)."""
+    email: str
+    full_name: Optional[str] = None
+    department: Optional[str] = None
+
+
 class TenantCreate(BaseModel):
     tenant_id: str
     name: str
@@ -465,6 +475,7 @@ class TenantBulkRequest(BaseModel):
 class RegulatorSetupRequest(BaseModel):
     setup_key: str
     regulator: RegulatorCreate
+    admin: Optional[RegulatorAdminCreate] = None
 
 
 class TenantSetupRequest(BaseModel):
@@ -510,17 +521,47 @@ async def admin_create_regulator(
     req: RegulatorSetupRequest,
     user: Dict[str, Any] = Depends(get_admin_user),
 ):
-    """Create a State Regulator document (SUPER_ADMIN + setup key)."""
+    """Create a State Regulator document (SUPER_ADMIN + setup key).
+
+    When the request carries an ``admin`` block with an email, the
+    regulator's STATE_SMD administrator is provisioned in the same request.
+    The two writes span Auth + Postgres (no shared transaction), so order is
+    regulator-first and a failed user creation compensates by removing the
+    just-created regulator doc — no admin-less regulator and no
+    regulator-less admin are ever left behind silently.
+    """
     _verify_admin_setup(req.setup_key)
     from app.services.production_seed import create_regulator
     try:
         doc = create_regulator(req.regulator.model_dump(), user)
-        return {"success": True, "regulator": doc}
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"Create regulator failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    if req.admin is None or not (req.admin.email or "").strip():
+        return {"success": True, "regulator": doc}
+    from app.services.tenant_credentials import create_user_for_regulator
+    try:
+        admin_result = create_user_for_regulator({
+            "regulator_id": doc.get("slug"),
+            "email": req.admin.email,
+            "full_name": req.admin.full_name or "",
+            "department": req.admin.department or "",
+        }, user)
+    except Exception as exc:
+        try:
+            pg.delete(Regulator, "slug", doc.get("slug"))
+            get_db().collection(settings.FIREBASE_COLLECTION_REGULATORS).document(doc.get("slug")).delete()
+        except Exception as del_err:
+            logger.error(f"Compensating regulator delete failed ({doc.get('slug')}): {del_err}")
+        logger.error(f"Create regulator admin failed ({doc.get('slug')}): {exc}")
+        if isinstance(exc, HTTPException):
+            raise
+        if isinstance(exc, ValueError):
+            raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"success": True, "regulator": doc, "admin": admin_result}
 
 
 @router.get("/regulators", status_code=status.HTTP_200_OK)

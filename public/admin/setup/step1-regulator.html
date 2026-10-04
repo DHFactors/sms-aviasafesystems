@@ -93,10 +93,24 @@ AUTHOR: AviaSAFE Systems
                             <small style="color:#94a3b8;">Checked = demo (purgeable). Unchecked = real (protected).</small>
                         </div>
                     </div>
+
+                    <!-- Administrator account (provisioned with the regulator) -->
+                    <div class="form-row">
+                        <div class="form-group"><label>Admin Email *</label><input type="email" id="regAdminEmail" placeholder="smd@example.gov" required></div>
+                        <div class="form-group"><label>Admin Full Name *</label><input type="text" id="regAdminName" placeholder="Safety Management Department" required></div>
+                        <div class="form-group"><label>Admin Department</label><input type="text" id="regAdminDept" placeholder="SMD"></div>
+                    </div>
                     <div class="btn-row" style="margin-top:12px;">
                         <button type="submit" class="btn btn-success"><i class="fas fa-plus"></i> Create Regulator</button>
                     </div>
                 </form>
+                <div id="regAdminSuccess" style="display:none;margin-top:14px;padding:14px 16px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;">
+                    <div style="font-weight:700;color:#15803d;margin-bottom:6px;"><i class="fas fa-check-circle"></i> <span id="regAdminSuccessTitle">Regulator created.</span></div>
+                    <div style="font-size:.85rem;color:#334155;">Admin: <strong id="regAdminSuccessEmail"></strong></div>
+                    <div style="font-size:.85rem;color:#334155;">One-time password: <code id="regAdminSuccessPassword" style="user-select:all;"></code>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="copyRegAdminPassword()" style="margin-left:8px;">Copy</button></div>
+                    <div style="font-size:.78rem;color:#b91c1c;margin-top:6px;">Shown once — copy now. It is never stored or shown again.</div>
+                </div>
             </div>
         </div>
 
@@ -128,6 +142,13 @@ async function createRegulator(e) {
     var regId = document.getElementById('regId').value.trim().toLowerCase();
     var isDemo = document.getElementById('regIsDemo').checked;
 
+    var adminEmail = document.getElementById('regAdminEmail').value.trim();
+    var adminName = document.getElementById('regAdminName').value.trim();
+    if (!adminEmail || !adminName) {
+        toast('Admin email and full name are required.', 'error');
+        return;
+    }
+
     var payload = {
         setup_key: AdminUI.ensureSetupKey(),
         regulator: {
@@ -141,16 +162,53 @@ async function createRegulator(e) {
             is_demo: isDemo,
             subscription_start: document.getElementById('regSubscriptionStart').value || null,
             subscription_end: document.getElementById('regSubscriptionEnd').value || null
+        },
+        admin: {
+            email: adminEmail,
+            full_name: adminName,
+            department: document.getElementById('regAdminDept').value.trim()
         }
     };
 
     try {
         var resp = await AdminUI.apiPost('/api/v1/admin/regulators', payload);
         var reg = resp.regulator || resp.data?.regulator || {};
+        var admin = resp.admin || {};
         toast('Regulator "' + (reg.slug || reg.id || regId) + '" created.', 'success');
+        if (admin.email && admin.password) {
+            document.getElementById('regAdminSuccessTitle').textContent =
+                'Regulator "' + (reg.slug || reg.id || regId) + '" created.';
+            document.getElementById('regAdminSuccessEmail').textContent = admin.email;
+            document.getElementById('regAdminSuccessPassword').textContent = admin.password;
+            document.getElementById('regAdminSuccess').style.display = 'block';
+        }
         e.target.reset();
     } catch (err) {
+        document.getElementById('regAdminSuccess').style.display = 'none';
         toast('Create failed: ' + err.message, 'error');
+    }
+}
+
+function copyRegAdminPassword() {
+    var el = document.getElementById('regAdminSuccessPassword');
+    var txt = el ? el.textContent : '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(
+            function () { toast('Password copied.', 'success'); },
+            function () { toast('Copy failed — select it manually.', 'error'); }
+        );
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = txt;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            toast('Password copied.', 'success');
+        } catch (e2) {
+            toast('Copy failed — select it manually.', 'error');
+        }
+        document.body.removeChild(ta);
     }
 }
 </script>
