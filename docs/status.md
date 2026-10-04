@@ -127,6 +127,19 @@ Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
   Live endpoints previously 404 (`/api/v1/nhrc/*`, `/api/v1/spi/*`) are now
   green after the Render **auto-deploy** from `main`.
 
+## 1c. Recent Work (Oct 2026)
+
+* **Typography cluster — closed.** `sms-maturity.html` page-local Segoe
+  override removed (`main.css` Inter stack now applies);
+  `shell.css` gained a base `body` rule (`font-family: var(--font-family);
+  color: var(--color-text)`) fixing the Times/black fallback on
+  `nhrc-kpis.html`. Headless `getComputedStyle` verification: all pages
+  compute Inter-class stacks (14px/500 nav). `nhrc-kpis.html` and
+  `spi-dashboard.html` nav verified correct after hard refresh (the
+  post-deploy "still broken" sighting was cached CSS only);
+  `psoe-audit.html` nav confirmed identical to references — its remaining
+  symptom is content-level, separate investigation.
+
 ## 2. System Architecture
 
 ```
@@ -215,6 +228,10 @@ flight diversions) creating one consistent view:
   lower-is-better) and closure rates are 0% — an honest, mixed-status demo.
 * **Manual UAT outstanding**: visual/browser verification of the two new
   dashboards (charts, status badges, nav) on the live host.
+* **Infra-1 — CSS cache staleness**: `*.css` is served with `max-age=3600`,
+  so browsers may render the pre-deploy stylesheet for ~1h after a CSS
+  release. **Hard-refresh is required for live CSS demos within an hour of
+  deploy.**
 
 ## 6. Known Follow-Ups
 

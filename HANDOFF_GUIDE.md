@@ -1344,3 +1344,48 @@ as backend boundary normalization (`resolve_user_context` maps
 `CANONICAL_ROLES` / `ALLOWED_USER_CREATE_ROLES` / `normalize_legacy_role` and
 the `role_validation` regulator-exclusivity check. Claim flip is Phase 2 and
 gated on Phase 1 deploy + verify.
+
+## Session Update - 2026-10-04 - Typography cluster closed
+
+### What was fixed
+
+Two real root causes, verified headless via computed styles, fixed in
+commit `1a72310` (`fix(css): base body font/color on shell.css; drop Segoe
+override on sms-maturity`):
+
+1. `public/dashboard/sms-maturity.html:19` — page-local `body` rule set
+   `font-family: 'Segoe UI', …`, dropping Inter and overriding
+   `main.css:23-24`. Fix: deleted only the `font-family` declaration;
+   `main.css` now applies.
+2. `public/dashboard/nhrc-kpis.html` — declared no `font-family` for `body`
+   anywhere (no `main.css`, no `theme.css`, no `global.css`, no inline
+   `<style>`; `nhrc-dashboard.css` has no body rules). Browser fell back to
+   Times New Roman + black text. Fix: base rule in `public/css/shell.css`
+   (`body { font-family: var(--font-family); color: var(--color-text); }`),
+   kept deliberately broad as structural hardening for future pages.
+
+`public/psoe-audit.html` was **not** a nav defect — computed nav is
+Inter/14px/500, identical to the references. Its symptom report stands as a
+content-level item for separate investigation; untouched in this task.
+
+### Verification
+
+- Headless Chromium (`getComputedStyle` on rendered nav links): all six
+  pages compute Inter-class stacks at 14px/500 top-level, 13px/500 dropdown.
+- Live check post-deploy confirmed the new `shell.css` body rule serving.
+- SME hard-refresh check: `nhrc-kpis.html` and `spi-dashboard.html` nav
+  verified correct; `psoe-audit.html` confirmed fixed. Cluster closed, no
+  commit needed beyond `1a72310`.
+
+### Infra-1 (logged)
+
+CSS served with `max-age=3600` → ~1h staleness post-deploy. The spokes
+appeared "still broken" after the typography deploy purely due to cached
+`shell.css`; hard refresh resolved it. **Rule: hard-refresh is required for
+live CSS demos within an hour of deploy.**
+
+### UX-1 (closed as intentional — no change)
+
+Spoke pages show no `active` pill on the state nav (`setActiveNav` matches
+pathname; `/dashboard/nhrc-kpis.html` matches none of the four state hrefs).
+Closed as intentional; no fix proposed.
