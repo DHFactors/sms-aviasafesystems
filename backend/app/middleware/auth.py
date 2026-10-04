@@ -49,9 +49,18 @@ def _lookup_tenant_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+# Inbound claim aliases for the CAAN -> state transition. STATE_SMD is the
+# generalized name for the state-regulator role; normalize it to the existing
+# internal value (CAAN_SMD) here so every downstream guard keeps a single
+# comparison target and no route/service needs to change. Remove this map once
+# the internal vocabulary is migrated.
+_ROLE_CLAIM_ALIASES = {"STATE_SMD": "CAAN_SMD"}
+
+
 def resolve_user_context(email: str, role: str, tenant_id: Optional[str]) -> Dict[str, Any]:
     """Normalize tenant_id and fall back to a tenants-table email lookup when
     the ID token carries no custom claims (e.g. freshly-linked Google sign-ins)."""
+    role = _ROLE_CLAIM_ALIASES.get(role, role)
     if tenant_id:
         normalized = tenant_id.replace('_', '-')
         if normalized != tenant_id:

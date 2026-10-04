@@ -28,6 +28,11 @@ class AuthRole(str, Enum):
     # Canonical least-privilege member role; USER is its legacy alias.
     STAFF = "STAFF"
     CAAN_SMD = "CAAN_SMD"
+    # Generalized alias for the state-regulator role. Accepted on inbound
+    # claims during the CAAN -> state transition and normalized to CAAN_SMD at
+    # the auth boundary (middleware/auth.resolve_user_context) so downstream
+    # guards keep a single comparison target. Remove once no token carries it.
+    STATE_SMD = "STATE_SMD"
     SUPER_ADMIN = "SUPER_ADMIN"
     # Accountable Executive (Doc 9859); one per tenant; terminal CAP/EIP +
     # risk acceptance. New literal (no legacy alias).
@@ -167,7 +172,7 @@ class Settings(BaseSettings):
     # ── Roles ──
     ROLE_DEFAULT: str = "USER"
     ROLE_DEFAULT_REGISTRATION: str = "AIRLINE_ADMIN"
-    CROSS_TENANT_ROLES: List[str] = ["CAAN_SMD", "SUPER_ADMIN"]
+    CROSS_TENANT_ROLES: List[str] = ["CAAN_SMD", "STATE_SMD", "SUPER_ADMIN"]
     SUPER_ADMIN_ROLES: List[str] = ["SUPER_ADMIN"]
     # Canonical role constants for the delegated admin hierarchy.
     ROLE_TENANT_ADMIN: str = "TENANT_ADMIN"
@@ -183,6 +188,7 @@ class Settings(BaseSettings):
     CANONICAL_ROLES: List[str] = [
         "SUPER_ADMIN",
         "CAAN_SMD",
+        "STATE_SMD",
         "TENANT_ADMIN",
         "ACCOUNTABLE_EXECUTIVE",
         "DEPT_ADMIN",

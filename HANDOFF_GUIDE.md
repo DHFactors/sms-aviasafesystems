@@ -1286,3 +1286,61 @@ No Option A rebuild hook and no Option C role cache were added.
 
 The "Shared spokes role-aware nav" open item (previously Outstanding
 follow-on #1) is closed.
+
+## CAAN -> state rename — deferred backlog + decisions (recorded 2026-10-03)
+
+### Deferred items (do before paid launch)
+
+**A — RLS coverage gap.** 10 `public` tables have RLS enabled with **zero
+policies** -> default-deny for any non-owner role: `audit_dispatches`,
+`dead_letter_queue`, `feedback`, `hazard_assessments`, `hazard_capas`,
+`hazard_rca_entries`, `hazard_rca_factors`, `invites`, `psoe_findings`,
+`sms_dispatches`. Separately: the live policies read `auth.jwt()`
+(Supabase JWT), **not** Firebase claims, and the backend connects as the
+Supabase owner (`rls_forced = false` everywhere) -> RLS is bypassed on the
+app path regardless.
+
+**B — Unversioned RLS policies.** ~12 live policies have no repo source:
+`audit_logs_admin_only`, `hfacs_nanocodes_read_policy`, `icao_adrep_read_policy`,
+`psoe_questions_read_all`, `regulator_read_all`, `tenant_admin_all`,
+`tenant_read_own`, `user_read_own`, `tenant_isolation_hazard_adrep`,
+`tenant_isolation_hazard_hfacs`, `tenant_isolation_report_adrep`,
+`tenant_isolation_report_hfacs`. Action: capture the live `pg_policies`
+output into `supabase/migrations/` and add a `pg_policies` drift check.
+
+### Exempt-identifier allowlist (NOT renamed)
+
+Real-world identifiers and kept internal ids: `caanepal.gov.np`,
+`caan.gov.np`, `ssp.caanepal.gov.np`, `smd@caanepal.gov.np`,
+`smssurvey.gsacharya.com`, `sms.nac.com.np`; the stored tenant/regulator
+slug `caan`; `caan-ops` (survey hostname alias); `caan-assd` / `caan-fssd`
+(until removed by Plan B).
+
+### Role model direction (Plan B — execution deferred)
+
+`TENANT_ADMIN` is canonical and `AIRLINE_ADMIN` is its alias
+(`RBAC_MODEL.md:27`); the code drifted to `AIRLINE_ADMIN`. Bring the code
+back to the neutral canonical in Plan B. Do **not** touch it during the
+CAAN -> state work.
+
+### Seed scripts retired
+
+`backend/seed/*` and `scripts/firebase/set-claims.js` are retired in favour
+of `public/admin/production-setup.html` (`public/admin/setup/step*.html`) for
+user/tenant/regulator provisioning.
+
+### Scope decision
+
+Product goal: stop showing "CAAN" in user-visible labels, and generalize the
+auth claim `CAAN_SMD` -> `STATE_SMD`. Internal identifier renames (files, CSS
+classes, DOM ids, API paths, tenant slug) are **out of scope** unless a
+deliverable requires them — no user-visible benefit, real migration risk. The
+tenant slug `caan` is kept (it keys the `uuid5`-derived tenant UUID and every
+FK). RLS policies are deferred with items A/B.
+
+**Phase 1 (accept `STATE_SMD` alongside `CAAN_SMD`) — in progress:** implemented
+as backend boundary normalization (`resolve_user_context` maps
+`STATE_SMD -> CAAN_SMD`), plus `STATE_SMD` added to `CROSS_TENANT_ROLES` /
+`CANONICAL_ROLES` / `ALLOWED_USER_CREATE_ROLES` / `normalize_legacy_role` and
+the `role_validation` regulator-exclusivity check. Claim flip is Phase 2 and
+gated on Phase 1 deploy + verify.
