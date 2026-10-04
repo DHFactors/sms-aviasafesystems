@@ -1389,3 +1389,22 @@ live CSS demos within an hour of deploy.**
 Spoke pages show no `active` pill on the state nav (`setActiveNav` matches
 pathname; `/dashboard/nhrc-kpis.html` matches none of the four state hrefs).
 Closed as intentional; no fix proposed.
+
+### UX-2 (logged — separate polish task)
+
+Step 1 (and step 3) do not disable the submit button while the request is in
+flight. A double-click produces a confusing "already exists" toast —
+observed 2026-10-04 on `test-regulator`: first click succeeded (regulator +
+`test-admin@examples.com` created, audit `USER_CREATED` 08:01:36), second
+click hit the duplicate-slug 409. Low priority; fix is disable-on-submit,
+re-enable on settle. Check step3-manage.html for the same gap.
+
+### Process note — deploy-window timing (logged)
+
+When a change touches both frontend and backend, wait for **both** deploys
+green before testing. Concrete instance 2026-10-04 (Adm-2): the "password
+not shown" report traced to a double-click during/around the deploy window —
+first click succeeded (password was in the response), second click 409'd,
+and the panel was missed. Confirmed via audit trail, not code inspection.
+Rule stands alongside Infra-1 (hard-refresh for CSS): verify deploy state
+(`origin/main` SHA vs `/health` commit) before manual testing a fresh push.
