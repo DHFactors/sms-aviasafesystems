@@ -1,6 +1,6 @@
 # AviaSAFE — Project Status & Architecture Report
 
-**Date:** 2026-09-01 · **Release:** Safety Performance Framework — SPI/SPT + N-HRC dashboards · DEMO data platform
+**Date:** 2026-10-05 · **Release:** Safety Performance Framework — SPI/SPT + N-HRC dashboards · DEMO data platform
 **Scope:** Consolidated `sms-db` · DEMO operator platform (4 tenants) · full seeders CLI · SPI/SPT & N-HRC API + dashboards · UAT sweep · Render auto-deploy
 
 ---
@@ -57,7 +57,7 @@ surfaces:
   `tenants/{tid}/flight_diversions` store is deprecated.
 * The **pre-UAT verification sweep** is green at the API/data level and the
   current backend is **live on Render** (auto-deploy from `main`,
-  commit `82b4cc6`).
+  commit `cf69771`).
 
 ## 1a. Recent Work (Aug 2026)
 
@@ -115,12 +115,16 @@ Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
 * **HFACS JSON correction** — `hfacs_nanocodes.json` had a 5-line `//` comment
   header that broke both `json.load` and the browser `fetch().json()` at
   `hazard-analysis.js:67`; header removed → valid JSON, **109 codes, 0 dupes**.
-* **Diversion rate reads Firestore (UAT fix)** — `spi_service.py` now computes
-  `diversion_rate` from `tenants/{tid}/flight_diversions` via
-  `FlightDiversionService` (state view aggregates minus `demostate`). The
-  Postgres `flight_diversions` query was removed. Verified through the live
-  API: fixedwing **3.0** · rotarywing **2.0** · demoairport **2.0** ·
-  demostate **0.0** · state **7.0**.
+* **Diversion rate reads Postgres (UAT fix)** — `spi_service.py` computes
+  `diversion_rate` from the Postgres `flight_diversions` table via
+  `FlightDiversionService`
+  (`backend/app/services/flight_diversion_service.py:8-9,25,29`, which reads
+  `app.db.pg` / `db_models.FlightDiversion`; state view aggregates minus
+  `demostate`). The legacy Firestore `tenants/{tid}/flight_diversions` store is
+  deprecated. Verified through the live API: fixedwing **3.0** · rotarywing
+  **2.0** · demoairport **2.0** · demostate **0.0** · state **7.0**. (The
+  comments in `backend/app/services/spi_service.py:488,528,574-593` still say
+  Firestore; they are stale and harmless.)
 * **Pre-UAT verification sweep** — services import cleanly, seeders report
   **87 created / 0 errors**, DB counts match the target exactly, HFACS 109
   loads, navigation present with no duplicates, and all API routes respond 200.
@@ -200,7 +204,7 @@ flight diversions) creating one consistent view:
 | Firebase project | `aerosafety-sms-prod` (Auth only); `sms-db` deprecated 2026-09-12 |
 | Deploy plumbing | root `render.yaml` (`autoDeploy: true`, `healthCheckPath: /live`, `dockerContext: backend`) |
 | Supabase | project ref `bftwNljNpnpniksmalnk` (config.toml tracked; remote schema migration tracked) |
-| Deployed commit | `82b4cc6` (feat(spi): fix diversion rate to read from Firestore) |
+| Deployed commit | `cf69771` (fix(feedback): unify on FAB widget; route to backend with DB write + email notification) |
 
 ## 5. Operational Notes
 
