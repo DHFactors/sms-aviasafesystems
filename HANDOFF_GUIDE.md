@@ -145,6 +145,7 @@ findable. Long-form detail lives in the owning section.
 - **Op-1** — `sms-maturity.html` "Error loading tenants" runtime bug. Source: `public/dashboard/sms-maturity.html:263`. Status: Open. (The legacy `NAV_ITEMS` nav half is folded into Nav Submenu Consistency finding #1.)
 - **Design-1** — Dashboard data mapping not finalized (safety, AE, state): which dashboard renders which cards/charts/tables is only partially decided. Product design task before paid launch. Status: Open.
 - **Design-2** — `flight_diversions/index.html` direct-URL reachability redirects to the homepage. Determine intended behavior once Design-1 is settled. Source: `public/flight_diversions/index.html`. Status: Open.
+- **Copilot/FAB z-index coexistence** — Copilot widget (bottom-right, `z-index:2147483000`) never coexists with the FAB today (different pages). If Copilot is ever added to a shell page, decide the design. Source: Feedback Phase 2 investigation. Status: Open (latent).
 
 C1/C2 remediation appears implemented in code — verify before closing. Pointers: `backend/app/api/v1/endpoints/tenants.py:55` (`Depends(get_admin_user)`) and `backend/app/core/config.py:251` (`BETA_ACCESS_KEY: Optional[str] = None`). Do not claim closed. `Sec-1` (invite-code onboarding) duplicates `SECURITY_REVIEW.md` C1/C2/L7 and Tier 3 #11; `Sec-3` (survey window enforcement) is implemented (`backend/app/routes/surveys.py:186-243`); `Sec-4` (App Check on login) duplicates `SECURITY_REVIEW.md` H3/M1/L2 and `HANDOFF_GUIDE.md:63,198`.
 
@@ -1438,5 +1439,55 @@ proper error state instead of the silent generic throw.
 ### Cleanup-1 (logged — Phase 2 or small cleanup)
 
 `getUserEmail` / `getTenantName` in `public/js/feedback.js` are unused
-after the Cloudflare → backend unification (identity now comes from the
+after the Cloudflare  backend unification (identity now comes from the
 auth token). Remove them in Phase 2 or a small cleanup task.
+
+## Session Update — 2026-10-05 - Feedback Phase 2 Steps 1-3 shipped
+
+### Feedback Phase 2 status
+
+- **Step 1+2 — DONE** (`add4c41`, deployed 2026-10-05, verified). Shell now
+  injects `api/client.js` (guarded) then `feedback.js` (guarded, then calls
+  `initFeedbackWidget()`) in place of the old opt-out branch; the three
+  bottom-right toast anchors were moved to clear the FAB
+  (`administration.html`, `settings/team.html`, `sram/index.html`). Headless:
+  every reachable shell page shows exactly one FAB, no shell modal;
+  `hazard-analysis.html` submit verified (closes the ApiClient gap).
+- **Step 3 — DONE** (`dbf187e`, deployed 2026-10-05, verified). Stripped the
+  redundant per-page FAB opt-in (`feedbackWidget` flag, `<script
+  src="/js/feedback.js">`, `initFeedbackWidget()`) from 8 pages: nhrc-kpis,
+  spi-dashboard, state-sms-maturity, psoe-audit, safety, state-oversight,
+  state-risk-register, state-safety-trends; removed an empty `<script></script>`
+  block in `safety.html`. Diff 9 files, +2/−28. Verified headless: all 8 pages
+  show exactly 1 FAB, 0 shell modal, no console errors.
+- **Step 4 — NEXT** (authorized, not started): retire shell's modal + CSS.
+
+### Backlog items logged 2026-10-05
+
+- `Design-1` — dashboard data mapping not finalized (safety, AE, state)
+  (`HANDOFF_GUIDE.md:146`).
+- `Design-2` — `flight_diversions/index.html` direct-URL reachability
+  (`HANDOFF_GUIDE.md:147`).
+- `Copilot/FAB z-index coexistence` — latent; Copilot and the FAB never
+  coexist today, different pages (`HANDOFF_GUIDE.md:148`).
+
+### Tomorrow's first task
+
+**Feedback Phase 2 Step 4 — retire shell's modal and CSS.**
+
+- Remove from `public/js/shell.js`: the feedback footer button in
+  `buildFooter()` (:798-806); `buildFeedbackModal()` (:812-852);
+  `let feedbackRating = 0;` (:854); `openFeedbackModal` (:856-864);
+  `closeFeedbackModal` (:866-873); `setRating` (:875-883);
+  `resetFeedbackForm` (:885-895); `global.submitFeedback` (:897-945);
+  `bindFeedbackModalEvents` (:947-993); and any remaining reference to those
+  symbols.
+- Remove `public/css/dashboard-responsive.css:133-340` (the shell modal's CSS
+  block).
+- Verify: no `shell.js` reference to the removed symbols remains; no HTML page
+  calls `openFeedbackModal`/`closeFeedbackModal`; all 27 shell pages still show
+  exactly 1 FAB after removal (the FAB is unaffected — it is `feedback.js`,
+  not shell's modal).
+- The commits that were holding Step 4 back are `add4c41` and `dbf187e` (both
+  deployed and verified); Step 4 is now safe to execute.
+- After Step 4: Feedback Phase 2 is closed. Next: **Adm-3**.

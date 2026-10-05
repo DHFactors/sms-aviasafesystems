@@ -143,6 +143,12 @@ Completed, committed (`82b4cc6` pushed to `origin/main`), and **live on Render**
   post-deploy "still broken" sighting was cached CSS only);
   `psoe-audit.html` nav confirmed identical to references — its remaining
   symptom is content-level, separate investigation.
+* **Feedback Phase 2 (Steps 1-3) — shell-injected FAB.** The feedback widget is
+  now injected by `shell.js` on every shell page (`api/client.js` then
+  `feedback.js`, both guarded); the per-page `feedbackWidget` opt-in and
+  page-level `feedback.js` tags were removed from the 8 pages that carried
+  them. Verified headless: one FAB per page, no duplicate modal. **Step 4
+  (retire shell's legacy modal + CSS) is pending.**
 
 ## 2. System Architecture
 
