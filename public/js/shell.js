@@ -1037,13 +1037,29 @@
 
         shell.appendChild(main);
 
-        // Append feedback modal to body, unless the page opts into the
-        // standalone feedback.js widget (SHELL_CONFIG.feedbackWidget), which
-        // builds the only #feedbackModal to avoid duplicate IDs.
-        if (!cfg.feedbackWidget && !document.getElementById('feedbackModal')) {
-            document.body.appendChild(buildFeedbackModal());
-            bindFeedbackModalEvents();
+        // Guarantee the feedback FAB widget on every shell page. Load
+        // api/client.js first (feedback.js needs ApiClient at submit), then
+        // feedback.js, which builds the only #feedbackModal + FAB. Both
+        // injections are guarded so pages that still carry their own tags do
+        // not double-load. Mirrors the loadInterFont() injection pattern.
+        function loadScriptOnce(src, isLoaded, onload) {
+            if (isLoaded()) { if (onload) onload(); return; }
+            const existing = document.querySelector('script[src="' + src + '"]');
+            if (existing) { if (onload) existing.addEventListener('load', onload); return; }
+            const s = document.createElement('script');
+            s.src = src;
+            if (onload) s.addEventListener('load', onload);
+            document.head.appendChild(s);
         }
+
+        loadScriptOnce('/js/api/client.js', function () {
+            return typeof window.ApiClient !== 'undefined';
+        });
+        loadScriptOnce('/js/feedback.js', function () {
+            return typeof window.initFeedbackWidget === 'function';
+        }, function () {
+            if (typeof window.initFeedbackWidget === 'function') window.initFeedbackWidget();
+        });
 
         setActiveNav();
         applyNavVisibility();

@@ -71,6 +71,10 @@ AUTHOR: AviaSAFE Systems
     // ============================================================
     // Widget CSS
     // ============================================================
+    // Convention: the FAB reserves the bottom-right ~4rem of the page.
+    // Bottom-anchored toasts on shell pages must use bottom >= 4.5rem;
+    // top-right toasts are the alternative.
+    // (See administration.html, settings/team.html, sram/index.html.)
     var CSS = '\
         #feedbackWidgetHost .feedback-fab {\
             position: fixed;\
