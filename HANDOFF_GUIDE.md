@@ -143,6 +143,8 @@ findable. Long-form detail lives in the owning section.
 - **Cleanup-2** — Prune 6 stale merged local branches. Local only; `origin/*` prune is a separate decision. Status: Open.
 - **Sec-2** — Survey link signing (prevent anonymous re-filing to a different tenant). Status: Open.
 - **Op-1** — `sms-maturity.html` "Error loading tenants" runtime bug. Source: `public/dashboard/sms-maturity.html:263`. Status: Open. (The legacy `NAV_ITEMS` nav half is folded into Nav Submenu Consistency finding #1.)
+- **Design-1** — Dashboard data mapping not finalized (safety, AE, state): which dashboard renders which cards/charts/tables is only partially decided. Product design task before paid launch. Status: Open.
+- **Design-2** — `flight_diversions/index.html` direct-URL reachability redirects to the homepage. Determine intended behavior once Design-1 is settled. Source: `public/flight_diversions/index.html`. Status: Open.
 
 C1/C2 remediation appears implemented in code — verify before closing. Pointers: `backend/app/api/v1/endpoints/tenants.py:55` (`Depends(get_admin_user)`) and `backend/app/core/config.py:251` (`BETA_ACCESS_KEY: Optional[str] = None`). Do not claim closed. `Sec-1` (invite-code onboarding) duplicates `SECURITY_REVIEW.md` C1/C2/L7 and Tier 3 #11; `Sec-3` (survey window enforcement) is implemented (`backend/app/routes/surveys.py:186-243`); `Sec-4` (App Check on login) duplicates `SECURITY_REVIEW.md` H3/M1/L2 and `HANDOFF_GUIDE.md:63,198`.
 

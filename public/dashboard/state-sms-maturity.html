@@ -193,7 +193,6 @@ window.SHELL_CONFIG = {
     tenantTitle: 'State SMS Maturity Assessment — CAAN SMD',
     heroSubtitle: 'Civil Aviation Authority of Nepal — State-Wide 4-Pillar / 12-Element SMS Evaluation',
     suppressAutoHome: true,
-    feedbackWidget: true,
     nav: [
         { href: '/state-oversight.html', label: 'Home', icon: 'fa-house' },
         { href: '/dashboard/state-sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
@@ -205,7 +204,6 @@ window.SHELL_CONFIG = {
 <script src="/js/api/client.js"></script>
 <script src="/js/nav-config.js"></script>
 <script src="/js/shell.js"></script>
-<script src="/js/feedback.js"></script>
 <script>
 const PILLAR_META = [
     { key: 'safety_policy', label: 'Safety Policy', color: '#1a6b8a' },
@@ -578,7 +576,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([loadMaturity(), loadAssessment(false)]);
 });
 
-initFeedbackWidget();
 </script>
 
 </body>

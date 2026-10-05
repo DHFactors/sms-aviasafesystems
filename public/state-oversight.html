@@ -213,7 +213,6 @@ window.SHELL_CONFIG = {
     tenantTitle: 'State Aviation Safety Oversight — CAAN SMD',
     heroSubtitle: 'Civil Aviation Authority of Nepal — State Safety Programme (SSP)',
     suppressAutoHome: true,
-    feedbackWidget: true,
     nav: [
         { href: '/state-oversight.html', label: 'Home', icon: 'fa-house' },
         { href: '/dashboard/state-sms-maturity.html', label: 'SMS Maturity', icon: 'fa-heart-pulse' },
@@ -226,7 +225,6 @@ window.SHELL_CONFIG = {
 <script src="/js/api/client.js"></script>
 <script src="/js/dashboard-utils.js"></script>
 <script src="/js/hazards.js"></script>
-<script src="/js/feedback.js"></script>
 <script src="/js/shell.js"></script>
 <script>
 const OPERATOR_ORDER = [
@@ -602,7 +600,6 @@ function renderStateSpiTrend(trend) {
     });
 }
 
-initFeedbackWidget();
 </script>
 <footer class="app-footer">
     <div class="footer-line">Made with <span class="heart">&#10084;&#65039;</span> from Nepal</div>
