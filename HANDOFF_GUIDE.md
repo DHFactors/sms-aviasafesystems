@@ -131,6 +131,21 @@ Get-ChildItem -Path backend -Include *.py -Recurse |
 3. Project D — Report intake forms aligned to Sita Air's
    accepted manuals (VSR first, then MOR).
 
+### Backlog register (IDs)
+
+Stable IDs for open cross-cutting items; declared once here so they are
+findable. Long-form detail lives in the owning section.
+
+- **Adm-3** — Parameterize `STATE_REGULATOR_ID`. Source: `public/state-oversight.html:206,360` (`'caan'` hardcoded). Status: Open.
+- **Infra-2** — Retire Cloudflare feedback worker (redundant after feedback unification). Source: `cf69771`. Status: Open.
+- **Infra-3** — App Check reliability monitoring (two occurrences 2026-10-04; TTL reduced to 1h). Status: Open.
+- **Infra-4** — New-subdomain App Check registration process (for per-tenant subdomains). Status: Open.
+- **Cleanup-2** — Prune 6 stale merged local branches. Local only; `origin/*` prune is a separate decision. Status: Open.
+- **Sec-2** — Survey link signing (prevent anonymous re-filing to a different tenant). Status: Open.
+- **Op-1** — `sms-maturity.html` "Error loading tenants" runtime bug. Source: `public/dashboard/sms-maturity.html:263`. Status: Open. (The legacy `NAV_ITEMS` nav half is folded into Nav Submenu Consistency finding #1.)
+
+C1/C2 remediation appears implemented in code — verify before closing. Pointers: `backend/app/api/v1/endpoints/tenants.py:55` (`Depends(get_admin_user)`) and `backend/app/core/config.py:251` (`BETA_ACCESS_KEY: Optional[str] = None`). Do not claim closed. `Sec-1` (invite-code onboarding) duplicates `SECURITY_REVIEW.md` C1/C2/L7 and Tier 3 #11; `Sec-3` (survey window enforcement) is implemented (`backend/app/routes/surveys.py:186-243`); `Sec-4` (App Check on login) duplicates `SECURITY_REVIEW.md` H3/M1/L2 and `HANDOFF_GUIDE.md:63,198`.
+
 ### Tier 1 — This week
 1. Tenant-user VSR smoke test — verify the deployed fb4bb3b
    build accepts VSR submissions with a real tenant context
@@ -832,7 +847,9 @@ nav that belongs to a different group.
    mixes Module 1, Module 2, and Module 3 entries
    (Home, SMS Maturity, Risk Management, Assurance, Reports, Promotion,
    Administration) instead of the Safety Manager nav the user came
-   from.
+   from. **Op-1 (nav half) folded here** — the legacy `NAV_ITEMS` nav on
+   this page is this finding; the only separate Op-1 item is the
+   `Error loading tenants` runtime bug (`sms-maturity.html:263`).
 
 2. **Performance → SPI/SPT content not developed.**
    `/dashboard/spi-dashboard.html` renders the page shell (title,

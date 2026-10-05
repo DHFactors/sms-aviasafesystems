@@ -222,6 +222,20 @@ A tenant outside the current map is onboarded.
 ### Effort
 ~1 hour.
 
+## Phase 1 — Registration Activation (Backlog)
+
+Priority: **High** — product activation, gated by the security remediation in
+`SECURITY_REVIEW.md` C1/C2 (see the C1/C2 note in `HANDOFF_GUIDE.md`; the
+onboarding gate now requires an admin dependency and the hardcoded default key
+is removed).
+
+- **Prod-1 — Activate operator self-registration** (`public/register.html`).
+  Currently gated by the enterprise access key (`BETA_ACCESS_KEY`).
+- **Prod-2 — Activate team onboarding** (`public/join.html`). Currently
+  invite-code gated.
+
+Cross-reference: `SECURITY_REVIEW.md:36-42` (C1/C2).
+
 ## Phase 1 — Repo Hygiene: No Snapshot Files (Convention)
 
 Working-session artifacts (todos snapshots, session logs, chat exports) must **not** be committed to
