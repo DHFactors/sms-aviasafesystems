@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: LOGIN_FAILURE_DIAGNOSIS.md
+Archived: 2026-10-07
+Category: historical
+Reason: Resolved production login incident diagnosis (2026-09-25).
+Authority: none. This file is a historical record only.
+-->
+
 # LOGIN_FAILURE_DIAGNOSIS.md — Production login "App Check token required"
 
 Date: 2026-09-23. Commit d412dd4 deployed to aerosafety-sms-prod.web.app.

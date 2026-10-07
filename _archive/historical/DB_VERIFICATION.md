@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: DB_VERIFICATION.md
+Archived: 2026-10-07
+Category: historical
+Reason: Point-in-time live DB schema snapshot (2026-09-16).
+Authority: none. This file is a historical record only.
+-->
+
 # DB_VERIFICATION.md — Live Supabase schema verification
 
 Connection: `DATABASE_URL` from `backend/.env` (psycopg2, `postgresql://postgres.bftnwljnpnpniksmalnk:***@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require`, `pgbouncer=true` param dropped for psycopg2).

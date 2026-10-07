@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: CONNECTION_STABILITY_REPORT.md
+Archived: 2026-10-07
+Category: historical
+Reason: One-off live-Supabase test-suite investigation (2026-09-22).
+Authority: none. This file is a historical record only.
+-->
+
 # CONNECTION_STABILITY_REPORT.md — Live-Supabase connection instability in the full test suite
 
 Status: READ-ONLY INVESTIGATION (no code changed)

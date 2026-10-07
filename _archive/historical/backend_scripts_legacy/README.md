@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: backend/scripts/legacy/README.md
+Archived: 2026-10-07
+Category: historical
+Reason: Legacy scripts folder README (self-declared 'Do Not Run').
+Authority: none. This file is a historical record only.
+-->
+
 # Legacy Scripts — Do Not Run
 
 These scripts pre-date the A-series migration (2026-09-12)

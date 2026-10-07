@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: docs\delivery-workorder-20260914.md
+Archived: 2026-10-07
+Category: historical
+Reason: Dated Sita Air delivery work order (2026-09-14).
+Authority: none. This file is a historical record only.
+-->
+
 # Delivery Work Order — 2026-09-14 (Sita Air Delivery Day)
 
 SCOPE: Prepare for and support the Sita Air delivery. Do NOT

@@ -1,0 +1,92 @@
+2026-08-24 20:16:50,490 INFO ======================================================================
+2026-08-24 20:16:50,491 INFO Beta-only Firestore reset & seed
+2026-08-24 20:16:50,491 INFO ======================================================================
+2026-08-24 20:16:50,491 INFO Script version: 1.0.0-beta-minimal commit: 15e7c88
+2026-08-24 20:16:50,491 INFO Database ID: sms-db-beta
+2026-08-24 20:16:50,491 INFO Execution mode: execute
+2026-08-24 20:16:50,491 INFO Dry-run: False
+2026-08-24 20:16:50,491 INFO Auth operations: 0 (Auth disabled per safety directives)
+2026-08-24 20:16:51,051 INFO Firebase project ID: aerosafety-sms-prod
+2026-08-24 20:16:51,051 INFO Firestore database ID: sms-db-beta
+2026-08-24 20:16:51,051 INFO Auth operations: 0
+2026-08-24 20:16:51,051 INFO [DISCOVER] Counting documents in demo tenant paths (beta only)...
+2026-08-24 20:17:06,008 INFO [DISCOVER] Counts before: {
+  "fishtail-air": {
+    "reports": 31,
+    "hazards": 110,
+    "can_cap": 18,
+    "can_cap/caps": 32,
+    "flight_diversions": 0,
+    "surveys": 16,
+    "responses": 16,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 2
+  },
+  "vnkt-airport": {
+    "reports": 0,
+    "hazards": 0,
+    "can_cap": 0,
+    "flight_diversions": 0,
+    "surveys": 0,
+    "responses": 0,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 0
+  }
+}
+2026-08-24 20:17:06,008 WARNING [AUTH-SAFETY] Beta and production SHARE the same Firebase project (aerosafety-sms-prod).
+2026-08-24 20:17:06,009 WARNING [AUTH-SAFETY] Firebase Auth custom claims are PROJECT-WIDE, not per-database.
+2026-08-24 20:17:06,009 WARNING [AUTH-SAFETY] AUTOMATIC Auth provisioning BLOCKED. Dedicated beta project or explicit approval required.
+2026-08-24 20:17:06,009 INFO [AUTH-CHECK] {
+  "beta_project": "aerosafety-sms-prod",
+  "beta_database": "sms-db-beta",
+  "prod_database": "sms-db",
+  "prod_project_guess": "aerosafety-sms-prod",
+  "shared_project": true,
+  "auth_scoped_to_database": false,
+  "auth_is_project_wide": true,
+  "auth_blocked": true,
+  "action": "BLOCKED - Auth provisioning stopped. Firestore purge/seed may proceed if its own checks pass."
+}
+2026-08-24 20:17:06,009 INFO [PURGE] Execute — purging demo tenant subcollections in sms-db-beta...
+2026-08-24 20:17:16,100 INFO [PURGE] fishtail-air/reports: 31 docs
+2026-08-24 20:17:50,703 INFO [PURGE] fishtail-air/hazards: 110 docs
+2026-08-24 20:18:11,001 INFO [PURGE] fishtail-air/can_cap: 18 docs, 32 caps
+2026-08-24 20:18:16,675 INFO [PURGE] fishtail-air/surveys: 16 docs
+2026-08-24 20:18:21,805 INFO [PURGE] fishtail-air/responses: 16 docs
+2026-08-24 20:18:25,097 INFO [SEED] Execute — seeding 3-5 records per tenant...
+2026-08-24 20:18:25,671 INFO [SEED] Tenant fishtail-air exists, departments synced (task canonical check logged)
+2026-08-24 20:18:27,398 INFO [SEED] Created tenant vnkt-airport with departments ['Airside Operations', 'Wildlife & Bird Hazard Management', 'Rescue & Fire Fighting (ARFF)', 'Apron Control', 'Air Traffic Coordination']
+2026-08-24 20:18:34,944 INFO [DISCOVER] Counts after: {
+  "fishtail-air": {
+    "reports": 1,
+    "hazards": 1,
+    "can_cap": 1,
+    "can_cap/caps": 1,
+    "flight_diversions": 0,
+    "surveys": 0,
+    "responses": 0,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 2
+  },
+  "vnkt-airport": {
+    "reports": 1,
+    "hazards": 1,
+    "can_cap": 1,
+    "can_cap/caps": 1,
+    "flight_diversions": 0,
+    "surveys": 0,
+    "responses": 0,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 1
+  }
+}
+2026-08-24 20:18:34,946 INFO [SUMMARY] JSON written to C:\Users\CEO-LAPTOP\Projects\betasms-aviasafe\backend\scripts\logs\setup_two_tenants_beta_20260824_201650.json
+2026-08-24 20:18:34,946 INFO [SUMMARY] Log written to C:\Users\CEO-LAPTOP\Projects\betasms-aviasafe\backend\scripts\logs\setup_two_tenants_beta_20260824_201650.log

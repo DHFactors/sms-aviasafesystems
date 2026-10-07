@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: SCHEMA_RECONCILIATION_PLAN.md
+Archived: 2026-10-07
+Category: historical
+Reason: D1 reconciliation plan; D1 resolved per G3 (2026-10-07).
+Authority: none. This file is a historical record only.
+-->
+
 # SCHEMA RECONCILIATION PLAN — ORM vs Live Drift Resolution
 
 - **Status**: IN IMPLEMENTATION. Steps 1 (D7), 2 (D1), 3 (D5), 4 (D6) complete in the ORM; Step 2 applies to the live DB via migration `supabase/migrations/20260916120000_sram_risk_register.sql`; Step 5 (D4) pending. §3 reflects the applied numeric D1 decisions (see Step 2).

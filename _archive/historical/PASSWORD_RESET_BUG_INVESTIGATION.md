@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: PASSWORD_RESET_BUG_INVESTIGATION.md
+Archived: 2026-10-07
+Category: historical
+Reason: Resolved password-reset investigation (2026-09-17).
+Authority: none. This file is a historical record only.
+-->
+
 # PASSWORD_RESET_BUG_INVESTIGATION.md
 
 Investigation: "Passwords set during user creation by Super Admin (Production Setup Step 3)

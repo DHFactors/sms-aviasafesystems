@@ -1,0 +1,202 @@
+<!--
+AUTHORITATIVE COPY.
+Location: D:\Projects\aviasafesms\docs\step0\Boundary_Charter_Addendum.md
+Original (historical): D:\Projects\Project_Boundary_Charter_Addendum.md
+Copied: 2026-10-07
+Edits must be made here, not in the original.
+-->
+
+# Project Boundary Charter — Addendum
+
+## Ownership map, reporting rule, and pre-integration gates for the Unified Product Vision v1.0
+
+Status: Addendum to the Unified Product Vision
+
+Date: 2026-10-07
+
+Audience: Concept owner / Subject Matter Expert
+
+Companion documents (same folder):
+
+- `SOURCE-DATA-CATALOG-AND-ARCHITECTURE-REPORT.md`
+- `Project_Evalulation_Report.md`
+- `Project_Convergence_Blueprint.md`
+
+Purpose: The Unified Product Vision defines the boundaries. This addendum fills the three gaps that must be closed before integration can start: it assigns an owner to every layer and object, states the statutory-versus-protected reporting rule, and lists the pre-integration gates.
+
+---
+
+# 1. Why this addendum exists
+
+The Unified Product Vision correctly establishes:
+
+- One Object, One System of Record.
+- Operator owns operational data; State owns state intelligence.
+- The Operator Intelligence Pack (OIP) is the only intelligence path to the State.
+
+Three things were left open:
+
+1. Layers 4, 5, and 6 had no named system owner (and neither did Layer 0).
+2. The OIP firewall did not distinguish **legally mandatory reporting** from **protected safety data**.
+3. The critical formulas (SMS Maturity Index, RBO scoring) and the identity/access model were not named as gates.
+
+This addendum closes those three gaps.
+
+---
+
+# 2. Layer ownership map
+
+Every layer now has exactly one accountable owner. "Owner" means the authoritative source, not necessarily the builder.
+
+| Layer | Name | Data / objects | Accountable owner |
+|---|---|---|---|
+| 0 | Source Data | Occurrences, voluntary reports, hazard reports, audits, findings, investigations, training, surveys, MOC | Operator tenant (captured in the Operational SMS Core) |
+| 1 | Compliance Intelligence | MOR compliance, CAP compliance, audit/training compliance, SMS maturity evidence | Unified Platform (scoring); evidence of record in the Operational SMS Core |
+| 2 | Safety Risk Management Intelligence | Hazard, Risk, Barrier, Finding, Action/CAP, Occurrence registers | Operational SMS Core (AviaSAFE lineage), with SMS360X barrier/risk model enrichment |
+| 3 | Safety Intelligence (Emerging) | Emerging hazards, weak signals, positive practices, national profiles | SMS360X Intelligence Layer |
+| 4 | ADREP Intelligence | Occurrence classification, event categories, N-HRC linkage | Unified Platform classification service (coding captured in the Operational SMS Core) |
+| 5 | HFACS Intelligence | Human/organisational factor coding and trends | Unified Platform classification service (coding captured in the Operational SMS Core) |
+| 6 | Nano-Code Intelligence | Granular pattern and relationship intelligence | SMS360X Intelligence Layer |
+
+Rule: if a layer both stores coding and produces intelligence, the **stored coding belongs to the Operational SMS Core** and the **intelligence belongs to SMS360X**. This keeps one source and one brain.
+
+---
+
+# 3. Object ownership map
+
+Each object has one authoritative store. This table resolves the objects left open in the vision and the conflict register.
+
+| Object | Authoritative store | Notes |
+|---|---|---|
+| Tenant / Operator | Operational SMS Core | Unify on one tenant key (e.g. deterministic slug) |
+| Identity / Membership | Unified Governance (SMS360X model) | One login; effective-dated memberships; single active context |
+| Occurrence / VSR / MOR | Operational SMS Core | Statutory MOR channel preserved (see Section 4) |
+| Hazard | Operational SMS Core | Keeps triage/enrichment/N-HRC |
+| Risk | Operational SMS Core | Fix the dual-shape `risk_register` defect first (gate G3) |
+| Barrier | Operational SMS Core (data) + SMS360X (model) | One register; richer assurance model applied |
+| TopEvent / Consequence | Operational SMS Core (bow-tie) | Reconcile to one structure |
+| Finding | Operational SMS Core (AviaSAFE lineage) | — |
+| Action / CAN / CAP | Operational SMS Core | Two-signature acceptance and AE non-delegability enforced here |
+| Verification / Closure | Operational SMS Core | — |
+| Flight diversion | Operational SMS Core | Feeds operational context intelligence |
+| Investigation | Operational SMS Core | Feeds OIP-05 |
+| SPI / SPT | Operational SMS Core computes; Unified Platform governs definitions | One measure, one number |
+| SMS Maturity | Operational SMS Core engine; SMS360X supplies the approved formula | One formula, one calculation (gate G5) |
+| Classification reference (ADREP / HFACS / Nano-Code / N-HRC) | Unified Platform reference data | One classification service |
+| Import history / lineage | Unified Governance (SMS360X versioned model) | Reproducibility |
+| OIP-01 .. OIP-07 | SMS360X Intelligence Layer | Generated by the operator from operator-owned registers |
+| Operator Risk Profile | SMS360X | Derived only from OIPs |
+| State products S1-S10 | SMS360X (M14 State Workspace) | State-owned |
+| Knowledge Network content | SMS360X | De-identified only; future phase |
+| Audit log | Unified Platform | Covers both sides |
+
+---
+
+# 4. Statutory versus protected reporting rule
+
+This is the most important correction to the vision. The OIP firewall applies to **protected safety data**, not to **legally mandatory reports**.
+
+## 4.1 The two channels
+
+| Channel | Examples | Who receives it | Legal character | Path |
+|---|---|---|---|---|
+| Statutory reporting | Accidents, serious incidents, Mandatory Occurrence Reports (MORs) | The State / regulator / investigation authority, as law requires | A legal duty, not discretionary intelligence | Direct reporting relationship, with regulatory deadlines |
+| Protected safety data | Voluntary safety reports (VSR), internal hazard/risk/barrier registers, internal findings, just-culture data | No one outside the operator, except as governed | Protected for reporting-culture and confidentiality reasons | OIP intelligence only; raw records never leave |
+
+## 4.2 The rule
+
+1. **Statutory reports travel through their own legal channel.** They are not re-labelled as OIP-01.
+2. **OIP-01 Mandatory Occurrence Intelligence summarises** occurrence intelligence for State monitoring; it does not replace the legal MOR submission.
+3. **Protected data leaves only as intelligence.** Raw voluntary reports, hazard registers, and risk registers stay in the operator tenant.
+4. **Grey zone rule.** Where a protected record is derived from a mandatory occurrence, the statutory facts follow the legal channel and the protected analysis stays protected. This policy must be written and approved (gate G2).
+
+## 4.3 Consequence for RBO
+
+Risk-Based Oversight is built from OIP intelligence (OIP-01/02/03/04/06). It does **not** require direct access to operator registers, even though statutory occurrence facts still reach the regulator through the legal channel.
+
+---
+
+# 5. Access and identity target
+
+The vision defines data boundaries but must also name access boundaries.
+
+- **One identity** for the whole product (single login provider). Running two indefinitely is a security and cost risk (gate G4).
+- **One membership model**: a user holds one active, effective-dated membership per request, scoped to an operator tenant, a regulator, or the State (SMS360X AD-01..AD-15).
+- **Default-deny** row-level security on all tenant-owned tables.
+- **Non-owning regulator access**: purpose-bound, jurisdiction-scoped, time-limited, and audited.
+- **No special path** may bypass these rules.
+
+---
+
+# 6. Explainability gates
+
+The success criteria promise "explainable intelligence". That cannot be claimed until two formulas exist.
+
+| Gate | What must be defined | Why |
+|---|---|---|
+| G5 | SMS Maturity Index formula (pillar weights, method, version) | So maturity can be independently recalculated and audited |
+| G6 | RBO scoring model (inputs, weights, bands, explanation view) | So an oversight decision can be justified to an operator |
+
+Both must publish their inputs, weights, version, reporting period, and data-quality limits.
+
+---
+
+# 7. OIP lifecycle (new, because the OIP is now the key interface)
+
+| Stage | Owner | Rule |
+|---|---|---|
+| Generate | Operator tenant | From operator-owned registers only |
+| Review / approve | Operator (Safety Manager / Accountable Executive) | Accountable sign-off before release |
+| Publish | Operator to State | A published OIP is versioned and immutable for its period |
+| Consume | State Workspace (M14) | Read-only; preserves reporting period and source lineage |
+| Supersede | Operator | A correction creates a new version; the original is retained |
+
+Suggested cadence (from the approved OIP spec): OIP-01 event-driven, OIP-02 quarterly, OIP-03/04 annual plus significant change, OIP-05 event-driven, OIP-06 monthly or quarterly, OIP-07 annual.
+
+---
+
+# 8. Pre-integration gates (checklist before any build)
+
+| Gate | Decision | Owner |
+|---|---|---|
+| G1 | Approve this ownership map | SME |
+| G2 | Approve statutory-versus-protected reporting policy | SME / legal |
+| G3 | Approve the canonical domain model and resolve the `risk_register` dual-shape defect | SME + technical |
+| G4 | Choose one identity and membership model | SME + technical |
+| G5 | Approve the SMS Maturity Index formula | SME |
+| G6 | Approve the RBO scoring model | SME |
+| G7 | Approve the OIP lifecycle and immutability rule | SME |
+| G8 | Approve default-deny RLS as the single access model | SME + technical |
+| G9 | Confirm the legal basis for any regulator record-level access | SME / legal |
+| G10 | Decide the single tenant key scheme | SME + technical |
+| G11 | Enforce the "no duplicate register, no duplicate intelligence engine" rule | All |
+
+No integration development should start until G1-G11 are recorded.
+
+---
+
+# 9. Numbering reconciliation
+
+Two numbering systems currently coexist and should be reduced to one public map.
+
+- Proposed public map: **Layers 0-6** (Source Data, Compliance, SRM, Safety Intelligence, ADREP, HFACS, Nano-Code), plus **OIP** and **M14 State Workspace**.
+- Retire "Module 1 / Module 2" from public documents, or define them once as internal aliases (Module 1 = Compliance/SMS Maturity; Module 2 = SRM).
+- The success-criteria chain should read in one direction only:
+
+```
+
+Source Data → Registers → Compliance + SRM Intelligence → OIP → M14 State Workspace → RBO → SSP / NASP
+
+```
+
+---
+
+# 10. Change control
+
+- This addendum, the Unified Product Vision, the Evaluation Report, and the Convergence Blueprint form one decision set.
+- Any change to the ownership map or the reporting rule must update all four together.
+- The conflict register in the Convergence Blueprint (C-01..C-10) remains the live list of open conflicts; this addendum resolves C-01 (regulator access) and C-05 (duplicate intelligence) and assigns owners for the rest.
+
+---
+
+*End of Boundary Charter Addendum. Decision document only; no code or repository changes.*

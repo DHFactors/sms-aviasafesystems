@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: data\README.md
+Archived: 2026-10-07
+Category: historical
+Reason: Data Archive notes; reference-data notes superseded by docs/status.md.
+Authority: none. This file is a historical record only.
+-->
+
 @"
 # Data Archive
 

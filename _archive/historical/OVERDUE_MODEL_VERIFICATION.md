@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: OVERDUE_MODEL_VERIFICATION.md
+Archived: 2026-10-07
+Category: historical
+Reason: One-off overdue-model verification report (2026-09-17).
+Authority: none. This file is a historical record only.
+-->
+
 # OVERDUE_MODEL_VERIFICATION — Overdue across Hazards and CAPs
 
 Companion to MODULE_B_CONTRACT.md (verified before Chunk 2c). Read-only

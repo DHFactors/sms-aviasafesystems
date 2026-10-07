@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: SCHEMA_DRIFT_REPORT.md
+Archived: 2026-10-07
+Category: historical
+Reason: ORM-vs-live drift snapshot (2026-09-16).
+Authority: none. This file is a historical record only.
+-->
+
 # SCHEMA DRIFT REPORT — ORM (SQLAlchemy) vs Live Supabase PostgreSQL
 
 - Objective: Systematically compare every ORM model (`backend/app/db/db_models.py`) against the LIVE database schema to detect drift, before Module B's contract is written.

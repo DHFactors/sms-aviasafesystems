@@ -1,0 +1,396 @@
+2026-08-25 08:07:54,084 INFO ======================================================================
+2026-08-25 08:07:54,084 INFO Beta-only Firestore reset & seed
+2026-08-25 08:07:54,084 INFO ======================================================================
+2026-08-25 08:07:54,085 INFO Script version: 1.0.0-beta-minimal commit: 8938eb2
+2026-08-25 08:07:54,085 INFO Database ID: sms-db-beta
+2026-08-25 08:07:54,085 INFO Execution mode: dry-run
+2026-08-25 08:07:54,085 INFO Dry-run: True
+2026-08-25 08:07:54,085 INFO Auth operations: 0 (Auth disabled per safety directives)
+2026-08-25 08:07:54,648 INFO Firebase project ID: aerosafety-sms-prod
+2026-08-25 08:07:54,648 INFO Firestore database ID: sms-db-beta
+2026-08-25 08:07:54,648 INFO Auth operations: 0
+2026-08-25 08:07:54,653 INFO [SELF-TEST] validating exact-count helper...
+2026-08-25 08:07:58,094 INFO [SELF-TEST] fishtail-air/reports -> 1 via aggregation_verified verified=True
+2026-08-25 08:08:00,786 INFO [SELF-TEST] buddha-air/hazards -> 164 via aggregation_verified verified=True
+2026-08-25 08:08:00,786 INFO [SELF-TEST] PASS
+2026-08-25 08:08:01,412 INFO [INVENTORY] tenants discovered: 23
+2026-08-25 08:08:01,413 INFO [INVENTORY] air-dynasty ...
+2026-08-25 08:08:19,373 INFO [INVENTORY] buddha-air ...
+2026-08-25 08:08:41,009 INFO [INVENTORY] caan ...
+2026-08-25 08:08:44,626 INFO [INVENTORY] demo-fixed-wing ...
+2026-08-25 08:09:02,979 INFO [INVENTORY] demo-rotary-wing ...
+2026-08-25 08:09:20,035 INFO [INVENTORY] fishtail-air ...
+2026-08-25 08:09:27,061 INFO [INVENTORY] himalaya-ground-services ...
+2026-08-25 08:09:42,468 INFO [INVENTORY] ktm-mro ...
+2026-08-25 08:09:59,178 INFO [INVENTORY] pokhara-aerodrome ...
+2026-08-25 08:10:16,102 INFO [INVENTORY] simrik-air ...
+2026-08-25 08:10:32,376 INFO [INVENTORY] sita-air ...
+2026-08-25 08:10:50,133 INFO [INVENTORY] sita-air-ltd ...
+2026-08-25 08:10:53,764 INFO [INVENTORY] sita-air-ltd-2 ...
+2026-08-25 08:10:57,405 INFO [INVENTORY] sita-air-ltd-3 ...
+2026-08-25 08:11:01,025 INFO [INVENTORY] summit-air ...
+2026-08-25 08:11:18,121 INFO [INVENTORY] tac-nepal ...
+2026-08-25 08:11:21,741 INFO [INVENTORY] tac-nepal-2 ...
+2026-08-25 08:11:25,377 INFO [INVENTORY] tac-nepal-3 ...
+2026-08-25 08:11:29,021 INFO [INVENTORY] tac-nepal-4 ...
+2026-08-25 08:11:32,629 INFO [INVENTORY] tac-nepal-5 ...
+2026-08-25 08:11:36,270 INFO [INVENTORY] tara-air ...
+2026-08-25 08:11:53,357 INFO [INVENTORY] vnkt-airport ...
+2026-08-25 08:12:00,320 INFO [INVENTORY] yeti-airlines ...
+2026-08-25 08:12:31,066 INFO [ALL-TENANTS] Manifest written: C:\Users\CEO-LAPTOP\Projects\betasms-aviasafe\backend\scripts\logs\all_tenants_dryrun_20260825_080754.json
+2026-08-25 08:12:31,067 INFO [ALL-TENANTS] Purge plan preview: {
+  "targets": [
+    {
+      "tenant": "air-dynasty",
+      "collection": "reports",
+      "count": 32
+    },
+    {
+      "tenant": "air-dynasty",
+      "collection": "hazards",
+      "count": 118
+    },
+    {
+      "tenant": "air-dynasty",
+      "collection": "can_cap",
+      "count": 19
+    },
+    {
+      "tenant": "air-dynasty",
+      "collection": "surveys",
+      "count": 18
+    },
+    {
+      "tenant": "air-dynasty",
+      "collection": "responses",
+      "count": 18
+    },
+    {
+      "tenant": "air-dynasty",
+      "collection": "can_cap/caps (nested)",
+      "count": 40
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "reports",
+      "count": 34
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "hazards",
+      "count": 164
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "can_cap",
+      "count": 31
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "surveys",
+      "count": 22
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "responses",
+      "count": 22
+    },
+    {
+      "tenant": "buddha-air",
+      "collection": "can_cap/caps (nested)",
+      "count": 62
+    },
+    {
+      "tenant": "demo-fixed-wing",
+      "collection": "hazards",
+      "count": 168
+    },
+    {
+      "tenant": "demo-fixed-wing",
+      "collection": "can_cap",
+      "count": 32
+    },
+    {
+      "tenant": "demo-fixed-wing",
+      "collection": "can_cap/caps (nested)",
+      "count": 67
+    },
+    {
+      "tenant": "demo-rotary-wing",
+      "collection": "hazards",
+      "count": 167
+    },
+    {
+      "tenant": "demo-rotary-wing",
+      "collection": "can_cap",
+      "count": 30
+    },
+    {
+      "tenant": "demo-rotary-wing",
+      "collection": "can_cap/caps (nested)",
+      "count": 58
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "reports",
+      "count": 26
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "hazards",
+      "count": 108
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "can_cap",
+      "count": 17
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "surveys",
+      "count": 15
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "responses",
+      "count": 15
+    },
+    {
+      "tenant": "himalaya-ground-services",
+      "collection": "can_cap/caps (nested)",
+      "count": 32
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "reports",
+      "count": 33
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "hazards",
+      "count": 113
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "can_cap",
+      "count": 20
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "surveys",
+      "count": 16
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "responses",
+      "count": 16
+    },
+    {
+      "tenant": "ktm-mro",
+      "collection": "can_cap/caps (nested)",
+      "count": 35
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "reports",
+      "count": 26
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "hazards",
+      "count": 99
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "can_cap",
+      "count": 18
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "surveys",
+      "count": 15
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "responses",
+      "count": 15
+    },
+    {
+      "tenant": "pokhara-aerodrome",
+      "collection": "can_cap/caps (nested)",
+      "count": 35
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "reports",
+      "count": 30
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "hazards",
+      "count": 110
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "can_cap",
+      "count": 19
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "surveys",
+      "count": 17
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "responses",
+      "count": 17
+    },
+    {
+      "tenant": "simrik-air",
+      "collection": "can_cap/caps (nested)",
+      "count": 39
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "reports",
+      "count": 34
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "hazards",
+      "count": 119
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "can_cap",
+      "count": 21
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "surveys",
+      "count": 18
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "responses",
+      "count": 18
+    },
+    {
+      "tenant": "sita-air",
+      "collection": "can_cap/caps (nested)",
+      "count": 36
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "reports",
+      "count": 32
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "hazards",
+      "count": 125
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "can_cap",
+      "count": 20
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "surveys",
+      "count": 20
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "responses",
+      "count": 20
+    },
+    {
+      "tenant": "summit-air",
+      "collection": "can_cap/caps (nested)",
+      "count": 43
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "reports",
+      "count": 33
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "hazards",
+      "count": 115
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "can_cap",
+      "count": 20
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "surveys",
+      "count": 19
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "responses",
+      "count": 19
+    },
+    {
+      "tenant": "tara-air",
+      "collection": "can_cap/caps (nested)",
+      "count": 40
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "reports",
+      "count": 37
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "hazards",
+      "count": 151
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "can_cap",
+      "count": 28
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "surveys",
+      "count": 24
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "responses",
+      "count": 24
+    },
+    {
+      "tenant": "yeti-airlines",
+      "collection": "can_cap/caps (nested)",
+      "count": 59
+    }
+  ],
+  "total_docs_to_purge": 3063,
+  "preserve": [
+    "tenants/{tid}",
+    "tenants/{tid}/metadata/*",
+    "fishtail-air operational docs",
+    "vnkt-airport operational docs",
+    "psoe_assessments",
+    "audit_logs",
+    "feedback",
+    "regulators",
+    "surveyResponses",
+    "public_responses",
+    "demo_sessions",
+    "caan_oversight",
+    "state/ssp/risk_register"
+  ],
+  "post_purge_steps": [
+    "re-verify counts: legacy operational collections == 0",
+    "update regulators/caan.operator_tenant_ids -> ['fishtail-air','vnkt-airport']",
+    "re-run master-register live pagination tests"
+  ]
+}
+2026-08-25 08:12:31,067 INFO [ALL-TENANTS] Read-only mode complete. No writes. Auth operations: 0.

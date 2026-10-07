@@ -1,0 +1,27 @@
+=== aviaSDCPS tenant data wipe ===
+timestamp : 2026-09-01T04:27:45.555599+00:00
+project   : aerosafety-sms-prod
+database  : sms-db
+  deleted tenants/buddha-air/metadata/info
+  deleted tenants/buddha-air/metadata/risk_matrix
+  deleted tenants/buddha-air/profile/operational
+  deleted tenants/buddha-air (document)
+  deleted tenants/caan/metadata/info
+  deleted tenants/caan/metadata/risk_matrix
+  deleted tenants/caan (document)
+  deleted tenants/system (document)
+  deleted tenants/yeti-airlines/metadata/info
+  deleted tenants/yeti-airlines/metadata/risk_matrix
+  deleted tenants/yeti-airlines/profile/operational
+  deleted tenants/yeti-airlines (document)
+  ! failed to scan regulators/caan: 'DocumentReference' object has no attribute 'stream'
+  deleted regulators/caan
+  ! failed to scan seed_metadata/seed: 'DocumentReference' object has no attribute 'stream'
+  deleted seed_metadata/seed
+  deleted auth user safety@buddhaair.com (uid=admin-buddha-air-001, claims={'role': 'AIRLINE_ADMIN', 'tenant_id': 'buddha-air', 'department': 'Safety'})
+  deleted auth user safety@yetiairlines.com (uid=admin-yeti-airlines-001, claims={'role': 'AIRLINE_ADMIN', 'tenant_id': 'yeti-airlines', 'department': 'Safety'})
+  SKIPPED protected account ezondiza.dhf@gmail.com (uid=hLXs4mvtf5bb1hRSifnh6HuUHpC2)
+  deleted auth user ops@buddhaair.com (uid=ops-buddha-air-001, claims={'role': 'USER', 'tenant_id': 'buddha-air', 'department': 'Flight Operations'})
+  deleted auth user ops@yetiairlines.com (uid=ops-yeti-airlines-001, claims={'role': 'USER', 'tenant_id': 'yeti-airlines', 'department': 'Flight Operations'})
+  deleted auth user smd@caanepal.gov.np (uid=smd-caan-001, claims={'role': 'CAAN_SMD', 'tenant_id': 'caan'})
+=== end audit log ===

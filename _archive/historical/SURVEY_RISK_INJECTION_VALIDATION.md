@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: SURVEY_RISK_INJECTION_VALIDATION.md
+Archived: 2026-10-07
+Category: historical
+Reason: One-off survey/risk validation report (2026-09-16).
+Authority: none. This file is a historical record only.
+-->
+
 # Survey Risk Injection Validation Report
 
 **Date**: 2026-09-16 | **Status**: READ-ONLY ANALYSIS COMPLETE — CAAN MANUAL REVIEWED

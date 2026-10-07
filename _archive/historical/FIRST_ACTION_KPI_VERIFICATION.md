@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: FIRST_ACTION_KPI_VERIFICATION.md
+Archived: 2026-10-07
+Category: historical
+Reason: One-off KPI verification report (2026-09-17).
+Authority: none. This file is a historical record only.
+-->
+
 # FIRST_ACTION_KPI_VERIFICATION — Timestamps for "registration → first action"
 
 Read-only verification for the AE dashboard KPI "Average days between hazard

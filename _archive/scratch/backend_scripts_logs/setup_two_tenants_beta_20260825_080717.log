@@ -1,0 +1,12 @@
+2026-08-25 08:07:17,164 INFO ======================================================================
+2026-08-25 08:07:17,165 INFO Beta-only Firestore reset & seed
+2026-08-25 08:07:17,165 INFO ======================================================================
+2026-08-25 08:07:17,165 INFO Script version: 1.0.0-beta-minimal commit: 8938eb2
+2026-08-25 08:07:17,165 INFO Database ID: sms-db-beta
+2026-08-25 08:07:17,165 INFO Execution mode: dry-run
+2026-08-25 08:07:17,165 INFO Dry-run: True
+2026-08-25 08:07:17,165 INFO Auth operations: 0 (Auth disabled per safety directives)
+2026-08-25 08:07:17,895 INFO Firebase project ID: aerosafety-sms-prod
+2026-08-25 08:07:17,896 INFO Firestore database ID: sms-db-beta
+2026-08-25 08:07:17,896 INFO Auth operations: 0
+2026-08-25 08:07:17,900 INFO [SELF-TEST] validating exact-count helper...

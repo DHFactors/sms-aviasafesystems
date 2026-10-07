@@ -1,0 +1,88 @@
+2026-08-24 20:03:51,533 INFO ======================================================================
+2026-08-24 20:03:51,533 INFO Beta-only Firestore reset & seed
+2026-08-24 20:03:51,533 INFO ======================================================================
+2026-08-24 20:03:51,533 INFO Script version: 1.0.0-beta-minimal commit: ed2eb0e
+2026-08-24 20:03:51,533 INFO Database ID: sms-db-beta
+2026-08-24 20:03:51,533 INFO Execution mode: dry-run
+2026-08-24 20:03:51,534 INFO Dry-run: True
+2026-08-24 20:03:51,534 INFO Auth operations: 0 (Auth disabled per safety directives)
+2026-08-24 20:03:52,089 INFO Firebase project ID: aerosafety-sms-prod
+2026-08-24 20:03:52,089 INFO Firestore database ID: sms-db-beta
+2026-08-24 20:03:52,089 INFO Auth operations: 0
+2026-08-24 20:03:52,089 INFO [DISCOVER] Counting documents in demo tenant paths (beta only)...
+2026-08-24 20:04:10,059 INFO [DISCOVER] Counts before: {
+  "fishtail-air": {
+    "reports": 31,
+    "hazards": 110,
+    "can_cap": 18,
+    "can_cap/caps": 32,
+    "flight_diversions": 0,
+    "surveys": 16,
+    "responses": 16,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 2
+  },
+  "vnkt-airport": {
+    "reports": 0,
+    "hazards": 0,
+    "can_cap": 0,
+    "flight_diversions": 0,
+    "surveys": 0,
+    "responses": 0,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 0
+  }
+}
+2026-08-24 20:04:10,059 WARNING [AUTH-SAFETY] Beta and production SHARE the same Firebase project (aerosafety-sms-prod).
+2026-08-24 20:04:10,059 WARNING [AUTH-SAFETY] Firebase Auth custom claims are PROJECT-WIDE, not per-database.
+2026-08-24 20:04:10,059 WARNING [AUTH-SAFETY] AUTOMATIC Auth provisioning BLOCKED. Dedicated beta project or explicit approval required.
+2026-08-24 20:04:10,059 INFO [AUTH-CHECK] {
+  "beta_project": "aerosafety-sms-prod",
+  "beta_database": "sms-db-beta",
+  "prod_database": "sms-db",
+  "prod_project_guess": "aerosafety-sms-prod",
+  "shared_project": true,
+  "auth_scoped_to_database": false,
+  "auth_is_project_wide": true,
+  "auth_blocked": true,
+  "action": "BLOCKED - Auth provisioning stopped. Firestore purge/seed may proceed if its own checks pass."
+}
+2026-08-24 20:04:10,059 INFO [PURGE] Dry-run — no documents deleted. Would purge demo collections for 2 tenants.
+2026-08-24 20:04:24,337 INFO [SEED] Dry-run — no documents written.
+2026-08-24 20:04:24,650 INFO [SEED] Tenant fishtail-air exists, departments synced (task canonical check logged)
+2026-08-24 20:04:24,651 INFO [DRY-RUN] Would seed fishtail-air: report report-fishtail-air-mor-001 -> hazard FI-HZ-001-26 (Flight Operations, Bow-Tie/Fishbone) -> CAN CAN-FISHTAIL-001 -> CAP CAP-FISHTAIL-001-001 (Open)
+2026-08-24 20:04:24,948 INFO [DRY-RUN] Would create tenant vnkt-airport (Tribhuvan International Airport (VNKT)) type AERODROME
+2026-08-24 20:04:24,949 INFO [DRY-RUN] Would seed vnkt-airport: report report-vnkt-airport-vsr-001 -> hazard VN-HZ-001-26 (Airside Operations, Bow-Tie/Fishbone) -> CAN CAN-VNKT-001 -> CAP CAP-VNKT-001-001 (Closed)
+2026-08-24 20:04:37,820 INFO [DISCOVER] Counts after: {
+  "fishtail-air": {
+    "reports": 31,
+    "hazards": 110,
+    "can_cap": 18,
+    "can_cap/caps": 32,
+    "flight_diversions": 0,
+    "surveys": 16,
+    "responses": 16,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 2
+  },
+  "vnkt-airport": {
+    "reports": 0,
+    "hazards": 0,
+    "can_cap": 0,
+    "flight_diversions": 0,
+    "surveys": 0,
+    "responses": 0,
+    "verification": 0,
+    "audit_logs": 0,
+    "notifications": 0,
+    "metadata (protected, not purged)": 0
+  }
+}
+2026-08-24 20:04:37,821 INFO [SUMMARY] JSON written to C:\Users\CEO-LAPTOP\Projects\betasms-aviasafe\backend\scripts\logs\setup_two_tenants_beta_20260824_200351.json
+2026-08-24 20:04:37,821 INFO [SUMMARY] Log written to C:\Users\CEO-LAPTOP\Projects\betasms-aviasafe\backend\scripts\logs\setup_two_tenants_beta_20260824_200351.log

@@ -1,3 +1,12 @@
+<!--
+ARCHIVED — MERGED.
+Original path: IMPLEMENTATION_ROADMAP.md
+Archived: 2026-10-07
+Category: historical
+Reason: Merged into ROADMAP.md on 2026-10-07.
+Authority: none. See ROADMAP.md for the current version.
+-->
+
 # IMPLEMENTATION_ROADMAP.md — Sequenced Schema-Note Implementation Plan
 
 AviaSAFE SMS Platform

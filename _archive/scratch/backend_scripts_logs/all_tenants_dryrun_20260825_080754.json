@@ -1,0 +1,2401 @@
+{
+  "script_version": "1.0.0-beta-inventory",
+  "generated_at": "2026-08-25T02:27:31.062683+00:00",
+  "database_id": "sms-db-beta",
+  "mode": "READ_ONLY_DRY_RUN",
+  "writes": 0,
+  "auth_operations": 0,
+  "no_production_access": true,
+  "minimal_tenants": [
+    "fishtail-air",
+    "vnkt-airport"
+  ],
+  "counts_by_method_note": "aggregation counts are self-tested against full enumeration on every collection; mismatches resolved by exact enumeration",
+  "top_level": {
+    "psoe_assessments": {
+      "count": 10,
+      "method": "aggregation_verified",
+      "mark": "PRESERVE"
+    },
+    "audit_logs": {
+      "count": 1044,
+      "method": "aggregation_verified",
+      "mark": "PRESERVE"
+    },
+    "feedback": {
+      "count": 4,
+      "method": "aggregation_verified",
+      "mark": "PRESERVE"
+    },
+    "regulators": {
+      "count": 1,
+      "method": "aggregation_verified",
+      "mark": "PRESERVE",
+      "docs": [
+        {
+          "id": "caan",
+          "operator_tenant_ids": [
+            "air-dynasty",
+            "buddha-air",
+            "demo-fixed-wing",
+            "demo-rotary-wing",
+            "fishtail-air",
+            "himalaya-ground-services",
+            "ktm-mro",
+            "pokhara-aerodrome",
+            "simrik-air",
+            "sita-air",
+            "summit-air",
+            "tara-air",
+            "yeti-airlines"
+          ]
+        }
+      ]
+    },
+    "surveyResponses": {
+      "count": 0,
+      "mark": "EMPTY",
+      "method": "probe_empty"
+    },
+    "public_responses": {
+      "count": 0,
+      "mark": "EMPTY",
+      "method": "probe_empty"
+    },
+    "demo_sessions": {
+      "count": 0,
+      "mark": "EMPTY",
+      "method": "probe_empty"
+    },
+    "caan_oversight": {
+      "count": 0,
+      "mark": "EMPTY",
+      "method": "probe_empty"
+    },
+    "state/ssp/risk_register": {
+      "count": 14,
+      "method": "aggregation_verified",
+      "mark": "PRESERVE"
+    }
+  },
+  "tenants": {
+    "air-dynasty": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 32,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 118,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 19,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 18,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 18,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 40,
+          "ids": [
+            "cap_air-dynasty_51770f2f4999392fd23e",
+            "cap_air-dynasty_190c9f120f47244623e8",
+            "cap_air-dynasty_308c65ebbbaa1c4f1204",
+            "cap_air-dynasty_c7f5f1222468a9bba5b3",
+            "cap_air-dynasty_cc5a788be62e18929a6b",
+            "cap_air-dynasty_1542beed24323f1bf08e",
+            "cap_air-dynasty_f107be99bd9ee318e262",
+            "cap_air-dynasty_1d5f8ac2e00c1721ee0f",
+            "cap_air-dynasty_adaaa5d1bfb7111f1b7b",
+            "cap_air-dynasty_d47896cd19dda0543b00",
+            "cap_air-dynasty_0ecfbafd5b064eea184e",
+            "cap_air-dynasty_86e2e38690f8b5ca2cba",
+            "cap_air-dynasty_a9f27795311090bde4f7",
+            "cap_air-dynasty_0853b24f4e91d29b4236",
+            "cap_air-dynasty_e484605b637844f366de",
+            "cap_air-dynasty_41e894d83e14eab337a9",
+            "cap_air-dynasty_d99def73cfdc19c35ef1",
+            "cap_air-dynasty_f0842b4cd12dd9788427",
+            "cap_air-dynasty_44413fb376d844305375",
+            "cap_air-dynasty_6a5518a500a21647354b",
+            "cap_air-dynasty_354ab1ed5018825ff299",
+            "cap_air-dynasty_470b2cc64de08bbb3ddc",
+            "cap_air-dynasty_660c4418ee9d2b030f35",
+            "cap_air-dynasty_15f542ea8651f942735f",
+            "cap_air-dynasty_4d36140babd8b800eb82",
+            "cap_air-dynasty_79aa77f8094f956b0d80",
+            "cap_air-dynasty_83efe2b98c7887e435ed",
+            "cap_air-dynasty_a33417eca6f1b0bfd6f6",
+            "cap_air-dynasty_c5ee70f639c1fe2462cb",
+            "cap_air-dynasty_04fb696a2e7e08dd4987",
+            "cap_air-dynasty_c051ea1afe16d7c6b4a8",
+            "cap_air-dynasty_5d0074ec287288533e34",
+            "cap_air-dynasty_af0a6975199500f003e7",
+            "cap_air-dynasty_b18c4dfeca113361bca5",
+            "cap_air-dynasty_37a11682c5beda01c795",
+            "cap_air-dynasty_8131038531f43204f9cb",
+            "cap_air-dynasty_17d3ef864c93389f0965",
+            "cap_air-dynasty_6fb1a355d0aec0bd69e8",
+            "cap_air-dynasty_80db6af963505f457fff",
+            "cap_air-dynasty_467fb61f04c297dc9416"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "buddha-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 34,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 164,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 31,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 22,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 22,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 62,
+          "ids": [
+            "cap_buddha-air_52325b6d1221a47660a7",
+            "cap_buddha-air_662630c4b2d692cdacce",
+            "cap_buddha-air_c765f83190a3ebf3217a",
+            "cap_buddha-air_11918c10cc30c9f4335a",
+            "cap_buddha-air_a90e8104801ea353a758",
+            "cap_buddha-air_4074bb7c11f71cc683e3",
+            "cap_buddha-air_c4bdf3303acfbfab1dfe",
+            "cap_buddha-air_0d725f843198824de1a5",
+            "cap_buddha-air_1e62518ca543b862a320",
+            "cap_buddha-air_3305c2d540fddf6167e3",
+            "cap_buddha-air_b87f3590d0039c7525a1",
+            "cap_buddha-air_0dd8102e05ca6dd3afb3",
+            "cap_buddha-air_63f6ceb955369e4fb5e0",
+            "cap_buddha-air_d03f86346e0dcb731591",
+            "cap_buddha-air_19f9d6758ee691651070",
+            "cap_buddha-air_cc32900aae96d14934c9",
+            "cap_buddha-air_19c061818673f606c4f6",
+            "cap_buddha-air_6cddecd129f87a60f289",
+            "cap_buddha-air_cb33cea6cf614e5d074b",
+            "cap_buddha-air_4f7c85414bcc9fd002d9",
+            "cap_buddha-air_4b38bde66a8203997186",
+            "cap_buddha-air_88b0f844d72c2c8ccc7e",
+            "cap_buddha-air_ab853d91f2dadd566b2b",
+            "cap_buddha-air_63a1ad9639cc22bedc96",
+            "cap_buddha-air_7313b155cf33d284c3e4",
+            "cap_buddha-air_25cc72f7aed958443c55",
+            "cap_buddha-air_66393326b49e71f1bc6f",
+            "cap_buddha-air_bf42bf184494a9d975d7",
+            "cap_buddha-air_0cf0dff4a8d975d8eb82",
+            "cap_buddha-air_14209d78a4dfd4db55f9",
+            "cap_buddha-air_9e6236dbf416b0bfce71",
+            "cap_buddha-air_340badd4c7b089cea239",
+            "cap_buddha-air_9f21bead1218fed26ab1",
+            "cap_buddha-air_e7fbf3c3ee89acafc01f",
+            "cap_buddha-air_ea763b6af4aa82f9bf5c",
+            "cap_buddha-air_6eeef93eb91d46997f34",
+            "cap_buddha-air_91c4b48b478ab76aa97d",
+            "cap_buddha-air_6d0acd959c896f0b340d",
+            "cap_buddha-air_8d3058622b36dc96e242",
+            "cap_buddha-air_6b986955daf7796b5125",
+            "cap_buddha-air_aae1554055fa149ad6e8",
+            "cap_buddha-air_dab559721a4abadf21c9",
+            "cap_buddha-air_19cd78f6157a70334656",
+            "cap_buddha-air_23f18b138c175cf3e4e3",
+            "cap_buddha-air_41c93978804c24536602",
+            "cap_buddha-air_d8322c39e184e8fb4924",
+            "cap_buddha-air_ab95685645d9e126ee2e",
+            "cap_buddha-air_0348d9cf32d77759effe",
+            "cap_buddha-air_9c13c6da32130217be47",
+            "cap_buddha-air_a468b823cc28dba18b82",
+            "cap_buddha-air_9513f7fec5fe72666293",
+            "cap_buddha-air_ab9f4a66125f72b8659e",
+            "cap_buddha-air_70bf3bf1177bcbcb1729",
+            "cap_buddha-air_ad13ab6e0bec5f3bafd5",
+            "cap_buddha-air_b2295a62c36e41f0a45a",
+            "cap_buddha-air_4cae8e9f67fe0fc34135",
+            "cap_buddha-air_33219e44d54dcfd34b43",
+            "cap_buddha-air_f976ee15c3cfa1629661",
+            "cap_buddha-air_6b6a3fd6549da6ab0586",
+            "cap_buddha-air_5f6ce74754960b40d462",
+            "cap_buddha-air_991d9fc016876e18a029",
+            "cap_buddha-air_b25d8ed5cfda550c111a"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "caan": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "demo-fixed-wing": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 168,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 32,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 67,
+          "ids": [
+            "cap_demo-fixed-wing_63107df4bd2022529000",
+            "cap_demo-fixed-wing_b1c33d8eca2ff2580888",
+            "cap_demo-fixed-wing_926bf0c338e7b55ce1cf",
+            "cap_demo-fixed-wing_24883c42bbaa237b003f",
+            "cap_demo-fixed-wing_8f5ef3ab4d59041792d6",
+            "cap_demo-fixed-wing_b8dcfec18552d4042e70",
+            "cap_demo-fixed-wing_70898fb45bf5508acc05",
+            "cap_demo-fixed-wing_e0d1e24782b0c3f6a090",
+            "cap_demo-fixed-wing_ac9c834c27a13e4985a3",
+            "cap_demo-fixed-wing_eec0dd33f60eed370d26",
+            "cap_demo-fixed-wing_27a9350b9a2f315251e5",
+            "cap_demo-fixed-wing_2008b9b8bdf63d848c0c",
+            "cap_demo-fixed-wing_4e3c155ef467542c2d55",
+            "cap_demo-fixed-wing_9d00cf4cce27179aa2d1",
+            "cap_demo-fixed-wing_12b9997478d069201b63",
+            "cap_demo-fixed-wing_1e57b92b3a93b00b64f1",
+            "cap_demo-fixed-wing_4dcee9137ca2883b9a82",
+            "cap_demo-fixed-wing_6eb06e1625b593fd984a",
+            "cap_demo-fixed-wing_6aebd9d736dd518b1de1",
+            "cap_demo-fixed-wing_aa8a88fd7056c36b1082",
+            "cap_demo-fixed-wing_171455e5e4b761a45595",
+            "cap_demo-fixed-wing_54fe3bc5866380f4beb7",
+            "cap_demo-fixed-wing_8dc3eaee51f2e9a24b6f",
+            "cap_demo-fixed-wing_a8ceb01a25d2e131621e",
+            "cap_demo-fixed-wing_8d496e4620e4d912a06a",
+            "cap_demo-fixed-wing_b7c4d2dea4d5ab443c1a",
+            "cap_demo-fixed-wing_12991f76e8983a933aeb",
+            "cap_demo-fixed-wing_0603e89c6022c737b5a1",
+            "cap_demo-fixed-wing_265c204406ac7ce585c4",
+            "cap_demo-fixed-wing_8f26b839565700a93b9d",
+            "cap_demo-fixed-wing_00e9452be6181899f527",
+            "cap_demo-fixed-wing_37a5b905601adb7ab6c9",
+            "cap_demo-fixed-wing_57ed56d285a608e4573a",
+            "cap_demo-fixed-wing_681617ab31930986425b",
+            "cap_demo-fixed-wing_ce7156608f9c1c7d943b",
+            "cap_demo-fixed-wing_25eae42a351839ab01f0",
+            "cap_demo-fixed-wing_77fc6b1e37ec7c881dc0",
+            "cap_demo-fixed-wing_d29caeff37f8eb8f1299",
+            "cap_demo-fixed-wing_379b2490df1df7fb42ac",
+            "cap_demo-fixed-wing_54212e32b71c0ac6fae0",
+            "cap_demo-fixed-wing_dd54d131e4e2287572b2",
+            "cap_demo-fixed-wing_4eed8f8efdb0a1687ded",
+            "cap_demo-fixed-wing_54d1bd1ba79d5386b5d1",
+            "cap_demo-fixed-wing_cb3ee25462c7bd738fb9",
+            "cap_demo-fixed-wing_ac62e10dc0c798681963",
+            "cap_demo-fixed-wing_b5350b8316ca722eff0e",
+            "cap_demo-fixed-wing_23292b979f20d0a646ab",
+            "cap_demo-fixed-wing_b91fbe068d699b4a3829",
+            "cap_demo-fixed-wing_d9b4fe5aa903994bc7e9",
+            "cap_demo-fixed-wing_19dc1658f43ff53388af",
+            "cap_demo-fixed-wing_3456fe536135ac1ed57c",
+            "cap_demo-fixed-wing_d76a24195aeeb972b044",
+            "cap_demo-fixed-wing_85b56838e73704d92921",
+            "cap_demo-fixed-wing_bbc3d705524f13bc084a",
+            "cap_demo-fixed-wing_d04f52c196c9fca17355",
+            "cap_demo-fixed-wing_38dd778920287cbd97b6",
+            "cap_demo-fixed-wing_50eae5b91988528bf721",
+            "cap_demo-fixed-wing_9c1cf38e97c0f22351ae",
+            "cap_demo-fixed-wing_fb883d3b7cc089b1da84",
+            "cap_demo-fixed-wing_63a5d7a33665d7bf661c",
+            "cap_demo-fixed-wing_f03e369214ebac411550",
+            "cap_demo-fixed-wing_a2dd5dfeacc86dfa9653",
+            "cap_demo-fixed-wing_af92243ce5d51e825f5a",
+            "cap_demo-fixed-wing_db5669496a897ced6f30",
+            "cap_demo-fixed-wing_ab09512ca014dfda6799",
+            "cap_demo-fixed-wing_d55077bf10a26dc98615",
+            "cap_demo-fixed-wing_f6003820e1b13c981ac2"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "demo-rotary-wing": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 167,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 30,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 58,
+          "ids": [
+            "cap_demo-rotary-wing_0c01adfa2d3fccb7d50b",
+            "cap_demo-rotary-wing_35ebb9c84554ff146f09",
+            "cap_demo-rotary-wing_b05b8d900c4c7dee9993",
+            "cap_demo-rotary-wing_ff47826be6d77aa6dad4",
+            "cap_demo-rotary-wing_eb2a109be4abba8ba02e",
+            "cap_demo-rotary-wing_46aed5fcf5cf81ca7d6f",
+            "cap_demo-rotary-wing_704787ddeea3f474f99a",
+            "cap_demo-rotary-wing_87faf279f9f2c8d0e0ea",
+            "cap_demo-rotary-wing_329ac132fdfec67769f2",
+            "cap_demo-rotary-wing_fba3b723c4effcfab27d",
+            "cap_demo-rotary-wing_65c50a471337ffe3c5b7",
+            "cap_demo-rotary-wing_a3e72a625e6c5d014eb2",
+            "cap_demo-rotary-wing_cda4002075f9eed46db0",
+            "cap_demo-rotary-wing_97abeb6fa8f1f38acad1",
+            "cap_demo-rotary-wing_cc19ca2fa0733ad61592",
+            "cap_demo-rotary-wing_f2e3d1ec096c90c02993",
+            "cap_demo-rotary-wing_0d1f50afdc2acc85b465",
+            "cap_demo-rotary-wing_c898f6a1f39c568dd883",
+            "cap_demo-rotary-wing_d7a9ca7600d7e10808e8",
+            "cap_demo-rotary-wing_057a86b4e2e15bdd1ada",
+            "cap_demo-rotary-wing_8269993cdf8d1dc4ecbc",
+            "cap_demo-rotary-wing_2924a53edbc22b18fb73",
+            "cap_demo-rotary-wing_c6eb5269cfbd51914572",
+            "cap_demo-rotary-wing_24e5a285567451c6e010",
+            "cap_demo-rotary-wing_bfa15254c1ece76305a0",
+            "cap_demo-rotary-wing_d10abb5e876e39ce4db8",
+            "cap_demo-rotary-wing_e94a127c801c4ce852d2",
+            "cap_demo-rotary-wing_46b940873a980e7a3f0d",
+            "cap_demo-rotary-wing_61e0518e56abee63eb1a",
+            "cap_demo-rotary-wing_9e5f92dae3372dd9c043",
+            "cap_demo-rotary-wing_f5f76638feda662e1209",
+            "cap_demo-rotary-wing_5820772b635fe75bb8dc",
+            "cap_demo-rotary-wing_a58035214f530f3d38fb",
+            "cap_demo-rotary-wing_74d38e4ea8e90126a72a",
+            "cap_demo-rotary-wing_906f992b2614646dc84f",
+            "cap_demo-rotary-wing_ca71c4b35f0b0883fa9c",
+            "cap_demo-rotary-wing_8a47abde7f0189b5651b",
+            "cap_demo-rotary-wing_a09badb5e0a79c0c60e4",
+            "cap_demo-rotary-wing_8a9665176c8bce87674c",
+            "cap_demo-rotary-wing_d534580f4b9228334c23",
+            "cap_demo-rotary-wing_c83d0b51258d3f0e32df",
+            "cap_demo-rotary-wing_0268b100a2c43cb8bac6",
+            "cap_demo-rotary-wing_e3337c46a159ad2d9e07",
+            "cap_demo-rotary-wing_6637e213371b6902cb59",
+            "cap_demo-rotary-wing_e9a28a60a76c25b2df3c",
+            "cap_demo-rotary-wing_732e55da6d31a6cf5ab9",
+            "cap_demo-rotary-wing_a834928d320cd0d46634",
+            "cap_demo-rotary-wing_d8c7355caf4f478aaf61",
+            "cap_demo-rotary-wing_0ea614e155f87cbbd38b",
+            "cap_demo-rotary-wing_6cbc456b77026133d6cc",
+            "cap_demo-rotary-wing_a34f70a54b0c06777555",
+            "cap_demo-rotary-wing_3dafbecd743a7992fbeb",
+            "cap_demo-rotary-wing_e494cbd0a7ff8011cf0f",
+            "cap_demo-rotary-wing_bf148c2a8fbe820cd04c",
+            "cap_demo-rotary-wing_e8d51b3e6ba6c073cfcd",
+            "cap_demo-rotary-wing_ece5830c4607a563ad37",
+            "cap_demo-rotary-wing_7be60ef962a885e247ed",
+            "cap_demo-rotary-wing_c133cecc4f463d1f0020"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "fishtail-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "hazards": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "can_cap": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 1,
+          "ids": [
+            "cap-fishtail-air-001-001"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PRESERVE"
+        }
+      }
+    },
+    "himalaya-ground-services": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 26,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 108,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 17,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 15,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 15,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 32,
+          "ids": [
+            "cap_himalaya-ground-services_31744498a08792d79cc6",
+            "cap_himalaya-ground-services_18ceaaec658648b50507",
+            "cap_himalaya-ground-services_1cff0b2658502ce3937e",
+            "cap_himalaya-ground-services_b82b388c805451f41883",
+            "cap_himalaya-ground-services_42204c42c550a250230c",
+            "cap_himalaya-ground-services_1d2e62f18e64ba2dcce9",
+            "cap_himalaya-ground-services_2666d6c5e46345ce5ecd",
+            "cap_himalaya-ground-services_35d093dd568104b077e8",
+            "cap_himalaya-ground-services_0cf17cf4f819bb3a0b77",
+            "cap_himalaya-ground-services_93a204ee0b0d8e649258",
+            "cap_himalaya-ground-services_9cd1089315deba978c25",
+            "cap_himalaya-ground-services_42c1747a0989cc75f6b3",
+            "cap_himalaya-ground-services_cd6c97b6f9cb7d68d142",
+            "cap_himalaya-ground-services_e1e8b29b131b6266cbb7",
+            "cap_himalaya-ground-services_55ec712d87cfaced16db",
+            "cap_himalaya-ground-services_e43244b32736e56a9a7c",
+            "cap_himalaya-ground-services_40f61583a7f1733f7b9f",
+            "cap_himalaya-ground-services_4a08ee6aa66467d890fe",
+            "cap_himalaya-ground-services_0225d095ff512daddfc9",
+            "cap_himalaya-ground-services_d1e4ab8b57e8a9dd6407",
+            "cap_himalaya-ground-services_d50971e0d0d2656355a9",
+            "cap_himalaya-ground-services_87e0daa5b196679bb48e",
+            "cap_himalaya-ground-services_ce6a8f78a6e497015f15",
+            "cap_himalaya-ground-services_3b2f9f981aecd43e58ec",
+            "cap_himalaya-ground-services_59dfce639261f2a30295",
+            "cap_himalaya-ground-services_7bd9701118032cea9675",
+            "cap_himalaya-ground-services_245e6351f22967a2a5a9",
+            "cap_himalaya-ground-services_8cc5fa95af85b4ccd93f",
+            "cap_himalaya-ground-services_be4043e04734aa9aebaa",
+            "cap_himalaya-ground-services_fc18c3b5b4482c1c3ee7",
+            "cap_himalaya-ground-services_1efbb2dae9fe09c6a130",
+            "cap_himalaya-ground-services_b6688e9904da4d9ea627"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "ktm-mro": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 33,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 113,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 20,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 16,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 16,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 35,
+          "ids": [
+            "cap_ktm-mro_1fc88920c7dac8abed3e",
+            "cap_ktm-mro_b781d52020956fe461da",
+            "cap_ktm-mro_965f56abdffce0bb7741",
+            "cap_ktm-mro_78f5a12a9ab77bed6619",
+            "cap_ktm-mro_aea1f45feea79f89e0fd",
+            "cap_ktm-mro_a4f1d98e3b92c44b028d",
+            "cap_ktm-mro_bf4a9f5094ba0503661b",
+            "cap_ktm-mro_cb8776f88ba142711018",
+            "cap_ktm-mro_5f0cb16f5074c0ee1eb6",
+            "cap_ktm-mro_1892b4356a80a0cca54e",
+            "cap_ktm-mro_aaae2aeeab3f039ccd4f",
+            "cap_ktm-mro_790cb1d06e1a848c5411",
+            "cap_ktm-mro_5f34477152800db8e9d9",
+            "cap_ktm-mro_647da3cd0524cf8e09e9",
+            "cap_ktm-mro_b965e94358950a6939df",
+            "cap_ktm-mro_9dadb5fbcdee8b058e93",
+            "cap_ktm-mro_a4528bb86d7d732f9b03",
+            "cap_ktm-mro_fdca5861313081d2c361",
+            "cap_ktm-mro_0e25731359eeb44bed6e",
+            "cap_ktm-mro_1db2d4a587dcdf65f9ac",
+            "cap_ktm-mro_c41b903f6f8ee47385ff",
+            "cap_ktm-mro_d08d853a0f6fc6adbc7f",
+            "cap_ktm-mro_55c23532471a35e3b146",
+            "cap_ktm-mro_efc95b3beb702c53b10f",
+            "cap_ktm-mro_05d7ed00d446371817a1",
+            "cap_ktm-mro_36c6f78ee054ca16de2a",
+            "cap_ktm-mro_59d145c8d4d99e66092c",
+            "cap_ktm-mro_dff81b932f119319d8eb",
+            "cap_ktm-mro_4c7a4df349d0f6d27ddc",
+            "cap_ktm-mro_60457683274984c94d50",
+            "cap_ktm-mro_44b42cd4db3a9633e2cc",
+            "cap_ktm-mro_ecd1faa2db71acb54713",
+            "cap_ktm-mro_ffa10732494219489a61",
+            "cap_ktm-mro_3650544b45c0653e910c",
+            "cap_ktm-mro_8544e1a0dcc0af8af6a3"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "pokhara-aerodrome": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 26,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 99,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 18,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 15,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 15,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 35,
+          "ids": [
+            "cap_pokhara-aerodrome_79f0164ea1cd144c6837",
+            "cap_pokhara-aerodrome_0f4e6fd5100b621b66ea",
+            "cap_pokhara-aerodrome_6ecdc5c677067de13929",
+            "cap_pokhara-aerodrome_f8a2abcf13d546187c71",
+            "cap_pokhara-aerodrome_2d32a7822dbfefa40ac8",
+            "cap_pokhara-aerodrome_3e8e98aeba7ed5d23b43",
+            "cap_pokhara-aerodrome_acbdb6b19fe754672b89",
+            "cap_pokhara-aerodrome_1528c81e6505fde2569b",
+            "cap_pokhara-aerodrome_57cf2caa25577746d742",
+            "cap_pokhara-aerodrome_7e8a9df9284c189841b1",
+            "cap_pokhara-aerodrome_0eccb26843af39bb833e",
+            "cap_pokhara-aerodrome_95227029376ee7d868fd",
+            "cap_pokhara-aerodrome_40f1c77407cf7985e40b",
+            "cap_pokhara-aerodrome_878ddf9ea9804fb1d552",
+            "cap_pokhara-aerodrome_921ef31fb6ad0bc59a0a",
+            "cap_pokhara-aerodrome_533266515a77714feeba",
+            "cap_pokhara-aerodrome_d65259bc0ddb1a8202d3",
+            "cap_pokhara-aerodrome_a862acdb49f8b3d5465c",
+            "cap_pokhara-aerodrome_3f73b5eadfe70d9ca7c7",
+            "cap_pokhara-aerodrome_76252316ad13575a5589",
+            "cap_pokhara-aerodrome_6319830cd9b6e8a90c1e",
+            "cap_pokhara-aerodrome_97153940f15ed0f2e845",
+            "cap_pokhara-aerodrome_0d6825db076352c26e22",
+            "cap_pokhara-aerodrome_cf2d033f9b0e36d96695",
+            "cap_pokhara-aerodrome_1d8c968ef09dac565b0b",
+            "cap_pokhara-aerodrome_9618eeae5b2e48b45621",
+            "cap_pokhara-aerodrome_e272100cac9fb8a78c3a",
+            "cap_pokhara-aerodrome_02f0815f7d0975c8b27d",
+            "cap_pokhara-aerodrome_2493494707f803cad2c2",
+            "cap_pokhara-aerodrome_8f21667f7a8dbb55a72c",
+            "cap_pokhara-aerodrome_da82f9886a6e03bdca05",
+            "cap_pokhara-aerodrome_c917904fd8e01edac3dd",
+            "cap_pokhara-aerodrome_f448c70ab6741964a79c",
+            "cap_pokhara-aerodrome_b2bfbcf056dff563906e",
+            "cap_pokhara-aerodrome_647fefdc22fd3f11981d"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "simrik-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 30,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 110,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 19,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 17,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 17,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 39,
+          "ids": [
+            "cap_simrik-air_988d1a80b86a14087e79",
+            "cap_simrik-air_560bb3b8e51a84ec4d79",
+            "cap_simrik-air_a146487bce1cbb7406b0",
+            "cap_simrik-air_730b3e993b929ca0340a",
+            "cap_simrik-air_c05a52e149248b514284",
+            "cap_simrik-air_070ae8c6116cdb063fbb",
+            "cap_simrik-air_fa34a43803aa21f1f89d",
+            "cap_simrik-air_5bedbcb2b0d351fb9bb8",
+            "cap_simrik-air_8fb27f670762a57bee71",
+            "cap_simrik-air_0d902369c74c1bab328a",
+            "cap_simrik-air_1e1b7f6f546756abbb89",
+            "cap_simrik-air_a25cee99f19eebb700be",
+            "cap_simrik-air_6d32d43ac6158b07bcbd",
+            "cap_simrik-air_1d0cbd7691c643eaa4c3",
+            "cap_simrik-air_c3adadc6b392ef463824",
+            "cap_simrik-air_86342a9d17d3476b28ff",
+            "cap_simrik-air_03a07f745eee107dbf98",
+            "cap_simrik-air_62f2f99bebebadeb178f",
+            "cap_simrik-air_b5bb60c02c683c9ff1e0",
+            "cap_simrik-air_e1a55875deff12089597",
+            "cap_simrik-air_1a36911b8b44c7b8eb27",
+            "cap_simrik-air_28abb510465b80fa5048",
+            "cap_simrik-air_51a272602634f3764b92",
+            "cap_simrik-air_aec6efac703e2deae62f",
+            "cap_simrik-air_866702924e0abbcbefdd",
+            "cap_simrik-air_ad408694317717b09a6d",
+            "cap_simrik-air_e59a1dc47e0ebcb2033a",
+            "cap_simrik-air_26584f2183eca0ac4006",
+            "cap_simrik-air_5c55ede8cd83ee5fe693",
+            "cap_simrik-air_9c731e42d37af15e990d",
+            "cap_simrik-air_aeac8fd6e48cce666562",
+            "cap_simrik-air_44f76a8284e800bdf416",
+            "cap_simrik-air_f563add2e9e91a61bda3",
+            "cap_simrik-air_8e257f8b0cb7ccf4c8dc",
+            "cap_simrik-air_ae4c9441dc407b342a62",
+            "cap_simrik-air_ce9e18c2ba208ac805b5",
+            "cap_simrik-air_8c321d836832dd543495",
+            "cap_simrik-air_8fe3cbe92167a6f7505f",
+            "cap_simrik-air_fab30d2d5f9a05a98b98"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "sita-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 34,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 119,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 21,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 18,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 18,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 36,
+          "ids": [
+            "cap_sita-air_3421a8c0fb33b64df18b",
+            "cap_sita-air_f171323be75f33295211",
+            "cap_sita-air_1b5adf071af364bfdc1e",
+            "cap_sita-air_64a74db0c29bd75fb658",
+            "cap_sita-air_87bf84249b4b0ef4a1de",
+            "cap_sita-air_4e93dbab40db3a6a338f",
+            "cap_sita-air_33c34764e1cf10c7d589",
+            "cap_sita-air_3aa937e88a92acf92f55",
+            "cap_sita-air_a4822300aaab32546811",
+            "cap_sita-air_b4bb8594886558a978ff",
+            "cap_sita-air_0cd634695af06da391d6",
+            "cap_sita-air_69e1f0de212503fee738",
+            "cap_sita-air_cb4b00853af3a7dd4a76",
+            "cap_sita-air_60fff77d9e0a1b2516ad",
+            "cap_sita-air_b5a7aac908cd9d61ff69",
+            "cap_sita-air_a96e0debf1fd3040bfef",
+            "cap_sita-air_aab39ae3d1928195bd78",
+            "cap_sita-air_40324fd25ba39fe7e319",
+            "cap_sita-air_55fc5738e220d808c171",
+            "cap_sita-air_732ba9a44681d1f30a3d",
+            "cap_sita-air_23ae2217309517e9f61f",
+            "cap_sita-air_3689bfc0c856e22d8a52",
+            "cap_sita-air_92159125b63e454a094d",
+            "cap_sita-air_95495b6a13ab70140164",
+            "cap_sita-air_a1192465b9533ddfc39d",
+            "cap_sita-air_43751559c9e050ff9cb7",
+            "cap_sita-air_97ae2b307a381cc289c6",
+            "cap_sita-air_edf3ad5a4f8d2e555ae9",
+            "cap_sita-air_2e5b6aa253fbc74fd317",
+            "cap_sita-air_43c53438b113366cab28",
+            "cap_sita-air_1e746ced08b0f8afe1c5",
+            "cap_sita-air_9876d2a36f0bce80715c",
+            "cap_sita-air_22345e97c52082dcfbad",
+            "cap_sita-air_508de6da221c39738bf5",
+            "cap_sita-air_bc3332a92a1b1b060f87",
+            "cap_sita-air_fe66daa22425f500060a"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "sita-air-ltd": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "sita-air-ltd-2": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "sita-air-ltd-3": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "summit-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 32,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 125,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 20,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 20,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 20,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 43,
+          "ids": [
+            "cap_summit-air_02d8899e08bc2a466e88",
+            "cap_summit-air_53d9e35684722fc1b578",
+            "cap_summit-air_9de75b6a096411eedbfa",
+            "cap_summit-air_191cc9c5009332ef7f07",
+            "cap_summit-air_2164d9aab6f419882da0",
+            "cap_summit-air_8ce8bb1b78009b28bb43",
+            "cap_summit-air_3d7aac0d28e5be4b60ab",
+            "cap_summit-air_a2e6e754e864bd49161b",
+            "cap_summit-air_d698fc53f902ab6cfc95",
+            "cap_summit-air_1bf92f18e8f72cea8186",
+            "cap_summit-air_6952df678ae702df1518",
+            "cap_summit-air_9dc045706067dd35e2ef",
+            "cap_summit-air_8772b112d82c5925523c",
+            "cap_summit-air_1414e4a28439ad892dac",
+            "cap_summit-air_2c50012b83fa93b51789",
+            "cap_summit-air_3d0f5f39ba9e997f94dc",
+            "cap_summit-air_2f924939f556c8481601",
+            "cap_summit-air_486b9a6434a2f360faf2",
+            "cap_summit-air_e5a3ce98c516af98d5ed",
+            "cap_summit-air_3df43acce746c56e55df",
+            "cap_summit-air_e49921acbbd70d192916",
+            "cap_summit-air_8aa6d8f0a520131ce415",
+            "cap_summit-air_6b8c8a9534b3cf148f20",
+            "cap_summit-air_31d79c067d27ba147592",
+            "cap_summit-air_4155f377a5a654929eda",
+            "cap_summit-air_7ffe0c4f978732f888bc",
+            "cap_summit-air_8caa078c9a8d5a1ca666",
+            "cap_summit-air_696c92137c51af8e86c5",
+            "cap_summit-air_a5b0a30fe8d2fd013887",
+            "cap_summit-air_ef352223d3dd97d1f7b3",
+            "cap_summit-air_51ac465983e9f7037160",
+            "cap_summit-air_76ce8f928ec16eeb7d32",
+            "cap_summit-air_0908bbf7b34cc339cca3",
+            "cap_summit-air_2ef1273d8cf747d65309",
+            "cap_summit-air_ec7090a3c2463f34b114",
+            "cap_summit-air_5f07247adf2d414866a6",
+            "cap_summit-air_05bf7aea378de5f8b0eb",
+            "cap_summit-air_61d20588e0807358923e",
+            "cap_summit-air_f17dbb39559f8ae71fab",
+            "cap_summit-air_2c6ee7c59f281b4d7fd8",
+            "cap_summit-air_6e926dab22db7844085c",
+            "cap_summit-air_24d8f0af6cd7d8ae8ab6",
+            "cap_summit-air_a5c174e61fb85904be59"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "tac-nepal": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "tac-nepal-2": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "tac-nepal-3": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "tac-nepal-4": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "tac-nepal-5": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 0,
+        "ids": [],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "hazards": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 0,
+          "ids": [],
+          "method": "per_can_enumeration",
+          "mark": "EMPTY"
+        }
+      }
+    },
+    "tara-air": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 33,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 115,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 20,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 19,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 19,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 40,
+          "ids": [
+            "cap_tara-air_9f5b9305c0297664e68a",
+            "cap_tara-air_c1d1a6f36cad6d8fd0a5",
+            "cap_tara-air_c7633757d8a2cbb63766",
+            "cap_tara-air_ffe7d243c1aa507933ed",
+            "cap_tara-air_01961fb87d6d38502e66",
+            "cap_tara-air_35e3229059bf14151d77",
+            "cap_tara-air_ea0716743692d340b8fa",
+            "cap_tara-air_f083611e5c3d338d4f4b",
+            "cap_tara-air_aabe9eae0409c395655c",
+            "cap_tara-air_5779313df478bdce222f",
+            "cap_tara-air_7494b5c0593c12f4ebc2",
+            "cap_tara-air_bd2ca6d2cd8f35a70651",
+            "cap_tara-air_3390c596db0508516480",
+            "cap_tara-air_8179aeda9f9d8393f7eb",
+            "cap_tara-air_d6b05820dfe7b26f2c19",
+            "cap_tara-air_60e69a31f3412adc83de",
+            "cap_tara-air_edf0f7847b276d7989f9",
+            "cap_tara-air_c09bd2c164693ef5bf6e",
+            "cap_tara-air_ea6e69e9fef0869163a9",
+            "cap_tara-air_2a1258d81e01dbcff39c",
+            "cap_tara-air_9aad1b08a0e92088859e",
+            "cap_tara-air_b6eeb6f81790f80f202a",
+            "cap_tara-air_f2964cfe40ac1e0e02ab",
+            "cap_tara-air_4a19571a0d3cfd77e0c7",
+            "cap_tara-air_551388d5b4f8861c0b2c",
+            "cap_tara-air_aaec111ea51468b89190",
+            "cap_tara-air_4cf6e3bd0f7e7b575f1e",
+            "cap_tara-air_8789a35c77e2a5187a18",
+            "cap_tara-air_929ce331ba5d770aebcc",
+            "cap_tara-air_6539191725ada2dd71d8",
+            "cap_tara-air_69a4fc206c95de79df0a",
+            "cap_tara-air_73ffc2f4b6f9015fcd16",
+            "cap_tara-air_02cbd2ac8052ef46b849",
+            "cap_tara-air_4447ebf7cb940aca0d5f",
+            "cap_tara-air_4c5a587f413bc5936514",
+            "cap_tara-air_e7e589c6402223c76557",
+            "cap_tara-air_7385a224306c61cef100",
+            "cap_tara-air_a1de232153036b57a5ba",
+            "cap_tara-air_bf816ddaf607a87d7f97",
+            "cap_tara-air_73574b01e3fbb848f71a"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    },
+    "vnkt-airport": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 1,
+        "ids": [
+          "info"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "hazards": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "can_cap": {
+          "count": 1,
+          "method": "aggregation_verified",
+          "mark": "PRESERVE"
+        },
+        "surveys": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "responses": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 1,
+          "ids": [
+            "cap-vnkt-airport-001-001"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PRESERVE"
+        }
+      }
+    },
+    "yeti-airlines": {
+      "tenant_doc": {
+        "exists": true,
+        "mark": "PRESERVE"
+      },
+      "metadata": {
+        "count": 2,
+        "ids": [
+          "info",
+          "risk_matrix"
+        ],
+        "mark": "PRESERVE"
+      },
+      "operational": {
+        "reports": {
+          "count": 37,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "hazards": {
+          "count": 151,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "can_cap": {
+          "count": 28,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "surveys": {
+          "count": 24,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "responses": {
+          "count": 24,
+          "method": "aggregation_verified",
+          "mark": "PURGE"
+        },
+        "verification": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "flight_diversions": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "notifications": {
+          "count": 0,
+          "mark": "EMPTY",
+          "method": "probe_empty"
+        },
+        "can_cap/caps (nested)": {
+          "count": 59,
+          "ids": [
+            "cap_yeti-airlines_37f1c51e6adcf770fb46",
+            "cap_yeti-airlines_8fc7deedef9f272a48aa",
+            "cap_yeti-airlines_f43593ee11bfa39ffc60",
+            "cap_yeti-airlines_12e4fcbae9301140bece",
+            "cap_yeti-airlines_6762fb1bf09035255df2",
+            "cap_yeti-airlines_1dd9349bdeb155e5d679",
+            "cap_yeti-airlines_4cd0cdb5e722f36742cb",
+            "cap_yeti-airlines_b17bc43645724fd81c20",
+            "cap_yeti-airlines_3abc1a1a89f9b0f327eb",
+            "cap_yeti-airlines_5d39a497cd7accea3d3b",
+            "cap_yeti-airlines_fd33d77b0921c4b9d685",
+            "cap_yeti-airlines_18d2c2d4a39f15581010",
+            "cap_yeti-airlines_88a05ae63dee3a2c0ff9",
+            "cap_yeti-airlines_c70f7c394a85421fa59c",
+            "cap_yeti-airlines_429541f28ad593375844",
+            "cap_yeti-airlines_ec8d48d06cdaaa021af5",
+            "cap_yeti-airlines_ee38d9652f243e71f2f1",
+            "cap_yeti-airlines_935d0e707487009ff8a7",
+            "cap_yeti-airlines_c3290905cde4cc3bf215",
+            "cap_yeti-airlines_0ba4c708ce36f1ae04fa",
+            "cap_yeti-airlines_5315b166afaeee0aac16",
+            "cap_yeti-airlines_9f64a0ec3d472ffa7607",
+            "cap_yeti-airlines_1de92802f36e7ba830ee",
+            "cap_yeti-airlines_e4ed31bef0e6059d6706",
+            "cap_yeti-airlines_fb57ddd51604e31a8681",
+            "cap_yeti-airlines_f36c2310897686e85309",
+            "cap_yeti-airlines_2ce739ac16d56cbb013f",
+            "cap_yeti-airlines_e5ee2ee7272d123e8b47",
+            "cap_yeti-airlines_45aae38be67a6db6201c",
+            "cap_yeti-airlines_a2bd7a86c6d2c9df8c71",
+            "cap_yeti-airlines_7daa9c9cc7454602686b",
+            "cap_yeti-airlines_c98ae35c0bb47c4c12bd",
+            "cap_yeti-airlines_95acf107383cd38e198f",
+            "cap_yeti-airlines_5d562352efd45fc32ad9",
+            "cap_yeti-airlines_8b66710f8774f314db30",
+            "cap_yeti-airlines_f4c7d2250419f0d00510",
+            "cap_yeti-airlines_90a4643ef61a7532987d",
+            "cap_yeti-airlines_0a41918d973b7d4c08ad",
+            "cap_yeti-airlines_2c71465ebcbf69708e82",
+            "cap_yeti-airlines_a912bfc292fb83b7a833",
+            "cap_yeti-airlines_31a83a93c4b293a49286",
+            "cap_yeti-airlines_e3b16bd0016eec426cef",
+            "cap_yeti-airlines_0740af56c1524a807bcf",
+            "cap_yeti-airlines_6f770efb5e289a7abf8f",
+            "cap_yeti-airlines_1be5b056804f680c2fbf",
+            "cap_yeti-airlines_2804df935fcb1bb1d323",
+            "cap_yeti-airlines_50a04cadca49aecc28bb",
+            "cap_yeti-airlines_97ad2301df33db08876e",
+            "cap_yeti-airlines_9d6fd0e7518c983bf3ab",
+            "cap_yeti-airlines_cbb6b30d8a546dfb24c9",
+            "cap_yeti-airlines_2151745947331c4233bd",
+            "cap_yeti-airlines_4351b8b2ed9b7e3bff48",
+            "cap_yeti-airlines_85131826d469743df295",
+            "cap_yeti-airlines_18a95151e7497103db20",
+            "cap_yeti-airlines_240a29b7380575caec42",
+            "cap_yeti-airlines_715206c003c0dca5f5c3",
+            "cap_yeti-airlines_c40cf481a55ce667c191",
+            "cap_yeti-airlines_ddd8dc1b97d9e43852d7",
+            "cap_yeti-airlines_9e975a2ae130da70106e"
+          ],
+          "method": "per_can_enumeration",
+          "mark": "PURGE"
+        }
+      }
+    }
+  },
+  "purge_plan_preview": {
+    "targets": [
+      {
+        "tenant": "air-dynasty",
+        "collection": "reports",
+        "count": 32
+      },
+      {
+        "tenant": "air-dynasty",
+        "collection": "hazards",
+        "count": 118
+      },
+      {
+        "tenant": "air-dynasty",
+        "collection": "can_cap",
+        "count": 19
+      },
+      {
+        "tenant": "air-dynasty",
+        "collection": "surveys",
+        "count": 18
+      },
+      {
+        "tenant": "air-dynasty",
+        "collection": "responses",
+        "count": 18
+      },
+      {
+        "tenant": "air-dynasty",
+        "collection": "can_cap/caps (nested)",
+        "count": 40
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "reports",
+        "count": 34
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "hazards",
+        "count": 164
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "can_cap",
+        "count": 31
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "surveys",
+        "count": 22
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "responses",
+        "count": 22
+      },
+      {
+        "tenant": "buddha-air",
+        "collection": "can_cap/caps (nested)",
+        "count": 62
+      },
+      {
+        "tenant": "demo-fixed-wing",
+        "collection": "hazards",
+        "count": 168
+      },
+      {
+        "tenant": "demo-fixed-wing",
+        "collection": "can_cap",
+        "count": 32
+      },
+      {
+        "tenant": "demo-fixed-wing",
+        "collection": "can_cap/caps (nested)",
+        "count": 67
+      },
+      {
+        "tenant": "demo-rotary-wing",
+        "collection": "hazards",
+        "count": 167
+      },
+      {
+        "tenant": "demo-rotary-wing",
+        "collection": "can_cap",
+        "count": 30
+      },
+      {
+        "tenant": "demo-rotary-wing",
+        "collection": "can_cap/caps (nested)",
+        "count": 58
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "reports",
+        "count": 26
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "hazards",
+        "count": 108
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "can_cap",
+        "count": 17
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "surveys",
+        "count": 15
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "responses",
+        "count": 15
+      },
+      {
+        "tenant": "himalaya-ground-services",
+        "collection": "can_cap/caps (nested)",
+        "count": 32
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "reports",
+        "count": 33
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "hazards",
+        "count": 113
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "can_cap",
+        "count": 20
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "surveys",
+        "count": 16
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "responses",
+        "count": 16
+      },
+      {
+        "tenant": "ktm-mro",
+        "collection": "can_cap/caps (nested)",
+        "count": 35
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "reports",
+        "count": 26
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "hazards",
+        "count": 99
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "can_cap",
+        "count": 18
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "surveys",
+        "count": 15
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "responses",
+        "count": 15
+      },
+      {
+        "tenant": "pokhara-aerodrome",
+        "collection": "can_cap/caps (nested)",
+        "count": 35
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "reports",
+        "count": 30
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "hazards",
+        "count": 110
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "can_cap",
+        "count": 19
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "surveys",
+        "count": 17
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "responses",
+        "count": 17
+      },
+      {
+        "tenant": "simrik-air",
+        "collection": "can_cap/caps (nested)",
+        "count": 39
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "reports",
+        "count": 34
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "hazards",
+        "count": 119
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "can_cap",
+        "count": 21
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "surveys",
+        "count": 18
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "responses",
+        "count": 18
+      },
+      {
+        "tenant": "sita-air",
+        "collection": "can_cap/caps (nested)",
+        "count": 36
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "reports",
+        "count": 32
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "hazards",
+        "count": 125
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "can_cap",
+        "count": 20
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "surveys",
+        "count": 20
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "responses",
+        "count": 20
+      },
+      {
+        "tenant": "summit-air",
+        "collection": "can_cap/caps (nested)",
+        "count": 43
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "reports",
+        "count": 33
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "hazards",
+        "count": 115
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "can_cap",
+        "count": 20
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "surveys",
+        "count": 19
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "responses",
+        "count": 19
+      },
+      {
+        "tenant": "tara-air",
+        "collection": "can_cap/caps (nested)",
+        "count": 40
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "reports",
+        "count": 37
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "hazards",
+        "count": 151
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "can_cap",
+        "count": 28
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "surveys",
+        "count": 24
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "responses",
+        "count": 24
+      },
+      {
+        "tenant": "yeti-airlines",
+        "collection": "can_cap/caps (nested)",
+        "count": 59
+      }
+    ],
+    "total_docs_to_purge": 3063,
+    "preserve": [
+      "tenants/{tid}",
+      "tenants/{tid}/metadata/*",
+      "fishtail-air operational docs",
+      "vnkt-airport operational docs",
+      "psoe_assessments",
+      "audit_logs",
+      "feedback",
+      "regulators",
+      "surveyResponses",
+      "public_responses",
+      "demo_sessions",
+      "caan_oversight",
+      "state/ssp/risk_register"
+    ],
+    "post_purge_steps": [
+      "re-verify counts: legacy operational collections == 0",
+      "update regulators/caan.operator_tenant_ids -> ['fishtail-air','vnkt-airport']",
+      "re-run master-register live pagination tests"
+    ]
+  }
+}

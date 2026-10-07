@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: public/_hold/README.md
+Archived: 2026-10-07
+Category: historical
+Reason: Parked-files folder README; folder archived as a prior parking area.
+Authority: none. This file is a historical record only.
+-->
+
 # _hold/ — parked files pending confirmation
 
 Files in this folder are not part of any live page chain: they are not

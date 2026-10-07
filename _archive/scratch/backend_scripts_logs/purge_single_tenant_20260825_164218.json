@@ -1,0 +1,41 @@
+{
+  "database_id": "sms-db-beta",
+  "deleted_tenants": [
+    "air-dynasty",
+    "buddha-air",
+    "caan",
+    "demo-fixed-wing",
+    "demo-rotary-wing",
+    "himalaya-ground-services",
+    "ktm-mro",
+    "pokhara-aerodrome",
+    "simrik-air",
+    "sita-air",
+    "sita-air-ltd",
+    "sita-air-ltd-2",
+    "sita-air-ltd-3",
+    "summit-air",
+    "tac-nepal",
+    "tac-nepal-2",
+    "tac-nepal-3",
+    "tac-nepal-4",
+    "tac-nepal-5",
+    "tara-air",
+    "vnkt-airport",
+    "yeti-airlines"
+  ],
+  "remaining_tenants": [
+    "fishtail-air"
+  ],
+  "users_deleted": 29,
+  "regulator_before": [
+    "fishtail-air",
+    "vnkt-airport"
+  ],
+  "regulator_after": [
+    "fishtail-air"
+  ],
+  "success": true,
+  "elapsed_seconds": 128.81,
+  "timestamp_utc": "2026-08-25T10:57:18.329769+00:00"
+}

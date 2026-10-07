@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: PURGE_VERIFICATION_REPORT.md
+Archived: 2026-10-07
+Category: historical
+Reason: Phase-1 purge analysis; row counts cited by newer docs (2026-09-17).
+Authority: none. This file is a historical record only.
+-->
+
 # PURGE VERIFICATION REPORT — Phase 1 (Read-Only)
 
 **Date:** 2026-09-17 (UTC) · **Mode:** Read-only (SELECT only; no deletes; no schema/migration/RLS changes)

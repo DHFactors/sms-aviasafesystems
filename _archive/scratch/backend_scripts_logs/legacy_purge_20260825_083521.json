@@ -1,0 +1,178 @@
+{
+  "script_version": "1.0.0-beta-legacy-purge",
+  "timestamp_utc": "2026-08-25T02:50:21.680570+00:00",
+  "database_id": "sms-db-beta",
+  "mode": "dry-run",
+  "auth_operations": 0,
+  "preflight": {
+    "actual": {
+      "air-dynasty": {
+        "reports": 32,
+        "hazards": 118,
+        "can_cap": 19,
+        "surveys": 18,
+        "responses": 18,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 40
+      },
+      "buddha-air": {
+        "reports": 34,
+        "hazards": 164,
+        "can_cap": 31,
+        "surveys": 22,
+        "responses": 22,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 62
+      },
+      "demo-fixed-wing": {
+        "reports": 0,
+        "hazards": 168,
+        "can_cap": 32,
+        "surveys": 0,
+        "responses": 0,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 67
+      },
+      "demo-rotary-wing": {
+        "reports": 0,
+        "hazards": 167,
+        "can_cap": 30,
+        "surveys": 0,
+        "responses": 0,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 58
+      },
+      "himalaya-ground-services": {
+        "reports": 26,
+        "hazards": 108,
+        "can_cap": 17,
+        "surveys": 15,
+        "responses": 15,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 32
+      },
+      "ktm-mro": {
+        "reports": 33,
+        "hazards": 113,
+        "can_cap": 20,
+        "surveys": 16,
+        "responses": 16,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 35
+      },
+      "pokhara-aerodrome": {
+        "reports": 26,
+        "hazards": 99,
+        "can_cap": 18,
+        "surveys": 15,
+        "responses": 15,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 35
+      },
+      "simrik-air": {
+        "reports": 30,
+        "hazards": 110,
+        "can_cap": 19,
+        "surveys": 17,
+        "responses": 17,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 39
+      },
+      "sita-air": {
+        "reports": 34,
+        "hazards": 119,
+        "can_cap": 21,
+        "surveys": 18,
+        "responses": 18,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 36
+      },
+      "summit-air": {
+        "reports": 32,
+        "hazards": 125,
+        "can_cap": 20,
+        "surveys": 20,
+        "responses": 20,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 43
+      },
+      "tara-air": {
+        "reports": 33,
+        "hazards": 115,
+        "can_cap": 20,
+        "surveys": 19,
+        "responses": 19,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 40
+      },
+      "yeti-airlines": {
+        "reports": 37,
+        "hazards": 151,
+        "can_cap": 28,
+        "surveys": 24,
+        "responses": 24,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 59
+      }
+    },
+    "drift": [],
+    "expected_total": 2695,
+    "actual_total": 2695,
+    "minimal_before": {
+      "fishtail-air": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1
+      },
+      "vnkt-airport": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1
+      }
+    },
+    "regulator_current": [
+      "air-dynasty",
+      "buddha-air",
+      "demo-fixed-wing",
+      "demo-rotary-wing",
+      "fishtail-air",
+      "himalaya-ground-services",
+      "ktm-mro",
+      "pokhara-aerodrome",
+      "simrik-air",
+      "sita-air",
+      "summit-air",
+      "tara-air",
+      "yeti-airlines"
+    ]
+  },
+  "would_purge_docs": 2695,
+  "would_set_operator_tenant_ids": [
+    "fishtail-air",
+    "vnkt-airport"
+  ]
+}

@@ -1,0 +1,352 @@
+{
+  "script_version": "1.0.0-beta-legacy-purge",
+  "timestamp_utc": "2026-08-25T02:57:00.292804+00:00",
+  "database_id": "sms-db-beta",
+  "mode": "execute",
+  "auth_operations": 0,
+  "preflight": {
+    "actual": {
+      "air-dynasty": {
+        "reports": 32,
+        "hazards": 118,
+        "can_cap": 19,
+        "surveys": 18,
+        "responses": 18,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 40
+      },
+      "buddha-air": {
+        "reports": 34,
+        "hazards": 164,
+        "can_cap": 31,
+        "surveys": 22,
+        "responses": 22,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 62
+      },
+      "demo-fixed-wing": {
+        "reports": 0,
+        "hazards": 168,
+        "can_cap": 32,
+        "surveys": 0,
+        "responses": 0,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 67
+      },
+      "demo-rotary-wing": {
+        "reports": 0,
+        "hazards": 167,
+        "can_cap": 30,
+        "surveys": 0,
+        "responses": 0,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 58
+      },
+      "himalaya-ground-services": {
+        "reports": 26,
+        "hazards": 108,
+        "can_cap": 17,
+        "surveys": 15,
+        "responses": 15,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 32
+      },
+      "ktm-mro": {
+        "reports": 33,
+        "hazards": 113,
+        "can_cap": 20,
+        "surveys": 16,
+        "responses": 16,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 35
+      },
+      "pokhara-aerodrome": {
+        "reports": 26,
+        "hazards": 99,
+        "can_cap": 18,
+        "surveys": 15,
+        "responses": 15,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 35
+      },
+      "simrik-air": {
+        "reports": 30,
+        "hazards": 110,
+        "can_cap": 19,
+        "surveys": 17,
+        "responses": 17,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 39
+      },
+      "sita-air": {
+        "reports": 34,
+        "hazards": 119,
+        "can_cap": 21,
+        "surveys": 18,
+        "responses": 18,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 36
+      },
+      "summit-air": {
+        "reports": 32,
+        "hazards": 125,
+        "can_cap": 20,
+        "surveys": 20,
+        "responses": 20,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 43
+      },
+      "tara-air": {
+        "reports": 33,
+        "hazards": 115,
+        "can_cap": 20,
+        "surveys": 19,
+        "responses": 19,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 40
+      },
+      "yeti-airlines": {
+        "reports": 37,
+        "hazards": 151,
+        "can_cap": 28,
+        "surveys": 24,
+        "responses": 24,
+        "verification": 0,
+        "flight_diversions": 0,
+        "notifications": 0,
+        "caps": 59
+      }
+    },
+    "drift": [],
+    "expected_total": 2695,
+    "actual_total": 2695,
+    "minimal_before": {
+      "fishtail-air": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1
+      },
+      "vnkt-airport": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1
+      }
+    },
+    "regulator_current": [
+      "air-dynasty",
+      "buddha-air",
+      "demo-fixed-wing",
+      "demo-rotary-wing",
+      "fishtail-air",
+      "himalaya-ground-services",
+      "ktm-mro",
+      "pokhara-aerodrome",
+      "simrik-air",
+      "sita-air",
+      "summit-air",
+      "tara-air",
+      "yeti-airlines"
+    ]
+  },
+  "purged_per_tenant": {
+    "air-dynasty": {
+      "caps": 40,
+      "can_cap": 19,
+      "reports": 32,
+      "hazards": 118,
+      "surveys": 18,
+      "responses": 18,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "buddha-air": {
+      "caps": 62,
+      "can_cap": 31,
+      "reports": 34,
+      "hazards": 164,
+      "surveys": 22,
+      "responses": 22,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "demo-fixed-wing": {
+      "caps": 67,
+      "can_cap": 32,
+      "reports": 0,
+      "hazards": 168,
+      "surveys": 0,
+      "responses": 0,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "demo-rotary-wing": {
+      "caps": 58,
+      "can_cap": 30,
+      "reports": 0,
+      "hazards": 167,
+      "surveys": 0,
+      "responses": 0,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "himalaya-ground-services": {
+      "caps": 32,
+      "can_cap": 17,
+      "reports": 26,
+      "hazards": 108,
+      "surveys": 15,
+      "responses": 15,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "ktm-mro": {
+      "caps": 35,
+      "can_cap": 20,
+      "reports": 33,
+      "hazards": 113,
+      "surveys": 16,
+      "responses": 16,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "pokhara-aerodrome": {
+      "caps": 35,
+      "can_cap": 18,
+      "reports": 26,
+      "hazards": 99,
+      "surveys": 15,
+      "responses": 15,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "simrik-air": {
+      "caps": 39,
+      "can_cap": 19,
+      "reports": 30,
+      "hazards": 110,
+      "surveys": 17,
+      "responses": 17,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "sita-air": {
+      "caps": 36,
+      "can_cap": 21,
+      "reports": 34,
+      "hazards": 119,
+      "surveys": 18,
+      "responses": 18,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "summit-air": {
+      "caps": 43,
+      "can_cap": 20,
+      "reports": 32,
+      "hazards": 125,
+      "surveys": 20,
+      "responses": 20,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "tara-air": {
+      "caps": 40,
+      "can_cap": 20,
+      "reports": 33,
+      "hazards": 115,
+      "surveys": 19,
+      "responses": 19,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    },
+    "yeti-airlines": {
+      "caps": 59,
+      "can_cap": 28,
+      "reports": 37,
+      "hazards": 151,
+      "surveys": 24,
+      "responses": 24,
+      "verification": 0,
+      "flight_diversions": 0,
+      "notifications": 0
+    }
+  },
+  "total_deleted_reported": 3063,
+  "purge_seconds": 171.23,
+  "regulator_update": {
+    "before": [
+      "air-dynasty",
+      "buddha-air",
+      "demo-fixed-wing",
+      "demo-rotary-wing",
+      "fishtail-air",
+      "himalaya-ground-services",
+      "ktm-mro",
+      "pokhara-aerodrome",
+      "simrik-air",
+      "sita-air",
+      "summit-air",
+      "tara-air",
+      "yeti-airlines"
+    ],
+    "after": [
+      "fishtail-air",
+      "vnkt-airport"
+    ]
+  },
+  "postverify": {
+    "residual_legacy": {},
+    "minimal_after": {
+      "fishtail-air": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1,
+        "metadata": 2
+      },
+      "vnkt-airport": {
+        "reports": 1,
+        "hazards": 1,
+        "can_cap": 1,
+        "metadata": 1
+      }
+    },
+    "regulator_operator_tenant_ids": [
+      "fishtail-air",
+      "vnkt-airport"
+    ]
+  },
+  "success": false
+}

@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-08-24T13:35:15.287937+00:00",
+  "project_id": "aerosafety-sms-prod",
+  "database_id": "sms-db-beta",
+  "execution_mode": "dry-run",
+  "dry_run": true,
+  "counts_before": {
+    "fishtail-air": {
+      "reports": 31,
+      "hazards": 110,
+      "can_cap": 18,
+      "can_cap/caps": 32,
+      "flight_diversions": 0,
+      "surveys": 16,
+      "responses": 16,
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0,
+      "metadata (protected, not purged)": 2
+    },
+    "vnkt-airport": {
+      "reports": 0,
+      "hazards": 0,
+      "can_cap": 0,
+      "flight_diversions": 0,
+      "surveys": 0,
+      "responses": 0,
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0,
+      "metadata (protected, not purged)": 0
+    }
+  },
+  "purge_summary": {
+    "fishtail-air": {
+      "reports": "dry-run would delete 31",
+      "hazards": "dry-run would delete 110",
+      "can_cap": "dry-run would delete 18",
+      "can_cap/caps": "dry-run would delete 32 caps",
+      "flight_diversions": 0,
+      "surveys": "dry-run would delete 16",
+      "responses": "dry-run would delete 16",
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0
+    },
+    "vnkt-airport": {
+      "reports": 0,
+      "hazards": 0,
+      "can_cap": 0,
+      "flight_diversions": 0,
+      "surveys": 0,
+      "responses": 0,
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0
+    }
+  },
+  "seed_summary": {
+    "fishtail-air": {
+      "hazards": 0,
+      "flight_diversions": 0,
+      "can_cap": 0
+    },
+    "vnkt-airport": {
+      "hazards": 0,
+      "flight_diversions": 0,
+      "can_cap": 0
+    }
+  },
+  "counts_after": {
+    "fishtail-air": {
+      "reports": 31,
+      "hazards": 110,
+      "can_cap": 18,
+      "can_cap/caps": 32,
+      "flight_diversions": 0,
+      "surveys": 16,
+      "responses": 16,
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0,
+      "metadata (protected, not purged)": 2
+    },
+    "vnkt-airport": {
+      "reports": 0,
+      "hazards": 0,
+      "can_cap": 0,
+      "flight_diversions": 0,
+      "surveys": 0,
+      "responses": 0,
+      "verification": 0,
+      "audit_logs": 0,
+      "notifications": 0,
+      "metadata (protected, not purged)": 0
+    }
+  },
+  "auth_check": {
+    "beta_project": "aerosafety-sms-prod",
+    "beta_database": "sms-db-beta",
+    "prod_database": "sms-db",
+    "prod_project_guess": "aerosafety-sms-prod",
+    "shared_project": true,
+    "auth_scoped_to_database": false,
+    "auth_is_project_wide": true,
+    "auth_blocked": true,
+    "action": "BLOCKED - Auth provisioning stopped. Firestore purge/seed may proceed if its own checks pass."
+  },
+  "hard_fail_test": "Script hard-fails for any --database-id != sms-db-beta"
+}

@@ -1,3 +1,12 @@
+<!--
+ARCHIVED.
+Original path: DISCOVERY_REPORT.md
+Archived: 2026-10-07
+Category: historical
+Reason: Architectural discovery snapshot (2026-09-16).
+Authority: none. This file is a historical record only.
+-->
+
 # AviaSAFE Platform — Architectural Discovery Report
 
 Discovered from shipped code, committed migrations, git history and on-disk layout.
